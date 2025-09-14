@@ -437,33 +437,6 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     }
   };
 
-  const itemVariants: Variants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { 
-      y: 0, 
-      opacity: 1,
-      transition: { 
-        type: "spring", 
-        stiffness: 300,
-        damping: 24
-      }
-    }
-  };
-
-  const pulseVariants: Variants = {
-    initial: { opacity: 0.5, scale: 0.98 },
-    animate: {
-      opacity: 1,
-      scale: 1,
-      transition: {
-        duration: 2,
-        repeat: Infinity,
-        repeatType: "reverse" as "reverse",
-        ease: "easeInOut"
-      }
-    }
-  };
-
   const loaderVariants: Variants = {
     animate: {
       rotate: 360,
@@ -531,49 +504,6 @@ export const ChartPage: React.FC<ChartPageProps> = ({
       </div>
     );
   };
-  
-  // Render placeholder when no token is selected
-  const renderPlaceholder = () => (
-    <motion.div 
-      key="placeholder"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      exit={{ opacity: 0 }}
-      className="w-full h-full flex flex-col items-center justify-center p-8"
-    >
-      <motion.div
-        variants={pulseVariants}
-        initial="initial"
-        animate="animate" 
-        className="rounded-full bg-gradient-to-br from-app-secondary to-app-primary p-4 mb-6"
-      >
-        <Search className="h-10 w-10 text-app-muted opacity-50" />
-      </motion.div>
-      
-      <motion.h3 
-        variants={itemVariants}
-        className="text-lg font-medium text-app-muted mb-2"
-      >
-        Set token address
-      </motion.h3>
-      
-      <motion.p 
-        variants={itemVariants}
-        className="text-app-secondary-60 text-sm max-w-md text-center"
-      >
-        Enter a valid token address in the search bar above to view the token frame
-      </motion.p>
-      
-      <motion.div
-        variants={itemVariants}
-        className="mt-6 flex items-center gap-2 px-4 py-3 rounded-lg bg-primary-10 border border-app-primary-20"
-      >
-        <AlertCircle size={16} className="color-primary-light" />
-        <span className="text-app-tertiary text-sm">No token selected</span>
-      </motion.div>
-    </motion.div>
-  );
 
   return (
     <motion.div 

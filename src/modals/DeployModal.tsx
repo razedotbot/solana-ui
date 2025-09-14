@@ -28,7 +28,7 @@ export const DeployModal: React.FC<DeployModalProps> = ({
   handleRefresh,
   solBalances,
 }) => {
-  const [selectedDeployType, setSelectedDeployType] = useState<'pump' | 'bonk' | 'cook' | 'moon' | 'boop' | 'bags' | null>(null);
+  const [selectedDeployType, setSelectedDeployType] = useState<'pump' | 'bonk' | 'cook' | 'moon' | 'boop' | 'bags' | 'fury' | null>(null);
   const [sharedFeesEnabled, setSharedFeesEnabled] = useState(false);
 
   const { showToast } = useToast();

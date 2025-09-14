@@ -331,6 +331,9 @@ const WalletManager: React.FC = () => {
     quickBuyMaxAmount: number;
     useQuickBuyRange: boolean;
     quickSellPercentage: number;
+    quickSellMinPercentage: number;
+    quickSellMaxPercentage: number;
+    useQuickSellRange: boolean;
     iframeData: {
     tradingStats: any;
     solPrice: number | null;
@@ -399,6 +402,9 @@ const WalletManager: React.FC = () => {
     | { type: 'SET_QUICK_BUY_MAX_AMOUNT'; payload: number }
     | { type: 'SET_USE_QUICK_BUY_RANGE'; payload: boolean }
     | { type: 'SET_QUICK_SELL_PERCENTAGE'; payload: number }
+    | { type: 'SET_QUICK_SELL_MIN_PERCENTAGE'; payload: number }
+    | { type: 'SET_QUICK_SELL_MAX_PERCENTAGE'; payload: number }
+    | { type: 'SET_USE_QUICK_SELL_RANGE'; payload: boolean }
     | { type: 'SET_IFRAME_DATA'; payload: { tradingStats: any; solPrice: number | null; currentWallets: any[]; recentTrades: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; }[]; tokenPrice: { tokenPrice: number; tokenMint: string; timestamp: number; tradeType: 'buy' | 'sell'; volume: number; } | null; marketCap: number | null; } | null }
     | { type: 'SET_NON_WHITELISTED_TRADES'; payload: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; tokenMint: string; marketCap: number; }[] }
     | { type: 'TOGGLE_LEFT_COLUMN'; payload?: undefined };
@@ -460,6 +466,9 @@ const WalletManager: React.FC = () => {
     quickBuyMaxAmount: 0.05,
     useQuickBuyRange: false,
     quickSellPercentage: 100,
+    quickSellMinPercentage: 25,
+    quickSellMaxPercentage: 100,
+    useQuickSellRange: false,
     iframeData: null,
     nonWhitelistedTrades: []
   };
@@ -579,6 +588,12 @@ const WalletManager: React.FC = () => {
         return { ...state, useQuickBuyRange: action.payload };
       case 'SET_QUICK_SELL_PERCENTAGE':
         return { ...state, quickSellPercentage: action.payload };
+      case 'SET_QUICK_SELL_MIN_PERCENTAGE':
+        return { ...state, quickSellMinPercentage: action.payload };
+      case 'SET_QUICK_SELL_MAX_PERCENTAGE':
+        return { ...state, quickSellMaxPercentage: action.payload };
+      case 'SET_USE_QUICK_SELL_RANGE':
+        return { ...state, useQuickSellRange: action.payload };
       case 'SET_IFRAME_DATA':
         return { ...state, iframeData: action.payload };
       case 'SET_NON_WHITELISTED_TRADES':
@@ -642,6 +657,9 @@ const WalletManager: React.FC = () => {
     setQuickBuyMaxAmount: (amount: number) => dispatch({ type: 'SET_QUICK_BUY_MAX_AMOUNT', payload: amount }),
     setUseQuickBuyRange: (useRange: boolean) => dispatch({ type: 'SET_USE_QUICK_BUY_RANGE', payload: useRange }),
     setQuickSellPercentage: (percentage: number) => dispatch({ type: 'SET_QUICK_SELL_PERCENTAGE', payload: percentage }),
+    setQuickSellMinPercentage: (percentage: number) => dispatch({ type: 'SET_QUICK_SELL_MIN_PERCENTAGE', payload: percentage }),
+    setQuickSellMaxPercentage: (percentage: number) => dispatch({ type: 'SET_QUICK_SELL_MAX_PERCENTAGE', payload: percentage }),
+    setUseQuickSellRange: (useRange: boolean) => dispatch({ type: 'SET_USE_QUICK_SELL_RANGE', payload: useRange }),
     setIframeData: (data: { tradingStats: any; solPrice: number | null; currentWallets: any[]; recentTrades: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; }[]; tokenPrice: { tokenPrice: number; tokenMint: string; timestamp: number; tradeType: 'buy' | 'sell'; volume: number; } | null; marketCap: number | null; } | null) => dispatch({ type: 'SET_IFRAME_DATA', payload: data }),
     setNonWhitelistedTrades: (trades: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; tokenMint: string; marketCap: number; }[]) => dispatch({ type: 'SET_NON_WHITELISTED_TRADES', payload: trades }),
     toggleLeftColumn: () => dispatch({ type: 'TOGGLE_LEFT_COLUMN' })
@@ -710,6 +728,7 @@ const WalletManager: React.FC = () => {
     { value: 'auto', label: '⭐ Auto', icon: '⭐' },
     { value: 'pumpfun', label: 'PumpFun' },
     { value: 'moonshot', label: 'Moonshot' },
+    { value: 'fury', label: 'Fury' },
     { value: 'pumpswap', label: 'PumpSwap' },
     { value: 'raydium', label: 'Raydium' },
     { value: 'launchpad', label: 'Launchpad' },
@@ -835,6 +854,15 @@ const WalletManager: React.FC = () => {
         if (savedQuickBuyPreferences.quickSellPercentage !== undefined) {
           memoizedCallbacks.setQuickSellPercentage(savedQuickBuyPreferences.quickSellPercentage);
         }
+        if (savedQuickBuyPreferences.quickSellMinPercentage !== undefined) {
+          memoizedCallbacks.setQuickSellMinPercentage(savedQuickBuyPreferences.quickSellMinPercentage);
+        }
+        if (savedQuickBuyPreferences.quickSellMaxPercentage !== undefined) {
+          memoizedCallbacks.setQuickSellMaxPercentage(savedQuickBuyPreferences.quickSellMaxPercentage);
+        }
+        if (savedQuickBuyPreferences.useQuickSellRange !== undefined) {
+          memoizedCallbacks.setUseQuickSellRange(savedQuickBuyPreferences.useQuickSellRange);
+        }
       }
     };
 
@@ -870,10 +898,13 @@ const WalletManager: React.FC = () => {
       quickBuyMinAmount: state.quickBuyMinAmount,
       quickBuyMaxAmount: state.quickBuyMaxAmount,
       quickSellPercentage: state.quickSellPercentage,
-      useQuickBuyRange: state.useQuickBuyRange
+      useQuickBuyRange: state.useQuickBuyRange,
+      quickSellMinPercentage: state.quickSellMinPercentage,
+      quickSellMaxPercentage: state.quickSellMaxPercentage,
+      useQuickSellRange: state.useQuickSellRange
     };
     saveQuickBuyPreferencesToCookies(preferences);
-  }, [state.quickBuyEnabled, state.quickBuyAmount, state.quickBuyMinAmount, state.quickBuyMaxAmount, state.quickSellPercentage, state.useQuickBuyRange]);
+  }, [state.quickBuyEnabled, state.quickBuyAmount, state.quickBuyMinAmount, state.quickBuyMaxAmount, state.quickSellPercentage, state.useQuickBuyRange, state.quickSellMinPercentage, state.quickSellMaxPercentage, state.useQuickSellRange]);
 
   // Update connection when RPC endpoint changes
   useEffect(() => {
@@ -1195,6 +1226,12 @@ const WalletManager: React.FC = () => {
                   setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
                   quickSellPercentage={state.quickSellPercentage}
                   setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
+                  quickSellMinPercentage={state.quickSellMinPercentage}
+                  setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
+                  quickSellMaxPercentage={state.quickSellMaxPercentage}
+                  setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
+                  useQuickSellRange={state.useQuickSellRange}
+                  setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
                 />
               )}
             </div>
@@ -1272,6 +1309,12 @@ const WalletManager: React.FC = () => {
                   setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
                   quickSellPercentage={state.quickSellPercentage}
                   setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
+                  quickSellMinPercentage={state.quickSellMinPercentage}
+                  setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
+                  quickSellMaxPercentage={state.quickSellMaxPercentage}
+                  setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
+                  useQuickSellRange={state.useQuickSellRange}
+                  setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
                 />
               ) : (
                 <div className="p-4 text-center text-app-secondary">

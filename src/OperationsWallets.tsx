@@ -42,6 +42,12 @@ interface WalletOperationsButtonsProps {
   setUseQuickBuyRange?: (useRange: boolean) => void;
   quickSellPercentage?: number;
   setQuickSellPercentage?: (percentage: number) => void;
+  quickSellMinPercentage?: number;
+  setQuickSellMinPercentage?: (percentage: number) => void;
+  quickSellMaxPercentage?: number;
+  setQuickSellMaxPercentage?: (percentage: number) => void;
+  useQuickSellRange?: boolean;
+  setUseQuickSellRange?: (useRange: boolean) => void;
 }
 
 type OperationTab = 'distribute' | 'consolidate' | 'transfer' | 'deposit' | 'mixer' | 'fund';
@@ -71,7 +77,13 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
   useQuickBuyRange = false,
   setUseQuickBuyRange,
   quickSellPercentage = 100,
-  setQuickSellPercentage
+  setQuickSellPercentage,
+  quickSellMinPercentage = 25,
+  setQuickSellMinPercentage,
+  quickSellMaxPercentage = 100,
+  setQuickSellMaxPercentage,
+  useQuickSellRange = false,
+  setUseQuickSellRange
 }) => {
   // State for active modal
   const [activeModal, setActiveModal] = useState<OperationTab | null>(null);
@@ -90,6 +102,9 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
   const [tempQuickBuyMaxAmount, setTempQuickBuyMaxAmount] = useState(quickBuyMaxAmount);
   const [tempUseQuickBuyRange, setTempUseQuickBuyRange] = useState(useQuickBuyRange);
   const [tempQuickSellPercentage, setTempQuickSellPercentage] = useState(quickSellPercentage);
+  const [tempQuickSellMinPercentage, setTempQuickSellMinPercentage] = useState(quickSellMinPercentage);
+  const [tempQuickSellMaxPercentage, setTempQuickSellMaxPercentage] = useState(quickSellMaxPercentage);
+  const [tempUseQuickSellRange, setTempUseQuickSellRange] = useState(useQuickSellRange);
   
   // Function to toggle drawer
   const toggleDrawer = () => {
@@ -138,6 +153,9 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
     setTempQuickBuyMaxAmount(quickBuyMaxAmount);
     setTempUseQuickBuyRange(useQuickBuyRange);
     setTempQuickSellPercentage(quickSellPercentage);
+    setTempQuickSellMinPercentage(quickSellMinPercentage);
+    setTempQuickSellMaxPercentage(quickSellMaxPercentage);
+    setTempUseQuickSellRange(useQuickSellRange);
     setIsQuickBuySettingsOpen(true);
     setIsDrawerOpen(false);
   };
@@ -161,6 +179,15 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
     }
     if (setQuickSellPercentage && tempQuickSellPercentage >= 1 && tempQuickSellPercentage <= 100) {
       setQuickSellPercentage(tempQuickSellPercentage);
+    }
+    if (setQuickSellMinPercentage && tempQuickSellMinPercentage >= 1 && tempQuickSellMinPercentage <= 100) {
+      setQuickSellMinPercentage(tempQuickSellMinPercentage);
+    }
+    if (setQuickSellMaxPercentage && tempQuickSellMaxPercentage >= 1 && tempQuickSellMaxPercentage <= 100) {
+      setQuickSellMaxPercentage(tempQuickSellMaxPercentage);
+    }
+    if (setUseQuickSellRange !== undefined) {
+      setUseQuickSellRange(tempUseQuickSellRange);
     }
     setIsQuickBuySettingsOpen(false);
   };
@@ -386,267 +413,395 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
+            onClick={() => setIsQuickBuySettingsOpen(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-app-primary border border-app-primary-30 rounded-lg p-4 sm:p-6 
-                         w-full max-w-sm sm:max-w-md lg:max-w-lg max-h-[90vh] overflow-y-auto"
+              className="bg-app-primary border border-app-primary-30 rounded-xl p-6 
+                         w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-start mb-4 sm:mb-6">
-                <h2 className="text-base sm:text-lg font-mono color-primary tracking-wider pr-4">
-                  Quick Buy Settings
-                </h2>
-                <button
-                  onClick={() => setIsQuickBuySettingsOpen(false)}
-                  className="color-primary hover-color-primary-light transition-colors flex-shrink-0 p-1"
-                >
-                  <X size={18} className="sm:w-5 sm:h-5" />
-                </button>
-              </div>
               
-              <div className="space-y-4 sm:space-y-5">
-                <div>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-mono color-primary block mb-1">
-                        Quick Buy Feature
-                      </span>
-                      <p className="text-xs text-app-secondary-80 break-words">
-                        Show quick buy buttons in wallet rows
-                      </p>
-                    </div>
+              <div className="space-y-6">                
+                {/* Buy Amount Configuration */}
+                <motion.div 
+                  className={`transition-all duration-300 ${tempQuickBuyEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}
+                  animate={{ opacity: tempQuickBuyEnabled ? 1 : 0.4 }}
+                >
+                  <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                    <h3 className="font-mono color-primary font-medium mb-4 flex items-center gap-2">
+                      <DollarSign size={16} />
+                      Buy Amount Configuration
+                    </h3>
                     
-                    {/* Custom Toggle Switch */}
-                    <button
-                      onClick={() => setTempQuickBuyEnabled(!tempQuickBuyEnabled)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 ring-app-primary-color focus:ring-offset-2 ring-offset-app-primary flex-shrink-0 ${
-                        tempQuickBuyEnabled 
-                          ? 'bg-gradient-to-r from-app-primary-color to-app-primary-light' 
-                          : 'bg-app-secondary border border-app-primary-30'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full transition-transform duration-200 ${
-                          tempQuickBuyEnabled 
-                            ? 'translate-x-6 bg-app-quaternary shadow-lg' 
-                            : 'translate-x-1 bg-primary-60'
-                        }`}
-                      />
-                      {/* Glow effect when enabled */}
-                      {tempQuickBuyEnabled && (
-                        <div className="absolute inset-0 rounded-full bg-app-primary-color opacity-20 blur-sm" />
-                      )}
-                    </button>
+                    {/* Amount Type Toggle */}
+                    <div className="flex items-center gap-3 mb-4 p-3 bg-app-primary border border-app-primary-30 rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-mono color-primary text-sm mb-1">Amount Type</div>
+                        <p className="text-xs text-app-secondary-80">
+                          {tempUseQuickBuyRange ? 'Random amounts for natural variation' : 'Fixed amount for consistency'}
+                        </p>
+                      </div>
+                      
+                      <div className="flex bg-app-secondary rounded-lg p-1 border border-app-primary-30">
+                        <button
+                          onClick={() => setTempUseQuickBuyRange(false)}
+                          disabled={!tempQuickBuyEnabled}
+                          className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
+                            !tempUseQuickBuyRange && tempQuickBuyEnabled
+                              ? 'bg-app-primary-color text-app-quaternary shadow-md'
+                              : 'color-primary hover-color-primary-light'
+                          }`}
+                        >
+                          Fixed
+                        </button>
+                        <button
+                          onClick={() => setTempUseQuickBuyRange(true)}
+                          disabled={!tempQuickBuyEnabled}
+                          className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
+                            tempUseQuickBuyRange && tempQuickBuyEnabled
+                              ? 'bg-app-primary-color text-app-quaternary shadow-md'
+                              : 'color-primary hover-color-primary-light'
+                          }`}
+                        >
+                          Range
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Amount Inputs */}
+                    {tempUseQuickBuyRange ? (
+                      <div className="space-y-4">
+                        {/* Preset buttons */}
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { min: 0.1, max: 0.5, label: 'Conservative' },
+                            { min: 0.7, max: 1.5, label: 'Moderate' },
+                            { min: 2, max: 4, label: 'Aggressive' }
+                          ].map((preset, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                setTempQuickBuyMinAmount(preset.min);
+                                setTempQuickBuyMaxAmount(preset.max);
+                              }}
+                              disabled={!tempQuickBuyEnabled}
+                              className="py-2 px-3 text-xs font-mono bg-app-primary border border-app-primary-30 
+                                       hover-border-primary-60 rounded-md color-primary hover-color-primary-light 
+                                       transition-colors duration-200 disabled:opacity-50"
+                            >
+                              <div className="font-medium">{preset.label}</div>
+                              <div className="text-app-secondary-80">{preset.min}-{preset.max}</div>
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-mono color-primary mb-2 flex items-center gap-1">
+                              <span>Min Amount</span>
+                              <span className="text-app-secondary-80 text-xs">(SOL)</span>
+                            </label>
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0.001"
+                              max="10"
+                              value={tempQuickBuyMinAmount}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value);
+                                if (!isNaN(value) && value >= 0.001 && value <= 10) {
+                                  setTempQuickBuyMinAmount(value);
+                                  if (value >= tempQuickBuyMaxAmount) {
+                                    setTempQuickBuyMaxAmount(Math.min(value + 0.01, 10));
+                                  }
+                                }
+                              }}
+                              disabled={!tempQuickBuyEnabled}
+                              className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
+                                       text-app-primary font-mono text-sm focus-border-primary focus:outline-none
+                                       transition-colors duration-200 disabled:opacity-50"
+                              placeholder="0.01"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-mono color-primary mb-2 flex items-center gap-1">
+                              <span>Max Amount</span>
+                              <span className="text-app-secondary-80 text-xs">(SOL)</span>
+                            </label>
+                            <input
+                              type="number"
+                              step="0.001"
+                              min={tempQuickBuyMinAmount + 0.001}
+                              max="10"
+                              value={tempQuickBuyMaxAmount}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value);
+                                if (!isNaN(value) && value > tempQuickBuyMinAmount && value <= 10) {
+                                  setTempQuickBuyMaxAmount(value);
+                                }
+                              }}
+                              disabled={!tempQuickBuyEnabled}
+                              className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
+                                       text-app-primary font-mono text-sm focus-border-primary focus:outline-none
+                                       transition-colors duration-200 disabled:opacity-50"
+                              placeholder="0.05"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="bg-app-primary border border-app-primary-20 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 bg-app-primary-color rounded-full animate-pulse"></div>
+                            <span className="text-xs font-mono color-primary">Preview</span>
+                          </div>
+                          <p className="text-xs text-app-secondary-80">
+                            Each quick buy will randomly spend between <span className="color-primary font-mono">{tempQuickBuyMinAmount.toFixed(3)}</span> and <span className="color-primary font-mono">{tempQuickBuyMaxAmount.toFixed(3)}</span> SOL
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Preset buttons for fixed amounts */}
+                        <div className="grid grid-cols-4 gap-2">
+                          {[0.01, 0.05, 0.1, 0.25].map((amount) => (
+                            <button
+                              key={amount}
+                              onClick={() => setTempQuickBuyAmount(amount)}
+                              disabled={!tempQuickBuyEnabled}
+                              className={`py-2 px-2 text-xs font-mono rounded-md transition-colors duration-200 
+                                       border disabled:opacity-50 ${
+                                tempQuickBuyAmount === amount
+                                  ? 'bg-app-primary-color text-app-quaternary border-app-primary-color'
+                                  : 'bg-app-primary border-app-primary-30 hover-border-primary-60 color-primary hover-color-primary-light'
+                              }`}
+                            >
+                              {amount} SOL
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-mono color-primary mb-2 flex items-center gap-1">
+                            <span>Custom Amount</span>
+                            <span className="text-app-secondary-80 text-xs">(SOL)</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0.001"
+                            max="10"
+                            value={tempQuickBuyAmount}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value);
+                              if (!isNaN(value) && value >= 0.001 && value <= 10) {
+                                setTempQuickBuyAmount(value);
+                              }
+                            }}
+                            disabled={!tempQuickBuyEnabled}
+                            className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
+                                     text-app-primary font-mono text-sm focus-border-primary focus:outline-none
+                                     transition-colors duration-200 disabled:opacity-50"
+                            placeholder="0.01"
+                          />
+                          <p className="text-xs text-app-secondary-80 mt-2">
+                            Fixed amount of SOL to spend on each quick buy
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </motion.div>
+
+                {/* Quick Sell Configuration */}
+                <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                  <h3 className="font-mono color-primary font-medium mb-4 flex items-center gap-2">
+                    <Share size={16} />
+                    Quick Sell Configuration
+                  </h3>
                   
-                </div>
-                
-                <div className={tempQuickBuyEnabled ? '' : 'opacity-50'}>
-                  {/* Range Toggle */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-mono color-primary block mb-1">
-                        Random Amount Range
-                      </span>
-                      <p className="text-xs text-app-secondary-80 break-words">
-                        Use random amounts between min and max
+                  {/* Percentage Type Toggle */}
+                  <div className="flex items-center gap-3 mb-4 p-3 bg-app-primary border border-app-primary-30 rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-mono color-primary text-sm mb-1">Percentage Type</div>
+                      <p className="text-xs text-app-secondary-80">
+                        {tempUseQuickSellRange ? 'Random percentages for natural variation' : 'Fixed percentage for consistency'}
                       </p>
                     </div>
                     
-                    <button
-                      onClick={() => setTempUseQuickBuyRange(!tempUseQuickBuyRange)}
-                      disabled={!tempQuickBuyEnabled}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 ring-app-primary-color focus:ring-offset-2 ring-offset-app-primary disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 ${
-                        tempUseQuickBuyRange && tempQuickBuyEnabled
-                          ? 'bg-gradient-to-r from-app-primary-color to-app-primary-light' 
-                          : 'bg-app-secondary border border-app-primary-30'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full transition-transform duration-200 ${
-                          tempUseQuickBuyRange && tempQuickBuyEnabled
-                            ? 'translate-x-5 bg-app-quaternary shadow-lg' 
-                            : 'translate-x-1 bg-primary-60'
+                    <div className="flex bg-app-secondary rounded-lg p-1 border border-app-primary-30">
+                      <button
+                        onClick={() => setTempUseQuickSellRange(false)}
+                        className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
+                          !tempUseQuickSellRange
+                            ? 'bg-app-primary-color text-app-quaternary shadow-md'
+                            : 'color-primary hover-color-primary-light'
                         }`}
-                      />
-                    </button>
+                      >
+                        Fixed
+                      </button>
+                      <button
+                        onClick={() => setTempUseQuickSellRange(true)}
+                        className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
+                          tempUseQuickSellRange
+                            ? 'bg-app-primary-color text-app-quaternary shadow-md'
+                            : 'color-primary hover-color-primary-light'
+                        }`}
+                      >
+                        Range
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Amount Inputs */}
-                  {tempUseQuickBuyRange ? (
-                    <div className="space-y-3 sm:space-y-4">
-                      <div>
-                        <label className="block text-sm font-mono color-primary mb-2">
-                          Minimum SOL Amount
-                        </label>
-                        <input
-                          type="number"
-                          step="0.001"
-                          min="0.001"
-                          max="10"
-                          value={tempQuickBuyMinAmount}
-                          onChange={(e) => {
-                            const inputValue = e.target.value;
-                            if (inputValue === '') {
-                              setTempQuickBuyMinAmount(0.001);
-                              return;
-                            }
-                            const value = parseFloat(inputValue);
-                            if (!isNaN(value) && value >= 0.001 && value <= 10) {
-                              setTempQuickBuyMinAmount(value);
-                              if (value >= tempQuickBuyMaxAmount) {
-                                setTempQuickBuyMaxAmount(Math.min(value + 0.01, 10));
+                  {/* Percentage Inputs */}
+                  {tempUseQuickSellRange ? (
+                    <div className="space-y-4">
+                      {/* Preset buttons */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { min: 25, max: 50, label: 'Conservative' },
+                          { min: 50, max: 75, label: 'Moderate' },
+                          { min: 75, max: 100, label: 'Aggressive' }
+                        ].map((preset, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              setTempQuickSellMinPercentage(preset.min);
+                              setTempQuickSellMaxPercentage(preset.max);
+                            }}
+                            className="py-2 px-3 text-xs font-mono bg-app-primary border border-app-primary-30 
+                                     hover-border-primary-60 rounded-md color-primary hover-color-primary-light 
+                                     transition-colors duration-200"
+                          >
+                            <div className="font-medium">{preset.label}</div>
+                            <div className="text-app-secondary-80">{preset.min}-{preset.max}%</div>
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-mono color-primary mb-2 flex items-center gap-1">
+                            <span>Min Percentage</span>
+                            <span className="text-app-secondary-80 text-xs">(%)</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="5"
+                            min="1"
+                            max="100"
+                            value={tempQuickSellMinPercentage}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              if (!isNaN(value) && value >= 1 && value <= 100) {
+                                setTempQuickSellMinPercentage(value);
+                                if (value >= tempQuickSellMaxPercentage) {
+                                  setTempQuickSellMaxPercentage(Math.min(value + 5, 100));
+                                }
                               }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const value = parseFloat(e.target.value);
-                            if (isNaN(value) || value < 0.001) {
-                              setTempQuickBuyMinAmount(0.001);
-                            }
-                          }}
-                          disabled={!tempQuickBuyEnabled}
-                          className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded-md
-                                   text-app-primary font-mono text-sm focus-border-primary focus:outline-none
-                                   transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          placeholder="0.01"
-                        />
+                            }}
+                            className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
+                                     text-app-primary font-mono text-sm focus-border-primary focus:outline-none
+                                     transition-colors duration-200"
+                            placeholder="25"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-mono color-primary mb-2 flex items-center gap-1">
+                            <span>Max Percentage</span>
+                            <span className="text-app-secondary-80 text-xs">(%)</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="5"
+                            min={tempQuickSellMinPercentage + 5}
+                            max="100"
+                            value={tempQuickSellMaxPercentage}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              if (!isNaN(value) && value > tempQuickSellMinPercentage && value <= 100) {
+                                setTempQuickSellMaxPercentage(value);
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
+                                     text-app-primary font-mono text-sm focus-border-primary focus:outline-none
+                                     transition-colors duration-200"
+                            placeholder="100"
+                          />
+                        </div>
                       </div>
                       
-                      <div>
-                        <label className="block text-sm font-mono color-primary mb-2">
-                          Maximum SOL Amount
-                        </label>
-                        <input
-                          type="number"
-                          step="0.001"
-                          min={tempQuickBuyMinAmount + 0.001}
-                          max="10"
-                          value={tempQuickBuyMaxAmount}
-                          onChange={(e) => {
-                            const inputValue = e.target.value;
-                            if (inputValue === '') {
-                              setTempQuickBuyMaxAmount(Math.max(tempQuickBuyMinAmount + 0.001, 0.05));
-                              return;
-                            }
-                            const value = parseFloat(inputValue);
-                            if (!isNaN(value) && value > tempQuickBuyMinAmount && value <= 10) {
-                              setTempQuickBuyMaxAmount(value);
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const value = parseFloat(e.target.value);
-                            if (isNaN(value) || value <= tempQuickBuyMinAmount) {
-                              setTempQuickBuyMaxAmount(Math.max(tempQuickBuyMinAmount + 0.001, 0.05));
-                            }
-                          }}
-                          disabled={!tempQuickBuyEnabled}
-                          className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded-md
-                                   text-app-primary font-mono text-sm focus-border-primary focus:outline-none
-                                   transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          placeholder="0.05"
-                        />
-                      </div>
-                      
-                      <div className="bg-primary-10 border border-app-primary-20 rounded-md p-3">
-                        <p className="text-xs text-app-secondary-80 break-words">
-                          Each quick buy will use a random amount between {tempQuickBuyMinAmount.toFixed(3)} and {tempQuickBuyMaxAmount.toFixed(3)} SOL
+                      <div className="bg-app-primary border border-app-primary-30 rounded-lg p-3">
+                        <p className="text-xs text-app-secondary-80">
+                          Each quick sell will randomly sell between <span className="color-primary font-mono">{tempQuickSellMinPercentage}%</span> and <span className="color-primary font-mono">{tempQuickSellMaxPercentage}%</span> of token balance
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div>
-                      <label className="block text-sm font-mono color-primary mb-2">
-                        Fixed SOL Amount
-                      </label>
-                      <input
-                        type="number"
-                        step="0.001"
-                        min="0.001"
-                        max="10"
-                        value={tempQuickBuyAmount}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          if (inputValue === '') {
-                            setTempQuickBuyAmount(0.001);
-                            return;
-                          }
-                          const value = parseFloat(inputValue);
-                          if (!isNaN(value) && value >= 0.001 && value <= 10) {
-                            setTempQuickBuyAmount(value);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const value = parseFloat(e.target.value);
-                          if (isNaN(value) || value < 0.001) {
-                            setTempQuickBuyAmount(0.001);
-                          }
-                        }}
-                        disabled={!tempQuickBuyEnabled}
-                        className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded-md
-                                 text-app-primary font-mono text-sm focus-border-primary focus:outline-none
-                                 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        placeholder="0.01"
-                      />
-                      <p className="text-xs text-app-secondary-80 mt-1 break-words">
-                        Fixed amount of SOL to spend when clicking quick buy buttons
-                      </p>
+                    <div className="space-y-4">
+                      {/* Preset buttons for fixed percentages */}
+                      <div className="grid grid-cols-4 gap-2">
+                        {[25, 50, 75, 100].map((percentage) => (
+                          <button
+                            key={percentage}
+                            onClick={() => setTempQuickSellPercentage(percentage)}
+                            className={`py-2 px-2 text-xs font-mono rounded-md transition-colors duration-200 
+                                     border ${
+                              tempQuickSellPercentage === percentage
+                                ? 'bg-app-primary-color text-app-quaternary border-app-primary-color'
+                                : 'bg-app-primary border-app-primary-30 hover-border-primary-60 color-primary hover-color-primary-light'
+                            }`}
+                          >
+                            {percentage}%
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-mono color-primary mb-2 flex items-center gap-1">
+                          <span>Custom Percentage</span>
+                          <span className="text-app-secondary-80 text-xs">(1-100%)</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="5"
+                          min="1"
+                          max="100"
+                          value={tempQuickSellPercentage}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            if (!isNaN(value) && value >= 1 && value <= 100) {
+                              setTempQuickSellPercentage(value);
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
+                                   text-app-primary font-mono text-sm focus-border-primary focus:outline-none
+                                   transition-colors duration-200"
+                          placeholder="100"
+                        />
+                        <p className="text-xs text-app-secondary-80 mt-2">
+                          Fixed percentage of token balance to sell on each quick sell
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
-
-                {/* Quick Sell Percentage */}
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <label className="block text-sm font-mono color-primary mb-2">
-                      Quick Sell Percentage
-                    </label>
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      max="100"
-                      value={tempQuickSellPercentage}
-                      onChange={(e) => {
-                        const inputValue = e.target.value;
-                        if (inputValue === '') {
-                          setTempQuickSellPercentage(100);
-                          return;
-                        }
-                        const value = parseInt(inputValue);
-                        if (!isNaN(value) && value >= 1 && value <= 100) {
-                          setTempQuickSellPercentage(value);
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const value = parseInt(e.target.value);
-                        if (isNaN(value) || value < 1 || value > 100) {
-                          setTempQuickSellPercentage(100);
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded-md
-                               text-app-primary font-mono text-sm focus-border-primary focus:outline-none
-                               transition-colors duration-200"
-                      placeholder="100"
-                    />
-                    <p className="text-xs text-app-secondary-80 mt-1 break-words">
-                      Percentage of token balance to sell when clicking quick sell buttons (1-100%)
-                    </p>
-                  </div>
-                </div>
                 
-                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-app-primary-20">
                   <motion.button
                     variants={buttonVariants}
                     initial="rest"
                     whileHover="hover"
                     whileTap="tap"
                     onClick={() => setIsQuickBuySettingsOpen(false)}
-                    className="flex-1 py-2 px-4 rounded-md border border-app-primary-30
+                    className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30
                              color-primary hover-color-primary-light transition-colors duration-200
-                             text-sm font-mono"
+                             font-mono text-sm hover:bg-app-quaternary"
                   >
                     Cancel
                   </motion.button>
@@ -660,12 +815,17 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
                       tempUseQuickBuyRange 
                         ? (tempQuickBuyMinAmount <= 0 || tempQuickBuyMaxAmount <= 0 || tempQuickBuyMinAmount >= tempQuickBuyMaxAmount)
                         : tempQuickBuyAmount <= 0
+                    ) || (
+                      tempUseQuickSellRange
+                        ? (tempQuickSellMinPercentage <= 0 || tempQuickSellMaxPercentage <= 0 || tempQuickSellMinPercentage >= tempQuickSellMaxPercentage)
+                        : tempQuickSellPercentage <= 0
                     )}
-                    className="flex-1 py-2 px-4 rounded-md bg-app-primary-color text-app-quaternary
-                             hover:bg-app-primary-light disabled:opacity-50 disabled:cursor-not-allowed
-                             transition-colors duration-200 font-mono text-sm"
+                    className="flex-1 py-3 px-4 rounded-lg bg-gradient-to-r from-app-primary-color to-app-primary-light
+                             text-app-quaternary hover:from-app-primary-light hover:to-app-primary-color 
+                             disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 
+                             font-mono text-sm shadow-lg disabled:shadow-none"
                   >
-                    Save
+                    Save Settings
                   </motion.button>
                 </div>
               </div>

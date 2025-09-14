@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
    Download, 
    Settings2,
@@ -23,7 +23,6 @@ import { WalletType, loadConfigFromCookies } from "./Utils";
 import { useToast } from "./Notifications";
 import { countActiveWallets, getScriptName } from './utils/wallets';
 import TradingCard from './TradingForm';
-import AutomateFloatingCard from './AutomateFloatingCard';
 
 import { executeTrade } from './utils/trading';
 
@@ -369,7 +368,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   setAutomateCardDragging,
   iframeData
 }) => {
-  // State management (no changes)
+  // State management
   const [buyAmount, setBuyAmount] = useState('');
   const [sellAmount, setSellAmount] = useState('');
   const [selectedDex, setSelectedDex] = useState('auto'); // Default to auto
@@ -378,12 +377,17 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const [tokenPrice, setTokenPrice] = useState<string | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
   const { showToast } = useToast();
+  
+  // Auto-buy settings
+  const [autoBuyEnabled, setAutoBuyEnabled] = useState(false);
+  const [autoBuyAmount, setAutoBuyAmount] = useState('0.01'); // Default SOL amount for auto-buy
 
 
   const dexOptions = [
     { value: 'auto', label: '⭐ Auto', icon: '⭐' },
     { value: 'pumpfun', label: 'PumpFun' },
     { value: 'moonshot', label: 'Moonshot' },
+    { value: 'fury', label: 'Fury' },
     { value: 'pumpswap', label: 'PumpSwap' },
     { value: 'raydium', label: 'Raydium' },
     { value: 'launchpad', label: 'Launchpad' },
@@ -391,10 +395,13 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     { value: 'meteora', label: 'Meteora' },
   ];
   
-  const handleTradeSubmit = async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string) => {
+  const handleTradeSubmit = async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string, tokenAddressParam?: string) => {
     setIsLoading(true);
     
-    if (!tokenAddress) {
+    // Use tokenAddressParam if provided, otherwise use the component's tokenAddress
+    const tokenAddressToUse = tokenAddressParam || tokenAddress;
+    
+    if (!tokenAddressToUse) {
       showToast("Please select a token first", "error");
       setIsLoading(false);
       return;
@@ -406,14 +413,14 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       
       // Create trading config
        const config = {
-         tokenAddress: tokenAddress,
+         tokenAddress: tokenAddressToUse,
          ...(isBuyMode 
            ? { solAmount: parseFloat(buyAmount || '0') }
            : { sellPercent: parseFloat(sellAmount || '0') }
          )
        };
       
-      console.log(`Executing ${isBuyMode ? 'Buy' : 'Sell'} on ${dexToUse} for ${tokenAddress}`);
+      console.log(`Executing ${isBuyMode ? 'Buy' : 'Sell'} on ${dexToUse} for ${tokenAddressToUse}`);
       
       // Execute trade using centralized logic
       const result = await executeTrade(dexToUse, wallets, config, isBuyMode, solBalances);
@@ -430,6 +437,38 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       setIsLoading(false);
     }
   };
+
+  // Handle iframe messages for TOKEN_SELECTED
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Check if the message is a TOKEN_SELECTED message
+      if (event.data && event.data.type === 'TOKEN_SELECTED') {
+        console.log('Received TOKEN_SELECTED message:', event.data);
+        
+        // If auto-buy is enabled and no token is currently selected
+        if (autoBuyEnabled && !tokenAddress && event.data.tokenAddress) {
+          // Get active wallets
+          const activeWallets = wallets.filter(wallet => wallet.isActive);
+          
+          if (activeWallets.length > 0) {
+            // Execute buy with the specified amount and token address from the message
+            handleTradeSubmit(activeWallets, true, 'auto', autoBuyAmount, undefined, event.data.tokenAddress);
+            showToast(`Auto-buying ${autoBuyAmount} SOL of token ${event.data.tokenAddress.substring(0, 8)}...`, "success");
+          } else {
+            showToast("No active wallets for auto-buy", "error");
+          }
+        }
+      }
+    };
+
+    // Add event listener for messages
+    window.addEventListener('message', handleMessage);
+    
+    // Clean up event listener
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [autoBuyEnabled, tokenAddress, autoBuyAmount, wallets, handleTradeSubmit, showToast]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-app-primary p-4 md:p-6 relative">
@@ -471,29 +510,144 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       </div>
       
       <div className="max-w-4xl mx-auto space-y-8 relative z-10">
-        {/* Trading Card (unchanged) */}
-        <TradingCard
-          tokenAddress={tokenAddress}
-          wallets={wallets}
-          selectedDex={selectedDex}
-          setSelectedDex={setSelectedDex}
-          isDropdownOpen={isDropdownOpen}
-          setIsDropdownOpen={setIsDropdownOpen}
-          buyAmount={buyAmount}
-          setBuyAmount={setBuyAmount}
-          sellAmount={sellAmount}
-          setSellAmount={setSellAmount}
-          handleTradeSubmit={handleTradeSubmit}
-          isLoading={isLoading}
-          dexOptions={dexOptions}
-          getScriptName={getScriptName}
-          countActiveWallets={countActiveWallets}
-          currentMarketCap={currentMarketCap}
-          tokenBalances={tokenBalances}
-          onOpenFloating={onOpenFloating}
-          isFloatingCardOpen={isFloatingCardOpen}
-          solPrice={iframeData?.solPrice}
-        />
+        {/* Trading Card - only show when token is selected, otherwise show auto-buy settings */}
+        {tokenAddress ? (
+          <TradingCard
+            tokenAddress={tokenAddress}
+            wallets={wallets}
+            selectedDex={selectedDex}
+            setSelectedDex={setSelectedDex}
+            isDropdownOpen={isDropdownOpen}
+            setIsDropdownOpen={setIsDropdownOpen}
+            buyAmount={buyAmount}
+            setBuyAmount={setBuyAmount}
+            sellAmount={sellAmount}
+            setSellAmount={setSellAmount}
+            handleTradeSubmit={handleTradeSubmit}
+            isLoading={isLoading}
+            dexOptions={dexOptions}
+            getScriptName={getScriptName}
+            countActiveWallets={countActiveWallets}
+            currentMarketCap={currentMarketCap}
+            tokenBalances={tokenBalances}
+            onOpenFloating={onOpenFloating}
+            isFloatingCardOpen={isFloatingCardOpen}
+            solPrice={iframeData?.solPrice}
+          />
+        ) : (
+          <div className="relative overflow-hidden rounded-xl shadow-xl bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm p-6 border border-app-primary-20">
+            {/* Cyberpunk corner accents */}
+            <div className="absolute top-0 left-0 w-24 h-24 pointer-events-none">
+              <div className="absolute top-0 left-0 w-px h-8 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+              <div className="absolute top-0 left-0 w-8 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+            </div>
+            <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none">
+              <div className="absolute top-0 right-0 w-px h-8 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+              <div className="absolute top-0 right-0 w-8 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+            </div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 pointer-events-none">
+              <div className="absolute bottom-0 left-0 w-px h-8 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+              <div className="absolute bottom-0 left-0 w-8 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+            </div>
+            <div className="absolute bottom-0 right-0 w-24 h-24 pointer-events-none">
+              <div className="absolute bottom-0 right-0 w-px h-8 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+              <div className="absolute bottom-0 right-0 w-8 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+            </div>
+            <div className="space-y-6">
+              {/* Auto-buy toggle */}
+              <div className="flex items-center justify-between bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
+                {/* Cyberpunk corner accents - smaller version */}
+                <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
+                  <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+                  <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+                </div>
+                <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none opacity-60">
+                  <div className="absolute top-0 right-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+                  <div className="absolute top-0 right-0 w-4 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+                </div>
+                
+                <div>
+                  <div className="text-app-secondary font-mono text-xs tracking-wide flex items-center">
+                    <span className="mr-2 text-app-primary-color">⟁</span>
+                    <span>ENABLE AUTO-BUY</span>
+                  </div>
+                  <div className="text-xs text-app-secondary-60 mt-2 ml-5">Buy tokens on click</div>
+                </div>
+                <Switch 
+                  checked={autoBuyEnabled} 
+                  onCheckedChange={setAutoBuyEnabled}
+                />
+              </div>
+              
+              {/* SOL amount input */}
+              <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
+                {/* Cyberpunk corner accents - smaller version */}
+                <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
+                  <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+                  <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+                </div>
+                <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none opacity-60">
+                  <div className="absolute top-0 right-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+                  <div className="absolute top-0 right-0 w-4 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+                </div>
+                
+                <div className="text-app-secondary font-mono text-xs tracking-wide mb-3 flex items-center">
+                  <span className="mr-2 text-app-primary-color">⟁</span>
+                  <span>SOL AMOUNT</span>
+                </div>
+                
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={autoBuyAmount}
+                    onChange={(e) => setAutoBuyAmount(e.target.value)}
+                    min="0.001"
+                    step="0.001"
+                    className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg 
+                           text-app-primary placeholder-app-secondary-60 font-mono text-sm 
+                           focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40 
+                           transition-all duration-300 shadow-inner-black-80
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                    placeholder="Enter SOL amount"
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-primary-color text-xs font-mono font-bold">
+                    SOL
+                  </div>
+                </div>
+              </div>
+              
+              {/* Active wallets info */}
+              <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
+                {/* Cyberpunk corner accents - smaller version */}
+                <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
+                  <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+                  <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+                </div>
+                <div className="absolute bottom-0 right-0 w-16 h-16 pointer-events-none opacity-60">
+                  <div className="absolute bottom-0 right-0 w-px h-4 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+                  <div className="absolute bottom-0 right-0 w-4 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+                </div>
+                
+                <div className="text-app-secondary font-mono text-xs tracking-wide mb-3 flex items-center">
+                  <span className="mr-2 text-app-primary-color">⟁</span>
+                  <span>ACTIVE WALLETS</span>
+                </div>
+                
+                <div className="text-xs text-app-secondary-60 flex items-center justify-between bg-app-primary-dark p-2 rounded border border-app-primary-40">
+                  <span>Wallets selected to buy:</span>
+                  <span className="text-app-primary-color font-mono font-bold">{countActiveWallets(wallets)}</span>
+                </div>
+                
+                {countActiveWallets(wallets) === 0 && (
+                  <div className="mt-3 text-warning text-xs font-mono flex items-center bg-app-primary-dark-50 p-2 rounded border border-warning-40">
+                    <span className="inline-block w-2 h-2 bg-warning rounded-full mr-2 animate-pulse"></span>
+                    No active wallets. Enable wallets to use auto-buy.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Token Operations */}
         <div className="space-y-4">          

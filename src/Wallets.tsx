@@ -90,6 +90,12 @@ interface WalletsPageProps {
   setUseQuickBuyRange?: (enabled: boolean) => void;
   quickSellPercentage?: number;
   setQuickSellPercentage?: (percentage: number) => void;
+  quickSellMinPercentage?: number;
+  setQuickSellMinPercentage?: (percentage: number) => void;
+  quickSellMaxPercentage?: number;
+  setQuickSellMaxPercentage?: (percentage: number) => void;
+  useQuickSellRange?: boolean;
+  setUseQuickSellRange?: (useRange: boolean) => void;
 }
 
 export const WalletsPage: React.FC<WalletsPageProps> = ({
@@ -127,7 +133,13 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   useQuickBuyRange = false,
   setUseQuickBuyRange,
   quickSellPercentage = 100,
-  setQuickSellPercentage
+  setQuickSellPercentage,
+  quickSellMinPercentage = 25,
+  setQuickSellMinPercentage,
+  quickSellMaxPercentage = 100,
+  setQuickSellMaxPercentage,
+  useQuickSellRange = false,
+  setUseQuickSellRange
 }) => {
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const [showingTokenWallets, setShowingTokenWallets] = useState(true);
@@ -420,6 +432,12 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
             setUseQuickBuyRange={setUseQuickBuyRange}
             quickSellPercentage={quickSellPercentage}
             setQuickSellPercentage={setQuickSellPercentage}
+            quickSellMinPercentage={quickSellMinPercentage}
+            setQuickSellMinPercentage={setQuickSellMinPercentage}
+            quickSellMaxPercentage={quickSellMaxPercentage}
+            setQuickSellMaxPercentage={setQuickSellMaxPercentage}
+            useQuickSellRange={useQuickSellRange}
+            setUseQuickSellRange={setUseQuickSellRange}
           />
         </div>
         

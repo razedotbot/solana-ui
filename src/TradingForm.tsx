@@ -17,25 +17,6 @@ import {
 import { useToast } from './Notifications';
 
 
-// Helper function to format numbers with k, M, B suffixes
-const formatNumber = (num) => {
-  const number = parseFloat(num);
-  if (isNaN(number) || number === 0) return "0";
-  
-  const absNum = Math.abs(number);
-  
-  if (absNum >= 1000000000) {
-    return (number / 1000000000).toFixed(2).replace(/\.?0+$/, '') + 'B';
-  } else if (absNum >= 1000000) {
-    return (number / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
-  } else if (absNum >= 1000) {
-    return (number / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
-  } else if (absNum >= 1) {
-    return number.toFixed(2).replace(/\.?0+$/, '');
-  } else {
-    return number.toFixed(6).replace(/\.?0+$/, '');
-  }
-};
 
 // Preset Button component
 const PresetButton = ({ 
@@ -509,16 +490,6 @@ const TradingCard = ({
     ));
   };
   
-  // Handle trade execution
-  const handleTradeExecution = (amount, isBuy) => {
-    if (isBuy) {
-      setBuyAmount(amount);
-      handleTradeSubmit(wallets, isBuy, selectedDex, amount, undefined);
-    } else {
-      setSellAmount(amount);
-      handleTradeSubmit(wallets, isBuy, selectedDex, undefined, amount);
-    }
-  };
   
   // Custom DEX select component
   const CustomSelect = () => {

@@ -718,6 +718,9 @@ export interface QuickBuyPreferences {
   quickBuyMaxAmount: number;
   useQuickBuyRange: boolean;
   quickSellPercentage: number;
+  quickSellMinPercentage: number;
+  quickSellMaxPercentage: number;
+  useQuickSellRange: boolean;
 }
 
 export const saveQuickBuyPreferencesToCookies = (preferences: QuickBuyPreferences) => {

@@ -5,6 +5,7 @@ export type ScriptType =
   | 'pumpbuy' | 'pumpsell'
   | 'raybuy' | 'raysell'
   | 'jupbuy' | 'jupsell'
+  | 'furybuy' | 'furysell'
   | 'swapbuy' | 'swapsell'
   | 'moonbuy' | 'moonsell'
   | 'meteorabuy' | 'meteorasell'
@@ -95,6 +96,8 @@ export const getScriptName = (selectedDex: string, isBuyMode: boolean): ScriptTy
       return isBuyMode ? 'moonbuy' : 'moonsell';
     case 'launchpad':
       return isBuyMode ? 'launchbuy' : 'launchsell';
+    case 'fury':
+      return isBuyMode ? 'furybuy' : 'furysell';
     case 'boopfun':
       return isBuyMode ? 'boopbuy' : 'boopsell';
     case 'meteora':

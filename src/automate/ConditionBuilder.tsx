@@ -16,7 +16,8 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
     { value: 'sellVolume', label: 'Sell Volume' },
     { value: 'netVolume', label: 'Net Volume' },
     { value: 'lastTradeAmount', label: 'Last Trade Amount' },
-    { value: 'lastTradeType', label: 'Last Trade Type' }
+    { value: 'lastTradeType', label: 'Last Trade Type' },
+    { value: 'whitelistActivity', label: 'Whitelist Activity' }
   ];
 
   const operators = [
@@ -76,7 +77,8 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
 
         <div>
           <label className="block text-xs font-mono color-primary mb-1">
-            {condition.type === 'lastTradeType' ? 'Trade Type' : 'Value'}
+            {condition.type === 'lastTradeType' ? 'Trade Type' : 
+             condition.type === 'whitelistActivity' ? 'Activity Type' : 'Value'}
           </label>
           {condition.type === 'lastTradeType' ? (
             <select
@@ -86,6 +88,18 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
             >
               <option value={1}>Buy</option>
               <option value={0}>Sell</option>
+            </select>
+          ) : condition.type === 'whitelistActivity' ? (
+            <select
+              value={condition.whitelistActivityType || 'buyVolume'}
+              onChange={(e) => onUpdate({ whitelistActivityType: e.target.value as 'buyVolume' | 'sellVolume' | 'netVolume' | 'lastTradeAmount' | 'lastTradeType', value: 1 })}
+              className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
+            >
+              <option value="buyVolume">Buy Volume</option>
+              <option value="sellVolume">Sell Volume</option>
+              <option value="netVolume">Net Volume</option>
+              <option value="lastTradeAmount">Last Trade Amount</option>
+              <option value="lastTradeType">Last Trade Type</option>
             </select>
           ) : (
             <input
@@ -99,16 +113,28 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
         </div>
 
         <div>
-          <label className="block text-xs font-mono color-primary mb-1">Timeframe</label>
-          <select
-            value={condition.timeframe || 0}
-            onChange={(e) => onUpdate({ timeframe: Number(e.target.value) })}
-            className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
-          >
-            {timeframes.map(tf => (
-              <option key={tf.value} value={tf.value}>{tf.label}</option>
-            ))}
-          </select>
+          <label className="block text-xs font-mono color-primary mb-1">
+            {condition.type === 'whitelistActivity' ? 'Whitelist Address' : 'Timeframe'}
+          </label>
+          {condition.type === 'whitelistActivity' ? (
+            <input
+              type="text"
+              value={condition.whitelistAddress || ''}
+              onChange={(e) => onUpdate({ whitelistAddress: e.target.value })}
+              className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
+              placeholder="Enter wallet address"
+            />
+          ) : (
+            <select
+              value={condition.timeframe || 0}
+              onChange={(e) => onUpdate({ timeframe: Number(e.target.value) })}
+              className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
+            >
+              {timeframes.map(tf => (
+                <option key={tf.value} value={tf.value}>{tf.label}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
     </div>

@@ -61,6 +61,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     { value: 'auto', label: '⭐ Auto', icon: '⭐' },
     { value: 'raydium', label: 'Raydium' },
     { value: 'pumpfun', label: 'Pump.fun' },
+    { value: 'fury', label: 'Fury' },
     { value: 'moonshot', label: 'Moonshot' },
     { value: 'pumpswap', label: 'PumpSwap' },
     { value: 'launchpad', label: 'Launchpad' },

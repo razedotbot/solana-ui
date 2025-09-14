@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Move, Search, ArrowDown, Trash2, Users, Wallet, Settings, Plus, Play, Pause, Edit, RotateCcw, Minimize2, Maximize2 } from 'lucide-react';
+import { X, Move, Search, ArrowDown, Trash2, Users, Wallet, Settings, Plus, Play, Pause, Edit, RotateCcw, Minimize2, Maximize2, Download, Upload } from 'lucide-react';
 import { getWalletDisplayName, WalletType, saveTradingStrategiesToCookies, loadTradingStrategiesFromCookies } from './Utils.tsx';
 import { TradingCondition, TradingAction, TradingStrategy, StrategyBuilder } from './automate';
+import { generateStrategyId } from './automate/utils';
 import { executeTrade, TradingConfig, FormattedWallet } from './utils/trading';
 
 interface NonWhitelistedTrade {
@@ -14,6 +15,7 @@ interface NonWhitelistedTrade {
   signature: string;
   tokenMint: string;
   marketCap: number;
+  walletAddress?: string; // Address of the wallet that made the trade
 }
 
 interface SelectedWallet {
@@ -32,6 +34,12 @@ interface MarketData {
   lastTrade: NonWhitelistedTrade | null;
   tokenPrice: number;
   priceChange24h?: number;
+  whitelistActivity?: Record<string, {
+    buyVolume: number;
+    sellVolume: number;
+    netVolume: number;
+    lastTrade: NonWhitelistedTrade | null;
+  }>;
 }
 
 interface AutomateFloatingCardProps {
@@ -203,6 +211,38 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       .filter(trade => trade.tokenMint === tokenAddress)
       .sort((a, b) => b.timestamp - a.timestamp)[0] || null;
     
+    // Get whitelist activity for each whitelisted address in active strategies
+    const whitelistActivity: Record<string, { buyVolume: number, sellVolume: number, netVolume: number, lastTrade: NonWhitelistedTrade | null }> = {};
+    
+    // Collect all whitelisted addresses from active strategies
+    const whitelistedAddresses = new Set<string>();
+    tradingStrategies.forEach(strategy => {
+      if (strategy.isActive && strategy.whitelistedAddresses) {
+        strategy.whitelistedAddresses.forEach(address => whitelistedAddresses.add(address));
+      }
+    });
+    
+    // Initialize whitelist activity for each address
+    whitelistedAddresses.forEach(address => {
+      const addressTrades = nonWhitelistedTrades
+        .filter(trade => trade.tokenMint === tokenAddress && 
+                (trade.walletAddress?.toLowerCase() === address.toLowerCase() || 
+                 trade.address.toLowerCase() === address.toLowerCase()));
+      
+      const buyTrades = addressTrades.filter(trade => trade.type === 'buy');
+      const sellTrades = addressTrades.filter(trade => trade.type === 'sell');
+      
+      const buyVolume = buyTrades.reduce((sum, trade) => sum + trade.solAmount, 0);
+      const sellVolume = sellTrades.reduce((sum, trade) => sum + trade.solAmount, 0);
+      
+      whitelistActivity[address] = {
+        buyVolume,
+        sellVolume,
+        netVolume: buyVolume - sellVolume,
+        lastTrade: addressTrades.sort((a, b) => b.timestamp - a.timestamp)[0] || null
+      };
+    });
+    
     const marketData = {
       marketCap: iframeData?.marketCap || 0,
       buyVolume: cumulativeBuyVolume,
@@ -210,7 +250,8 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       netVolume: cumulativeBuyVolume - cumulativeSellVolume,
       lastTrade: latestTrade,
       tokenPrice: iframeData?.tokenPrice?.tokenPrice || 0,
-      priceChange24h: 0 // TODO: Calculate from historical data
+      priceChange24h: 0, // TODO: Calculate from historical data
+      whitelistActivity
     };
     
     console.log('[AutomateFloatingCard] Current market data:', {
@@ -237,32 +278,66 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       marketData
     });
     
-    switch (condition.type) {
-      case 'marketCap':
-        currentValue = marketData.marketCap;
-        break;
-      case 'buyVolume':
-        currentValue = marketData.buyVolume;
-        break;
-      case 'sellVolume':
-        currentValue = marketData.sellVolume;
-        break;
-      case 'netVolume':
-        currentValue = marketData.netVolume;
-        break;
-      case 'lastTradeAmount':
-        currentValue = marketData.lastTrade?.solAmount || 0;
-        break;
-      case 'priceChange':
-        currentValue = marketData.priceChange24h || 0;
-        break;
-      case 'lastTradeType':
-        // Special case: 1 for buy, 0 for sell
-        currentValue = marketData.lastTrade?.type === 'buy' ? 1 : 0;
-        break;
-      default:
-        console.log(`[AutomateFloatingCard] Unknown condition type: ${condition.type}`);
+    // Handle whitelist activity condition type
+    if (condition.type === 'whitelistActivity' && condition.whitelistAddress) {
+      const address = condition.whitelistAddress;
+      const addressActivity = marketData.whitelistActivity?.[address];
+      
+      if (!addressActivity) {
+        console.log(`[AutomateFloatingCard] No activity found for whitelisted address: ${address}`);
         return false;
+      }
+      
+      switch (condition.whitelistActivityType) {
+        case 'buyVolume':
+          currentValue = addressActivity.buyVolume;
+          break;
+        case 'sellVolume':
+          currentValue = addressActivity.sellVolume;
+          break;
+        case 'netVolume':
+          currentValue = addressActivity.netVolume;
+          break;
+        case 'lastTradeAmount':
+          currentValue = addressActivity.lastTrade?.solAmount || 0;
+          break;
+        case 'lastTradeType':
+          // Special case: 1 for buy, 0 for sell
+          currentValue = addressActivity.lastTrade?.type === 'buy' ? 1 : 0;
+          break;
+        default:
+          console.log(`[AutomateFloatingCard] Unknown whitelist activity type: ${condition.whitelistActivityType}`);
+          return false;
+      }
+    } else {
+      // Handle standard condition types
+      switch (condition.type) {
+        case 'marketCap':
+          currentValue = marketData.marketCap;
+          break;
+        case 'buyVolume':
+          currentValue = marketData.buyVolume;
+          break;
+        case 'sellVolume':
+          currentValue = marketData.sellVolume;
+          break;
+        case 'netVolume':
+          currentValue = marketData.netVolume;
+          break;
+        case 'lastTradeAmount':
+          currentValue = marketData.lastTrade?.solAmount || 0;
+          break;
+        case 'priceChange':
+          currentValue = marketData.priceChange24h || 0;
+          break;
+        case 'lastTradeType':
+          // Special case: 1 for buy, 0 for sell
+          currentValue = marketData.lastTrade?.type === 'buy' ? 1 : 0;
+          break;
+        default:
+          console.log(`[AutomateFloatingCard] Unknown condition type: ${condition.type}`);
+          return false;
+      }
     }
     
     console.log(`[AutomateFloatingCard] Current value for ${condition.type}:`, currentValue);
@@ -596,22 +671,49 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
         // Based on last trade amount
         const lastTradeAmount = marketData.lastTrade?.solAmount || 0;
         tradeAmount = lastTradeAmount * action.amount;
-      } else if (action.amountType === 'volume') {
+      } else if (action.amountType === 'volume' || action.amountType === 'whitelistVolume') {
         // Based on volume data
         let volumeAmount: number;
-        switch (action.volumeType) {
-          case 'buyVolume':
-            volumeAmount = marketData.buyVolume;
-            break;
-          case 'sellVolume':
-            volumeAmount = marketData.sellVolume;
-            break;
-          case 'netVolume':
-            volumeAmount = marketData.netVolume;
-            break;
-          default:
-            volumeAmount = marketData.buyVolume;
+        
+        if (action.amountType === 'whitelistVolume' && action.whitelistAddress) {
+          // Get volume from whitelisted address activity
+          const addressActivity = marketData.whitelistActivity?.[action.whitelistAddress];
+          
+          if (!addressActivity) {
+            console.log(`[AutomateFloatingCard] No activity found for whitelisted address: ${action.whitelistAddress}`);
+            return;
+          }
+          
+          switch (action.whitelistActivityType) {
+            case 'buyVolume':
+              volumeAmount = addressActivity.buyVolume;
+              break;
+            case 'sellVolume':
+              volumeAmount = addressActivity.sellVolume;
+              break;
+            case 'netVolume':
+              volumeAmount = addressActivity.netVolume;
+              break;
+            default:
+              volumeAmount = addressActivity.buyVolume;
+          }
+        } else {
+          // Get volume from general market data
+          switch (action.volumeType) {
+            case 'buyVolume':
+              volumeAmount = marketData.buyVolume;
+              break;
+            case 'sellVolume':
+              volumeAmount = marketData.sellVolume;
+              break;
+            case 'netVolume':
+              volumeAmount = marketData.netVolume;
+              break;
+            default:
+              volumeAmount = marketData.buyVolume;
+          }
         }
+        
         tradeAmount = volumeAmount * (action.volumeMultiplier || 0.1);
       } else {
         tradeAmount = action.amount; // fallback
@@ -758,8 +860,9 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   };
   
   // Drag functionality
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!dragHandleRef.current?.contains(e.target as Node)) return;
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as Node;
+    if (!dragHandleRef.current?.contains(target)) return;
     
     onDraggingChange(true);
     const rect = cardRef.current?.getBoundingClientRect();
@@ -1061,6 +1164,61 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                     <h4 className="text-lg font-mono font-semibold color-primary">Trading Strategies</h4>
                     <div className="flex gap-2">
                       <button
+                        onClick={() => {
+                          // Create a file input element
+                          const fileInput = document.createElement('input');
+                          fileInput.type = 'file';
+                          fileInput.accept = '.json';
+                          fileInput.style.display = 'none';
+                          
+                          // Handle file selection
+                          fileInput.onchange = (event: Event) => {
+                            const target = event.target as HTMLInputElement;
+                            const file = target.files?.[0];
+                            if (!file) return;
+                            
+                            const reader = new FileReader();
+                            reader.onload = (e: ProgressEvent<FileReader>) => {
+                              try {
+                                const content = e.target?.result as string;
+                                if (!content) return;
+                                
+                                const importedStrategy = JSON.parse(content);
+                                
+                                // Add the imported strategy to the list
+                                setTradingStrategies(prev => [...prev, {
+                                  ...importedStrategy,
+                                  id: importedStrategy.id || generateStrategyId(),
+                                  createdAt: importedStrategy.createdAt || Date.now(),
+                                  updatedAt: Date.now(),
+                                  executionCount: importedStrategy.executionCount || 0
+                                }]);
+                                
+                                // Show a success message
+                                alert('Strategy imported successfully!');
+                              } catch (error) {
+                                console.error('Error importing strategy:', error);
+                                alert('Error importing strategy. Please check the file format.');
+                              }
+                            };
+                            
+                            reader.readAsText(file);
+                            
+                            // Clean up
+                            document.body.removeChild(fileInput);
+                          };
+                          
+                          // Add to DOM and trigger click
+                          document.body.appendChild(fileInput);
+                          fileInput.click();
+                        }}
+                        className="px-3 py-1.5 border border-app-primary-40 rounded color-primary font-mono text-sm hover:bg-app-primary-40 transition-colors flex items-center gap-2"
+                        title="Import strategy from JSON file"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Import
+                      </button>
+                      <button
                         onClick={() => setIsCreatingStrategy(!isCreatingStrategy)}
                         className="px-3 py-1.5 bg-app-accent border border-app-primary-40 rounded color-primary font-mono text-sm hover:bg-app-primary hover:border-app-primary transition-colors flex items-center gap-2"
                       >
@@ -1117,6 +1275,35 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                             }`}>
                               {strategy.isActive ? 'Active' : 'Inactive'}
                             </span>
+                            <button
+                              onClick={() => {
+                                // Create a strategy object for export
+                                const strategyToExport = {
+                                  ...strategy,
+                                  updatedAt: Date.now()
+                                };
+                                
+                                // Convert to JSON and create a downloadable file
+                                const jsonContent = JSON.stringify(strategyToExport, null, 2);
+                                const blob = new Blob([jsonContent], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                
+                                // Create a download link and trigger it
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${strategyToExport.name.replace(/\s+/g, '_')}_strategy.json`;
+                                document.body.appendChild(a);
+                                a.click();
+                                
+                                // Clean up
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                              }}
+                              className="p-1 rounded hover:bg-app-primary-60 transition-colors"
+                              title="Export strategy as JSON file"
+                            >
+                              <Download className="w-4 h-4 text-app-secondary-60 hover:color-primary" />
+                            </button>
                             <button
                               onClick={() => {
                                 if (editingStrategy?.id === strategy.id) {
@@ -1244,7 +1431,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                     type="text"
                     placeholder="Search wallets..."
                     value={walletSearchTerm}
-                    onChange={(e) => setWalletSearchTerm(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWalletSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-app-tertiary border border-app-primary-40 rounded-lg color-primary placeholder-app-secondary-60 font-mono text-sm focus:outline-none focus:border-app-primary"
                   />
                 </div>
@@ -1253,7 +1440,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   <select
                     value={walletSortOption}
-                    onChange={(e) => setWalletSortOption(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setWalletSortOption(e.target.value)}
                     className="px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-sm focus:outline-none focus:border-app-primary"
                   >
                     <option value="address">Sort by Address</option>
@@ -1271,7 +1458,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
                 <select
                   value={walletBalanceFilter}
-                  onChange={(e) => setWalletBalanceFilter(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setWalletBalanceFilter(e.target.value)}
                   className="w-full px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-sm focus:outline-none focus:border-app-primary mb-4"
                 >
                   <option value="all">All Wallets</option>

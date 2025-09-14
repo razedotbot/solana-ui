@@ -19,10 +19,17 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
     { value: 'percentage', label: 'Percentage of Balance' },
     { value: 'sol', label: 'Fixed Amount (SOL)' },
     { value: 'lastTrade', label: 'Last Trade Amount' },
-    { value: 'volume', label: 'Volume-based Amount' }
+    { value: 'volume', label: 'Volume-based Amount' },
+    { value: 'whitelistVolume', label: 'Whitelist Volume-based Amount' }
   ];
 
   const volumeTypes = [
+    { value: 'buyVolume', label: 'Buy Volume' },
+    { value: 'sellVolume', label: 'Sell Volume' },
+    { value: 'netVolume', label: 'Net Volume' }
+  ];
+  
+  const whitelistActivityTypes = [
     { value: 'buyVolume', label: 'Buy Volume' },
     { value: 'sellVolume', label: 'Sell Volume' },
     { value: 'netVolume', label: 'Net Volume' }
@@ -117,6 +124,33 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
             </select>
           </div>
         )}
+        
+        {action.amountType === 'whitelistVolume' && (
+          <>
+            <div>
+              <label className="block text-xs font-mono color-primary mb-1">Whitelist Address</label>
+              <input
+                type="text"
+                value={action.whitelistAddress || ''}
+                onChange={(e) => onUpdate({ whitelistAddress: e.target.value })}
+                className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
+                placeholder="Enter wallet address"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono color-primary mb-1">Activity Type</label>
+              <select
+                value={action.whitelistActivityType || 'buyVolume'}
+                onChange={(e) => onUpdate({ whitelistActivityType: e.target.value as 'buyVolume' | 'sellVolume' | 'netVolume' })}
+                className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
+              >
+                {whitelistActivityTypes.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
 
 
       </div>
@@ -150,7 +184,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
         </div>
       </div>
 
-      {action.amountType === 'volume' && (
+      {(action.amountType === 'volume' || action.amountType === 'whitelistVolume') && (
         <div className="mt-3">
           <label className="block text-xs font-mono color-primary mb-1">Volume Multiplier</label>
           <input
@@ -163,7 +197,11 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
             className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
             placeholder="0.1"
           />
-          <div className="text-xs text-app-secondary-60 mt-1">Amount = {action.volumeType || 'buyVolume'} × Multiplier</div>
+          <div className="text-xs text-app-secondary-60 mt-1">
+            {action.amountType === 'volume' ? 
+              `Amount = ${action.volumeType || 'buyVolume'} × Multiplier` : 
+              `Amount = Whitelist ${action.whitelistActivityType || 'any'} Volume × Multiplier`}
+          </div>
         </div>
       )}
 

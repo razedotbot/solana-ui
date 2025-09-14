@@ -183,6 +183,23 @@ export const executeMeteoraTrade = async (
 };
 
 // BoopFun trading functions
+export const executeFuryTrade = async (
+  wallets: FormattedWallet[],
+  config: TradingConfig,
+  isBuyMode: boolean,
+  walletBalances?: Map<string, number>
+): Promise<TradingResult> => {
+  try {
+    if (isBuyMode) {
+      return await executeUnifiedBuy(wallets, config, 'fury');
+    } else {
+      return await executeUnifiedSell(wallets, config, 'fury');
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+// BoopFun trading functions
 export const executeBoopFunTrade = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
@@ -326,6 +343,8 @@ export const executeTrade = async (
   switch (dex) {
     case 'moonshot':
       return await executeMoonshotTrade(formattedWallets, config, isBuyMode, walletBalances);
+    case 'fury':
+      return await executeFuryTrade(formattedWallets, config, isBuyMode, walletBalances);
     case 'boopfun':
       return await executeBoopFunTrade(formattedWallets, config, isBuyMode, walletBalances);
     case 'pumpfun':
