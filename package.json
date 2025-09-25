@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "node scripts/generate-html.js && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "analyze": "npx vite-bundle-analyzer"
+    "analyze": "npx vite-bundle-analyzer",
+    "generate-html": "node scripts/generate-html.js"
   },
   "dependencies": {
     "@jup-ag/api": "^6.0.30",

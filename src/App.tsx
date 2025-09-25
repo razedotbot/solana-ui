@@ -1161,6 +1161,7 @@ const WalletManager: React.FC = () => {
               <div className="backdrop-blur-sm bg-app-primary-99 overflow-y-auto">
                 <ActionsPage
                  tokenAddress={state.tokenAddress}
+                 setTokenAddress={memoizedCallbacks.setTokenAddress}
                  transactionFee={state.config.transactionFee}
                  handleRefresh={handleRefresh}
                  wallets={state.wallets}
@@ -1252,6 +1253,7 @@ const WalletManager: React.FC = () => {
             <div className="backdrop-blur-sm bg-app-primary-99 overflow-y-auto">
               <ActionsPage
               tokenAddress={state.tokenAddress}
+              setTokenAddress={memoizedCallbacks.setTokenAddress}
               transactionFee={state.config.transactionFee}
               handleRefresh={handleRefresh}
               wallets={state.wallets}
@@ -1338,6 +1340,7 @@ const WalletManager: React.FC = () => {
             ActionsPage: (
               <ActionsPage
                 tokenAddress={state.tokenAddress}
+                setTokenAddress={memoizedCallbacks.setTokenAddress}
                 transactionFee={state.config.transactionFee}
                 handleRefresh={handleRefresh}
                 wallets={state.wallets}

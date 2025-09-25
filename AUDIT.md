@@ -2,7 +2,7 @@
 
 ## Overview
 
-This audit report documents the security of Raze Bot application. The encryption was implemented to protect sensitive wallet private keys stored locally.
+This audit report documents the application security standards. The encryption was implemented to protect sensitive wallet private keys stored locally.
 
 ### Key Findings
 - **Encryption Standard:** AES (Advanced Encryption Standard) via crypto-js library

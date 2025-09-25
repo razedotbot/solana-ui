@@ -129,7 +129,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       formData.append('image', file);
       
       // Create URL based on base URL
-      const baseUrl = 'https://img.raze.bot';
+      const baseUrl = 'https://img.fury.bot';
       const uploadUrl = `${baseUrl}/upload-image`;
       
       // Upload with progress tracking

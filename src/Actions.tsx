@@ -18,6 +18,7 @@ import {
    Coins,
    Bot
  } from 'lucide-react';
+import { brand } from './config/brandConfig';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import { WalletType, loadConfigFromCookies } from "./Utils";
 import { useToast } from "./Notifications";
@@ -56,6 +57,7 @@ Switch.displayName = 'Switch';
 
 interface ActionsPageProps {
   tokenAddress: string;
+  setTokenAddress: (address: string) => void;
   transactionFee: string;
   handleRefresh: () => void;
   wallets: WalletType[];
@@ -346,6 +348,7 @@ const DataBox: React.FC<{
 };
 export const ActionsPage: React.FC<ActionsPageProps> = ({ 
   tokenAddress, 
+  setTokenAddress,
   transactionFee, 
   handleRefresh, 
   wallets, 
@@ -379,8 +382,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const { showToast } = useToast();
   
   // Auto-buy settings
-  const [autoBuyEnabled, setAutoBuyEnabled] = useState(false);
+  const [autoBuyEnabled, setAutoBuyEnabled] = useState(true);
   const [autoBuyAmount, setAutoBuyAmount] = useState('0.01'); // Default SOL amount for auto-buy
+  const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(false); // Auto redirect to token after buy
 
 
   const dexOptions = [
@@ -438,25 +442,45 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     }
   };
 
-  // Handle iframe messages for TOKEN_SELECTED
+  // Handle iframe messages for TOKEN_SELECTED and TOKEN_BUY
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Check if the message is a TOKEN_SELECTED message
+      // Handle TOKEN_SELECTED message (only for token selection, no auto-buy)
       if (event.data && event.data.type === 'TOKEN_SELECTED') {
         console.log('Received TOKEN_SELECTED message:', event.data);
+        // TOKEN_SELECTED now only redirects to token (no auto-buy functionality)
+        // The token selection is handled elsewhere in the application
+      }
+      
+      // Handle TOKEN_BUY message for quick buy functionality
+      if (event.data && event.data.type === 'TOKEN_BUY') {
+        console.log('Received TOKEN_BUY message:', event.data);
         
-        // If auto-buy is enabled and no token is currently selected
-        if (autoBuyEnabled && !tokenAddress && event.data.tokenAddress) {
+        // Try different possible property names for the token address
+        const tokenMint = event.data.tokenMint || event.data.tokenAddress || event.data.token || event.data.mint;
+        console.log('Quick buy requested for token:', tokenMint);
+        
+        if (tokenMint) {
           // Get active wallets
           const activeWallets = wallets.filter(wallet => wallet.isActive);
           
           if (activeWallets.length > 0) {
             // Execute buy with the specified amount and token address from the message
-            handleTradeSubmit(activeWallets, true, 'auto', autoBuyAmount, undefined, event.data.tokenAddress);
-            showToast(`Auto-buying ${autoBuyAmount} SOL of token ${event.data.tokenAddress.substring(0, 8)}...`, "success");
+            handleTradeSubmit(activeWallets, true, 'auto', autoBuyAmount, undefined, tokenMint);
+            showToast(`Quick buying ${autoBuyAmount} SOL of token ${tokenMint.substring(0, 8)}...`, "success");
+            
+            // Auto redirect to token if enabled
+            if (autoRedirectEnabled && setTokenAddress) {
+              setTimeout(() => {
+                setTokenAddress(tokenMint);
+              }, 1000); // Wait 1 seconds after buy to redirect
+            }
           } else {
-            showToast("No active wallets for auto-buy", "error");
+            showToast("No active wallets for quick buy", "error");
           }
+        } else {
+          console.error('TOKEN_BUY message missing token identifier. Available properties:', Object.keys(event.data));
+          showToast("Invalid token for quick buy - missing token identifier", "error");
         }
       }
     };
@@ -468,7 +492,25 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [autoBuyEnabled, tokenAddress, autoBuyAmount, wallets, handleTradeSubmit, showToast]);
+  }, [autoBuyEnabled, tokenAddress, autoBuyAmount, autoRedirectEnabled, wallets, handleTradeSubmit, showToast, setTokenAddress]);
+
+  // Send QUICKBUY_ACTIVATE to iframe when component loads without token set
+  useEffect(() => {
+    const sendQuickBuyActivate = () => {
+      const iframe = document.querySelector('iframe');
+      if (iframe && iframe.contentWindow && !tokenAddress) {
+        console.log('Sending QUICKBUY_ACTIVATE to iframe on load (no token set)');
+        iframe.contentWindow.postMessage({
+          type: 'QUICKBUY_ACTIVATE'
+        }, '*');
+      }
+    };
+
+    // Send activation message after a short delay to ensure iframe is loaded
+    const timer = setTimeout(sendQuickBuyActivate, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [tokenAddress]); // Re-run when tokenAddress changes
 
   return (
     <div className="flex-1 overflow-y-auto bg-app-primary p-4 md:p-6 relative">
@@ -554,7 +596,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               <div className="absolute bottom-0 right-0 w-8 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
             </div>
             <div className="space-y-6">
-              {/* Auto-buy toggle */}
+              {/* Auto redirect toggle */}
               <div className="flex items-center justify-between bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
                 {/* Cyberpunk corner accents - smaller version */}
                 <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
@@ -569,13 +611,13 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 <div>
                   <div className="text-app-secondary font-mono text-xs tracking-wide flex items-center">
                     <span className="mr-2 text-app-primary-color">⟁</span>
-                    <span>ENABLE AUTO-BUY</span>
+                    <span>AUTO REDIRECT TOKEN</span>
                   </div>
-                  <div className="text-xs text-app-secondary-60 mt-2 ml-5">Buy tokens on click</div>
+                  <div className="text-xs text-app-secondary-60 mt-2 ml-5">Redirect to token after buy</div>
                 </div>
                 <Switch 
-                  checked={autoBuyEnabled} 
-                  onCheckedChange={setAutoBuyEnabled}
+                  checked={autoRedirectEnabled} 
+                  onCheckedChange={setAutoRedirectEnabled}
                 />
               </div>
               
@@ -791,7 +833,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Main Website Link */}
             <a 
-              href="https://raze.bot" 
+              href={`https://${brand.domain}`} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center justify-center py-2 px-4 rounded-lg bg-gradient-to-r 
@@ -808,12 +850,12 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               >
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
               </svg>
-              RAZE.BOT
+              {brand.displayName}
             </a>
             
             {/* GitHub Link */}
             <a 
-              href="https://github.com/razedotbot/solana-ui/" 
+              href={brand.githubUrl} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center justify-center py-2 px-4 rounded-lg bg-gradient-to-r 
@@ -831,7 +873,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.268 2.75 1.026A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.934.359.31.678.92.678 1.855 0 1.337-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.164 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
               </svg>
               <span className="text-xs font-mono tracking-wider color-primary font-semibold">
-                @RAZEDOTBOT
+                {brand.social.twitter}
               </span>
             </a>
           </div>

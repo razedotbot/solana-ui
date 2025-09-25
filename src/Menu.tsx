@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from './logo.png';
+import { brand } from './config/brandConfig';
 
 // Tooltip Component with cyberpunk styling
 export const Tooltip = ({ 
@@ -166,7 +167,7 @@ const ServiceSelector = () => {
         >
           <img 
             src={logo} 
-            alt="Raze Bundler" 
+            alt={brand.altText} 
             className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
           />
         </motion.div>
@@ -227,7 +228,7 @@ const ServiceSelector = () => {
                         </svg>
                       </div>} 
                       label="Launchpad" 
-                      url="https://app.Raze.bot"
+                      url={brand.appUrl}
                       description="Launchpad"
                     />
                   </motion.div>
@@ -250,7 +251,7 @@ const ServiceSelector = () => {
                         </svg>
                       </div>} 
                       label="Docs" 
-                      url="https://docs.Raze.bot"
+                      url={brand.docsUrl}
                       description="Documentation"
                     />
                   </motion.div>
@@ -269,7 +270,7 @@ const ServiceSelector = () => {
                         </svg>
                       </div>} 
                       label="GitHub" 
-                      url="https://github.com/Razedotbot"
+                      url={brand.githubOrg}
                       description="GitHub Repository"
                     />
                   </motion.div>
