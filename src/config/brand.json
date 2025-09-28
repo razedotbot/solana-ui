@@ -29,7 +29,7 @@
     },
     "theme": {
       "name": "green",
-      "css": "./styles/globals.css"
+      "css": "./styles/green.css"
     }
   }
 }

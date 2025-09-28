@@ -7,7 +7,21 @@ import Cookies from 'js-cookie';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 import { brand } from './config/brandConfig';
-import './styles/globals.css';
+
+// Dynamic CSS loading based on brand configuration using Vite's import
+const loadBrandCSS = async () => {
+  try {
+    // Use dynamic import for CSS files in Vite based on theme name
+    await import(`./styles/${brand.theme.name}.css`);
+  } catch (error) {
+    console.error('Failed to load brand CSS:', error);
+    // Fallback to globals.css
+    await import('./styles/green.css');
+  }
+};
+
+// Load brand CSS immediately
+loadBrandCSS();
 import { ToastProvider } from "./Notifications";
 import ServerConfig from './ServerConfig';
 import IntroModal from './modals/IntroModal';
