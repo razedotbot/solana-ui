@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Search, AlertCircle, BarChart } from 'lucide-react';
 import { WalletType, getWalletDisplayName } from './Utils';
+import { brand } from './config/brandConfig';
 
 interface ChartPageProps {
   isLoadingChart: boolean;
@@ -476,8 +477,8 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   // Render iframe with single frame
   const renderFrame = (hasToken: boolean = true) => {
     const iframeSrc = hasToken 
-      ? `https://frame.fury.bot/?tokenMint=${tokenAddress}&theme=green`
-      : 'https://frame.fury.bot/?theme=green';
+      ? `https://frame.fury.bot/?tokenMint=${tokenAddress}&theme=${brand.theme.name}`
+      : `https://frame.fury.bot/?theme=${brand.theme.name}`;
     
     return (
       <div className="relative flex-1 overflow-hidden iframe-container">

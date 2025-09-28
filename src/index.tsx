@@ -6,6 +6,7 @@ import { Buffer as NodeBuffer } from 'buffer';
 import Cookies from 'js-cookie';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
+import { brand } from './config/brandConfig';
 import './styles/globals.css';
 import { ToastProvider } from "./Notifications";
 import ServerConfig from './ServerConfig';

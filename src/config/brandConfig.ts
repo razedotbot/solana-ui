@@ -17,6 +17,10 @@ export interface BrandConfig {
     api: {
       key: string;
     };
+    theme: {
+      name: string;
+      css: string;
+    };
   };
 }
 
