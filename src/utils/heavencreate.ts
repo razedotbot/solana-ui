@@ -138,7 +138,7 @@ const getPartiallyPreparedBonkTransactions = async (
   buyerWallets: WalletForBonkCreate[]
 ): Promise<BonkCreateResponse> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     // Format buyer wallets for the API request
     const formattedBuyerWallets = buyerWallets.map(wallet => ({

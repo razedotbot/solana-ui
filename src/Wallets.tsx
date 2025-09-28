@@ -409,6 +409,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
           <WalletOperationsButtons
             wallets={wallets}
             solBalances={solBalances}
+            setSolBalances={setExternalSolBalances}
             connection={connection}
             tokenBalances={tokenBalances}
             tokenAddress={tokenAddress}

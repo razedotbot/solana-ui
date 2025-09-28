@@ -117,7 +117,7 @@ const getPartiallyPreparedTransactions = async (
   amounts?: number[]
 ): Promise<{ mintAddress: string, bundles: MoonCreateBundle[] }> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/moonshot/create`, {
       method: 'POST',

@@ -247,7 +247,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
             throw new Error('Source wallet not found');
           }
 
-          const baseUrl = (window as any).tradingServerUrl.replace(/\/+$/, '');
+          const baseUrl = 'https://solana.fury.bot';
           
           // Step 1: Request the transaction from the backend
           const buildResponse = await fetch(`${baseUrl}/api/tokens/transfer`, {

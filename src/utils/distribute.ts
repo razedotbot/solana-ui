@@ -57,7 +57,7 @@ const getPartiallySignedTransactions = async (
   recipients: { address: string, amount: string }[]
 ): Promise<string[]> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/wallets/distribute`, {
       method: 'POST',

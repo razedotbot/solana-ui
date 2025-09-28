@@ -88,7 +88,7 @@ const getPartiallyPreparedTransactions = async (
   percentage: number
 ): Promise<string[]> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/wallets/consolidate`, {
       method: 'POST',

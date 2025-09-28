@@ -173,7 +173,6 @@ const getPartiallyPreparedTransactions = async (
       requestBody.telegram = user;
     }
     
-    console.log(appConfig)
     const response = await fetch(`${baseUrl}/api/tokens/buy`, {
       method: 'POST',
       headers: {

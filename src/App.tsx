@@ -1071,32 +1071,50 @@ const WalletManager: React.FC = () => {
               placeholder="TOKEN ADDRESS"
               value={state.tokenAddress}
               onChange={(e) => memoizedCallbacks.setTokenAddress(e.target.value)}
-              className="w-full bg-app-secondary border border-app-primary-40 rounded px-3 py-2 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono tracking-wider"
+              className="w-full bg-app-secondary border border-app-primary-40 rounded px-3 py-2 pr-16 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono tracking-wider"
             />
-            <div className="absolute right-3 top-2.5 color-primary-40 text-xs font-mono">SOL</div>
-          </div>
-          
-          <WalletTooltip content="Paste from clipboard" position="bottom">
-            <button
-              className="p-2 border border-app-primary-40 hover-border-primary bg-app-secondary rounded cyberpunk-btn"
-              onClick={async () => {
-                try {
-                  const text = await navigator.clipboard.readText();
-                  if (text) {
-                    memoizedCallbacks.setTokenAddress(text);
-                    showToast("Token address pasted from clipboard", "success");
-                  }
-                } catch (err) {
-                  showToast("Failed to read from clipboard", "error");
-                }
-              }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="color-primary">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-              </svg>
-            </button>
-          </WalletTooltip>          
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+              {state.tokenAddress && (
+                <WalletTooltip content="Clear token address" position="bottom">
+                  <button
+                    className="color-primary-40 text-xs font-mono p-1"
+                    onClick={() => {
+                      memoizedCallbacks.setTokenAddress('');
+                      showToast("Token address cleared", "success");
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="color-primary opacity-60 hover:opacity-100 transition-opacity">
+                       <polyline points="3,6 5,6 21,6"></polyline>
+                       <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+                       <line x1="10" y1="11" x2="10" y2="17"></line>
+                       <line x1="14" y1="11" x2="14" y2="17"></line>
+                     </svg>
+                  </button>
+                </WalletTooltip>
+              )}
+              <WalletTooltip content="Paste from clipboard" position="bottom">
+                <button
+                  className="color-primary-40 text-xs font-mono p-1"
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      if (text) {
+                        memoizedCallbacks.setTokenAddress(text);
+                        showToast("Token address pasted from clipboard", "success");
+                      }
+                    } catch (err) {
+                      showToast("Failed to read from clipboard", "error");
+                    }
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="color-primary opacity-60 hover:opacity-100 transition-opacity">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  </svg>
+                </button>
+              </WalletTooltip>
+            </div>
+          </div>          
           
           <WalletTooltip content="Open Settings" position="bottom">
             <button 
@@ -1200,6 +1218,7 @@ const WalletManager: React.FC = () => {
                   handleSortWallets={() => handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
                   connection={state.connection}
                   solBalances={state.solBalances}
+                  setSolBalances={memoizedCallbacks.setSolBalances}
                   tokenBalances={state.tokenBalances}
                   quickBuyEnabled={state.quickBuyEnabled}
                   setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}

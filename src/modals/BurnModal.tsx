@@ -179,7 +179,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       );
       
       // 1. Request unsigned transaction from backend
-      const baseUrl = (window as any).tradingServerUrl.replace(/\/+$/, '');
+      const baseUrl = 'https://solana.fury.bot';
       
       const prepareResponse = await fetch(`${baseUrl}/api/tokens/burn`, {
         method: 'POST',

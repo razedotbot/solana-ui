@@ -91,7 +91,7 @@ const checkRateLimit = async (): Promise<void> => {
  */
 const sendBundle = async (encodedBundle: string[]): Promise<any> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     // Send to our backend proxy instead of directly to Jito
     const response = await fetch(`${baseUrl}/api/transactions/send`, {
@@ -136,7 +136,7 @@ const getPartiallyPreparedCookTransactions = async (
   buyerWallets: WalletForCookCreate[]
 ): Promise<CookCreateResponse> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     // Format buyer wallets for the API request
     const formattedBuyerWallets = buyerWallets.map(wallet => ({

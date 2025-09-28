@@ -150,7 +150,7 @@ export const checkDeveloperConfig = async (
   rpcUrl?: string
 ): Promise<BagsConfigResponse> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/bags/config`, {
       method: 'POST',
@@ -279,7 +279,7 @@ const getPartiallyPreparedTransactions = async (
   bagsConfig: BagsCreateConfig
 ): Promise<{ mintAddress: string, bundles: BagsCreateBundle[] }> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/bags/create`, {
       method: 'POST',

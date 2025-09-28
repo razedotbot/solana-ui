@@ -263,7 +263,7 @@ export const createTokenAndConfig = async (
   config: BagsSharedTokenCreateConfig
 ): Promise<BagsSharedTokenCreateResponse> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/bags/config/shared`, {
       method: 'POST',
@@ -408,7 +408,7 @@ export const checkSharedFeesConfig = async (
   sharedFeesConfig: BagsSharedFeesConfig
 ): Promise<BagsSharedConfigResponse> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/bags/config/shared`, {
       method: 'POST',
@@ -535,7 +535,7 @@ const getPartiallyPreparedSharedTransactions = async (
   sharedCreateConfig: BagsSharedCreateConfig
 ): Promise<{ mintAddress: string, bundles: BagsSharedCreateBundle[] }> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/bags/create/shared`, {
       method: 'POST',

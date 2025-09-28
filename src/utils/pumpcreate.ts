@@ -111,7 +111,7 @@ const getPartiallyPreparedTransactions = async (
   amounts?: number[]
 ): Promise<PumpCreateBundle[]> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = 'https://solana.fury.bot';
     
     const response = await fetch(`${baseUrl}/api/pumpfun/create`, {
       method: 'POST',

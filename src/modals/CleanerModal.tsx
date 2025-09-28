@@ -112,7 +112,7 @@ export const CleanerTokensModal: React.FC<CleanerTokensModalProps> = ({
       }
         
       const savedConfig = loadConfigFromCookies();
-      const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+      const baseUrl = 'https://solana.fury.bot';
       const response = await fetch(`${baseUrl}/api/tokens/route`, {
         method: 'POST',
         headers: {

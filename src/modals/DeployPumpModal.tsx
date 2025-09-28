@@ -60,7 +60,7 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
   const generateMintPubkey = async () => {
     setIsGenerating(true);
     try {
-      const baseUrl = (window as any).tradingServerUrl.replace(/\/+$/, '');
+      const baseUrl = 'https://solana.fury.bot';
       const mintResponse = await fetch(`${baseUrl}/api/utilities/generate-mint`);
       const data = await mintResponse.json();
       

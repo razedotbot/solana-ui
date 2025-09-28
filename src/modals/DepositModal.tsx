@@ -11,6 +11,7 @@ interface DepositModalProps {
   onClose: () => void;
   wallets: WalletType[];
   solBalances: Map<string, number>;
+  setSolBalances?: (balances: Map<string, number>) => void;
   connection: Connection;
 }
 
@@ -19,6 +20,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   onClose,
   wallets,
   solBalances,
+  setSolBalances,
   connection
 }) => {
   // States for deposit operation
@@ -54,7 +56,41 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
   // Get wallet SOL balance by address
   const getWalletBalance = (address: string): number => {
-    return solBalances.has(address) ? (solBalances.get(address) ?? 0) : 0;
+    const balance = solBalances.get(address);
+    return balance ?? 0;
+  };
+
+  // Get connected wallet balance
+  const getConnectedWalletBalance = (): number => {
+    if (!publicKey) {
+      return 0;
+    }
+    const balance = getWalletBalance(publicKey);
+    return balance;
+  };
+
+  // Check if connected wallet has sufficient balance for transaction
+  const hasInsufficientBalance = (): boolean => {
+    if (!publicKey || !amount) return false;
+    
+    const walletBalance = getConnectedWalletBalance();
+    const depositAmount = parseFloat(amount);
+    
+    return walletBalance < depositAmount;
+  };
+
+  // Get insufficient balance message
+  const getInsufficientBalanceMessage = (): string => {
+    if (!publicKey || !amount) return '';
+    
+    const walletBalance = getConnectedWalletBalance();
+    const depositAmount = parseFloat(amount);
+    
+    if (walletBalance < depositAmount) {
+      return `Insufficient balance. Need ${depositAmount.toFixed(4)} SOL, but only have ${walletBalance.toFixed(4)} SOL`;
+    }
+    
+    return '';
   };
 
   // Reset form state
@@ -85,7 +121,30 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       }
       
       const response = await solana.connect();
-      setPublicKey(response.publicKey.toString());
+      const walletAddress = response.publicKey.toString();
+      setPublicKey(walletAddress);
+      
+      // Fetch balance for the connected wallet
+      try {
+        const balance = await connection.getBalance(response.publicKey, "processed");
+        const solBalance = balance / 1e9; // Convert lamports to SOL
+        
+        console.log(`Fetched balance for connected Phantom wallet ${walletAddress}: ${solBalance} SOL`); // Debug log
+        
+        // Update the solBalances map with the connected wallet's balance
+        if (setSolBalances) {
+          const newSolBalances = new Map(solBalances);
+          newSolBalances.set(walletAddress, solBalance);
+          setSolBalances(newSolBalances);
+          console.log('Updated solBalances map for connected wallet'); // Debug log
+        } else {
+          console.log('setSolBalances is not available'); // Debug log
+        }
+      } catch (balanceError) {
+        console.error('Error fetching wallet balance:', balanceError);
+        // Don't fail the connection if balance fetch fails
+      }
+      
       return true;
     } catch (error) {
       console.error('Error connecting to Phantom wallet:', error);
@@ -98,6 +157,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWallet || !amount || !publicKey || !isConfirmed) return;
+
+    // Check if wallet has sufficient balance before proceeding
+    if (hasInsufficientBalance()) {
+      showToast("Insufficient SOL balance for this transaction", "error");
+      return;
+    }
  
     setIsSubmitting(true);
     try {
@@ -567,6 +632,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     <span className="text-sm text-app-primary font-mono">{formatSolBalance(getWalletBalance(selectedWallet) || 0)} SOL</span>
                   </div>
                   
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-app-secondary font-mono">YOUR BALANCE:</span>
+                    <span className="text-sm text-app-primary font-mono">{formatSolBalance(getConnectedWalletBalance())} SOL</span>
+                  </div>
+                  
                   <div className="pt-2 border-t border-app-primary-20 flex items-center justify-between">
                     <span className="text-sm font-medium text-app-secondary font-mono">AMOUNT TO DEPOSIT:</span>
                     <span className="text-sm font-semibold color-primary font-mono">{parseFloat(amount).toFixed(4)} SOL</span>
@@ -607,9 +677,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </button>
                 <button
                   onClick={handleDeposit}
-                  disabled={!isConfirmed || isSubmitting}
+                  disabled={!isConfirmed || isSubmitting || hasInsufficientBalance()}
                   className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider
-                            ${!isConfirmed || isSubmitting
+                            ${!isConfirmed || isSubmitting || hasInsufficientBalance()
                               ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50' 
                               : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
                 >
@@ -618,6 +688,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       <div className="h-4 w-4 rounded-full border-2 border-app-primary-80 border-t-transparent animate-spin mr-2"></div>
                       PROCESSING...
                     </>
+                  ) : hasInsufficientBalance() ? (
+                    "INSUFFICIENT BALANCE"
                   ) : (
                     "DEPOSIT SOL"
                   )}

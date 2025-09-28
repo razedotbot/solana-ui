@@ -18,6 +18,7 @@ import { MixerModal } from './modals/MixerModal';
 interface WalletOperationsButtonsProps {
   wallets: WalletType[];
   solBalances: Map<string, number>;
+  setSolBalances?: (balances: Map<string, number>) => void;
   connection: Connection;
   tokenBalances: Map<string, number>;
   tokenAddress: string;
@@ -55,6 +56,7 @@ type OperationTab = 'distribute' | 'consolidate' | 'transfer' | 'deposit' | 'mix
 export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = ({
   wallets,
   solBalances,
+  setSolBalances,
   connection,
   tokenBalances,
   tokenAddress,
@@ -332,6 +334,7 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
         onClose={closeModal}
         wallets={wallets}
         solBalances={solBalances}
+        setSolBalances={setSolBalances}
         connection={connection}
       />
       
