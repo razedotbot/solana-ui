@@ -217,7 +217,6 @@ interface FloatingTradingCardProps {
   setSellAmount: (amount: string) => void;
   handleTradeSubmit: (wallets: any[], isBuy: boolean, dex?: string, buyAmount?: string, sellAmount?: string) => void;
   isLoading: boolean;
-  dexOptions: any[];
   getScriptName: (dex: string, isBuy: boolean) => ScriptType;
   countActiveWallets: (wallets: WalletType[]) => number;
   currentMarketCap: number | null;
@@ -243,7 +242,6 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   setSellAmount,
   handleTradeSubmit,
   isLoading,
-  dexOptions,
   getScriptName,
   countActiveWallets,
   currentMarketCap,
@@ -253,7 +251,6 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
   const [manualProtocol, setManualProtocol] = useState(null);
-  const [isProtocolDropdownOpen, setIsProtocolDropdownOpen] = useState(false);
   
   const cardRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -440,20 +437,6 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isProtocolDropdownOpen && !event.target.closest('.protocol-dropdown')) {
-        setIsProtocolDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isProtocolDropdownOpen]);
-
   if (!isOpen) return null;
 
   return (
@@ -478,64 +461,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
             title="Drag to move"
           >
             <Move size={12} className="text-app-secondary-60" />
-            <div className="relative protocol-dropdown">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsProtocolDropdownOpen(!isProtocolDropdownOpen);
-                }}
-                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-mono color-primary font-medium
-                         bg-app-tertiary border border-app-primary-40 hover:bg-app-secondary hover-border-primary-80
-                         transition-all duration-300 focus:outline-none"
-              >
-                <span className="flex items-center">
-                  {(manualProtocol || selectedDex) === 'auto' ? (
-                    <span className="flex items-center gap-1">
-                      <span className="text-yellow-400 animate-pulse text-xs">⭐</span>
-                      <span>Auto</span>
-                    </span>
-                  ) : (
-                    dexOptions.find(d => d.value === (manualProtocol || selectedDex))?.label?.replace('⭐ ', '') || 'DEX'
-                  )}
-                </span>
-                <ChevronDown size={10} className={`color-primary transition-transform duration-300 ${isProtocolDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isProtocolDropdownOpen && (
-                <div 
-                  className="absolute z-50 w-48 mt-1 rounded-md bg-app-primary
-                            border border-app-primary-40 shadow-lg shadow-black-80 left-0"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* DEX options */}
-                  <div className="max-h-32 overflow-y-auto">
-                    {dexOptions.map((dex) => (
-                      <button
-                        key={dex.value}
-                        className={`w-full px-2 py-1 text-left text-app-tertiary text-xs font-mono flex items-center gap-1
-                                   hover:bg-primary-20 transition-colors duration-200
-                                   ${(manualProtocol || selectedDex) === dex.value ? 'bg-primary-15 border-l-2 border-app-primary' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setManualProtocol(dex.value);
-                          setSelectedDex(dex.value);
-                          setIsProtocolDropdownOpen(false);
-                        }}
-                      >
-                        {dex.value === 'auto' ? (
-                          <>
-                            <span className="text-yellow-400 animate-pulse text-xs">⭐</span>
-                            <span>Auto</span>
-                          </>
-                        ) : (
-                          dex.label
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            
           </div>
           
           <div className="flex items-center gap-2">

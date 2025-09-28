@@ -59,14 +59,6 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   // DEX/Protocol options (removed auto option)
   const protocolOptions = [
     { value: 'auto', label: '⭐ Auto', icon: '⭐' },
-    { value: 'raydium', label: 'Raydium' },
-    { value: 'pumpfun', label: 'Pump.fun' },
-    { value: 'fury', label: 'Fury' },
-    { value: 'moonshot', label: 'Moonshot' },
-    { value: 'pumpswap', label: 'PumpSwap' },
-    { value: 'launchpad', label: 'Launchpad' },
-    { value: 'meteora', label: 'Meteora' },
-    { value: 'boopfun', label: 'Boop.fun' }
   ];
 
   // Bundle mode options

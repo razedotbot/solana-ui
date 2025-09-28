@@ -723,19 +723,6 @@ const WalletManager: React.FC = () => {
     }
   }, [state.iframeData?.marketCap]);
 
-  // DEX options for trading
-  const dexOptions = [
-    { value: 'auto', label: '⭐ Auto', icon: '⭐' },
-    { value: 'pumpfun', label: 'PumpFun' },
-    { value: 'moonshot', label: 'Moonshot' },
-    { value: 'fury', label: 'Fury' },
-    { value: 'pumpswap', label: 'PumpSwap' },
-    { value: 'raydium', label: 'Raydium' },
-    { value: 'launchpad', label: 'Launchpad' },
-    { value: 'boopfun', label: 'BoopFun' },
-    { value: 'meteora', label: 'Meteora' },
-  ];
-
   // Handle trade submission
   const handleTradeSubmit = async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string) => {
     memoizedCallbacks.setIsRefreshing(true);
@@ -765,8 +752,7 @@ const WalletManager: React.FC = () => {
       const result = await executeTrade(dex, wallets, config, isBuyMode, state.solBalances);
       
       if (result.success) {
-        const dexLabel = dexOptions.find(d => d.value === dex)?.label || dex;
-        showToast(`${dexLabel} ${isBuyMode ? 'Buy' : 'Sell'} transactions submitted successfully`, "success");
+        showToast(`${isBuyMode ? 'Buy' : 'Sell'} transactions submitted successfully`, "success");
       } else {
         showToast(`${dex} ${isBuyMode ? 'Buy' : 'Sell'} failed: ${result.error}`, "error");
       }
@@ -1474,7 +1460,6 @@ const WalletManager: React.FC = () => {
         setSellAmount={configCallbacks.setSellAmount}
         handleTradeSubmit={handleTradeSubmit}
         isLoading={state.isRefreshing}
-        dexOptions={dexOptions}
         getScriptName={getScriptName}
         countActiveWallets={countActiveWallets}
         currentMarketCap={state.currentMarketCap}

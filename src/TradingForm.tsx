@@ -346,7 +346,6 @@ const TradingCard = ({
   setSellAmount,
   handleTradeSubmit,
   isLoading,
-  dexOptions,
   getScriptName,
   countActiveWallets,
   currentMarketCap,
@@ -491,72 +490,6 @@ const TradingCard = ({
   };
   
   
-  // Custom DEX select component
-  const CustomSelect = () => {
-    const handleDexSelect = (dexValue, e) => {
-      e.stopPropagation();
-      setSelectedDex(dexValue);
-      setIsDropdownOpen(false);
-    };
-    
-    return (
-      <div className="relative" ref={dropdownRef}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsDropdownOpen(!isDropdownOpen);
-          }}
-          className={`flex items-center justify-between px-1.5 py-0.5 rounded
-                   bg-app-primary-60 text-app-tertiary border border-app-primary-40
-                   hover-bg-primary-20 hover-border-primary-80
-                   transition-all duration-300 text-[10px] font-mono min-w-[60px]
-                   ${isDropdownOpen ? 'shadow-glow-primary' : ''}`}
-        >
-          <span className="truncate flex items-center">
-            {selectedDex === 'auto' ? (
-              <span className="flex items-center gap-1">
-                <span className="text-yellow-400 animate-pulse text-xs">⭐</span>
-                <span>AUTO</span>
-              </span>
-            ) : (
-              dexOptions.find(d => d.value === selectedDex)?.label?.toUpperCase() || 'SELECT DEX'
-            )}
-          </span>
-          <div className={`transform transition-transform duration-300 ml-0.5 ${isDropdownOpen ? 'rotate-180' : ''}`}>
-            <ChevronDown size={10} className="color-primary" />
-          </div>
-        </button>
-
-        {isDropdownOpen && (
-          <div 
-            className="fixed z-[9999] w-32 mt-1 rounded-md bg-app-primary
-                      border border-app-primary-40 shadow-lg shadow-black-80"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="py-0.5">
-              {dexOptions.filter(dex => dex.value !== selectedDex).map((dex) => (
-                <button
-                  key={dex.value}
-                  className="w-full px-2 py-1 text-left text-app-tertiary text-[10px] font-mono
-                         hover-bg-primary-20 transition-colors duration-200 flex items-center gap-1"
-                  onClick={(e) => handleDexSelect(dex.value, e)}
-                >
-                  {dex.value === 'auto' ? (
-                    <>
-                      <span className="text-yellow-400 animate-pulse text-xs">⭐</span>
-                      <span>AUTO</span>
-                    </>
-                  ) : (
-                    dex.label.toUpperCase()
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
   
   // Handle amount change
   const handleAmountChange = (e) => {
@@ -1171,7 +1104,6 @@ const TradingCard = ({
           {/* Action Icons - Hidden for limit orders */}
           {orderType !== 'limit' && (
             <div className="flex items-center gap-2">
-              <CustomSelect />
               <button
                 onClick={onOpenFloating}
                 className="p-1.5 rounded hover-bg-primary-20 text-app-secondary-60 hover:color-primary transition-all duration-200"

@@ -145,176 +145,6 @@ const executeUnifiedSell = async (
   }
 };
 
-// Moonshot trading functions
-export const executeMoonshotTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'moonshot');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'moonshot');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// Meteora trading functions
-
-export const executeMeteoraTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'meteora');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'meteora');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// BoopFun trading functions
-export const executeFuryTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'fury');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'fury');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-// BoopFun trading functions
-export const executeBoopFunTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'boopfun');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'boopfun');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// PumpFun trading functions
-export const executePumpFunTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'pumpfun');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'pumpfun');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-
-// Raydium trading functions
-export const executeRaydiumTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'raydium');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'raydium');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// Auto trading functions
-export const executeAutoTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'auto');
-    } else {
-      return await executeUnifiedSell(
-        wallets, 
-        config, 
-        'auto', 
-        undefined, // Use default slippage from config
-        'So11111111111111111111111111111111111111112', // SOL
-        undefined // Use default jito tip from config
-      );
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// Launchpad trading functions
-export const executeLaunchpadTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'launchpad');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'launchpad');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// PumpSwap trading functions
-export const executePumpSwapTrade = async (
-  wallets: FormattedWallet[],
-  config: TradingConfig,
-  isBuyMode: boolean,
-  walletBalances?: Map<string, number>
-): Promise<TradingResult> => {
-  try {
-    if (isBuyMode) {
-      return await executeUnifiedBuy(wallets, config, 'pumpswap');
-    } else {
-      return await executeUnifiedSell(wallets, config, 'pumpswap');
-    }
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
 // Main trading executor
 export const executeTrade = async (
   dex: string,
@@ -339,27 +169,14 @@ export const executeTrade = async (
     const balance = solBalances.get(wallet.address) || 0;
     walletBalances.set(wallet.address, balance);
   });
-  
-  switch (dex) {
-    case 'moonshot':
-      return await executeMoonshotTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'fury':
-      return await executeFuryTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'boopfun':
-      return await executeBoopFunTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'pumpfun':
-      return await executePumpFunTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'raydium':
-      return await executeRaydiumTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'auto':
-      return await executeAutoTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'launchpad':
-      return await executeLaunchpadTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'meteora':
-      return await executeMeteoraTrade(formattedWallets, config, isBuyMode, walletBalances);
-    case 'pumpswap':
-      return await executePumpSwapTrade(formattedWallets, config, isBuyMode, walletBalances);
-    default:
-      return await executeAutoTrade(formattedWallets, config, isBuyMode, walletBalances);
+  try {
+    if (isBuyMode) {
+      return await executeUnifiedBuy(formattedWallets, config, 'auto');
+    } else {
+      return await executeUnifiedSell(formattedWallets, config, 'auto');
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
   }
+
 };

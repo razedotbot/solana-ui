@@ -2,15 +2,7 @@ import { WalletType } from '../Utils';
 
 // Script types for different DEX and operation combinations
 export type ScriptType = 
-  | 'pumpbuy' | 'pumpsell'
-  | 'raybuy' | 'raysell'
-  | 'jupbuy' | 'jupsell'
-  | 'furybuy' | 'furysell'
-  | 'swapbuy' | 'swapsell'
-  | 'moonbuy' | 'moonsell'
-  | 'meteorabuy' | 'meteorasell'
-  | 'launchbuy' | 'launchsell'
-  | 'boopbuy' | 'boopsell'
+  | 'buy' | 'sell'
   | 'consolidate' | 'distribute' | 'mixer' | 'cleaner'
   | 'bonkcreate' | 'cookcreate' | 'pumpcreate' | 'mooncreate' | 'boopcreate'
   | 'deploy';
@@ -84,25 +76,7 @@ export const toggleWalletsByBalance = (
  */
 export const getScriptName = (selectedDex: string, isBuyMode: boolean): ScriptType => {
   switch(selectedDex) {
-    case 'raydium':
-      return isBuyMode ? 'raybuy' : 'raysell';
-    case 'auto':
-      return isBuyMode ? 'jupbuy' : 'jupsell';
-    case 'pumpfun':
-      return isBuyMode ? 'pumpbuy' : 'pumpsell';
-    case 'pumpswap':
-      return isBuyMode ? 'swapbuy' : 'swapsell';
-    case 'moonshot':
-      return isBuyMode ? 'moonbuy' : 'moonsell';
-    case 'launchpad':
-      return isBuyMode ? 'launchbuy' : 'launchsell';
-    case 'fury':
-      return isBuyMode ? 'furybuy' : 'furysell';
-    case 'boopfun':
-      return isBuyMode ? 'boopbuy' : 'boopsell';
-    case 'meteora':
-      return isBuyMode ? 'meteorabuy' : 'meteorasell';
     default:
-      return isBuyMode ? 'jupbuy' : 'jupsell';
+      return isBuyMode ? 'buy' : 'sell';
   }
 };

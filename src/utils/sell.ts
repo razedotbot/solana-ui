@@ -23,7 +23,7 @@ export type BundleMode = 'single' | 'batch' | 'all-in-one';
 
 export interface SellConfig {
   tokenAddress: string;
-  protocol: 'pumpfun' | 'moonshot' | 'launchpad' | 'raydium' | 'pumpswap' | 'fury' | 'auto' | 'boopfun' | 'meteora' | 'auto';
+  protocol: 'auto';
   sellPercent: number; // Percentage of tokens to sell (1-100)
   tokensAmount?: number; // Specific amount of tokens to sell (alternative to percentage)
   slippageBps?: number; // Slippage tolerance in basis points (e.g., 100 = 1%)
@@ -610,7 +610,7 @@ export const validateSellInputs = (
     return { valid: false, error: 'Protocol is required' };
   }
   
-  const validProtocols = ['pumpfun', 'moonshot', 'launchpad', 'raydium', 'pumpswap', 'fury', 'auto', 'boopfun', 'meteora', 'auto'];
+  const validProtocols = ['auto'];
 
   if (!validProtocols.includes(sellConfig.protocol)) {
     return { valid: false, error: `Invalid protocol. Must be one of: ${validProtocols.join(', ')}` };

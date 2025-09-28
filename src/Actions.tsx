@@ -387,18 +387,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(false); // Auto redirect to token after buy
 
 
-  const dexOptions = [
-    { value: 'auto', label: '⭐ Auto', icon: '⭐' },
-    { value: 'pumpfun', label: 'PumpFun' },
-    { value: 'moonshot', label: 'Moonshot' },
-    { value: 'fury', label: 'Fury' },
-    { value: 'pumpswap', label: 'PumpSwap' },
-    { value: 'raydium', label: 'Raydium' },
-    { value: 'launchpad', label: 'Launchpad' },
-    { value: 'boopfun', label: 'BoopFun' },
-    { value: 'meteora', label: 'Meteora' },
-  ];
-  
   const handleTradeSubmit = async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string, tokenAddressParam?: string) => {
     setIsLoading(true);
     
@@ -448,8 +436,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       // Handle TOKEN_SELECTED message (only for token selection, no auto-buy)
       if (event.data && event.data.type === 'TOKEN_SELECTED') {
         console.log('Received TOKEN_SELECTED message:', event.data);
-        // TOKEN_SELECTED now only redirects to token (no auto-buy functionality)
-        // The token selection is handled elsewhere in the application
       }
       
       // Handle TOKEN_BUY message for quick buy functionality
@@ -567,7 +553,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             setSellAmount={setSellAmount}
             handleTradeSubmit={handleTradeSubmit}
             isLoading={isLoading}
-            dexOptions={dexOptions}
             getScriptName={getScriptName}
             countActiveWallets={countActiveWallets}
             currentMarketCap={currentMarketCap}
