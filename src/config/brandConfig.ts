@@ -19,7 +19,6 @@ export interface BrandConfig {
     };
     theme: {
       name: string;
-      css: string;
     };
   };
 }

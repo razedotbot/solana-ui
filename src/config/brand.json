@@ -28,8 +28,7 @@
       "key": "9e5df81803be1e58888249911b96c3fb0bad01c2621fab5a54eb5c908313a646"
     },
     "theme": {
-      "name": "green",
-      "css": "./styles/green.css"
+      "name": "green"
     }
   }
 }
