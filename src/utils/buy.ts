@@ -1,6 +1,7 @@
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { loadConfigFromCookies, loadUserFromCookies } from '../Utils';
+import { brand } from '../config/brandConfig';
 
 // Constants
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -177,7 +178,7 @@ const getPartiallyPreparedTransactions = async (
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': '4b911db128185d547203dd27990384509f1bc18faeb01b722329fa60ba6c897e' 
+        'X-API-Key': brand.api.key
       },
       body: JSON.stringify(requestBody),
     });

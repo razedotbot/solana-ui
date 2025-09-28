@@ -14,6 +14,9 @@ export interface BrandConfig {
       twitter: string;
       github: string;
     };
+    api: {
+      key: string;
+    };
   };
 }
 
