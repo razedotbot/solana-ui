@@ -33,7 +33,7 @@
     "react-dom": "^18.2.0",
     "react-split": "^2.0.14",
     "react-window": "^1.8.11",
-    "serve": "^14.2.4",
+    "serve": "^14.2.5",
     "tailwind-merge": "^1.14.0",
     "zustand": "^5.0.2"
   },
