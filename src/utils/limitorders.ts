@@ -38,22 +38,6 @@ export interface LimitOrderConfig {
   base?: 'input' | 'output';
 }
 
-export interface CreateLimitOrderRequest {
-  inputMint: string;
-  outputMint: string;
-  maker: string;
-  makingAmount: string;
-  takingAmount: string;
-  slippageBps?: number;
-  expiredAt?: number;
-  rpcUrl?: string;
-  includeTip?: boolean;
-  jitoTipLamports?: number;
-  affiliateAddress?: string;
-  affiliateFee?: number;
-  authenticated?: boolean;
-}
-
 export interface CreateMultipleLimitOrdersRequest {
   orders: LimitOrderConfig[];
   rpcUrl?: string;
@@ -147,50 +131,6 @@ export interface BundleSigningRequest {
 // API Base URL - This should be configured based on your backend
 const getBaseUrl = () => (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
 
-// Create a single limit order
-export const createLimitOrder = async (
-  config: CreateLimitOrderRequest
-): Promise<LimitOrderResponse> => {
-  try {
-    const appConfig = getDefaultConfig();
-    
-    // Apply default values from app config
-    const requestConfig: CreateLimitOrderRequest = {
-      ...config,
-      rpcUrl: config.rpcUrl || appConfig?.rpcEndpoint,
-      includeTip: config.includeTip ?? true,
-      jitoTipLamports: config.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000),
-      slippageBps: config.slippageBps ?? (appConfig?.slippageBps ? parseInt(appConfig.slippageBps) : 50),
-      authenticated: config.authenticated ?? false
-    };
-
-    const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/limit/create-single`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestConfig)
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`
-      };
-    }
-
-    return data;
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
-  }
-};
-
 // Create multiple limit orders
 export const createMultipleLimitOrders = async (
   wallets: FormattedWallet[],
@@ -224,7 +164,7 @@ export const createMultipleLimitOrders = async (
     };
 
     const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/limit/create`, {
+    const response = await fetch(`${baseUrl}/solana/limit/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -272,7 +212,7 @@ export const getActiveOrders = async (
     }
 
     const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/limit/active?${params.toString()}`, {
+    const response = await fetch(`${baseUrl}/solana/limit/active?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -314,7 +254,7 @@ export const cancelOrder = async (
     };
 
     const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/limit/cancel`, {
+    const response = await fetch(`${baseUrl}/solana/limit/cancel`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -500,9 +440,9 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       };
     }
 
-    console.log(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/solana/transactions/send`);
+    console.log(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/solana/send`);
     
-    const response = await fetch(`${baseUrl}/solana/transactions/send`, {
+    const response = await fetch(`${baseUrl}/solana/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

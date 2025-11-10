@@ -94,7 +94,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
     }
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/solana/transactions/send`, {
+    const response = await fetch(`${baseUrl}/solana/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -184,7 +184,7 @@ const getPartiallyPreparedSellTransactions = async (
       requestBody.telegram = user;
     }
 
-    const response = await fetch(`${baseUrl}/solana/tokens/sell`, {
+    const response = await fetch(`${baseUrl}/solana/sell`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -282,7 +282,7 @@ const completeBundleSigning = (
       console.error(`Error signing transaction:`, error);
       return null;
     }
-  }).filter(tx => tx !== null); // Filter out any null transactions
+  }).filter((tx): tx is string => tx !== null); // Filter out any null transactions with type guard
   
   return { transactions: signedTransactions };
 };
