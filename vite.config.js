@@ -31,7 +31,6 @@ export default defineConfig({
           'operations': [
             './src/utils/bonkcreate.ts',
             './src/utils/cookcreate.ts',
-            './src/utils/cleaner.ts',
             './src/utils/consolidate.ts',
             './src/utils/distribute.ts',
             './src/utils/mixer.ts'
@@ -42,7 +41,6 @@ export default defineConfig({
             './src/modals/BurnModal.tsx',
             './src/modals/CalculatePNLModal.tsx', 
             './src/modals/DeployModal.tsx',
-            './src/modals/CleanerModal.tsx',
             './src/modals/CustomBuyModal.tsx',
             './src/modals/SettingsModal.tsx',
             './src/modals/WalletsModal.tsx'

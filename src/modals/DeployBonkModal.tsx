@@ -447,7 +447,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                             alt="Logo Preview"
                             className="max-h-full max-w-full object-contain"
                             onError={(e) => {
-                              e.currentTarget.src = '/api/placeholder/48/48';
+                              e.currentTarget.src = '/solana/placeholder/48/48';
                               e.currentTarget.alt = 'Failed to load';
                             }}
                           />
@@ -881,7 +881,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                             alt="Token Logo"
                             className="max-w-full max-h-full rounded object-contain"
                             onError={(e) => {
-                              e.currentTarget.src = '/api/placeholder/48/48';
+                              e.currentTarget.src = '/solana/placeholder/48/48';
                               e.currentTarget.alt = 'Failed to load';
                             }}
                           />

@@ -51,7 +51,6 @@ const MobileLayout = lazy(() => import('./Mobile'));
 const BurnModal = lazy(() => import('./modals/BurnModal.tsx').then(module => ({ default: module.BurnModal })));
 const PnlModal = lazy(() => import('./modals/CalculatePNLModal.tsx').then(module => ({ default: module.PnlModal })));
 const DeployModal = lazy(() => import('./modals/DeployModal.tsx').then(module => ({ default: module.DeployModal })));
-const CleanerTokensModal = lazy(() => import('./modals/CleanerModal.tsx').then(module => ({ default: module.CleanerTokensModal })));
 const CustomBuyModal = lazy(() => import('./modals/CustomBuyModal.tsx').then(module => ({ default: module.CustomBuyModal })));
 const FloatingTradingCard = lazy(() => import('./FloatingTradingCard'));
 const AutomateFloatingCard = lazy(() => import('./AutomateFloatingCard'));
@@ -309,7 +308,6 @@ const WalletManager: React.FC = () => {
       burnModalOpen: boolean;
       calculatePNLModalOpen: boolean;
       deployModalOpen: boolean;
-      cleanerTokensModalOpen: boolean;
       customBuyModalOpen: boolean;
     };
     sortDirection: 'asc' | 'desc';
@@ -444,7 +442,6 @@ const WalletManager: React.FC = () => {
       burnModalOpen: false,
       calculatePNLModalOpen: false,
       deployModalOpen: false,
-      cleanerTokensModalOpen: false,
       customBuyModalOpen: false
     },
     sortDirection: 'asc',
@@ -640,7 +637,6 @@ const WalletManager: React.FC = () => {
     setBurnModalOpen: (open: boolean) => dispatch({ type: 'SET_MODAL', payload: { modal: 'burnModalOpen', open } }),
     setCalculatePNLModalOpen: (open: boolean) => dispatch({ type: 'SET_MODAL', payload: { modal: 'calculatePNLModalOpen', open } }),
     setDeployModalOpen: (open: boolean) => dispatch({ type: 'SET_MODAL', payload: { modal: 'deployModalOpen', open } }),
-    setCleanerTokensModalOpen: (open: boolean) => dispatch({ type: 'SET_MODAL', payload: { modal: 'cleanerTokensModalOpen', open } }),
     setCustomBuyModalOpen: (open: boolean) => dispatch({ type: 'SET_MODAL', payload: { modal: 'customBuyModalOpen', open } }),
     setSortDirection: (direction: 'asc' | 'desc') => dispatch({ type: 'SET_SORT_DIRECTION', payload: direction }),
     setTickEffect: (effect: boolean) => dispatch({ type: 'SET_TICK_EFFECT', payload: effect }),
@@ -1175,7 +1171,6 @@ const WalletManager: React.FC = () => {
                  setBurnModalOpen={memoizedCallbacks.setBurnModalOpen}
                  setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
                  setDeployModalOpen={memoizedCallbacks.setDeployModalOpen}
-                 setCleanerTokensModalOpen={memoizedCallbacks.setCleanerTokensModalOpen}
                  setCustomBuyModalOpen={memoizedCallbacks.setCustomBuyModalOpen}
                  onOpenFloating={() => memoizedCallbacks.setFloatingCardOpen(true)}
                  isFloatingCardOpen={state.floatingCard.isOpen}
@@ -1268,7 +1263,6 @@ const WalletManager: React.FC = () => {
               setBurnModalOpen={memoizedCallbacks.setBurnModalOpen}
               setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
               setDeployModalOpen={memoizedCallbacks.setDeployModalOpen}
-              setCleanerTokensModalOpen={memoizedCallbacks.setCleanerTokensModalOpen}
               setCustomBuyModalOpen={memoizedCallbacks.setCustomBuyModalOpen}
               onOpenFloating={() => memoizedCallbacks.setFloatingCardOpen(true)}
               isFloatingCardOpen={state.floatingCard.isOpen}
@@ -1355,7 +1349,6 @@ const WalletManager: React.FC = () => {
                 setBurnModalOpen={memoizedCallbacks.setBurnModalOpen}
                 setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
                 setDeployModalOpen={memoizedCallbacks.setDeployModalOpen}
-                setCleanerTokensModalOpen={memoizedCallbacks.setCleanerTokensModalOpen}
                 setCustomBuyModalOpen={memoizedCallbacks.setCustomBuyModalOpen}
                 onOpenFloating={() => memoizedCallbacks.setFloatingCardOpen(true)}
                 isFloatingCardOpen={state.floatingCard.isOpen}
@@ -1440,15 +1433,6 @@ const WalletManager: React.FC = () => {
         onDeploy={handleDeploy}    
       />
       
-      <CleanerTokensModal
-        isOpen={state.modals.cleanerTokensModalOpen}
-        onClose={() => memoizedCallbacks.setCleanerTokensModalOpen(false)}
-        onCleanerTokens={handleCleaner}
-        handleRefresh={handleRefresh}
-        tokenAddress={state.tokenAddress}
-        solBalances={state.solBalances} 
-        tokenBalances={state.tokenBalances}
-      />
       
       <CustomBuyModal
         isOpen={state.modals.customBuyModalOpen}

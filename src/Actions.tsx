@@ -67,7 +67,6 @@ interface ActionsPageProps {
   setBurnModalOpen: (open: boolean) => void;
   setCalculatePNLModalOpen: (open: boolean) => void;
   setDeployModalOpen: (open: boolean) => void;
-  setCleanerTokensModalOpen: (open: boolean) => void;
   setCustomBuyModalOpen: (open: boolean) => void;
   onOpenFloating: () => void;
   isFloatingCardOpen: boolean;
@@ -358,7 +357,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   setBurnModalOpen,
   setCalculatePNLModalOpen,
   setDeployModalOpen,
-  setCleanerTokensModalOpen,
   setCustomBuyModalOpen,
   onOpenFloating,
   isFloatingCardOpen,

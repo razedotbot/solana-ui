@@ -179,9 +179,9 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       );
       
       // 1. Request unsigned transaction from backend
-      const baseUrl = 'https://solana.fury.bot';
       
-      const prepareResponse = await fetch(`${baseUrl}/api/tokens/burn`, {
+      
+      const prepareResponse = await fetch(`https://utils.fury.bot/solana/tokens/burn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

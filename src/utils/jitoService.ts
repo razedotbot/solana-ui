@@ -1,5 +1,5 @@
 /**
- * Sends a signed transaction to the server's /api/transactions/send endpoint
+ * Sends a signed transaction to the server's /solana/transactions/send endpoint
  * which then forwards it to the Jito bundle service
  * @param serializedTransaction - bs58-encoded serialized transaction
  * @returns Result from the bundle service
@@ -8,7 +8,7 @@ export const sendToJitoBundleService = async (serializedTransaction: string) => 
     try {
       // Get the server base URL
       const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || "";
-      const sendBundleEndpoint = `${baseUrl}/api/transactions/send`;
+      const sendBundleEndpoint = `${baseUrl}/solana/transactions/send`;
       
       // Create the request payload - this matches what the server endpoint expects
       const payload = {

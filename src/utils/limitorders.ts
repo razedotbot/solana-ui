@@ -500,9 +500,9 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       };
     }
 
-    console.log(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/api/transactions/send`);
+    console.log(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/solana/transactions/send`);
     
-    const response = await fetch(`${baseUrl}/api/transactions/send`, {
+    const response = await fetch(`${baseUrl}/solana/transactions/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

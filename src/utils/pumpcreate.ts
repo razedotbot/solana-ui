@@ -68,7 +68,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
     const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/api/transactions/send`, {
+    const response = await fetch(`${baseUrl}/solana/transactions/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -111,9 +111,9 @@ const getPartiallyPreparedTransactions = async (
   amounts?: number[]
 ): Promise<PumpCreateBundle[]> => {
   try {
-    const baseUrl = 'https://solana.fury.bot';
     
-    const response = await fetch(`${baseUrl}/api/pumpfun/create`, {
+    
+    const response = await fetch(`https://utils.fury.bot/solana/pumpfun/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -60,8 +60,8 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
   const generateMintPubkey = async () => {
     setIsGenerating(true);
     try {
-      const baseUrl = 'https://solana.fury.bot';
-      const mintResponse = await fetch(`${baseUrl}/api/utilities/generate-mint`);
+      
+      const mintResponse = await fetch(`https://utils.fury.bot/solana/utilities/generate-mint`);
       const data = await mintResponse.json();
       
       // Check if the API returned a valid pubkey
@@ -540,7 +540,7 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
                             alt="Logo Preview"
                             className="max-h-full max-w-full object-contain"
                             onError={(e) => {
-                              e.currentTarget.src = '/api/placeholder/48/48';
+                              e.currentTarget.src = '/solana/placeholder/48/48';
                               e.currentTarget.alt = 'Failed to load';
                             }}
                           />
@@ -944,7 +944,7 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
                             alt="Token Logo"
                             className="max-w-full max-h-full rounded object-contain"
                             onError={(e) => {
-                              e.currentTarget.src = '/api/placeholder/48/48';
+                              e.currentTarget.src = '/solana/placeholder/48/48';
                               e.currentTarget.alt = 'Failed to load';
                             }}
                           />

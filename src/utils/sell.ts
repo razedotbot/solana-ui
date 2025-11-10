@@ -94,7 +94,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
     }
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/api/transactions/send`, {
+    const response = await fetch(`${baseUrl}/solana/transactions/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -184,7 +184,7 @@ const getPartiallyPreparedSellTransactions = async (
       requestBody.telegram = user;
     }
 
-    const response = await fetch(`${baseUrl}/api/tokens/sell`, {
+    const response = await fetch(`${baseUrl}/solana/tokens/sell`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

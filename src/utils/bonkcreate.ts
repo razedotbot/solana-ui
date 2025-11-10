@@ -96,7 +96,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<any> => {
     const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/api/transactions/send`, {
+    const response = await fetch(`${baseUrl}/solana/transactions/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -138,7 +138,7 @@ const getPartiallyPreparedBonkTransactions = async (
   buyerWallets: WalletForBonkCreate[]
 ): Promise<BonkCreateResponse> => {
   try {
-    const baseUrl = 'https://solana.fury.bot';
+    
     
     // Format buyer wallets for the API request
     const formattedBuyerWallets = buyerWallets.map(wallet => ({
@@ -146,7 +146,7 @@ const getPartiallyPreparedBonkTransactions = async (
       amount: wallet.amount || config.initialBuyAmount * 1e9 // Convert to lamports if not specified
     }));
     
-    const response = await fetch(`${baseUrl}/api/letsbonk/create`, {
+    const response = await fetch(`https://utils.fury.bot/solana/letsbonk/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

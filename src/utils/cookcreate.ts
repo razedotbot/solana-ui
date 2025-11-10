@@ -91,10 +91,11 @@ const checkRateLimit = async (): Promise<void> => {
  */
 const sendBundle = async (encodedBundle: string[]): Promise<any> => {
   try {
-    const baseUrl = 'https://solana.fury.bot';
+    
+    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/api/transactions/send`, {
+    const response = await fetch(`${baseUrl}/solana/transactions/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -136,7 +137,7 @@ const getPartiallyPreparedCookTransactions = async (
   buyerWallets: WalletForCookCreate[]
 ): Promise<CookCreateResponse> => {
   try {
-    const baseUrl = 'https://solana.fury.bot';
+    
     
     // Format buyer wallets for the API request
     const formattedBuyerWallets = buyerWallets.map(wallet => ({
@@ -144,7 +145,7 @@ const getPartiallyPreparedCookTransactions = async (
       amount: wallet.amount || config.initialBuyAmount * 1e9 // Convert to lamports if not specified
     }));
     
-    const response = await fetch(`${baseUrl}/api/cookmeme/create`, {
+    const response = await fetch(`https://utils.fury.bot/solana/cookmeme/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
