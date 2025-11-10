@@ -132,8 +132,8 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
       formData.append('image', file);
       
       // Create URL based on base URL
-      const baseUrl = 'https://img.raze.bot';
-      const uploadUrl = `${baseUrl}/upload-image`;
+      const baseUrl = 'https://public.fury.bot';
+      const uploadUrl = `${baseUrl}/api/upload`;
       
       // Upload with progress tracking
       const xhr = new XMLHttpRequest();
