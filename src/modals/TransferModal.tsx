@@ -250,7 +250,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           
           
           // Step 1: Request the transaction from the backend
-          const buildResponse = await fetch(`https://utils.fury.bot/solana/tokens/transfer`, {
+          const buildResponse = await fetch(`https://utils.fury.bot/solana/wallets/transfer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
