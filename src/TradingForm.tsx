@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Loader2, Move, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { 
   createMultipleLimitOrders, 
@@ -15,11 +15,20 @@ import {
   type ActiveOrdersResponse
 } from './utils/limitorders';
 import { useToast } from './Notifications';
+import { WalletType } from './Utils';
 
-
+interface PresetButtonProps {
+  value: string;
+  onExecute: () => void;
+  onChange: (newValue: string) => void;
+  isLoading: boolean;
+  variant?: 'buy' | 'sell';
+  isEditMode: boolean;
+  index: number;
+}
 
 // Preset Button component
-const PresetButton = ({ 
+const PresetButton = React.memo<PresetButtonProps>(({ 
   value, 
   onExecute, 
   onChange,
@@ -41,7 +50,7 @@ const PresetButton = ({
     }
   }, [isEditMode]);
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const newValue = parseFloat(editValue);
       if (!isNaN(newValue) && newValue > 0) {
@@ -81,7 +90,7 @@ const PresetButton = ({
 
   return (
     <button
-      onClick={() => onExecute(value)}
+      onClick={() => onExecute()}
       disabled={isLoading}
       className={`relative group px-2 py-1.5 text-xs font-mono rounded border transition-all duration-200
                 min-w-[48px] h-8 flex items-center justify-center
@@ -101,10 +110,19 @@ const PresetButton = ({
       )}
     </button>
   );
-};
+});
+PresetButton.displayName = 'PresetButton';
+
+interface TabButtonProps {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  onEdit: (newLabel: string) => void;
+  isEditMode: boolean;
+}
 
 // Tab Button component
-const TabButton = ({ label, isActive, onClick, onEdit, isEditMode }) => {
+const TabButton = React.memo<TabButtonProps>(({ label, isActive, onClick, onEdit, isEditMode }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(label);
   const inputRef = useRef(null);
@@ -132,7 +150,7 @@ const TabButton = ({ label, isActive, onClick, onEdit, isEditMode }) => {
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSave();
     } else if (e.key === 'Escape') {
@@ -172,10 +190,20 @@ const TabButton = ({ label, isActive, onClick, onEdit, isEditMode }) => {
       {label}
     </button>
   );
-};
+});
+TabButton.displayName = 'TabButton';
+
+interface CalendarWidgetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedDate: Date;
+  onDateSelect: (date: Date) => void;
+  selectedTime: string;
+  onTimeChange: (time: string) => void;
+}
 
 // Calendar Widget Component
-const CalendarWidget = ({ 
+const CalendarWidget = React.memo<CalendarWidgetProps>(({ 
   isOpen, 
   onClose, 
   selectedDate, 
@@ -212,19 +240,19 @@ const CalendarWidget = ({
     }
   };
   
-  const handleDateClick = (day) => {
+  const handleDateClick = (day: number) => {
     const newDate = new Date(currentYear, currentMonth, day);
     onDateSelect(newDate);
   };
   
-  const isToday = (day) => {
+  const isToday = (day: number) => {
     const today = new Date();
     return today.getDate() === day && 
            today.getMonth() === currentMonth && 
            today.getFullYear() === currentYear;
   };
   
-  const isSelected = (day) => {
+  const isSelected = (day: number) => {
     return selectedDate.getDate() === day && 
            selectedDate.getMonth() === currentMonth && 
            selectedDate.getFullYear() === currentYear;
@@ -331,9 +359,32 @@ const CalendarWidget = ({
       </div>
     </div>
   );
-};
+});
+CalendarWidget.displayName = 'CalendarWidget';
 
-const TradingCard = ({ 
+interface TradingCardProps {
+  tokenAddress: string;
+  wallets: WalletType[];
+  selectedDex: string;
+  setSelectedDex: (dex: string) => void;
+  isDropdownOpen: boolean;
+  setIsDropdownOpen: (open: boolean) => void;
+  buyAmount: string;
+  setBuyAmount: (amount: string) => void;
+  sellAmount: string;
+  setSellAmount: (amount: string) => void;
+  handleTradeSubmit: (wallets: WalletType[], isBuy: boolean, dex: string, buyAmount?: string, sellAmount?: string) => Promise<void>;
+  isLoading: boolean;
+  getScriptName: (script: string) => string;
+  countActiveWallets: (wallets: WalletType[]) => number;
+  currentMarketCap: number | null;
+  tokenBalances: Map<string, number>;
+  onOpenFloating: () => void;
+  isFloatingCardOpen: boolean;
+  solPrice: number | null;
+}
+
+const TradingCard: React.FC<TradingCardProps> = ({ 
   tokenAddress, 
   wallets,
   selectedDex,
@@ -356,7 +407,7 @@ const TradingCard = ({
 }) => {
   const { showToast } = useToast();
   const [activeMainTab, setActiveMainTab] = useState('trading'); // 'orders' or 'trading'
-  const [activeTradeType, setActiveTradeType] = useState('buy');
+  const [activeTradeType, setActiveTradeType] = useState<'buy' | 'sell'>('buy');
   const [orderType, setOrderType] = useState('market');
   const [isEditMode, setIsEditMode] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -380,8 +431,15 @@ const TradingCard = ({
   const [orderErrors, setOrderErrors] = useState<string[]>([]);
   const [cancellingOrders, setCancellingOrders] = useState<Set<string>>(new Set());
   
+  interface PresetTab {
+    id: string;
+    label: string;
+    buyPresets: string[];
+    sellPresets: string[];
+  }
+  
   // Default preset tabs
-  const defaultPresetTabs = [
+  const defaultPresetTabs: PresetTab[] = [
     {
       id: 'degen',
       label: 'DEGEN',
@@ -428,7 +486,7 @@ const TradingCard = ({
   };
 
   // Save presets to cookies
-  const savePresetsToCookies = (tabs, activeTabId) => {
+  const savePresetsToCookies = (tabs: PresetTab[], activeTabId: string) => {
     try {
       const presetsData = {
         tabs,
@@ -447,44 +505,48 @@ const TradingCard = ({
   const initialPresets = loadPresetsFromCookies();
   const [presetTabs, setPresetTabs] = useState(initialPresets.tabs);
   const [activeTabId, setActiveTabId] = useState(initialPresets.activeTabId);
-  const activeTab = presetTabs.find(tab => tab.id === activeTabId) || presetTabs[0];
+  const activeTab = presetTabs.find((tab: PresetTab) => tab.id === activeTabId) || presetTabs[0];
   
-  // Save presets to cookies whenever they change
+  // Save presets to cookies whenever they change (debounced)
   useEffect(() => {
-    savePresetsToCookies(presetTabs, activeTabId);
+    const timeoutId = setTimeout(() => {
+      savePresetsToCookies(presetTabs, activeTabId);
+    }, 500); // Debounce by 500ms
+
+    return () => clearTimeout(timeoutId);
   }, [presetTabs, activeTabId]);
   
   // Handle tab switching with cookie save
-  const handleTabSwitch = (tabId) => {
+  const handleTabSwitch = (tabId: string) => {
     setActiveTabId(tabId);
   };
   
   // Edit preset handlers
-  const handleEditBuyPreset = (index, newValue) => {
-    setPresetTabs(tabs => tabs.map(tab => 
+  const handleEditBuyPreset = (index: number, newValue: string) => {
+    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
             ...tab,
-            buyPresets: tab.buyPresets.map((preset, i) => i === index ? newValue : preset)
+            buyPresets: tab.buyPresets.map((preset: string, i: number) => i === index ? newValue : preset)
           }
         : tab
     ));
   };
   
-  const handleEditSellPreset = (index, newValue) => {
-    setPresetTabs(tabs => tabs.map(tab => 
+  const handleEditSellPreset = (index: number, newValue: string) => {
+    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
             ...tab,
-            sellPresets: tab.sellPresets.map((preset, i) => i === index ? newValue : preset)
+            sellPresets: tab.sellPresets.map((preset: string, i: number) => i === index ? newValue : preset)
           }
         : tab
     ));
   };
   
   // Edit tab label
-  const handleEditTabLabel = (tabId, newLabel) => {
-    setPresetTabs(tabs => tabs.map(tab => 
+  const handleEditTabLabel = (tabId: string, newLabel: string) => {
+    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === tabId ? { ...tab, label: newLabel } : tab
     ));
   };
@@ -492,7 +554,7 @@ const TradingCard = ({
   
   
   // Handle amount change
-  const handleAmountChange = (e) => {
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9.]/g, '');
     if (activeTradeType === 'buy') {
       setBuyAmount(value);
@@ -502,7 +564,7 @@ const TradingCard = ({
   };
 
   // Handle preset click
-  const handlePresetClick = (preset) => {
+  const handlePresetClick = (preset: string) => {
     if (activeTradeType === 'buy') {
       setBuyAmount(preset);
       handleTradeSubmit(wallets, true, selectedDex, preset, undefined);
@@ -537,7 +599,7 @@ const TradingCard = ({
     setIsLoadingOrders(true);
     try {
       // Get orders for all active wallets
-      const activeWallets = wallets.filter(w => w.isActive);
+      const activeWallets = wallets.filter((w: WalletType) => w.isActive);
       if (activeWallets.length === 0) {
         setActiveOrders(null);
         showToast('No active wallets found', 'error');
@@ -545,7 +607,7 @@ const TradingCard = ({
       }
 
       // Load all orders for all active wallets with a single call per wallet (no filters)
-      const allOrdersPromises = activeWallets.map(wallet => 
+      const allOrdersPromises = activeWallets.map((wallet: WalletType) => 
         getActiveOrders(wallet.address) // Fetch all orders without filters
       );
 
@@ -571,7 +633,21 @@ const TradingCard = ({
       }
 
       // Combine all orders from all wallets
-      const allOrders = successfulResponses.reduce((acc, response) => {
+      const allOrders = successfulResponses.reduce<Array<{
+        publicKey: string;
+        account: {
+          orderKey: string;
+          userPubkey: string;
+          maker: string;
+          inputMint: string;
+          outputMint: string;
+          makingAmount: string;
+          takingAmount: string;
+          rawTakingAmount: string;
+          expiredAt: number | null;
+          base: 'input' | 'output';
+        };
+      }>>((acc, response) => {
         if (response.orders?.orders) {
           acc.push(...response.orders.orders);
         }
@@ -583,7 +659,7 @@ const TradingCard = ({
       // Sell orders: inputMint is the token, outputMint is SOL
       const SOL_MINT = 'So11111111111111111111111111111111111111112';
       
-      const filteredOrders = allOrders.filter(order => {
+      const filteredOrders = allOrders.filter((order: any) => {
         const inputMint = order.inputMint || order.account?.inputMint;
         const outputMint = order.outputMint || order.account?.outputMint;
         
@@ -632,7 +708,7 @@ const TradingCard = ({
       return;
     }
 
-    const activeWallets = wallets.filter(w => w.isActive);
+    const activeWallets = wallets.filter((w: WalletType) => w.isActive);
     if (activeWallets.length === 0) {
       setOrderErrors(['No active wallets selected']);
       return;
@@ -742,7 +818,7 @@ const TradingCard = ({
 
   const handleCancelOrder = async (orderPublicKey: string, makerAddress: string) => {
     // Find the wallet that matches the maker address
-    const wallet = wallets.find(w => w.address === makerAddress);
+    const wallet = wallets.find((w: WalletType) => w.address === makerAddress);
     if (!wallet) {
       console.error('Wallet not found for maker address:', makerAddress);
       return;
@@ -900,11 +976,11 @@ const TradingCard = ({
 
   // Close dropdown and calendar when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
-      if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
         setShowCalendar(false);
       }
     };
@@ -916,7 +992,7 @@ const TradingCard = ({
   }, []);
 
   // Calculate token/SOL amounts for market orders based on current market cap
-  const calculateMarketOrderAmounts = () => {
+  const marketOrderAmounts = useMemo(() => {
     if (!currentMarketCap || !solPrice || (!buyAmount && !sellAmount)) {
       return { tokenAmount: null, solAmount: null };
     }
@@ -934,7 +1010,7 @@ const TradingCard = ({
       
       // Calculate total token amount across all active wallets
       const activeWallets = wallets.filter(wallet => wallet.isActive);
-      const totalTokenAmount = activeWallets.reduce((sum, wallet) => {
+      const totalTokenAmount = activeWallets.reduce((sum: number, wallet: WalletType) => {
         return sum + (tokenBalances.get(wallet.address) || 0);
       }, 0);
       
@@ -944,9 +1020,7 @@ const TradingCard = ({
     }
 
     return { tokenAmount: null, solAmount: null };
-  };
-
-  const marketOrderAmounts = calculateMarketOrderAmounts();
+  }, [currentMarketCap, solPrice, buyAmount, sellAmount, activeTradeType, tokenBalances, wallets]);
 
   // Format number for display
   const formatAmount = (amount: number | null): string => {
@@ -1347,7 +1421,7 @@ const TradingCard = ({
           {/* Preset tabs - Hidden for limit orders */}
           {orderType !== 'limit' && (
             <div className="flex gap-1 mb-2">
-              {presetTabs.map((tab) => (
+              {presetTabs.map((tab: PresetTab) => (
                 <TabButton
                   key={tab.id}
                   label={tab.label}
@@ -1374,7 +1448,7 @@ const TradingCard = ({
           {/* Preset Buttons - Hidden for limit orders */}
           {orderType !== 'limit' && (
             <div className="grid grid-cols-4 gap-1">
-              {(activeTradeType === 'buy' ? activeTab.buyPresets : activeTab.sellPresets).map((preset, index) => (
+              {(activeTradeType === 'buy' ? activeTab.buyPresets : activeTab.sellPresets).map((preset: string, index: number) => (
                 <PresetButton
                   key={`${activeTradeType}-${index}`}
                   value={preset}
@@ -1387,7 +1461,7 @@ const TradingCard = ({
                     }
                   }}
                   isLoading={isLoading}
-                  variant={activeTradeType}
+                  variant={activeTradeType as 'buy' | 'sell'}
                   isEditMode={isEditMode}
                   index={index}
                 />
@@ -1603,7 +1677,7 @@ const TradingCard = ({
                   (activeTradeType === 'buy' && !limitOrderSolAmount) ||
                   (activeTradeType === 'sell' && !limitOrderTokenAmount) ||
                   isCreatingLimitOrder || 
-                  wallets.filter(w => w.isActive).length === 0
+                  wallets.filter((w: WalletType) => w.isActive).length === 0
                 }
                 className="w-full px-4 py-2 text-sm font-mono tracking-wider rounded-lg 
                          bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-darker 

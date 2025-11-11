@@ -3,6 +3,7 @@ import bs58 from 'bs58';
 import Cookies from 'js-cookie';
 import CryptoJS from 'crypto-js';
 import { TradingStrategy } from './automate/types';
+import { formatAddress as _formatAddress, formatTokenBalance as _formatTokenBalance } from './utils/formatting';
 
 export interface WalletType {
   id: number;
@@ -222,10 +223,8 @@ export const importWallet = async (
   }
 };
 
-export const formatAddress = (address: string) => {
-  if (address.length < 8) return address;
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
-};
+// Re-export from shared formatting utilities for backward compatibility
+export const formatAddress = _formatAddress;
 
 export const getWalletDisplayName = (wallet: WalletType): string => {
   return wallet.label && wallet.label.trim() ? wallet.label : formatAddress(wallet.address);
@@ -350,7 +349,6 @@ export const fetchWalletBalances = async (
   currentSolBalances?: Map<string, number>,
   currentTokenBalances?: Map<string, number>
 ) => {
-  console.log(`Fetching balances for ${wallets.length} wallets...`);
   // Start with existing balances to preserve them on errors
   const newSolBalances = new Map(currentSolBalances || new Map<string, number>());
   const newTokenBalances = new Map(currentTokenBalances || new Map<string, number>());
@@ -363,7 +361,6 @@ export const fetchWalletBalances = async (
       // Fetch SOL balance
       const solBalance = await fetchSolBalance(connection, wallet.address);
       newSolBalances.set(wallet.address, solBalance);
-      console.log(`Wallet ${wallet.address}: ${solBalance} SOL`);
       
       // Update SOL balances immediately to show progress
       setSolBalances(new Map(newSolBalances));
@@ -372,7 +369,6 @@ export const fetchWalletBalances = async (
       if (tokenAddress) {
         const tokenBalance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
         newTokenBalances.set(wallet.address, tokenBalance);
-        console.log(`Wallet ${wallet.address}: ${tokenBalance} tokens`);
         
         // Update token balances immediately to show progress
         setTokenBalances(new Map(newTokenBalances));
@@ -387,9 +383,6 @@ export const fetchWalletBalances = async (
     }
   }
   
-  console.log('Final SOL balances:', newSolBalances);
-  console.log('Final token balances:', newTokenBalances);
-  
   return { solBalances: newSolBalances, tokenBalances: newTokenBalances };
 };
 
@@ -403,7 +396,6 @@ export const fetchSolBalances = async (
   setSolBalances: Function,
   onProgress?: (current: number, total: number) => void
 ) => {
-  console.log(`Fetching SOL balances for ${wallets.length} wallets...`);
   const newBalances = new Map<string, number>();
   
   // Process wallets sequentially with delay
@@ -413,7 +405,6 @@ export const fetchSolBalances = async (
     try {
       const balance = await fetchSolBalance(connection, wallet.address);
       newBalances.set(wallet.address, balance);
-      console.log(`Wallet ${wallet.address}: ${balance} SOL`);
     } catch (error) {
       console.error(`Error fetching SOL balance for ${wallet.address}:`, error);
       // Don't set balance to 0 on error - preserve existing balance or skip if no existing balance
@@ -431,7 +422,6 @@ export const fetchSolBalances = async (
   }
   
   // Update balances once at the end
-  console.log('Setting SOL balances:', newBalances);
   setSolBalances(newBalances);
   return newBalances;
 };
@@ -671,18 +661,10 @@ export const loadConfigFromCookies = (): ConfigType | null => {
   }
   return null;
 };
-export const formatTokenBalance = (balance: number | undefined): string => {
-  if (balance === undefined) return '0.00';
-  if (balance < 1000) return balance.toFixed(2);
-  
-  if (balance < 1_000_000) {
-    return `${(balance / 1000).toFixed(1)}K`;
-  }
-  if (balance < 1_000_000_000) {
-    return `${(balance / 1_000_000).toFixed(1)}M`;
-  }
-  return `${(balance / 1_000_000_000).toFixed(1)}B`;
-};
+
+// Re-export from shared formatting utilities for backward compatibility
+export const formatTokenBalance = _formatTokenBalance;
+
 export const downloadPrivateKey = (wallet: WalletType) => {
   const blob = new Blob([wallet.privateKey], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);

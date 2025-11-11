@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowsUpFromLine, DollarSign, X, CheckCircle, Info, Search, ChevronRight, Settings } from 'lucide-react';
 import { Connection } from '@solana/web3.js';
-import { useToast } from "../Notifications.tsx";
-import { WalletType, getWalletDisplayName } from '../Utils.tsx';
-import { batchMixSOL, validateMixingInputs } from '../utils/mixer.ts';
+import { useToast } from "../Notifications";
+import { WalletType, getWalletDisplayName } from '../Utils';
+import { batchMixSOL, validateMixingInputs } from '../utils/mixer';
 
 interface MixerModalProps {
   isOpen: boolean;
@@ -219,7 +219,8 @@ export const MixerModal: React.FC<MixerModalProps> = ({
       }
     } catch (error) {
       console.error('Mixing error:', error);
-      showToast("Mixing failed: " + (error.message || "Unknown error"), "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast("Mixing failed: " + (errorMessage || "Unknown error"), "error");
     } finally {
       setIsSubmitting(false);
     }

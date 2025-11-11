@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart2, CheckCircle, ChevronLeft, ChevronRight, Info, Search, X } from 'lucide-react';
-import { getWallets, getWalletDisplayName } from '../Utils.tsx';
-import PnlCard from '../PnlCard.tsx';
-import { useToast } from "../Notifications.tsx";
-import { loadConfigFromCookies } from '../Utils.tsx';
+import { getWallets, getWalletDisplayName } from '../Utils';
+import PnlCard from '../PnlCard';
+import { useToast } from "../Notifications";
+import { loadConfigFromCookies } from '../Utils';
 import { createPortal } from 'react-dom';
 
 const STEPS_PNL = ['Select Wallets', 'View Results', 'Share Card'];

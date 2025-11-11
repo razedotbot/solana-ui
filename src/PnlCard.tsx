@@ -65,7 +65,7 @@ const PnlCard: React.FC<PnlCardProps> = ({
   const summary = calculateSummary();
 
   // Format currency
-  const formatAmount = (amount) => {
+  const formatAmount = (amount: number) => {
     if (amount > 0) return `+${amount.toFixed(5)}`;
     return amount.toFixed(5);
   };

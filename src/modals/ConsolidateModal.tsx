@@ -4,7 +4,7 @@ import { ArrowDown, X, CheckCircle, DollarSign, Info, Search, ChevronRight } fro
 import { Connection } from '@solana/web3.js';
 import { useToast } from "../Notifications";
 import { WalletType, getWalletDisplayName } from '../Utils';
-
+import { formatAddress, formatSolBalance } from '../utils/formatting';
 import { consolidateSOL, validateConsolidationInputs } from '../utils/consolidate';
 
 interface ConsolidateModalProps {
@@ -44,16 +44,6 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
       resetForm();
     }
   }, [isOpen]);
-
-  // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
-    return balance.toFixed(4);
-  };
-
-  // Format wallet address for display
-  const formatAddress = (address: string) => {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
 
   // Get wallet SOL balance by address
   const getWalletBalance = (address: string): number => {
@@ -151,7 +141,8 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
       }
     } catch (error) {
       console.error('Consolidation error:', error);
-      showToast("Consolidation failed: " + (error.message || "Unknown error"), "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast("Consolidation failed: " + (errorMessage || "Unknown error"), "error");
     } finally {
       setIsSubmitting(false);
     }

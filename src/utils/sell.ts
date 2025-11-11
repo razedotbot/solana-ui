@@ -596,7 +596,7 @@ export const executeSell = async (
     console.error('Sell error:', error);
     return {
       success: false,
-      error: error.message || 'Unknown error executing sell'
+      error: error instanceof Error ? error.message : 'Unknown error executing sell'
     };
   }
 };

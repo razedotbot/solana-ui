@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Move, Search, ArrowDown, Trash2, Users, Wallet, Settings, Plus, Play, Pause, Edit, RotateCcw, Minimize2, Maximize2, Download, Upload } from 'lucide-react';
-import { getWalletDisplayName, WalletType, saveTradingStrategiesToCookies, loadTradingStrategiesFromCookies } from './Utils.tsx';
+import { X, Move, Search, ArrowDown, Trash2, Users, Wallet, Settings, Plus, Play, Pause, Edit, Minimize2, Maximize2, Download, Upload } from 'lucide-react';
+import { getWalletDisplayName, WalletType, saveTradingStrategiesToCookies, loadTradingStrategiesFromCookies } from './Utils';
+import { formatAddress, formatSolBalance, formatTokenBalance, formatPrice, formatLargeNumber, formatCount } from './utils/formatting';
 import { TradingCondition, TradingAction, TradingStrategy, StrategyBuilder } from './automate';
 import { generateStrategyId } from './automate/utils';
 import { executeTrade, TradingConfig, FormattedWallet } from './utils/trading';
@@ -122,47 +123,13 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   const strategyMonitorRef = useRef<NodeJS.Timeout | null>(null);
   
   // Wallet utility functions
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const formatSolBalance = (balance: number) => {
-    return balance.toFixed(4);
-  };
-
-  const formatTokenBalance = (balance: number) => {
-    return balance.toFixed(6);
-  };
-
-  const getWalletBalance = (address: string) => {
+  const getWalletBalance = useCallback((address: string) => {
     return solBalances.has(address) ? solBalances.get(address) : 0;
-  };
+  }, [solBalances]);
 
-  const getWalletTokenBalance = (address: string) => {
+  const getWalletTokenBalance = useCallback((address: string) => {
     return tokenBalances.has(address) ? tokenBalances.get(address) : 0;
-  };
-
-  // Helper functions for formatting live data
-  const formatPrice = (price: number | null | undefined): string => {
-    if (!price || price === 0 || typeof price !== 'number' || isNaN(price)) return '$--';
-    if (price < 0.000001) return `$${price.toExponential(2)}`;
-    if (price < 0.01) return `$${price.toFixed(6)}`;
-    return `$${price.toFixed(4)}`;
-  };
-
-  const formatLargeNumber = (num: number | null | undefined): string => {
-    if (!num || num === 0 || typeof num !== 'number' || isNaN(num)) return '--';
-    if (num >= 1000000000) return `$${(num / 1000000000).toFixed(2)}B`;
-    if (num >= 1000000) return `$${(num / 1000000).toFixed(2)}M`;
-    if (num >= 1000) return `$${(num / 1000).toFixed(2)}K`;
-    return `$${num.toFixed(2)}`;
-  };
-
-  const formatCount = (count: number | null | undefined): string => {
-    if (!count && count !== 0) return '--';
-    if (typeof count !== 'number' || isNaN(count)) return '--';
-    return count.toLocaleString();
-  };
+  }, [tokenBalances]);
 
   const formatSolToUSD = (solAmount: number): string => {
     const solPrice = iframeData?.solPrice || 0;
@@ -180,10 +147,10 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     return `${solAmount.toFixed(4)} SOL`;
   };
 
-  const hasInsufficientSOL = (address: string) => {
+  const hasInsufficientSOL = useCallback((address: string) => {
     const solBalance = getWalletBalance(address) || 0;
     return solBalance < 0.01;
-  };
+  }, [getWalletBalance]);
 
   // Minimize/Maximize functions
   const handleMinimize = () => {
@@ -206,7 +173,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   };
 
   // Trading strategy helper functions
-  const getCurrentMarketData = (): MarketData => {
+  const getCurrentMarketData = useCallback((): MarketData => {
     const latestTrade = nonWhitelistedTrades
       .filter(trade => trade.tokenMint === tokenAddress)
       .sort((a, b) => b.timestamp - a.timestamp)[0] || null;
@@ -243,7 +210,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       };
     });
     
-    const marketData = {
+    return {
       marketCap: iframeData?.marketCap || 0,
       buyVolume: cumulativeBuyVolume,
       sellVolume: cumulativeSellVolume,
@@ -253,30 +220,10 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       priceChange24h: 0, // TODO: Calculate from historical data
       whitelistActivity
     };
-    
-    console.log('[AutomateFloatingCard] Current market data:', {
-      ...marketData,
-      lastTrade: latestTrade ? {
-        type: latestTrade.type,
-        solAmount: latestTrade.solAmount,
-        timestamp: latestTrade.timestamp
-      } : null,
-      tokenAddress,
-      tradesCount: nonWhitelistedTrades.filter(trade => trade.tokenMint === tokenAddress).length
-    });
-    
-    return marketData;
-  };
+  }, [cumulativeBuyVolume, cumulativeSellVolume, iframeData, nonWhitelistedTrades, tokenAddress, tradingStrategies]);
 
-  const evaluateCondition = (condition: TradingCondition, marketData: MarketData): boolean => {
+  const evaluateCondition = useCallback((condition: TradingCondition, marketData: MarketData): boolean => {
     let currentValue: number;
-    
-    console.log(`[AutomateFloatingCard] Evaluating condition:`, {
-      type: condition.type,
-      operator: condition.operator,
-      targetValue: condition.value,
-      marketData
-    });
     
     // Handle whitelist activity condition type
     if (condition.type === 'whitelistActivity' && condition.whitelistAddress) {
@@ -284,7 +231,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       const addressActivity = marketData.whitelistActivity?.[address];
       
       if (!addressActivity) {
-        console.log(`[AutomateFloatingCard] No activity found for whitelisted address: ${address}`);
         return false;
       }
       
@@ -306,7 +252,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           currentValue = addressActivity.lastTrade?.type === 'buy' ? 1 : 0;
           break;
         default:
-          console.log(`[AutomateFloatingCard] Unknown whitelist activity type: ${condition.whitelistActivityType}`);
           return false;
       }
     } else {
@@ -335,12 +280,9 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           currentValue = marketData.lastTrade?.type === 'buy' ? 1 : 0;
           break;
         default:
-          console.log(`[AutomateFloatingCard] Unknown condition type: ${condition.type}`);
           return false;
       }
     }
-    
-    console.log(`[AutomateFloatingCard] Current value for ${condition.type}:`, currentValue);
     
     let result: boolean;
     switch (condition.operator) {
@@ -360,35 +302,14 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
         result = currentValue <= condition.value;
         break;
       default:
-        console.log(`[AutomateFloatingCard] Unknown operator: ${condition.operator}`);
         return false;
     }
     
-    console.log(`[AutomateFloatingCard] Condition evaluation result:`, {
-      currentValue,
-      operator: condition.operator,
-      targetValue: condition.value,
-      result
-    });
-    
     return result;
-  };
+  }, []);
 
-  const evaluateStrategy = (strategy: TradingStrategy, marketData: MarketData): boolean => {
-    console.log(`[AutomateFloatingCard] Evaluating strategy details: ${strategy.name}`, {
-      isActive: strategy.isActive,
-      conditionsLength: strategy.conditions.length,
-      lastExecuted: strategy.lastExecuted,
-      executionCount: strategy.executionCount,
-      maxExecutions: strategy.maxExecutions,
-      cooldown: strategy.cooldown
-    });
-    
+  const evaluateStrategy = useCallback((strategy: TradingStrategy, marketData: MarketData): boolean => {
     if (!strategy.isActive || strategy.conditions.length === 0) {
-      console.log(`[AutomateFloatingCard] Strategy ${strategy.name} failed basic checks:`, {
-        isActive: strategy.isActive,
-        hasConditions: strategy.conditions.length > 0
-      });
       return false;
     }
     
@@ -396,52 +317,28 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     if (strategy.lastExecuted) {
       const timeSinceLastExecution = Date.now() - strategy.lastExecuted;
       const cooldownMs = strategy.cooldown * 60 * 1000;
-      console.log(`[AutomateFloatingCard] Cooldown check for ${strategy.name}:`, {
-        timeSinceLastExecution,
-        cooldownMs,
-        isInCooldown: timeSinceLastExecution < cooldownMs
-      });
       if (timeSinceLastExecution < cooldownMs) return false;
     }
     
     // Check max executions
     if (strategy.maxExecutions && strategy.executionCount >= strategy.maxExecutions) {
-      console.log(`[AutomateFloatingCard] Max executions reached for ${strategy.name}:`, {
-        executionCount: strategy.executionCount,
-        maxExecutions: strategy.maxExecutions
-      });
       return false;
     }
     
     // Evaluate conditions
-    const conditionResults = strategy.conditions.map((condition, index) => {
-      const result = evaluateCondition(condition, marketData);
-      console.log(`[AutomateFloatingCard] Condition ${index} for ${strategy.name}:`, {
-        condition,
-        result,
-        marketData
-      });
-      return result;
+    const conditionResults = strategy.conditions.map((condition) => {
+      return evaluateCondition(condition, marketData);
     });
     
-    const finalResult = strategy.conditionLogic === 'and' 
+    return strategy.conditionLogic === 'and' 
       ? conditionResults.every(result => result)
       : conditionResults.some(result => result);
-    
-    console.log(`[AutomateFloatingCard] Final evaluation for ${strategy.name}:`, {
-      conditionLogic: strategy.conditionLogic,
-      conditionResults,
-      finalResult
-    });
-    
-    return finalResult;
-  };
+  }, [evaluateCondition]);
 
   // Load trading strategies from cookies on component initialization
   useEffect(() => {
     const savedStrategies = loadTradingStrategiesFromCookies();
     if (savedStrategies.length > 0) {
-      console.log('[AutomateFloatingCard] Loaded strategies from cookies:', savedStrategies.length);
       setTradingStrategies(savedStrategies);
     }
   }, []);
@@ -449,7 +346,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   // Save trading strategies to cookies whenever they change
   useEffect(() => {
     if (tradingStrategies.length > 0) {
-      console.log('[AutomateFloatingCard] Saving strategies to cookies:', tradingStrategies.length);
       saveTradingStrategiesToCookies(tradingStrategies);
     }
   }, [tradingStrategies]);
@@ -490,82 +386,38 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
   // Strategy monitoring and execution
   useEffect(() => {
-    console.log('[AutomateFloatingCard] Strategy monitoring effect triggered', {
-      strategiesCount: tradingStrategies.length,
-      strategies: tradingStrategies.map(s => ({ id: s.id, name: s.name, isActive: s.isActive })),
-      selectedWalletsCount: selectedWallets.length,
-      tokenAddress
-    });
-    
     // Clear existing interval first
     if (strategyMonitorRef.current) {
-      console.log('[AutomateFloatingCard] Clearing existing strategy monitor interval');
       clearInterval(strategyMonitorRef.current);
       strategyMonitorRef.current = null;
     }
     
     if (tradingStrategies.length === 0) {
-      console.log('[AutomateFloatingCard] No strategies found, monitor will not start');
       return;
     }
 
     const activeStrategies = tradingStrategies.filter(s => s.isActive);
     if (activeStrategies.length === 0) {
-      console.log('[AutomateFloatingCard] No active strategies found, monitor will not start');
       return;
     }
 
     // Monitor strategies every 5 seconds
-    console.log('[AutomateFloatingCard] Starting strategy monitor interval', {
-      activeStrategiesCount: activeStrategies.length,
-      selectedWalletsCount: selectedWallets.length
-    });
-    
-    // Test interval first
-    let tickCount = 0;
     strategyMonitorRef.current = setInterval(() => {
-      tickCount++;
-      console.log(`[AutomateFloatingCard] === Strategy Monitor Tick #${tickCount} ===`);
       const marketData = getCurrentMarketData();
-      console.log('[AutomateFloatingCard] Market data retrieved:', {
-        marketCap: marketData.marketCap,
-        buyVolume: marketData.buyVolume,
-        sellVolume: marketData.sellVolume,
-        lastTrade: marketData.lastTrade ? {
-          type: marketData.lastTrade.type,
-          solAmount: marketData.lastTrade.solAmount
-        } : null
-      });
-      
       const currentActiveStrategies = tradingStrategies.filter(s => s.isActive);
-      console.log('[AutomateFloatingCard] Active strategies to evaluate:', currentActiveStrategies.length);
       
       currentActiveStrategies.forEach(strategy => {
-        console.log(`[AutomateFloatingCard] Evaluating strategy: ${strategy.name}`, {
-          isActive: strategy.isActive,
-          conditionsCount: strategy.conditions.length,
-          actionsCount: strategy.actions.length,
-          selectedWalletsCount: selectedWallets.length
-        });
-        
         if (selectedWallets.length === 0) {
-          console.warn(`[AutomateFloatingCard] No wallets selected for strategy: ${strategy.name}`);
           return;
         }
         
         if (evaluateStrategy(strategy, marketData)) {
-          console.log(`[AutomateFloatingCard] Strategy conditions met, executing: ${strategy.name}`);
           executeStrategy(strategy, marketData);
-        } else {
-          console.log(`[AutomateFloatingCard] Strategy conditions not met: ${strategy.name}`);
         }
       });
-      
-      console.log('[AutomateFloatingCard] === End Strategy Monitor Tick ===');
     }, 5000);
 
     return () => {
-      console.log('[AutomateFloatingCard] Cleaning up strategy monitor interval');
       if (strategyMonitorRef.current) {
         clearInterval(strategyMonitorRef.current);
         strategyMonitorRef.current = null;
@@ -573,62 +425,9 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     };
   }, [tradingStrategies, selectedWallets, tokenAddress]);
 
-  const executeStrategy = async (strategy: TradingStrategy, marketData: MarketData) => {
-    console.log(`[AutomateFloatingCard] Executing strategy: ${strategy.name}`, {
-      actionsCount: strategy.actions.length,
-      marketData
-    });
-    
-    try {
-      // Update strategy execution count and timestamp
-      console.log(`[AutomateFloatingCard] Updating strategy execution count for: ${strategy.name}`);
-      setTradingStrategies(prev => prev.map(s => 
-        s.id === strategy.id 
-          ? { ...s, executionCount: s.executionCount + 1, lastExecuted: Date.now() }
-          : s
-      ));
-
-      // Execute each action in the strategy
-      console.log(`[AutomateFloatingCard] Executing ${strategy.actions.length} actions for strategy: ${strategy.name}`);
-      for (const action of strategy.actions) {
-        console.log(`[AutomateFloatingCard] Executing action:`, action);
-        await executeAction(action, strategy, marketData);
-      }
-
-      // Log successful execution
-      console.log(`[AutomateFloatingCard] Strategy execution completed successfully: ${strategy.name}`);
-      setStrategyExecutionLog(prev => [{
-        strategyId: strategy.id,
-        timestamp: Date.now(),
-        action: `Executed strategy: ${strategy.name}`,
-        result: 'success',
-        message: `Conditions met, executed ${strategy.actions.length} action(s)`
-      }, ...prev.slice(0, 49)]); // Keep last 50 logs
-
-    } catch (error) {
-      // Log execution error
-      console.error(`[AutomateFloatingCard] Strategy execution failed: ${strategy.name}`, error);
-      setStrategyExecutionLog(prev => [{
-        strategyId: strategy.id,
-        timestamp: Date.now(),
-        action: `Failed to execute strategy: ${strategy.name}`,
-        result: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      }, ...prev.slice(0, 49)]);
-    }
-  };
-
-  const executeAction = async (action: TradingAction, strategy: TradingStrategy, marketData: MarketData) => {
-    console.log(`[AutomateFloatingCard] Executing action:`, {
-      actionType: action.type,
-      selectedWalletsCount: selectedWallets.length,
-      action,
-      marketData
-    });
-    
+  const executeAction = useCallback(async (action: TradingAction, strategy: TradingStrategy, marketData: MarketData) => {
     // Use all wallets selected in the sidebar
     const walletsToUse = selectedWallets;
-    console.log(`[AutomateFloatingCard] Wallets to use:`, walletsToUse.map(w => ({ address: w.address, displayName: w.displayName })));
 
     if (walletsToUse.length === 0) {
       console.error('[AutomateFloatingCard] No wallets selected in sidebar for action execution');
@@ -636,31 +435,16 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     }
 
     // Execute action for each wallet
-    console.log(`[AutomateFloatingCard] Starting action execution for ${walletsToUse.length} wallets`);
     for (const wallet of walletsToUse) {
-      console.log(`[AutomateFloatingCard] Processing wallet: ${wallet.address}`);
-      
       // Check if wallet has sufficient balance
       const walletBalance = getWalletBalance(wallet.address) || 0;
-      console.log(`[AutomateFloatingCard] Wallet balance check:`, {
-        address: wallet.address,
-        balance: walletBalance,
-        hasInsufficientSOL: hasInsufficientSOL(wallet.address)
-      });
       
       if (hasInsufficientSOL(wallet.address)) {
-        console.warn(`[AutomateFloatingCard] Wallet ${wallet.address} has insufficient SOL balance (${walletBalance})`);
         continue;
       }
 
       // Calculate trade amount
       let tradeAmount: number;
-      console.log(`[AutomateFloatingCard] Calculating trade amount:`, {
-        amountType: action.amountType,
-        amount: action.amount,
-        volumeType: action.volumeType,
-        volumeMultiplier: action.volumeMultiplier
-      });
       
       if (action.amountType === 'sol') {
         tradeAmount = action.amount;
@@ -680,7 +464,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           const addressActivity = marketData.whitelistActivity?.[action.whitelistAddress];
           
           if (!addressActivity) {
-            console.log(`[AutomateFloatingCard] No activity found for whitelisted address: ${action.whitelistAddress}`);
             return;
           }
           
@@ -718,11 +501,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       } else {
         tradeAmount = action.amount; // fallback
       }
-      
-      console.log(`[AutomateFloatingCard] Calculated trade amount:`, {
-        tradeAmount,
-        actionType: action.type
-      });
 
       try {
         // Create trading config
@@ -731,16 +509,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           solAmount: action.type === 'buy' ? tradeAmount : undefined,
           sellPercent: action.type === 'sell' ? (action.amountType === 'percentage' ? action.amount : 100) : undefined
         };
-        
-        console.log(`[AutomateFloatingCard] Created trading config:`, tradingConfig);
-
-        // Format wallet for trading
-        const formattedWallet: FormattedWallet = {
-          address: wallet.address,
-          privateKey: wallet.privateKey
-        };
-        
-        console.log(`[AutomateFloatingCard] Formatted wallet:`, { address: formattedWallet.address });
 
         // Execute the trade using the trading utility
         const walletForTrading: WalletType = {
@@ -750,14 +518,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           isActive: true
         };
         
-        console.log(`[AutomateFloatingCard] Executing trade:`, {
-          dex: 'auto',
-          walletAddress: wallet.address,
-          isBuy: action.type === 'buy',
-          tradingConfig,
-          walletForTrading
-        });
-        
         const result = await executeTrade(
           'auto', // Use auto DEX selection
           [walletForTrading], // Convert to WalletType format
@@ -765,14 +525,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           action.type === 'buy',
           solBalances
         );
-        
-        console.log(`[AutomateFloatingCard] Trade execution completed:`, {
-          success: result.success,
-          error: result.error,
-          walletAddress: wallet.address
-        });
-        
-        console.log(`[AutomateFloatingCard] Trade execution result:`, result);
 
         // Log the result
         setStrategyExecutionLog(prev => [{
@@ -801,14 +553,50 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
         console.error(`Trading execution failed for wallet ${wallet.address}:`, error);
       }
     }
-  };
+  }, [selectedWallets, getWalletBalance, hasInsufficientSOL, tokenAddress, solBalances, setStrategyExecutionLog]);
+
+  const executeStrategy = useCallback(async (strategy: TradingStrategy, marketData: MarketData) => {
+    try {
+      // Update strategy execution count and timestamp
+      setTradingStrategies(prev => prev.map(s => 
+        s.id === strategy.id 
+          ? { ...s, executionCount: s.executionCount + 1, lastExecuted: Date.now() }
+          : s
+      ));
+
+      // Execute each action in the strategy
+      for (const action of strategy.actions) {
+        await executeAction(action, strategy, marketData);
+      }
+
+      // Log successful execution
+      setStrategyExecutionLog(prev => [{
+        strategyId: strategy.id,
+        timestamp: Date.now(),
+        action: `Executed strategy: ${strategy.name}`,
+        result: 'success',
+        message: `Conditions met, executed ${strategy.actions.length} action(s)`
+      }, ...prev.slice(0, 49)]); // Keep last 50 logs
+
+    } catch (error) {
+      // Log execution error
+      console.error(`[AutomateFloatingCard] Strategy execution failed: ${strategy.name}`, error);
+      setStrategyExecutionLog(prev => [{
+        strategyId: strategy.id,
+        timestamp: Date.now(),
+        action: `Failed to execute strategy: ${strategy.name}`,
+        result: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      }, ...prev.slice(0, 49)]);
+    }
+  }, [executeAction, setTradingStrategies, setStrategyExecutionLog]);
 
   const getAvailableWallets = () => {
     const selectedWalletKeys = selectedWallets.map(w => w.privateKey);
     return wallets.filter(wallet => !selectedWalletKeys.includes(wallet.privateKey));
   };
 
-  const filterWallets = (walletList: any[], search: string) => {
+  const filterWallets = useCallback((walletList: any[], search: string) => {
     let filtered = walletList;
     if (search) {
       filtered = filtered.filter(wallet => 
@@ -844,7 +632,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       }
       return 0;
     });
-  };
+  }, [walletBalanceFilter, walletSortOption, walletSortDirection, getWalletBalance, getWalletTokenBalance]);
 
   const addWallet = (wallet: any) => {
     const newWallet: SelectedWallet = {

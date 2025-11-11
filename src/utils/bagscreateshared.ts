@@ -383,10 +383,11 @@ export const sendLaunchTransactions = async (
         
       } catch (error) {
         console.error(`❌ Transaction ${i + 1} failed:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         results.push({ 
           jsonrpc: "2.0", 
           id: i + 1, 
-          error: { code: -1, message: error.message } 
+          error: { code: -1, message: errorMessage } 
         });
       }
     }
@@ -397,9 +398,10 @@ export const sendLaunchTransactions = async (
     };
   } catch (error) {
     console.error('Error sending transactions:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message
+      error: errorMessage
     };
   }
 };
@@ -523,7 +525,7 @@ export const signAndSendSharedConfigTransaction = async (
     console.error('Error signing and sending shared fees config transaction:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };
@@ -791,7 +793,7 @@ export const executeSharedFeesBagsCreate = async (
     console.error('Shared fees bags create error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };

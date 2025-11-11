@@ -207,7 +207,7 @@ export const distributeSOL = async (
     console.error('SOL distribution error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };
@@ -329,7 +329,7 @@ export const batchDistributeSOL = async (
     console.error('Batch SOL distribution error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };

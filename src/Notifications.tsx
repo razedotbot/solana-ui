@@ -1,5 +1,5 @@
 import React, { useEffect, useState, createContext, useContext } from "react"
-import { AlertCircle, CheckCircle2, X, ZapIcon } from "lucide-react"
+import { AlertCircle, X, ZapIcon } from "lucide-react"
 
 interface Toast {
   id: number

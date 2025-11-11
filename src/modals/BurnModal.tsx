@@ -222,7 +222,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
         console.log('Transaction successfully submitted to Jito:', submitResult);
       } catch (error) {
         console.error('Error submitting transaction:', error);
-        throw new Error(`Failed to submit transaction: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to submit transaction: ${errorMessage}`);
       }
 
       showToast("Token burn completed successfully", "success");
@@ -230,7 +231,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       onClose();
     } catch (error) {
       console.error('Error:', error);
-      showToast(`Token burn failed: ${error.message || 'Unknown error'}`, "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(`Token burn failed: ${errorMessage || 'Unknown error'}`, "error");
     } finally {
       setIsSubmitting(false);
     }

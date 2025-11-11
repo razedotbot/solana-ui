@@ -85,7 +85,7 @@ const executeUnifiedBuy = async (
 
     return await executeBuy(wallets, buyConfig);
   } catch (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 };
 
@@ -155,7 +155,7 @@ const executeUnifiedSell = async (
 
     return await executeSell(wallets, sellConfig);
   } catch (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 };
 
@@ -190,7 +190,7 @@ export const executeTrade = async (
       return await executeUnifiedSell(formattedWallets, config);
     }
   } catch (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 
 };

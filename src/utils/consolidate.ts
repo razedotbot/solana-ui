@@ -244,7 +244,7 @@ export const consolidateSOL = async (
     console.error('SOL consolidation error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };

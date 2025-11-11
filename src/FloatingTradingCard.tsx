@@ -1,53 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, X, Move, Edit3, Plus, Check, ChevronDown, Sparkles } from 'lucide-react';
-import { loadConfigFromCookies, WalletType } from './Utils';
+import { Loader2, X, Move, Edit3, Check } from 'lucide-react';
+import { WalletType } from './Utils';
 import { ScriptType } from './utils/wallets';
+import { formatNumber } from './utils/formatting';
 
-// Helper function to format numbers with k, M, B suffixes
-const formatNumber = (num) => {
-  const number = parseFloat(num);
-  if (isNaN(number) || number === 0) return "0";
-  
-  const absNum = Math.abs(number);
-  
-  if (absNum >= 1000000000) {
-    return (number / 1000000000).toFixed(2).replace(/\.?0+$/, '') + 'B';
-  } else if (absNum >= 1000000) {
-    return (number / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
-  } else if (absNum >= 1000) {
-    return (number / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k';
-  } else if (absNum >= 1) {
-    return number.toFixed(2).replace(/\.?0+$/, '');
-  } else {
-    // For very small numbers, show more decimal places
-    return number.toFixed(6).replace(/\.?0+$/, '');
-  }
-};
-
-// Cyberpunk Tooltip component
-const Tooltip = ({ children, content, position = 'top' }) => {
-  const positionClasses = {
-    top: 'bottom-full mb-2 left-1/2 -translate-x-1/2',
-    bottom: 'top-full mt-2 left-1/2 -translate-x-1/2',
-    left: 'right-full mr-2 top-1/2 -translate-y-1/2',
-    right: 'left-full ml-2 top-1/2 -translate-y-1/2'
-  };
-
-  return (
-    <div className="relative group">
-      {children}
-      <div className={`absolute hidden group-hover:block px-3 py-1.5 text-xs font-mono tracking-wide
-                    bg-app-primary color-primary rounded-lg backdrop-blur-md
-                    border border-app-primary-40 shadow-lg shadow-black-80
-                    ${positionClasses[position]} z-50 whitespace-nowrap`}>
-        <div className="relative z-10">{content}</div>
-      </div>
-    </div>
-  );
-};
+interface PresetButtonProps {
+  value: string;
+  onExecute: (amount: string) => Promise<void>;
+  onChange: (newValue: string) => void;
+  isLoading: boolean;
+  variant?: 'buy' | 'sell';
+  isEditMode: boolean;
+  index: number;
+}
 
 // Preset Button component
-const PresetButton = ({ 
+const PresetButton = React.memo<PresetButtonProps>(({ 
   value, 
   onExecute, 
   onChange,
@@ -69,7 +37,7 @@ const PresetButton = ({
     }
   }, [isEditMode]);
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const newValue = parseFloat(editValue);
       if (!isNaN(newValue) && newValue > 0) {
@@ -127,10 +95,19 @@ const PresetButton = ({
       )}
     </button>
   );
-};
+});
+PresetButton.displayName = 'PresetButton';
+
+interface TabButtonProps {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  onEdit: (newLabel: string) => void;
+  isEditMode: boolean;
+}
 
 // Tab Button component
-const TabButton = ({ label, isActive, onClick, onEdit, isEditMode }) => {
+const TabButton = React.memo<TabButtonProps>(({ label, isActive, onClick, onEdit, isEditMode }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(label);
   const inputRef = useRef(null);
@@ -156,7 +133,7 @@ const TabButton = ({ label, isActive, onClick, onEdit, isEditMode }) => {
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSave();
     } else if (e.key === 'Escape') {
@@ -196,7 +173,8 @@ const TabButton = ({ label, isActive, onClick, onEdit, isEditMode }) => {
       {label}
     </button>
   );
-};
+});
+TabButton.displayName = 'TabButton';
 
 interface FloatingTradingCardProps {
   isOpen: boolean;
@@ -250,13 +228,20 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
-  const [manualProtocol, setManualProtocol] = useState(null);
+  const [manualProtocol, setManualProtocol] = useState<string | null>(null);
   
   const cardRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   
+  interface PresetTab {
+    id: string;
+    label: string;
+    buyPresets: string[];
+    sellPresets: string[];
+  }
+  
   // Default preset tabs
-  const defaultPresetTabs = [
+  const defaultPresetTabs: PresetTab[] = [
     {
       id: 'degen',
       label: 'DEGEN',
@@ -303,7 +288,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   };
 
   // Save presets to cookies
-  const savePresetsToCookies = (tabs, activeTabId) => {
+  const savePresetsToCookies = (tabs: PresetTab[], activeTabId: string) => {
     try {
       const presetsData = {
         tabs,
@@ -322,7 +307,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   const initialPresets = loadPresetsFromCookies();
   const [presetTabs, setPresetTabs] = useState(initialPresets.tabs);
   const [activeTabId, setActiveTabId] = useState(initialPresets.activeTabId);
-  const activeTab = presetTabs.find(tab => tab.id === activeTabId) || presetTabs[0];
+  const activeTab = presetTabs.find((tab: PresetTab) => tab.id === activeTabId) || presetTabs[0];
   
   // Save presets to cookies whenever they change
   useEffect(() => {
@@ -342,42 +327,42 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   }, [tokenAddress]);
   
   // Handle tab switching with cookie save
-  const handleTabSwitch = (tabId) => {
+  const handleTabSwitch = (tabId: string) => {
     setActiveTabId(tabId);
   };
   
   // Edit preset handlers
-  const handleEditBuyPreset = (index, newValue) => {
-    setPresetTabs(tabs => tabs.map(tab => 
+  const handleEditBuyPreset = (index: number, newValue: string) => {
+    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
             ...tab,
-            buyPresets: tab.buyPresets.map((preset, i) => i === index ? newValue : preset)
+            buyPresets: tab.buyPresets.map((preset: string, i: number) => i === index ? newValue : preset)
           }
         : tab
     ));
   };
   
-  const handleEditSellPreset = (index, newValue) => {
-    setPresetTabs(tabs => tabs.map(tab => 
+  const handleEditSellPreset = (index: number, newValue: string) => {
+    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
             ...tab,
-            sellPresets: tab.sellPresets.map((preset, i) => i === index ? newValue : preset)
+            sellPresets: tab.sellPresets.map((preset: string, i: number) => i === index ? newValue : preset)
           }
         : tab
     ));
   };
   
   // Edit tab label
-  const handleEditTabLabel = (tabId, newLabel) => {
-    setPresetTabs(tabs => tabs.map(tab => 
+  const handleEditTabLabel = (tabId: string, newLabel: string) => {
+    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === tabId ? { ...tab, label: newLabel } : tab
     ));
   };
   
   // Handle trade submission
-  const handleTrade = useCallback(async (amount, isBuy) => {
+  const handleTrade = useCallback(async (amount: string, isBuy: boolean) => {
     const dexToUse = manualProtocol || selectedDex;
     
     // Set the amount in parent state and call handleTradeSubmit with the specific amount
@@ -487,7 +472,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
         
         {/* Preset Tabs */}
         <div className="flex gap-1 mb-4">
-          {presetTabs.map((tab) => (
+          {presetTabs.map((tab: PresetTab) => (
             <TabButton
               key={tab.id}
               label={tab.label}
@@ -509,7 +494,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
             </div>
             
             <div className="grid grid-cols-4 gap-2">
-              {activeTab.buyPresets.map((preset, index) => (
+              {activeTab.buyPresets.map((preset: string, index: number) => (
                 <PresetButton
                   key={index}
                   value={preset}
@@ -532,7 +517,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
             </div>
             
             <div className="grid grid-cols-4 gap-2">
-              {activeTab.sellPresets.map((preset, index) => (
+              {activeTab.sellPresets.map((preset: string, index: number) => (
                 <PresetButton
                   key={index}
                   value={preset}

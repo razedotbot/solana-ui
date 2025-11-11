@@ -190,7 +190,7 @@ const decodeTransaction = (transactionStr: string): Uint8Array => {
     } catch (error) {
       // If both fail, log more context and rethrow
       console.error('Failed to decode transaction. First few characters:', transactionStr.substring(0, 20));
-      throw new Error(`Could not decode transaction: ${error.message}`);
+      throw new Error(`Could not decode transaction: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 };
@@ -395,7 +395,7 @@ export const executeBonkCreate = async (
     console.error('Bonk create error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };

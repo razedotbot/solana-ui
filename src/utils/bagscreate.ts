@@ -265,9 +265,10 @@ export const signAndSendConfigTransaction = async (
     }
   } catch (error) {
     console.error('Error signing and sending config transaction:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message
+      error: errorMessage
     };
   }
 };
@@ -509,7 +510,7 @@ export const executeBagsCreate = async (
     console.error('Bags create error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };

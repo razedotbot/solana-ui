@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, ExternalLink, DollarSign, Activity, Zap, Check, TrendingDown } from 'lucide-react';
-import { saveWalletsToCookies, WalletType, formatAddress, formatTokenBalance, copyToClipboard, toggleWallet, getWalletDisplayName } from './Utils';
+import { RefreshCw, DollarSign, Activity, Zap, TrendingDown } from 'lucide-react';
+import { saveWalletsToCookies, WalletType, copyToClipboard, toggleWallet, getWalletDisplayName } from './Utils';
+import { formatAddress, formatTokenBalance } from './utils/formatting';
 import { useToast } from "./Notifications";
 import { Connection } from '@solana/web3.js';
-import { WalletOperationsButtons } from './OperationsWallets'; // Import the new component
+import { WalletOperationsButtons } from './OperationsWallets';
 import { executeBuy, createBuyConfig, validateBuyInputs } from './utils/buy';
 import { executeSell, createSellConfig, validateSellInputs } from './utils/sell';
 import { 
@@ -15,44 +16,7 @@ import {
   toggleWalletsByBalance, 
   getScriptName 
 } from './utils/wallets';
-
-// Tooltip Component with cyberpunk styling
-export const Tooltip = ({ 
-  children, 
-  content,
-  position = 'top'
-}: { 
-  children: React.ReactNode;
-  content: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  const positionClasses = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2'
-  };
-
-  return (
-    <div className="relative inline-block">
-      <div
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-      >
-        {children}
-      </div>
-      {isVisible && (
-        <div className={`absolute z-50 ${positionClasses[position]}`}>
-          <div className="bg-app-quaternary cyberpunk-border color-primary text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-            {content}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import { Tooltip } from './components/Tooltip';
 
 interface WalletsPageProps {
   wallets: WalletType[];
@@ -160,21 +124,26 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   const prevSolBalancesRef = useRef<Map<string, number>>(new Map());
   const prevTokenBalancesRef = useRef<Map<string, number>>(new Map());
 
-
+  // Efficient Map comparison helper
+  const mapsEqual = (map1: Map<string, number>, map2: Map<string, number>): boolean => {
+    if (map1.size !== map2.size) return false;
+    for (const [key, value] of map1) {
+      if (map2.get(key) !== value) return false;
+    }
+    return true;
+  };
 
   // Monitor balance changes to show visual feedback for trade updates
   useEffect(() => {
     const prevSolBalances = prevSolBalancesRef.current;
     const prevTokenBalances = prevTokenBalancesRef.current;
     
-    // Create a serialized version of current balances to compare
-    const currentSolString = JSON.stringify(Array.from(solBalances.entries()).sort());
-    const currentTokenString = JSON.stringify(Array.from(tokenBalances.entries()).sort());
-    const prevSolString = JSON.stringify(Array.from(prevSolBalances.entries()).sort());
-    const prevTokenString = JSON.stringify(Array.from(prevTokenBalances.entries()).sort());
+    // Efficient comparison without JSON.stringify
+    const solBalancesChanged = !mapsEqual(solBalances, prevSolBalances);
+    const tokenBalancesChanged = !mapsEqual(tokenBalances, prevTokenBalances);
     
     // Only proceed if balances actually changed
-    if (currentSolString === prevSolString && currentTokenString === prevTokenString) {
+    if (!solBalancesChanged && !tokenBalancesChanged) {
       return;
     }
     

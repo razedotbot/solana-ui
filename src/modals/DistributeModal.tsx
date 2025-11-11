@@ -219,7 +219,8 @@ export const DistributeModal: React.FC<DistributeModalProps> = ({
       }
     } catch (error) {
       console.error('Distribution error:', error);
-      showToast("Distribution failed: " + (error.message || "Unknown error"), "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast("Distribution failed: " + (errorMessage || "Unknown error"), "error");
     } finally {
       setIsSubmitting(false);
     }

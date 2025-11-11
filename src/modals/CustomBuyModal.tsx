@@ -310,7 +310,8 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
       
     } catch (error) {
       console.error('CUSTOM BUY execution error:', error);
-      showToast(`CUSTOM BUY operation failed: ${error.message}`, 'error');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(`CUSTOM BUY operation failed: ${errorMessage}`, 'error');
     } finally {
       setIsSubmitting(false);
       setCurrentTransactionIndex(0);

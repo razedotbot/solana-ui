@@ -225,7 +225,7 @@ export const mixSOLToSingleRecipient = async (
     console.error('SOL mixing error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };
@@ -384,7 +384,7 @@ export const batchMixSOL = async (
     console.error('Batch SOL mixing error:', error);
     return {
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 };

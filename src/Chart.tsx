@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Search, AlertCircle, BarChart } from 'lucide-react';
 import { WalletType, getWalletDisplayName } from './Utils';
@@ -177,7 +177,7 @@ const IconButton: React.FC<{
   title: string;
   variant?: 'primary' | 'secondary' | 'solid';
   className?: string;
-}> = ({ icon, onClick, title, variant = 'primary', className = '' }) => {
+}> = React.memo(({ icon, onClick, title, variant = 'primary', className = '' }) => {
   const variants = {
     primary: 'bg-primary-20 hover:bg-primary-30 text-app-tertiary',
     secondary: 'bg-app-secondary hover:bg-app-tertiary text-app-primary',
@@ -194,7 +194,8 @@ const IconButton: React.FC<{
         {icon}
       </motion.button>
   );
-};
+});
+IconButton.displayName = 'IconButton';
 
 export const ChartPage: React.FC<ChartPageProps> = ({
   isLoadingChart,
@@ -249,9 +250,8 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   } | null>(null);
 
   // Calculate market cap from token price and SOL price
-  const calculateMarketCap = (tokenPriceData: typeof tokenPrice, solPriceData: number | null): number | null => {
+  const calculateMarketCap = useCallback((tokenPriceData: typeof tokenPrice, solPriceData: number | null): number | null => {
     if (!tokenPriceData || !solPriceData) {
-      console.log('Market cap calculation skipped - missing data:', { tokenPrice: tokenPriceData, solPrice: solPriceData });
       return null;
     }
     
@@ -262,31 +262,33 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     const marketCapInUSD = tokenPriceData.tokenPrice * tokenSupply * solPriceData;
     
     return marketCapInUSD;
-  };
+  }, []);
+
+  // Memoize iframe data object to prevent unnecessary parent re-renders
+  const iframeDataObject = useMemo(() => {
+    const marketCap = calculateMarketCap(tokenPrice, solPrice);
+    return {
+      tradingStats,
+      solPrice,
+      currentWallets,
+      recentTrades,
+      tokenPrice,
+      marketCap
+    };
+  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, calculateMarketCap]);
 
   // Notify parent component of data updates (excluding currentWallets to prevent balance updates on selection)
   useEffect(() => {
     if (onDataUpdate) {
-      const marketCap = calculateMarketCap(tokenPrice, solPrice);
-      
-      onDataUpdate({
-        tradingStats,
-        solPrice,
-        currentWallets,
-        recentTrades,
-        tokenPrice,
-        marketCap
-      });
+      onDataUpdate(iframeDataObject);
     }
-  }, [tradingStats, solPrice, recentTrades, tokenPrice, onDataUpdate]);
+  }, [iframeDataObject]);
 
 
   
   // Setup iframe message listener
   useEffect(() => {
     const handleMessage = (event: MessageEvent<IframeResponse>) => {
-      //console.log('Received iframe message:', event.data);
-      
       switch (event.data.type) {
         case 'IFRAME_READY':
           setIsIframeReady(true);
@@ -303,15 +305,12 @@ export const ChartPage: React.FC<ChartPageProps> = ({
           break;
         
         case 'WALLETS_ADDED':
-          console.log(`Successfully added ${event.data.count} wallets to iframe`);
           break;
         
         case 'WALLETS_CLEARED':
-          console.log('Cleared all iframe wallets');
           break;
         
         case 'CURRENT_WALLETS':
-          console.log('Current wallets in iframe:', event.data.wallets);
           setCurrentWallets(event.data.wallets);
           break;
         
@@ -323,7 +322,6 @@ export const ChartPage: React.FC<ChartPageProps> = ({
         
         case 'SOL_PRICE_UPDATE': {
           const response = event.data as SolPriceUpdateResponse;
-          console.log('SOL price updated:', response.data.solPrice);
           setSolPrice(response.data.solPrice);
           break;
         }
@@ -378,6 +376,11 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     iframeRef.current.contentWindow?.postMessage(message, '*');
   };
 
+  // Memoize wallet addresses for stable dependency comparison
+  const walletAddresses = useMemo(() => {
+    return wallets.map(w => w.address);
+  }, [wallets]);
+
   // Send wallets to iframe only when addresses change (not selection changes)
   useEffect(() => {
     if (wallets && wallets.length > 0) {
@@ -398,7 +401,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     }
   }, [
     // Only trigger when wallet addresses change, not when isActive changes
-    wallets.map(w => w.address).join(','), 
+    walletAddresses, 
     wallets.length, 
     isIframeReady
   ]);

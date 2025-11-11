@@ -1,29 +1,22 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-   Download, 
-   Settings2,
    ChevronDown, 
    Share2,
-   Waypoints,
    Blocks,
    Trash2,
    ChartSpline,
-   Send,
    Workflow,
-   Sparkles,
    Activity,
-   TrendingUp,
-   Users,
-   BarChart,
    Coins,
    Bot
  } from 'lucide-react';
 import { brand } from './config/brandConfig';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
-import { WalletType, loadConfigFromCookies } from "./Utils";
+import { WalletType } from "./Utils";
 import { useToast } from "./Notifications";
 import { countActiveWallets, getScriptName } from './utils/wallets';
 import TradingCard from './TradingForm';
+import { Tooltip } from './components/Tooltip';
 
 import { executeTrade } from './utils/trading';
 
@@ -100,44 +93,6 @@ interface ActionsPageProps {
   } | null;
 }
 
-// Simplified Tooltip component without animations
-export const Tooltip = ({ 
-  children, 
-  content,
-  position = 'top'
-}: { 
-  children: React.ReactNode;
-  content: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  const positionClasses = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2'
-  };
-
-  return (
-    <div className="relative inline-block">
-      <div
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-      >
-        {children}
-      </div>
-      {isVisible && (
-        <div className={`absolute z-50 ${positionClasses[position]}`}>
-          <div className="bg-app-quaternary border border-app-primary-40 color-primary text-xs px-2 py-1 rounded 
-                         shadow-lg shadow-app-primary-20 whitespace-nowrap font-mono tracking-wide">
-            {content}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 // Cyberpunk-themed DataBox with minimal clean column layout
 const DataBox: React.FC<{
   iframeData?: {
@@ -163,7 +118,7 @@ const DataBox: React.FC<{
   } | null;
   tokenAddress: string;
   tokenBalances: Map<string, number>;
-}> = ({ iframeData, tokenAddress, tokenBalances }) => {
+}> = React.memo(({ iframeData, tokenAddress, tokenBalances }) => {
   const [showUSD, setShowUSD] = useState(false);
   
   if (!tokenAddress || !iframeData) return null;
@@ -344,7 +299,9 @@ const DataBox: React.FC<{
       </div>
     </div>
   );
-};
+});
+DataBox.displayName = 'DataBox';
+
 export const ActionsPage: React.FC<ActionsPageProps> = ({ 
   tokenAddress, 
   setTokenAddress,
@@ -385,7 +342,15 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(false); // Auto redirect to token after buy
 
 
-  const handleTradeSubmit = async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string, tokenAddressParam?: string) => {
+  // Wrapper function to match TradingForm's expected signature
+  const getScriptNameWrapper = useCallback((script: string): string => {
+    // TradingForm passes the script name directly, so we just return it
+    // The original getScriptName takes (selectedDex, isBuyMode) but TradingForm
+    // already has the script name, so we return it as-is
+    return script;
+  }, []);
+
+  const handleTradeSubmit = useCallback(async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string, tokenAddressParam?: string) => {
     setIsLoading(true);
     
     // Use tokenAddressParam if provided, otherwise use the component's tokenAddress
@@ -410,8 +375,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
          )
        };
       
-      console.log(`Executing ${isBuyMode ? 'Buy' : 'Sell'} on ${dexToUse} for ${tokenAddressToUse}`);
-      
       // Execute trade using centralized logic
       const result = await executeTrade(dexToUse, wallets, config, isBuyMode, solBalances);
       
@@ -422,27 +385,25 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       }
     } catch (error) {
       console.error(`Trading error:`, error);
-      showToast(`Error: ${error.message}`, "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(`Error: ${errorMessage}`, "error");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [tokenAddress, selectedDex, solBalances, showToast, setIsLoading]);
 
   // Handle iframe messages for TOKEN_SELECTED and TOKEN_BUY
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Handle TOKEN_SELECTED message (only for token selection, no auto-buy)
       if (event.data && event.data.type === 'TOKEN_SELECTED') {
-        console.log('Received TOKEN_SELECTED message:', event.data);
+        // Message received
       }
       
       // Handle TOKEN_BUY message for quick buy functionality
       if (event.data && event.data.type === 'TOKEN_BUY') {
-        console.log('Received TOKEN_BUY message:', event.data);
-        
         // Try different possible property names for the token address
         const tokenMint = event.data.tokenMint || event.data.tokenAddress || event.data.token || event.data.mint;
-        console.log('Quick buy requested for token:', tokenMint);
         
         if (tokenMint) {
           // Get active wallets
@@ -483,7 +444,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     const sendQuickBuyActivate = () => {
       const iframe = document.querySelector('iframe');
       if (iframe && iframe.contentWindow && !tokenAddress) {
-        console.log('Sending QUICKBUY_ACTIVATE to iframe on load (no token set)');
         iframe.contentWindow.postMessage({
           type: 'QUICKBUY_ACTIVATE'
         }, '*');
@@ -551,13 +511,13 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             setSellAmount={setSellAmount}
             handleTradeSubmit={handleTradeSubmit}
             isLoading={isLoading}
-            getScriptName={getScriptName}
+            getScriptName={getScriptNameWrapper}
             countActiveWallets={countActiveWallets}
             currentMarketCap={currentMarketCap}
             tokenBalances={tokenBalances}
             onOpenFloating={onOpenFloating}
             isFloatingCardOpen={isFloatingCardOpen}
-            solPrice={iframeData?.solPrice}
+            solPrice={iframeData?.solPrice ?? null}
           />
         ) : (
           <div className="relative overflow-hidden rounded-xl shadow-xl bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm p-6 border border-app-primary-20">

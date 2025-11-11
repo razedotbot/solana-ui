@@ -1,8 +1,8 @@
 import React, { useEffect, lazy, useCallback, useReducer, useMemo, useState } from 'react';
 import { ChevronDown, Settings, Globe, Wifi, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Connection } from '@solana/web3.js';
-import ServiceSelector from './Menu.tsx';
-import { WalletTooltip, initStyles } from './styles/Styles.tsx';
+import ServiceSelector from './Menu';
+import { WalletTooltip, initStyles } from './styles/Styles';
 import { 
   saveWalletsToCookies,
   loadWalletsFromCookies,
@@ -28,7 +28,7 @@ import {
   handleApiKeyFromUrl
 } from './Manager';
 import { countActiveWallets, getScriptName } from './utils/wallets';
-import { executeTrade } from './utils/trading.ts';
+import { executeTrade } from './utils/trading';
 
 // Extend Window interface to include server-related properties
 declare global {
@@ -48,10 +48,10 @@ const ActionsPage = lazy(() => import('./Actions').then(module => ({ default: mo
 const MobileLayout = lazy(() => import('./Mobile'));
 
 // Import modal components 
-const BurnModal = lazy(() => import('./modals/BurnModal.tsx').then(module => ({ default: module.BurnModal })));
-const PnlModal = lazy(() => import('./modals/CalculatePNLModal.tsx').then(module => ({ default: module.PnlModal })));
-const DeployModal = lazy(() => import('./modals/DeployModal.tsx').then(module => ({ default: module.DeployModal })));
-const CustomBuyModal = lazy(() => import('./modals/CustomBuyModal.tsx').then(module => ({ default: module.CustomBuyModal })));
+const BurnModal = lazy(() => import('./modals/BurnModal').then(module => ({ default: module.BurnModal })));
+const PnlModal = lazy(() => import('./modals/CalculatePNLModal').then(module => ({ default: module.PnlModal })));
+const DeployModal = lazy(() => import('./modals/DeployModal').then(module => ({ default: module.DeployModal })));
+const CustomBuyModal = lazy(() => import('./modals/CustomBuyModal').then(module => ({ default: module.CustomBuyModal })));
 const FloatingTradingCard = lazy(() => import('./FloatingTradingCard'));
 const AutomateFloatingCard = lazy(() => import('./AutomateFloatingCard'));
 
@@ -125,7 +125,6 @@ const ServerRegionSelector: React.FC = () => {
         const server = availableServers.find(s => s.id === serverId);
         if (server) {
           setCurrentRegion(server.region);
-          console.log(`Switched to ${server.name} server`);
         }
       } else {
         console.error('Failed to switch server');
@@ -617,6 +616,11 @@ const WalletManager: React.FC = () => {
     };
   }, [state.solBalances, state.tokenBalances, state.wallets]);
 
+  // Memoized wallet addresses array for stable dependency comparison
+  const walletAddresses = useMemo(() => {
+    return state.wallets.map(w => w.address);
+  }, [state.wallets]);
+
   // Memoized callbacks to prevent unnecessary re-renders
   const memoizedCallbacks = useMemo(() => ({
     setCopiedAddress: (address: string | null) => dispatch({ type: 'SET_COPIED_ADDRESS', payload: address }),
@@ -717,7 +721,7 @@ const WalletManager: React.FC = () => {
     if (state.iframeData?.marketCap !== undefined) {
       memoizedCallbacks.setCurrentMarketCap(state.iframeData.marketCap);
     }
-  }, [state.iframeData?.marketCap]);
+  }, [state.iframeData?.marketCap, memoizedCallbacks]);
 
   // Handle trade submission
   const handleTradeSubmit = async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string) => {
@@ -743,8 +747,6 @@ const WalletManager: React.FC = () => {
         sellPercent: !isBuyMode ? parseFloat(sellAmount || state.config.sellAmount) : undefined
       };
       
-      console.log(`Executing ${dex} ${isBuyMode ? 'Buy' : 'Sell'} for ${state.tokenAddress}`);
-      
       const result = await executeTrade(dex, wallets, config, isBuyMode, state.solBalances);
       
       if (result.success) {
@@ -754,7 +756,8 @@ const WalletManager: React.FC = () => {
       }
     } catch (error) {
       console.error(`${dex} ${isBuyMode ? 'Buy' : 'Sell'} error:`, error);
-      showToast(`Error: ${error.message}`, "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(`Error: ${errorMessage}`, "error");
     } finally {
       memoizedCallbacks.setIsRefreshing(false);
     }
@@ -872,20 +875,24 @@ const WalletManager: React.FC = () => {
     };
   }, []);
 
-  // Save quick buy preferences when they change
+  // Save quick buy preferences when they change (debounced)
   useEffect(() => {
-    const preferences = {
-      quickBuyEnabled: state.quickBuyEnabled,
-      quickBuyAmount: state.quickBuyAmount,
-      quickBuyMinAmount: state.quickBuyMinAmount,
-      quickBuyMaxAmount: state.quickBuyMaxAmount,
-      quickSellPercentage: state.quickSellPercentage,
-      useQuickBuyRange: state.useQuickBuyRange,
-      quickSellMinPercentage: state.quickSellMinPercentage,
-      quickSellMaxPercentage: state.quickSellMaxPercentage,
-      useQuickSellRange: state.useQuickSellRange
-    };
-    saveQuickBuyPreferencesToCookies(preferences);
+    const timeoutId = setTimeout(() => {
+      const preferences = {
+        quickBuyEnabled: state.quickBuyEnabled,
+        quickBuyAmount: state.quickBuyAmount,
+        quickBuyMinAmount: state.quickBuyMinAmount,
+        quickBuyMaxAmount: state.quickBuyMaxAmount,
+        quickSellPercentage: state.quickSellPercentage,
+        useQuickBuyRange: state.useQuickBuyRange,
+        quickSellMinPercentage: state.quickSellMinPercentage,
+        quickSellMaxPercentage: state.quickSellMaxPercentage,
+        useQuickSellRange: state.useQuickSellRange
+      };
+      saveQuickBuyPreferencesToCookies(preferences);
+    }, 500); // Debounce by 500ms
+
+    return () => clearTimeout(timeoutId);
   }, [state.quickBuyEnabled, state.quickBuyAmount, state.quickBuyMinAmount, state.quickBuyMaxAmount, state.quickSellPercentage, state.useQuickBuyRange, state.quickSellMinPercentage, state.quickSellMaxPercentage, state.useQuickSellRange]);
 
   // Update connection when RPC endpoint changes
@@ -903,14 +910,14 @@ const WalletManager: React.FC = () => {
     if (state.connection && state.wallets.length > 0) {
       fetchSolBalances(state.connection, state.wallets, memoizedCallbacks.setSolBalances);
     }
-  }, [state.connection, state.wallets.length, state.wallets.map(w => w.address).join(',')]);
+  }, [state.connection, state.wallets.length, walletAddresses]);
 
   // Fetch token balances when token address changes or wallets are added/removed (not when selection changes)
   useEffect(() => {
     if (state.connection && state.wallets.length > 0 && state.tokenAddress) {
       fetchTokenBalances(state.connection, state.wallets, state.tokenAddress, memoizedCallbacks.setTokenBalances);
     }
-  }, [state.connection, state.wallets.length, state.wallets.map(w => w.address).join(','), state.tokenAddress]);
+  }, [state.connection, state.wallets.length, walletAddresses, state.tokenAddress]);
 
   // Trigger tick animation when wallet count changes
   useEffect(() => {
@@ -983,7 +990,6 @@ const WalletManager: React.FC = () => {
 
   const handleBurn = async (amount: string) => {
     try {
-      console.log('burn', amount, 'SOL to');
       showToast('Burn successful', 'success');
     } catch (error) {
       showToast('Burn failed', 'error');
@@ -992,7 +998,6 @@ const WalletManager: React.FC = () => {
 
   const handleDeploy = async (data: any) => {
     try {
-      console.log('Deploy executed:', data);
       showToast('Token deployment initiated successfully', 'success');
     } catch (error) {
       console.error('Error:', error);
@@ -1002,7 +1007,6 @@ const WalletManager: React.FC = () => {
 
   const handleCleaner = async (data: any) => {
     try {
-      console.log('Cleaning', data);
       showToast('Cleaning successfully', 'success');
     } catch (error) {
       showToast('Failed to clean', 'error');
@@ -1011,7 +1015,6 @@ const WalletManager: React.FC = () => {
 
   const handleCustomBuy = async (data: any) => {
     try {
-      console.log('Custom buy executed:', data);
       showToast('Custom buy completed successfully', 'success');
     } catch (error) {
       showToast('Custom buy failed', 'error');

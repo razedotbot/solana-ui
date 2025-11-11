@@ -2,9 +2,8 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 // Separate import for createPortal
 import { createPortal } from 'react-dom';
-import { Buffer as NodeBuffer } from 'buffer';
-import Cookies from 'js-cookie';
 import { Buffer } from 'buffer';
+import Cookies from 'js-cookie';
 window.Buffer = Buffer;
 import { brand } from './config/brandConfig';
 
@@ -30,7 +29,7 @@ const App = lazy(() => import('./App'));
 declare global {
   interface Window {
     tradingServerUrl: string;
-    Buffer: typeof NodeBuffer;
+    Buffer: typeof Buffer;
     serverRegion: string;
     availableServers: ServerInfo[];
     switchServer: (serverId: string) => Promise<boolean>;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink } from 'lucide-react';
-import { getWallets, getWalletDisplayName, loadConfigFromCookies } from '../Utils';
+import { getWallets, getWalletDisplayName, loadConfigFromCookies, WalletType } from '../Utils';
 import { useToast } from "../Notifications";
 import { executeBagsCreate, WalletForBagsCreate, createBagsConfig, BagsCreateConfig, checkDeveloperConfig, signAndSendConfigTransaction, BagsConfigResponse } from '../utils/bagscreate';
 
@@ -67,8 +67,8 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   const [isSendingConfig, setIsSendingConfig] = useState(false);
 
   // Function to handle image upload
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     
     // Check file type
@@ -205,11 +205,11 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   }, [isOpen]);
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList, search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string) => {
     // Apply search filter
     let filtered = walletList;
     if (search) {
-      filtered = filtered.filter(wallet => 
+      filtered = filtered.filter((wallet: WalletType) => 
         wallet.address.toLowerCase().includes(search.toLowerCase())
       );
     }
@@ -217,16 +217,16 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
     // Apply balance filter
     if (balanceFilter !== 'all') {
       if (balanceFilter === 'nonZero') {
-        filtered = filtered.filter(wallet => (solBalances.get(wallet.address) || 0) > 0);
+        filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) > 0);
       } else if (balanceFilter === 'highBalance') {
-        filtered = filtered.filter(wallet => (solBalances.get(wallet.address) || 0) >= 0.1);
+        filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) >= 0.1);
       } else if (balanceFilter === 'lowBalance') {
-        filtered = filtered.filter(wallet => (solBalances.get(wallet.address) || 0) < 0.1 && (solBalances.get(wallet.address) || 0) > 0);
+        filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) < 0.1 && (solBalances.get(wallet.address) || 0) > 0);
       }
     }
     
     // Sort the wallets
-    return filtered.sort((a, b) => {
+    return filtered.sort((a: WalletType, b: WalletType) => {
       if (sortOption === 'address') {
         return sortDirection === 'asc' 
           ? a.address.localeCompare(b.address)
@@ -405,7 +405,8 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
       }
     } catch (error) {
       console.error('Error during token deployment:', error);
-      showToast(`Token deployment failed: ${error.message}`, "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(`Token deployment failed: ${errorMessage}`, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -448,7 +449,8 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
       }
     } catch (error) {
       console.error('Error sending config transaction:', error);
-      showToast(`Failed to send config transaction: ${error.message}`, "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(`Failed to send config transaction: ${errorMessage}`, "error");
     } finally {
       setIsSendingConfig(false);
     }
@@ -871,7 +873,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                       <div className="text-sm font-medium text-app-secondary mb-2 font-mono uppercase tracking-wider">
                         <span className="color-primary">&#62;</span> Available Wallets <span className="color-primary">&#60;</span>
                       </div>
-                      {filterWallets(wallets.filter(w => !selectedWallets.includes(w.privateKey)), searchTerm).map((wallet) => {
+                      {filterWallets(wallets.filter(w => !selectedWallets.includes(w.privateKey)), searchTerm).map((wallet: WalletType) => {
                         const solBalance = solBalances.get(wallet.address) || 0;
                         
                         return (

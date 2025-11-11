@@ -12,6 +12,7 @@ import {
 import bs58 from 'bs58';
 import { useToast } from "../Notifications";
 import { WalletType, getWalletDisplayName } from '../Utils';
+import { formatAddress, formatSolBalance, formatTokenBalance } from '../utils/formatting';
 import { Buffer } from 'buffer';
 import { sendToJitoBundleService } from '../utils/jitoService';
 
@@ -83,25 +84,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       setSelectedToken('');
     }
   }, [transferType, tokenAddress]);
-
-  // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
-    return balance.toFixed(4);
-  };
-
-  // Format token balance for display
-  const formatTokenBalance = (balance: number) => {
-    if (balance === 0) return '0';
-    if (balance < 0.001 && balance > 0) {
-      return balance.toExponential(4);
-    }
-    return balance.toLocaleString(undefined, { maximumFractionDigits: 4 });
-  };
-
-  // Format wallet address for display
-  const formatAddress = (address: string) => {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
 
   // Get wallet SOL balance by address
   const getWalletBalance = (address: string): number => {

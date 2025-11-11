@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink, Users, Percent } from 'lucide-react';
-import { getWallets, getWalletDisplayName, loadConfigFromCookies } from '../Utils';
+import { getWallets, getWalletDisplayName, loadConfigFromCookies, WalletType } from '../Utils';
 import { useToast } from "../Notifications";
 import { 
   executeSharedFeesBagsCreate, 
@@ -104,8 +104,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   const [deploymentStep, setDeploymentStep] = useState<'step1' | 'step2'>('step1');
 
   // Function to handle image upload
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     
     // Check file type
@@ -265,11 +265,11 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   }, [isOpen]);
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList, search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string) => {
     // Apply search filter
     let filtered = walletList;
     if (search) {
-      filtered = filtered.filter(wallet => 
+      filtered = filtered.filter((wallet: WalletType) => 
         wallet.address.toLowerCase().includes(search.toLowerCase())
       );
     }
@@ -277,16 +277,16 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
     // Apply balance filter
     if (balanceFilter !== 'all') {
       if (balanceFilter === 'nonZero') {
-        filtered = filtered.filter(wallet => (solBalances.get(wallet.address) || 0) > 0);
+        filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) > 0);
       } else if (balanceFilter === 'highBalance') {
-        filtered = filtered.filter(wallet => (solBalances.get(wallet.address) || 0) >= 0.1);
+        filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) >= 0.1);
       } else if (balanceFilter === 'lowBalance') {
-        filtered = filtered.filter(wallet => (solBalances.get(wallet.address) || 0) < 0.1 && (solBalances.get(wallet.address) || 0) > 0);
+        filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) < 0.1 && (solBalances.get(wallet.address) || 0) > 0);
       }
     }
     
     // Sort the wallets
-    return filtered.sort((a, b) => {
+    return filtered.sort((a: WalletType, b: WalletType) => {
       if (sortOption === 'address') {
         return sortDirection === 'asc' 
           ? a.address.localeCompare(b.address)
@@ -527,7 +527,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                 
               } catch (step2Error) {
                 console.error('Step 2 error:', step2Error);
-                showToast(`Step 2 failed - Token launch: ${step2Error.message}`, "error");
+                const errorMessage = step2Error instanceof Error ? step2Error.message : String(step2Error);
+                showToast(`Step 2 failed - Token launch: ${errorMessage}`, "error");
                 return; // Don't close modal on step 2 failure
               }
               
@@ -697,7 +698,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                 }
               } catch (error) {
                 console.error('Error during automatic step 2:', error);
-                showToast(`Step 2 failed - Token launch: ${error.message}`, "error");
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                showToast(`Step 2 failed - Token launch: ${errorMessage}`, "error");
                 setDeploymentStep('step1'); // Reset to step 1 on failure
               } finally {
                 setIsSubmitting(false);
@@ -718,12 +720,13 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       
       // Provide specific error messages based on deployment step
       let errorMessage = 'Deployment failed';
+      const errorMsg = error instanceof Error ? error.message : String(error);
       if (deploymentStep === 'step1') {
-        errorMessage = `Step 1 failed - Token creation: ${error.message}`;
+        errorMessage = `Step 1 failed - Token creation: ${errorMsg}`;
         setIsStep1Processing(false);
         setDeploymentStep('step1'); // Reset to step 1 on failure
       } else {
-        errorMessage = `Step 2 failed - Token launch: ${error.message}`;
+        errorMessage = `Step 2 failed - Token launch: ${errorMsg}`;
         setDeploymentStep('step1'); // Reset to step 1 on step 2 failure
       }
       
@@ -864,14 +867,16 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
           }
         } catch (createError) {
           console.error('Error creating token after config:', createError);
-          showToast(`Failed to create token: ${createError.message}`, "error");
+          const errorMessage = createError instanceof Error ? createError.message : String(createError);
+          showToast(`Failed to create token: ${errorMessage}`, "error");
         }
       } else {
         throw new Error(result.error || "Failed to send shared fees config transaction");
       }
     } catch (error) {
       console.error('Error sending shared fees config transaction:', error);
-      showToast(`Failed to send shared fees config transaction: ${error.message}`, "error");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(`Failed to send shared fees config transaction: ${errorMessage}`, "error");
     } finally {
       setIsSendingConfig(false);
     }
@@ -1382,7 +1387,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                       <div className="text-sm font-medium text-app-secondary mb-2 font-mono uppercase tracking-wider">
                         <span className="color-primary">&#62;</span> Available Wallets <span className="color-primary">&#60;</span>
                       </div>
-                      {filterWallets(wallets.filter(w => !selectedWallets.includes(w.privateKey)), searchTerm).map((wallet) => {
+                      {filterWallets(wallets.filter(w => !selectedWallets.includes(w.privateKey)), searchTerm).map((wallet: WalletType) => {
                         const solBalance = solBalances.get(wallet.address) || 0;
                         
                         return (

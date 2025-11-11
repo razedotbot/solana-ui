@@ -3,52 +3,22 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from './logo.png';
 import { brand } from './config/brandConfig';
+import { Tooltip } from './components/Tooltip';
 
-// Tooltip Component with cyberpunk styling
-export const Tooltip = ({ 
-  children, 
-  content,
-  position = 'top'
-}: { 
-  children: React.ReactNode;
-  content: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  const positionClasses = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2'
-  };
-
-  return (
-    <div className="relative inline-block">
-      <div
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
-      >
-        {children}
-      </div>
-      {isVisible && (
-        <div className={`absolute z-50 ${positionClasses[position]}`}>
-          <div className="bg-app-quaternary cyberpunk-border color-primary text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-            {content}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+interface CyberpunkServiceButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  url: string;
+  description: string;
+}
 
 const CyberpunkServiceButton = ({ 
   icon, 
   label, 
   url,
   description 
-}) => {
-  const handleClick = (e) => {
+}: CyberpunkServiceButtonProps) => {
+  const handleClick = (e: React.MouseEvent) => {
     // Prevent event bubbling
     e.stopPropagation();
     
@@ -89,8 +59,15 @@ const CyberpunkServiceButton = ({
   );
 };
 
+interface DropdownPortalProps {
+  isOpen: boolean;
+  buttonRef: React.RefObject<HTMLButtonElement>;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
 // Dropdown component that uses portal to render outside the normal DOM hierarchy
-const DropdownPortal = ({ isOpen, buttonRef, onClose, children }) => {
+const DropdownPortal = ({ isOpen, buttonRef, onClose, children }: DropdownPortalProps) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef(null);
   
@@ -103,11 +80,11 @@ const DropdownPortal = ({ isOpen, buttonRef, onClose, children }) => {
       });
       
       // Add event listener to close dropdown when clicking outside
-      const handleClickOutside = (event) => {
+      const handleClickOutside = (event: MouseEvent) => {
         if (
           dropdownRef.current && 
           buttonRef.current && 
-          !buttonRef.current.contains(event.target)
+          !buttonRef.current.contains(event.target as Node)
         ) {
           onClose();
         }
