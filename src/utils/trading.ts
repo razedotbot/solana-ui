@@ -26,9 +26,9 @@ export interface TradingResult {
 const executeUnifiedBuy = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
-  protocol: BuyConfig['protocol'],
   slippageBps?: number,
-  jitoTipLamports?: number
+  jitoTipLamports?: number,
+  transactionsFeeLamports?: number
 ): Promise<TradingResult> => {
   try {
     // Load config once for all settings
@@ -46,6 +46,13 @@ const executeUnifiedBuy = async (
     if (finalJitoTipLamports === undefined && appConfig?.transactionFee) {
       const feeInSol = appConfig.transactionFee;
       finalJitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
+    }
+
+    // Use provided transactions fee or calculate from config
+    let finalTransactionsFeeLamports = transactionsFeeLamports;
+    if (finalTransactionsFeeLamports === undefined && appConfig?.transactionFee) {
+      const feeInSol = appConfig.transactionFee;
+      finalTransactionsFeeLamports = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
     }
 
     // Use provided bundle mode or fall back to config default
@@ -67,10 +74,10 @@ const executeUnifiedBuy = async (
 
     const buyConfig = createBuyConfig({
       tokenAddress: config.tokenAddress,
-      protocol,
       solAmount: config.solAmount!,
       slippageBps: finalSlippageBps,
       jitoTipLamports: finalJitoTipLamports,
+      transactionsFeeLamports: finalTransactionsFeeLamports,
       bundleMode: finalBundleMode,
       batchDelay: finalBatchDelay,
       singleDelay: finalSingleDelay
@@ -86,10 +93,10 @@ const executeUnifiedBuy = async (
 const executeUnifiedSell = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
-  protocol: SellConfig['protocol'],
   slippageBps?: number,
   outputMint?: string,
-  jitoTipLamports?: number
+  jitoTipLamports?: number,
+  transactionsFeeLamports?: number
 ): Promise<TradingResult> => {
   try {
     // Load config once for all settings
@@ -107,6 +114,13 @@ const executeUnifiedSell = async (
     if (finalJitoTipLamports === undefined && appConfig?.transactionFee) {
       const feeInSol = appConfig.transactionFee;
       finalJitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
+    }
+
+    // Use provided transactions fee or calculate from config
+    let finalTransactionsFeeLamports = transactionsFeeLamports;
+    if (finalTransactionsFeeLamports === undefined && appConfig?.transactionFee) {
+      const feeInSol = appConfig.transactionFee;
+      finalTransactionsFeeLamports = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
     }
 
     // Use provided bundle mode or fall back to config default
@@ -128,12 +142,12 @@ const executeUnifiedSell = async (
 
     const sellConfig = createSellConfig({
       tokenAddress: config.tokenAddress,
-      protocol,
       sellPercent: config.sellPercent,
       tokensAmount: config.tokensAmount,
       slippageBps: finalSlippageBps,
       outputMint,
       jitoTipLamports: finalJitoTipLamports,
+      transactionsFeeLamports: finalTransactionsFeeLamports,
       bundleMode: finalBundleMode,
       batchDelay: finalBatchDelay,
       singleDelay: finalSingleDelay
@@ -171,9 +185,9 @@ export const executeTrade = async (
   });
   try {
     if (isBuyMode) {
-      return await executeUnifiedBuy(formattedWallets, config, 'auto');
+      return await executeUnifiedBuy(formattedWallets, config);
     } else {
-      return await executeUnifiedSell(formattedWallets, config, 'auto');
+      return await executeUnifiedSell(formattedWallets, config);
     }
   } catch (error) {
     return { success: false, error: error.message };

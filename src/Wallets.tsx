@@ -312,7 +312,6 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
       // Create buy configuration using the unified system
       const buyConfig = createBuyConfig({
         tokenAddress,
-        protocol: 'auto', // Use Auto for quick buy
         solAmount: solAmountToUse
         // slippageBps will be automatically set from config in the buy.ts file
       });
@@ -368,7 +367,6 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
       // Create sell configuration using the unified system
       const sellConfig = createSellConfig({
         tokenAddress,
-        protocol: 'auto', // Use Auto for quick sell
         sellPercent: quickSellPercentage // Use the configured quick sell percentage
         // slippageBps will be automatically set from config in the sell.ts file
       });

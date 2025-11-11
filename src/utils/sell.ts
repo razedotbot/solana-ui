@@ -24,12 +24,12 @@ export type BundleMode = 'single' | 'batch' | 'all-in-one';
 
 export interface SellConfig {
   tokenAddress: string;
-  protocol: 'auto';
   sellPercent: number; // Percentage of tokens to sell (1-100)
   tokensAmount?: number; // Specific amount of tokens to sell (alternative to percentage)
   slippageBps?: number; // Slippage tolerance in basis points (e.g., 100 = 1%)
   outputMint?: string; // Output token (usually SOL) - mainly for Auto
   jitoTipLamports?: number; // Custom Jito tip in lamports
+  transactionsFeeLamports?: number; // Transaction fee in lamports (used when wallets.length < 2)
   bundleMode?: BundleMode; // Bundle execution mode: 'single', 'batch', or 'all-in-one'
   batchDelay?: number; // Delay between batches in milliseconds (for batch mode)
   singleDelay?: number; // Delay between wallets in milliseconds (for single mode)
@@ -131,8 +131,7 @@ const getPartiallyPreparedSellTransactions = async (
     }
     
     const requestBody: any = {
-      tokenAddress: sellConfig.tokenAddress,
-      protocol: sellConfig.protocol
+      tokenAddress: sellConfig.tokenAddress
     };
     
     // If self-hosted trading server is enabled, send private keys instead of addresses
@@ -151,31 +150,39 @@ const getPartiallyPreparedSellTransactions = async (
       requestBody.percentage = sellConfig.sellPercent;
     }
 
-    // Use custom Jito tip if provided, otherwise use default from config
-    if (sellConfig.jitoTipLamports !== undefined) {
-      requestBody.jitoTipLamports = sellConfig.jitoTipLamports;
-    } else {
-      // Get fee in SOL (string) with default if not found
-      const feeInSol = config?.transactionFee || '0.005';
-      requestBody.jitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
-    }
-
-    // Add slippage parameter for all protocols
+    // Always include slippageBps
     if (sellConfig.slippageBps !== undefined) {
       requestBody.slippageBps = sellConfig.slippageBps;
-    } else {
+    } else if (config?.slippageBps) {
       // Use default slippage from app config if available
-      const appConfig = loadConfigFromCookies();
-      if (appConfig?.slippageBps) {
-        requestBody.slippageBps = parseInt(appConfig.slippageBps);
+      requestBody.slippageBps = parseInt(config.slippageBps);
+    } else {
+      // Default slippage if not set in config
+      requestBody.slippageBps = 9900;
+    }
+
+    // Use transactionsFeeLamports when wallets.length < 2, otherwise use jitoTipLamports
+    if (wallets.length < 2) {
+      // Single wallet: use transactionsFeeLamports (transaction fee / 3)
+      if (sellConfig.transactionsFeeLamports !== undefined) {
+        requestBody.transactionsFeeLamports = sellConfig.transactionsFeeLamports;
+      } else {
+        const feeInSol = config?.transactionFee || '0.005';
+        requestBody.transactionsFeeLamports = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
+      }
+    } else {
+      // Multiple wallets: use jitoTipLamports
+      if (sellConfig.jitoTipLamports !== undefined) {
+        requestBody.jitoTipLamports = sellConfig.jitoTipLamports;
+      } else {
+        const feeInSol = config?.transactionFee || '0.005';
+        requestBody.jitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
       }
     }
 
-    // Add Auto-specific parameters if needed
-    if (sellConfig.protocol === 'auto') {
-      if (sellConfig.outputMint) {
-        requestBody.outputMint = sellConfig.outputMint;
-      }
+    // Add outputMint if provided
+    if (sellConfig.outputMint) {
+      requestBody.outputMint = sellConfig.outputMint;
     }
     
     // Add telegram parameter from user cookie
@@ -569,7 +576,7 @@ export const executeSell = async (
       console.log(`Self-hosted trading server enabled, forcing all-in-one mode`);
     }
     
-    console.log(`Preparing to sell ${sellConfig.sellPercent}% of ${sellConfig.tokenAddress} using ${wallets.length} wallets on ${sellConfig.protocol} with ${bundleMode} mode`);
+    console.log(`Preparing to sell ${sellConfig.sellPercent}% of ${sellConfig.tokenAddress} using ${wallets.length} wallets with ${bundleMode} mode`);
     
     // Execute based on bundle mode
     switch (bundleMode) {
@@ -607,16 +614,6 @@ export const validateSellInputs = (
     return { valid: false, error: 'Invalid token address' };
   }
   
-  if (!sellConfig.protocol) {
-    return { valid: false, error: 'Protocol is required' };
-  }
-  
-  const validProtocols = ['auto'];
-
-  if (!validProtocols.includes(sellConfig.protocol)) {
-    return { valid: false, error: `Invalid protocol. Must be one of: ${validProtocols.join(', ')}` };
-  }
-  
   // Validate that either sellPercent or tokensAmount is provided, but not both
   const hasPercent = sellConfig.sellPercent !== undefined && !isNaN(sellConfig.sellPercent);
   const hasAmount = sellConfig.tokensAmount !== undefined && !isNaN(sellConfig.tokensAmount);
@@ -637,8 +634,8 @@ export const validateSellInputs = (
     return { valid: false, error: 'Invalid tokens amount (must be greater than 0)' };
   }
   
-  // Validate Auto-specific parameters
-  if ((sellConfig.protocol === 'auto') && sellConfig.slippageBps !== undefined) {
+  // Validate slippage if provided
+  if (sellConfig.slippageBps !== undefined) {
     if (isNaN(sellConfig.slippageBps) || sellConfig.slippageBps < 0) {
       return { valid: false, error: 'Invalid slippage value' };
     }
@@ -675,24 +672,24 @@ export const validateSellInputs = (
  */
 export const createSellConfig = (params: {
   tokenAddress: string;
-  protocol?: SellConfig['protocol'];
   sellPercent?: number;
   tokensAmount?: number;
   slippageBps?: number;
   outputMint?: string;
   jitoTipLamports?: number;
+  transactionsFeeLamports?: number;
   bundleMode?: BundleMode;
   batchDelay?: number;
   singleDelay?: number;
 }): SellConfig => {
   return {
     tokenAddress: params.tokenAddress,
-    protocol: params.protocol || 'auto',
     sellPercent: params.sellPercent || 0,
     tokensAmount: params.tokensAmount,
     slippageBps: params.slippageBps,
     outputMint: params.outputMint,
     jitoTipLamports: params.jitoTipLamports,
+    transactionsFeeLamports: params.transactionsFeeLamports,
     bundleMode: params.bundleMode || 'batch',
     batchDelay: params.batchDelay,
     singleDelay: params.singleDelay

@@ -24,11 +24,11 @@ export type BundleMode = 'single' | 'batch' | 'all-in-one';
 
 export interface BuyConfig {
   tokenAddress: string;
-  protocol: 'auto';
   solAmount: number;
   amounts?: number[]; // Optional custom amounts per wallet
   slippageBps?: number; // Slippage in basis points (e.g., 100 = 1%)
   jitoTipLamports?: number; // Custom Jito tip in lamports
+  transactionsFeeLamports?: number; // Transaction fee in lamports (used when wallets.length < 2)
   bundleMode?: BundleMode; // Bundle execution mode: 'single', 'batch', or 'all-in-one'
   batchDelay?: number; // Delay between batches in milliseconds (for batch mode)
   singleDelay?: number; // Delay between wallets in milliseconds (for single mode)
@@ -132,7 +132,6 @@ const getPartiallyPreparedTransactions = async (
     // Prepare request body according to the unified endpoint specification
     const requestBody: any = {
       tokenAddress: config.tokenAddress,
-      protocol: config.protocol,
       solAmount: config.solAmount
     };
     
@@ -150,22 +149,34 @@ const getPartiallyPreparedTransactions = async (
       requestBody.amounts = config.amounts;
     }
     
+    // Always include slippageBps
     if (config.slippageBps !== undefined) {
       requestBody.slippageBps = config.slippageBps;
-    } else {
+    } else if (appConfig?.slippageBps) {
       // Use default slippage from app config if available
-      const appConfig = loadConfigFromCookies();
-      if (appConfig?.slippageBps) {
-        requestBody.slippageBps = parseInt(appConfig.slippageBps);
-      }
+      requestBody.slippageBps = parseInt(appConfig.slippageBps);
+    } else {
+      // Default slippage if not set in config
+      requestBody.slippageBps = 9900;
     }
     
-    // Use custom Jito tip if provided, otherwise use default from config
-    if (config.jitoTipLamports !== undefined) {
-      requestBody.jitoTipLamports = config.jitoTipLamports;
+    // Use transactionsFeeLamports when wallets.length < 2, otherwise use jitoTipLamports
+    if (wallets.length < 2) {
+      // Single wallet: use transactionsFeeLamports (transaction fee / 3)
+      if (config.transactionsFeeLamports !== undefined) {
+        requestBody.transactionsFeeLamports = config.transactionsFeeLamports;
+      } else {
+        const feeInSol = appConfig?.transactionFee || '0.005';
+        requestBody.transactionsFeeLamports = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
+      }
     } else {
-      const feeInSol = appConfig?.transactionFee || '0.005';
-      requestBody.jitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
+      // Multiple wallets: use jitoTipLamports
+      if (config.jitoTipLamports !== undefined) {
+        requestBody.jitoTipLamports = config.jitoTipLamports;
+      } else {
+        const feeInSol = appConfig?.transactionFee || '0.005';
+        requestBody.jitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
+      }
     }
     
     // Add telegram parameter from user cookie
@@ -564,7 +575,7 @@ export const executeBuy = async (
       console.log(`Self-hosted trading server enabled, forcing all-in-one mode`);
     }
     
-    console.log(`Preparing to buy ${config.tokenAddress} using ${config.protocol} protocol with ${wallets.length} wallets in ${bundleMode} mode`);
+    console.log(`Preparing to buy ${config.tokenAddress} using ${wallets.length} wallets in ${bundleMode} mode`);
     
     // Execute based on bundle mode
     switch (bundleMode) {
@@ -581,7 +592,7 @@ export const executeBuy = async (
         throw new Error(`Invalid bundle mode: ${bundleMode}. Must be 'single', 'batch', or 'all-in-one'`);
     }
   } catch (error) {
-    console.error(`${config.protocol} buy error:`, error);
+    console.error('Buy error:', error);
     return {
       success: false,
       error: error.message
@@ -600,16 +611,6 @@ export const validateBuyInputs = (
   // Check if config is valid
   if (!config.tokenAddress) {
     return { valid: false, error: 'Invalid token address' };
-  }
-  
-  if (!config.protocol) {
-    return { valid: false, error: 'Protocol is required' };
-  }
-  
-  const supportedProtocols = ['auto'];
-
-  if (!supportedProtocols.includes(config.protocol)) {
-    return { valid: false, error: `Unsupported protocol: ${config.protocol}. Supported protocols: ${supportedProtocols.join(', ')}` };
   }
   
   if (isNaN(config.solAmount) || config.solAmount <= 0) {
@@ -662,22 +663,22 @@ export const validateBuyInputs = (
  */
 export const createBuyConfig = (config: {
   tokenAddress: string;
-  protocol?: BuyConfig['protocol'];
   solAmount: number;
   amounts?: number[];
   slippageBps?: number;
   jitoTipLamports?: number;
+  transactionsFeeLamports?: number;
   bundleMode?: BundleMode;
   batchDelay?: number;
   singleDelay?: number;
 }): BuyConfig => {
   return {
     tokenAddress: config.tokenAddress,
-    protocol: config.protocol || 'auto',
     solAmount: config.solAmount,
     amounts: config.amounts,
     slippageBps: config.slippageBps,
     jitoTipLamports: config.jitoTipLamports,
+    transactionsFeeLamports: config.transactionsFeeLamports,
     bundleMode: config.bundleMode || 'batch',
     batchDelay: config.batchDelay,
     singleDelay: config.singleDelay
