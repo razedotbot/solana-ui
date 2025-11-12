@@ -47,12 +47,14 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
   const [walletAmounts, setWalletAmounts] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showInfoTip, setShowInfoTip] = useState(false);
+  const [showMayhemInfoTip, setShowMayhemInfoTip] = useState(false);
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');
   const [balanceFilter, setBalanceFilter] = useState('all');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isMayhemMode, setIsMayhemMode] = useState(false);
 
   // State to store wallet keypair for token creation
   const [mintKeypair, setMintKeypair] = useState<Keypair | null>(null);
@@ -315,6 +317,7 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
         mintPubkey: mintKeypair ? bs58.encode(mintKeypair.secretKey) : mintPubkey,
         config: {
           tokenCreation: {
+            isMayhemMode: isMayhemMode,
             metadata: {
               name: tokenData.name,
               symbol: tokenData.symbol,
@@ -355,6 +358,7 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
           website: '',
           file: ''
         });
+        setIsMayhemMode(false);
         setIsConfirmed(false);
         setCurrentStep(0);
         onClose();
@@ -637,6 +641,35 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
                           <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0zm14-6a9 9 0 0 0-4-2m-6 2a9 9 0 0 0-2 4m2 6a9 9 0 0 0 4 2m6-2a9 9 0 0 0 2-4" />
                         </svg>
                       </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Mayhem Mode Toggle */}
+                <div className="space-y-2 relative z-10 mt-4">
+                  <div className="flex items-center justify-between p-4 bg-app-tertiary border border-app-primary-30 rounded-lg hover-border-primary transition-all">
+                    <div className="flex items-center gap-3">
+                      <label 
+                        onClick={() => setIsMayhemMode(!isMayhemMode)}
+                        className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider cursor-pointer"
+                      >
+                        <span className="color-primary">&#62;</span> Mayhem Mode <span className="color-primary">&#60;</span>
+                      </label>
+                      <div className="relative" onMouseEnter={() => setShowMayhemInfoTip(true)} onMouseLeave={() => setShowMayhemInfoTip(false)}>
+                        <Info size={14} className="text-app-secondary cursor-help" />
+                        {showMayhemInfoTip && (
+                          <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
+                            Enable aggressive deployment mode
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div 
+                      onClick={() => setIsMayhemMode(!isMayhemMode)}
+                      className="relative w-12 h-6 cursor-pointer"
+                    >
+                      <div className={`w-12 h-6 rounded-full transition-all ${isMayhemMode ? 'bg-app-primary-color' : 'bg-app-primary-30'}`}></div>
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-app-primary rounded-full transition-all transform ${isMayhemMode ? 'translate-x-6' : 'translate-x-0'}`}></div>
                     </div>
                   </div>
                 </div>
@@ -988,6 +1021,12 @@ export const DeployPumpModal: React.FC<DeployPumpModalProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-app-secondary font-mono">TOTAL SOL:</span>
                       <span className="text-sm font-medium color-primary font-mono">{calculateTotalAmount().toFixed(4)} SOL</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-app-secondary font-mono">MAYHEM MODE:</span>
+                      <span className={`text-sm font-medium font-mono ${isMayhemMode ? 'color-primary' : 'text-app-secondary'}`}>
+                        {isMayhemMode ? 'ENABLED' : 'DISABLED'}
+                      </span>
                     </div>
                   </div>
                 </div>

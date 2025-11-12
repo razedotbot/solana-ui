@@ -247,7 +247,8 @@ export const executePumpCreate = async (
   customAmounts?: number[]
 ): Promise<{ success: boolean; mintAddress?: string; result?: any; error?: string }> => {
   try {
-    console.log(`Preparing to create token ${tokenCreationConfig.mintPubkey} using ${wallets.length} wallets`);
+    const isMayhemMode = tokenCreationConfig.config?.tokenCreation?.isMayhemMode || false;
+    console.log(`Preparing to create token ${tokenCreationConfig.mintPubkey} using ${wallets.length} wallets${isMayhemMode ? ' (Mayhem Mode enabled)' : ''}`);
     
     // Extract wallet addresses
     const walletAddresses = wallets.map(wallet => wallet.address);
