@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, Server, CreditCard, Key } from 'lucide-react';
+import { X, Settings, Server, CreditCard } from 'lucide-react';
 import { ConfigType } from './Utils';
 
 interface ConfigProps {
@@ -193,26 +193,6 @@ const Config: React.FC<ConfigProps> = ({
                 onChange={(e) => onConfigChange('rpcEndpoint', e.target.value)}
                 className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input-cyberpunk font-mono tracking-wider"
                 placeholder="ENTER RPC ENDPOINT URL"
-              />
-              <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-[#02b36d30] transition-all duration-300"></div>
-            </div>
-          </div>
-          
-          {/* New API Key field */}
-          <div className="group animate-[fadeIn_0.35s_ease]">
-            <div className="flex items-center gap-1 mb-2">
-              <label className="text-sm font-medium text-[#7ddfbd] group-hover:text-[#02b36d] transition-colors duration-200 font-mono uppercase tracking-wider">
-                <span className="text-[#02b36d]">&#62;</span> API Key <span className="text-[#02b36d]">&#60;</span>
-              </label>
-              <Key size={14} className="text-[#7ddfbd]" />
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                value={config.apiKey}
-                onChange={(e) => onConfigChange('apiKey', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input-cyberpunk font-mono tracking-wider"
-                placeholder="ENTER API KEY"
               />
               <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-[#02b36d30] transition-all duration-300"></div>
             </div>

@@ -45,7 +45,6 @@ export interface CreateMultipleLimitOrdersRequest {
   jitoTipLamports?: number;
   affiliateAddress?: string;
   affiliateFee?: number;
-  authenticated?: boolean;
 }
 
 export interface CancelOrderRequest {
@@ -55,7 +54,6 @@ export interface CancelOrderRequest {
   rpcUrl?: string;
   includeTip?: boolean;
   jitoTipLamports?: number;
-  authenticated?: boolean;
 }
 
 export interface LimitOrderResponse {
@@ -141,7 +139,6 @@ export const createMultipleLimitOrders = async (
     jitoTipLamports?: number;
     affiliateAddress?: string;
     affiliateFee?: number;
-    authenticated?: boolean;
   }
 ): Promise<MultipleLimitOrdersResponse> => {
   try {
@@ -159,8 +156,7 @@ export const createMultipleLimitOrders = async (
       includeTip: options?.includeTip ?? true,
       jitoTipLamports: options?.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000),
       affiliateAddress: options?.affiliateAddress,
-      affiliateFee: options?.affiliateFee,
-      authenticated: options?.authenticated ?? false
+      affiliateFee: options?.affiliateFee
     };
 
     const baseUrl = getBaseUrl();
@@ -249,8 +245,7 @@ export const cancelOrder = async (
       computeUnitPrice: config.computeUnitPrice || 'auto',
       rpcUrl: config.rpcUrl || appConfig?.rpcEndpoint,
       includeTip: config.includeTip ?? true,
-      jitoTipLamports: config.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000),
-      authenticated: config.authenticated ?? false
+      jitoTipLamports: config.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000)
     };
 
     const baseUrl = getBaseUrl();
@@ -287,7 +282,6 @@ export const cancelAllOrders = async (
     rpcUrl?: string;
     includeTip?: boolean;
     jitoTipLamports?: number;
-    authenticated?: boolean;
   }
 ): Promise<{ success: boolean; results: CancelOrderResponse[]; error?: string }> => {
   try {

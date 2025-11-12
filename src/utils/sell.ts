@@ -1,7 +1,6 @@
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { loadConfigFromCookies, loadUserFromCookies } from '../Utils';
-import { brand } from '../config/brandConfig';
+import { loadConfigFromCookies } from '../Utils';
 
 // Constants
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -184,18 +183,11 @@ const getPartiallyPreparedSellTransactions = async (
     if (sellConfig.outputMint) {
       requestBody.outputMint = sellConfig.outputMint;
     }
-    
-    // Add telegram parameter from user cookie
-    const user = loadUserFromCookies();
-    if (user) {
-      requestBody.telegram = user;
-    }
 
     const response = await fetch(`${baseUrl}/solana/sell`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': brand.api.key
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(requestBody)
     });

@@ -10,8 +10,6 @@ import {
   loadConfigFromCookies,
   loadQuickBuyPreferencesFromCookies,
   saveQuickBuyPreferencesToCookies,
-  saveUserToCookies,
-  loadUserFromCookies,
   deleteWallet, 
   WalletType, 
   ConfigType,
@@ -24,9 +22,6 @@ import {
   fetchTokenBalances,
   handleSortWallets
 } from './Utils';
-import {
-  handleApiKeyFromUrl
-} from './Manager';
 import { countActiveWallets, getScriptName } from './utils/wallets';
 import { executeTrade } from './utils/trading';
 
@@ -415,7 +410,6 @@ const WalletManager: React.FC = () => {
     config: {
       rpcEndpoint: 'https://solana-rpc.publicnode.com',
       transactionFee: '0.001',
-      apiKey: '',
       selectedDex: 'auto',
       isDropdownOpen: false,
       buyAmount: '',
@@ -763,32 +757,12 @@ const WalletManager: React.FC = () => {
     }
   };
 
-
-
-  // Extract API key from URL
-  useEffect(() => {
-    handleApiKeyFromUrl(memoizedCallbacks.setConfig, saveConfigToCookies, showToast);
-  }, []);
-
   // Read tokenAddress from URL parameter on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('tokenAddress');
     if (tokenFromUrl) {
       memoizedCallbacks.setTokenAddress(tokenFromUrl);
-    }
-  }, []);
-
-  // Read user parameter from URL and store in cookies
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const userFromUrl = urlParams.get('user');
-    if (userFromUrl) {
-      saveUserToCookies(userFromUrl);
-      // Remove the user parameter from URL
-      urlParams.delete('user');
-      const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
-      window.history.replaceState({}, '', newUrl);
     }
   }, []);
 
