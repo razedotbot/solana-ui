@@ -1021,11 +1021,12 @@ const WalletManager: React.FC = () => {
 
       
       {/* Top Navigation */}
-      <nav className="relative border-b border-app-primary-70 px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-20">
-        <div className="flex items-center gap-3">
+      <nav className="relative border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-20">
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Desktop-only: Toggle left column */}
           <WalletTooltip content={state.leftColumnCollapsed ? "Show Wallets" : "Hide Wallets"} position="bottom">
             <button
-              className="p-2 border border-app-primary-40 hover-border-primary bg-app-secondary rounded cyberpunk-btn"
+              className="hidden md:flex p-2 border border-app-primary-40 hover-border-primary bg-app-secondary rounded cyberpunk-btn"
               onClick={memoizedCallbacks.toggleLeftColumn}
             >
               {state.leftColumnCollapsed ? (
@@ -1036,27 +1037,31 @@ const WalletManager: React.FC = () => {
             </button>
           </WalletTooltip>
 
-        <ServiceSelector />
+          {/* Service Selector - Hidden on mobile */}
+          <div className="hidden md:block">
+            <ServiceSelector />
+          </div>
           
-          <div className="relative flex-1 mx-4">
+          {/* Token Address Input */}
+          <div className="relative flex-1 mx-1 md:mx-4">
             <input
               type="text"
               placeholder="TOKEN ADDRESS"
               value={state.tokenAddress}
               onChange={(e) => memoizedCallbacks.setTokenAddress(e.target.value)}
-              className="w-full bg-app-secondary border border-app-primary-40 rounded px-3 py-2 pr-16 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono tracking-wider"
+              className="w-full bg-app-secondary border border-app-primary-40 rounded px-2 md:px-3 py-1.5 md:py-2 pr-12 md:pr-16 text-xs md:text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono tracking-wider"
             />
-            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+            <div className="absolute right-1 md:right-2 top-1/2 transform -translate-y-1/2 flex gap-0.5 md:gap-1">
               {state.tokenAddress && (
                 <WalletTooltip content="Clear token address" position="bottom">
                   <button
-                    className="color-primary-40 text-xs font-mono p-1"
+                    className="color-primary-40 text-xs font-mono p-1 min-h-[32px] min-w-[32px] md:min-h-0 md:min-w-0 flex items-center justify-center"
                     onClick={() => {
                       memoizedCallbacks.setTokenAddress('');
                       showToast("Token address cleared", "success");
                     }}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="color-primary opacity-60 hover:opacity-100 transition-opacity">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="color-primary opacity-60 hover:opacity-100 transition-opacity">
                        <polyline points="3,6 5,6 21,6"></polyline>
                        <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
                        <line x1="10" y1="11" x2="10" y2="17"></line>
@@ -1067,7 +1072,7 @@ const WalletManager: React.FC = () => {
               )}
               <WalletTooltip content="Paste from clipboard" position="bottom">
                 <button
-                  className="color-primary-40 text-xs font-mono p-1"
+                  className="color-primary-40 text-xs font-mono p-1 min-h-[32px] min-w-[32px] md:min-h-0 md:min-w-0 flex items-center justify-center"
                   onClick={async () => {
                     try {
                       const text = await navigator.clipboard.readText();
@@ -1080,7 +1085,7 @@ const WalletManager: React.FC = () => {
                     }
                   }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="color-primary opacity-60 hover:opacity-100 transition-opacity">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="color-primary opacity-60 hover:opacity-100 transition-opacity">
                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                   </svg>
@@ -1089,22 +1094,25 @@ const WalletManager: React.FC = () => {
             </div>
           </div>          
           
+          {/* Settings Button */}
           <WalletTooltip content="Open Settings" position="bottom">
             <button 
-              className="p-2 border border-app-primary-40 hover-border-primary bg-app-secondary rounded cyberpunk-btn"
+              className="p-1.5 md:p-2 border border-app-primary-40 hover-border-primary bg-app-secondary rounded cyberpunk-btn min-h-[36px] min-w-[36px] md:min-h-0 md:min-w-0 flex items-center justify-center"
               onClick={() => memoizedCallbacks.setIsSettingsOpen(true)}
             >
-              <Settings size={20} className="color-primary" />
+              <Settings size={18} className="md:w-5 md:h-5 color-primary" />
             </button>
           </WalletTooltip>
 
-          {/* Server Region Selector instead of Wallet Count */}
-          <ServerRegionSelector />
+          {/* Server Region Selector - Hidden on mobile */}
+          <div className="hidden md:block">
+            <ServerRegionSelector />
+          </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col md:flex-row h-[calc(100vh-8rem)]">
+      <div className="flex-1 flex flex-col md:flex-row h-[calc(100vh-4rem)] md:h-[calc(100vh-8rem)]">
         {/* Desktop Layout */}
         <div className="hidden md:block w-full h-full">
           {state.leftColumnCollapsed ? (

@@ -4,6 +4,23 @@ import { WalletType } from './Utils';
 import { ScriptType } from './utils/wallets';
 import { formatNumber } from './utils/formatting';
 
+// Hook to detect mobile viewport
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
+
 interface PresetButtonProps {
   value: string;
   onExecute: (amount: string) => Promise<void>;
@@ -78,8 +95,8 @@ const PresetButton = React.memo<PresetButtonProps>(({
   return (
     <button
       onClick={() => onExecute(value)}
-      className={`relative group px-2 py-1.5 text-xs font-mono rounded border transition-all duration-200
-                min-w-[48px] h-8 flex items-center justify-center
+      className={`relative group px-3 py-3 md:px-2 md:py-1.5 text-sm md:text-xs font-mono rounded border transition-all duration-200
+                min-w-[48px] min-h-[48px] md:min-h-[32px] h-auto md:h-8 flex items-center justify-center
                 ${variant === 'buy' 
                   ? 'bg-app-primary-60 border-app-primary-40 color-primary hover:bg-primary-20 hover-border-primary' 
                   : 'bg-app-primary-60 border-error-alt-40 text-error-alt hover:bg-error-20 hover:border-error-alt'
@@ -229,6 +246,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
   const [manualProtocol, setManualProtocol] = useState<string | null>(null);
+  const isMobile = useIsMobile();
   
   const cardRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
@@ -424,10 +442,133 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
 
   if (!isOpen) return null;
 
+  if (isMobile) {
+    // Mobile: Bottom sheet style
+    return (
+      <>
+        {/* Backdrop */}
+        <div 
+          className="fixed inset-0 bg-black-70 z-[9998] md:hidden"
+          onClick={onClose}
+        />
+        {/* Bottom Sheet */}
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-[9999] md:hidden mobile-bottom-sheet"
+          style={{
+            paddingBottom: 'max(env(safe-area-inset-bottom), 0px)'
+          }}
+        >
+          <div 
+            className="relative overflow-hidden bg-app-primary-99 backdrop-blur-md border-t border-app-primary-30 shadow-lg shadow-black-80 rounded-t-2xl"
+          >
+            {/* Drag Handle */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-12 h-1 bg-app-primary-40 rounded-full" />
+            </div>
+            
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-mono color-primary font-semibold">QUICK TRADE</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={`p-2 rounded transition-all duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center
+                            ${isEditMode 
+                              ? 'bg-primary-20 border border-app-primary color-primary' 
+                              : 'hover:bg-primary-20 text-app-secondary-60 hover:color-primary'
+                            }`}
+                >
+                  {isEditMode ? <Check size={16} /> : <Edit3 size={16} />}
+                </button>
+                
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded hover:bg-primary-20 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                >
+                  <X size={18} className="text-app-secondary-60 hover:color-primary" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="px-4 pb-6 max-h-[70vh] overflow-y-auto">
+              {/* Preset Tabs */}
+              <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                {presetTabs.map((tab: PresetTab) => (
+                  <TabButton
+                    key={tab.id}
+                    label={tab.label}
+                    isActive={activeTabId === tab.id}
+                    onClick={() => handleTabSwitch(tab.id)}
+                    onEdit={(newLabel) => handleEditTabLabel(tab.id, newLabel)}
+                    isEditMode={isEditMode}
+                  />
+                ))}
+              </div>
+              
+              {/* Trading Interface */}
+              <div className="space-y-6">
+                {/* Buy Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-mono color-primary font-semibold">BUY</span>
+                    <span className="text-xs text-app-secondary-60 font-mono">SOL/wallet</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {activeTab.buyPresets.map((preset: string, index: number) => (
+                      <PresetButton
+                        key={index}
+                        value={preset}
+                        onExecute={(amount) => handleTrade(amount, true)}
+                        onChange={(newValue) => handleEditBuyPreset(index, newValue)}
+                        isLoading={isLoading}
+                        variant="buy"
+                        isEditMode={isEditMode}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Sell Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-mono text-error-alt font-semibold">SELL</span>
+                    <span className="text-xs text-error-alt-60 font-mono">% tokens</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {activeTab.sellPresets.map((preset: string, index: number) => (
+                      <PresetButton
+                        key={index}
+                        value={preset}
+                        onExecute={(amount) => handleTrade(amount, false)}
+                        onChange={(newValue) => handleEditSellPreset(index, newValue)}
+                        isLoading={isLoading}
+                        variant="sell"
+                        isEditMode={isEditMode}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Desktop: Floating card (original behavior)
   return (
     <div 
       ref={cardRef}
-      className="fixed z-[9999] select-none"
+      className="fixed z-[9999] select-none hidden md:block"
       style={{
         left: position.x,
         top: position.y,

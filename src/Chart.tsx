@@ -514,7 +514,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="relative w-full rounded-lg overflow-hidden h-full md:h-full min-h-[calc(100vh-4rem)] md:min-h-full bg-gradient-to-br from-app-primary to-app-secondary"
+      className="relative w-full rounded-lg overflow-hidden h-full md:h-full min-h-[calc(100vh-8rem)] md:min-h-full bg-gradient-to-br from-app-primary to-app-secondary"
       style={{
         touchAction: 'manipulation',
         WebkitOverflowScrolling: 'touch'
