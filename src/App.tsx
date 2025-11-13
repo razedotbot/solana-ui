@@ -1,7 +1,7 @@
 import React, { useEffect, lazy, useCallback, useReducer, useMemo, useState } from 'react';
 import { ChevronDown, Settings, Globe, Wifi, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Connection } from '@solana/web3.js';
-import ServiceSelector from './Menu';
+import ServiceSelector from './components/Menu';
 import { WalletTooltip, initStyles } from './styles/Styles';
 import { 
   saveWalletsToCookies,
@@ -15,7 +15,7 @@ import {
   ConfigType,
 } from './Utils';
 import Split from 'react-split';
-import { useToast } from "./Notifications";
+import { useToast } from "./components/Notifications";
 import {
   fetchWalletBalances,
   fetchSolBalances,
@@ -35,8 +35,8 @@ declare global {
 }
 
 // Lazy loaded components
-const EnhancedSettingsModal = lazy(() => import('./modals/SettingsModal'));
-const EnhancedWalletOverview = lazy(() => import('./modals/WalletsModal'));
+const SettingsModal = lazy(() => import('./modals/SettingsModal'));
+const WalletOverview = lazy(() => import('./modals/WalletsModal'));
 const WalletsPage = lazy(() => import('./Wallets').then(module => ({ default: module.WalletsPage })));
 const ChartPage = lazy(() => import('./Chart').then(module => ({ default: module.ChartPage })));
 const ActionsPage = lazy(() => import('./Actions').then(module => ({ default: module.ActionsPage })));
@@ -47,8 +47,8 @@ const BurnModal = lazy(() => import('./modals/BurnModal').then(module => ({ defa
 const PnlModal = lazy(() => import('./modals/CalculatePNLModal').then(module => ({ default: module.PnlModal })));
 const DeployModal = lazy(() => import('./modals/DeployModal').then(module => ({ default: module.DeployModal })));
 const CustomBuyModal = lazy(() => import('./modals/CustomBuyModal').then(module => ({ default: module.CustomBuyModal })));
-const FloatingTradingCard = lazy(() => import('./FloatingTradingCard'));
-const AutomateFloatingCard = lazy(() => import('./AutomateFloatingCard'));
+const FloatingTradingCard = lazy(() => import('./components/FloatingTradingCard'));
+const AutomateFloatingCard = lazy(() => import('./components/AutomateFloatingCard'));
 
 interface ServerInfo {
   id: string;
@@ -286,7 +286,6 @@ const WalletManager: React.FC = () => {
     tokenAddress: string;
     isModalOpen: boolean;
     isSettingsOpen: boolean;
-    activeTab: 'wallets' | 'advanced';
     config: ConfigType;
     currentPage: 'wallets' | 'chart' | 'actions';
     wallets: WalletType[];
@@ -366,7 +365,6 @@ const WalletManager: React.FC = () => {
     | { type: 'SET_TOKEN_ADDRESS'; payload: string }
     | { type: 'SET_MODAL_OPEN'; payload: boolean }
     | { type: 'SET_SETTINGS_OPEN'; payload: boolean }
-    | { type: 'SET_ACTIVE_TAB'; payload: 'wallets' | 'advanced' }
     | { type: 'SET_CONFIG'; payload: ConfigType }
     | { type: 'SET_CURRENT_PAGE'; payload: 'wallets' | 'chart' | 'actions' }
     | { type: 'SET_WALLETS'; payload: WalletType[] }
@@ -406,7 +404,6 @@ const WalletManager: React.FC = () => {
     tokenAddress: '',
     isModalOpen: false,
     isSettingsOpen: false,
-    activeTab: 'wallets',
     config: {
       rpcEndpoint: 'https://solana-rpc.publicnode.com',
       transactionFee: '0.001',
@@ -473,8 +470,6 @@ const WalletManager: React.FC = () => {
         return { ...state, isModalOpen: action.payload };
       case 'SET_SETTINGS_OPEN':
         return { ...state, isSettingsOpen: action.payload };
-      case 'SET_ACTIVE_TAB':
-        return { ...state, activeTab: action.payload };
       case 'SET_CONFIG':
         return { ...state, config: action.payload };
       case 'SET_CURRENT_PAGE':
@@ -621,7 +616,6 @@ const WalletManager: React.FC = () => {
     setTokenAddress: (address: string) => dispatch({ type: 'SET_TOKEN_ADDRESS', payload: address }),
     setIsModalOpen: (open: boolean) => dispatch({ type: 'SET_MODAL_OPEN', payload: open }),
     setIsSettingsOpen: (open: boolean) => dispatch({ type: 'SET_SETTINGS_OPEN', payload: open }),
-    setActiveTab: (tab: 'wallets' | 'advanced') => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab }),
     setConfig: (config: ConfigType) => dispatch({ type: 'SET_CONFIG', payload: config }),
     setCurrentPage: (page: 'wallets' | 'chart' | 'actions') => dispatch({ type: 'SET_CURRENT_PAGE', payload: page }),
     setWallets: (wallets: WalletType[]) => dispatch({ type: 'SET_WALLETS', payload: wallets }),
@@ -835,10 +829,9 @@ const WalletManager: React.FC = () => {
     }
   }, [state.wallets]);
 
-  // Listen for custom event to open settings modal with wallets tab
+  // Listen for custom event to open settings modal
   useEffect(() => {
     const handleOpenSettingsWalletsTab = () => {
-      memoizedCallbacks.setActiveTab('wallets');
       memoizedCallbacks.setIsSettingsOpen(true);
     };
 
@@ -1115,65 +1108,10 @@ const WalletManager: React.FC = () => {
       <div className="flex-1 flex flex-col md:flex-row h-[calc(100vh-4rem)] md:h-[calc(100vh-8rem)]">
         {/* Desktop Layout */}
         <div className="hidden md:block w-full h-full">
-          {state.leftColumnCollapsed ? (
             <Split
               className="flex w-full h-full split-custom"
-              sizes={[70, 30]}
-              minSize={[250, 350]}
-              gutterSize={8}
-              gutterAlign="center"
-              direction="horizontal"
-              dragInterval={1}
-              gutter={(index, direction) => {
-                const gutter = document.createElement('div');
-                gutter.className = `gutter gutter-${direction}`;
-                return gutter;
-              }}
-            >
-              {/* Middle Column (Chart) */}
-              <div className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto">
-                <ChartPage
-                isLoadingChart={state.isLoadingChart}
-                tokenAddress={state.tokenAddress}
-                wallets={state.wallets}
-                onDataUpdate={memoizedCallbacks.setIframeData}
-                onTokenSelect={memoizedCallbacks.setTokenAddress}
-                onNonWhitelistedTrade={handleNonWhitelistedTrade}
-              />
-              </div>
-
-              {/* Right Column (Actions) */}
-              <div className="backdrop-blur-sm bg-app-primary-99 overflow-y-auto">
-                <ActionsPage
-                 tokenAddress={state.tokenAddress}
-                 setTokenAddress={memoizedCallbacks.setTokenAddress}
-                 transactionFee={state.config.transactionFee}
-                 handleRefresh={handleRefresh}
-                 wallets={state.wallets}
-                 solBalances={state.solBalances}
-                 tokenBalances={state.tokenBalances}
-                 currentMarketCap={state.currentMarketCap}
-                 setBurnModalOpen={memoizedCallbacks.setBurnModalOpen}
-                 setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
-                 setDeployModalOpen={memoizedCallbacks.setDeployModalOpen}
-                 setCustomBuyModalOpen={memoizedCallbacks.setCustomBuyModalOpen}
-                 onOpenFloating={() => memoizedCallbacks.setFloatingCardOpen(true)}
-                 isFloatingCardOpen={state.floatingCard.isOpen}
-                 isAutomateCardOpen={state.automateCard.isOpen}
-                 setAutomateCardOpen={memoizedCallbacks.setAutomateCardOpen}
-                 automateCardPosition={state.automateCard.position}
-                 setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
-                 isAutomateCardDragging={state.automateCard.isDragging}
-                 setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
-                 iframeData={state.iframeData}
-                 />
-              </div>
-            </Split>
-          ) : (
-            <Split
-              className="flex w-full h-full split-custom"
-              sizes={[20, 60, 20]}
-              minSize={[250, 250, 350]}
+              sizes={state.leftColumnCollapsed ? [0, 80, 20] : [20, 60, 20]}
+              minSize={state.leftColumnCollapsed ? [0, 250, 350] : [250, 250, 350]}
               gutterSize={8}
               gutterAlign="center"
               direction="horizontal"
@@ -1185,7 +1123,11 @@ const WalletManager: React.FC = () => {
               }}
             >
               {/* Left Column */}
-              <div className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto">
+            <div 
+              className={`backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto ${
+                state.leftColumnCollapsed ? 'hidden' : ''
+              }`}
+            >
                 {state.connection && (
                   <WalletsPage
                   wallets={state.wallets}
@@ -1261,7 +1203,6 @@ const WalletManager: React.FC = () => {
             />
             </div>
           </Split>
-           )}
         </div>
 
         {/* Mobile Layout */}
@@ -1350,34 +1291,27 @@ const WalletManager: React.FC = () => {
         />
       </div>
   
-      {/* Enhanced Settings Modal */}
-      <EnhancedSettingsModal
+      {/*  Settings Modal */}
+      <SettingsModal
         isOpen={state.isSettingsOpen}
         onClose={() => memoizedCallbacks.setIsSettingsOpen(false)}
         config={state.config}
         onConfigChange={handleConfigChange}
         onSave={handleSaveSettings}
-        wallets={state.wallets}
-        setWallets={memoizedCallbacks.setWallets}
         connection={state.connection}
-        solBalances={state.solBalances}
-        setSolBalances={memoizedCallbacks.setSolBalances}
-        tokenBalances={state.tokenBalances}
-        setTokenBalances={memoizedCallbacks.setTokenBalances}
-        tokenAddress={state.tokenAddress}
         showToast={showToast}
-        activeTab={state.activeTab}
-        setActiveTab={memoizedCallbacks.setActiveTab}
       />
   
-      {/* Enhanced Wallet Overview */}
-      <EnhancedWalletOverview
+      {/*  Wallet Overview */}
+      <WalletOverview
         isOpen={state.isModalOpen}
         onClose={() => memoizedCallbacks.setIsModalOpen(false)}
         wallets={state.wallets}
         setWallets={memoizedCallbacks.setWallets}
         solBalances={state.solBalances}
+        setSolBalances={memoizedCallbacks.setSolBalances}
         tokenBalances={state.tokenBalances}
+        setTokenBalances={memoizedCallbacks.setTokenBalances}
         tokenAddress={state.tokenAddress}
         connection={state.connection}
         handleRefresh={handleRefresh}
@@ -1385,7 +1319,6 @@ const WalletManager: React.FC = () => {
         showToast={showToast}
         onOpenSettings={() => {
           memoizedCallbacks.setIsModalOpen(false); // Close wallet overview first
-          memoizedCallbacks.setActiveTab('wallets');
           memoizedCallbacks.setIsSettingsOpen(true);
         }}
       />

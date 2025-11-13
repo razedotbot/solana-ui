@@ -741,7 +741,7 @@ export const processCancelOrderTransaction = async (
 };
 
 /**
- * Enhanced cancel order function that handles transaction signing and bundle sending
+ *  cancel order function that handles transaction signing and bundle sending
  */
 export const cancelOrderWithBundle = async (
   config: CancelOrderRequest,

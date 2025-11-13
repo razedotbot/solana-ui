@@ -13,9 +13,9 @@ import {
   calculatePrice,
   type LimitOrderConfig,
   type ActiveOrdersResponse
-} from './utils/limitorders';
+} from '../utils/limitorders';
 import { useToast } from './Notifications';
-import { WalletType } from './Utils';
+import { WalletType } from '../Utils';
 
 interface PresetButtonProps {
   value: string;
@@ -830,7 +830,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
     try {
       console.log('� Starting cancel order process for:', orderPublicKey);
       
-      // Use the enhanced cancel order function that handles bundle processing
+      // Use the  cancel order function that handles bundle processing
       const result = await cancelOrderWithBundle({
         maker: makerAddress,
         order: orderPublicKey

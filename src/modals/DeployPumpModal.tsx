@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw } from 'lucide-react';
 import { getWallets, getWalletDisplayName, WalletType } from '../Utils';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 import { executePumpCreate, WalletForPumpCreate, TokenCreationConfig } from '../utils/pumpcreate';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';

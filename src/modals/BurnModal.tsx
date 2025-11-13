@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, ChevronLeft, ChevronRight, Info, Search, X, ArrowDown } from 'lucide-react';
 import { getWallets, getWalletDisplayName } from '../Utils';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 import { loadConfigFromCookies } from '../Utils';
 import * as web3 from '@solana/web3.js';
 import bs58 from 'bs58';

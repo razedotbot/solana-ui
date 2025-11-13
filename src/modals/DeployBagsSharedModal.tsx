@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink, Users, Percent } from 'lucide-react';
 import { getWallets, getWalletDisplayName, loadConfigFromCookies, WalletType } from '../Utils';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 import { 
   executeSharedFeesBagsCreate, 
   WalletForBagsSharedCreate, 
@@ -22,6 +23,12 @@ import {
 const STEPS_DEPLOY = ["Token & Fees Details", "Select Wallets", "Review"];
 const MAX_WALLETS = 5; // Maximum number of wallets that can be selected
 const MIN_WALLETS = 2; // Minimum number of wallets required (developer + 1 buyer)
+
+const buttonVariants = {
+  rest: { scale: 1 },
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 }
+};
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -918,12 +925,9 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
               </h3>
             </div>
             
-            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
-              <div className="p-6 space-y-6 relative">
-                {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
-              
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+            <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-app-secondary flex items-center gap-1 font-mono uppercase tracking-wider">
                       <span className="color-primary">&#62;</span> Name <span className="color-primary">*</span> <span className="color-primary">&#60;</span>
@@ -1164,7 +1168,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                       </div>
                     </div>
                     
-                    <div className="mt-4 p-3 bg-app-primary border border-app-primary-40 rounded-lg">
+                    <div className="mt-4 p-3 bg-app-primary border border-app-primary-30 rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-app-secondary font-mono">TOTAL FEE SPLIT:</span>
                         <span className={`text-sm font-medium font-mono ${
@@ -1273,7 +1277,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
 
             {/* Summary Stats */}
             {selectedWallets.length > 0 && (
-              <div className="bg-app-primary border border-app-primary-40 rounded-lg p-3 mb-3 shadow-lg modal-glow">
+              <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4 mb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-app-secondary font-mono">SELECTED:</span>
@@ -1289,11 +1293,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
               </div>
             )}
 
-            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
-              {/* Ambient grid background */}
-              <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
-              
-              <div className="p-4 relative z-10">
+            <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+              <div>
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary-40 scrollbar-track-app-tertiary">
                   {/* Selected Wallets */}
                   {selectedWallets.length > 0 && (
@@ -1452,11 +1453,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Left column - Token Details */}
-              <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
-                {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
-                
-                <div className="p-6 space-y-4 relative z-10">
+              <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                <div className="space-y-4">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
                     <span className="color-primary">&#62;</span> Token Details <span className="color-primary">&#60;</span>
                   </h4>
@@ -1608,20 +1606,11 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                     </div>
                   </div>
                 </div>
-                
-                {/* Cyberpunk decorative corner elements */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
               </div>
               
               {/* Right column - Selected Wallets */}
-              <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
-                {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
-                
-                <div className="p-6 space-y-4 relative z-10">
+              <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                <div className="space-y-4">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
                     <span className="color-primary">&#62;</span> Selected Wallets <span className="color-primary">&#60;</span>
                   </h4>
@@ -1647,21 +1636,11 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                     })}
                   </div>
                 </div>
-                
-                {/* Cyberpunk decorative corner elements */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
               </div>
             </div>
   
-            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
-              <div className="p-4 relative">
-                {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
-                
-                <div className="flex items-center gap-4 relative z-10">
+            <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+              <div className="flex items-center gap-4">
                   <div 
                     onClick={() => setIsConfirmed(!isConfirmed)}
                     className="relative w-5 h-5 cursor-pointer"
@@ -1682,7 +1661,6 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                 </div>
               </div>
             </div>
-          </div>
         );
     }
   };
@@ -1824,28 +1802,31 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-4xl overflow-hidden transform modal-cyberpunk-content modal-glow">
-        {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
-
-        {/* Header */}
-        <div className="relative z-10 p-4 flex justify-between items-center border-b border-app-primary-40">
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary-20 mr-3">
-              <Users size={16} className="color-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> DEPLOY BAGS TOKEN WITH SHARED FEES <span className="color-primary">/</span>
-            </h2>
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          className="bg-app-primary border border-app-primary-30 rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-app-primary-20">
+            <h2 className="text-lg font-mono color-primary font-bold tracking-wider">DEPLOY BAGS TOKEN WITH SHARED FEES</h2>
+            <button
+              onClick={onClose}
+              className="color-primary hover-color-primary-light transition-colors p-1"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <button 
-            onClick={onClose}
-            className="text-app-secondary hover:color-primary transition-colors p-1 hover:bg-primary-20 rounded"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
         {/* Progress Indicator - Only show for steps 0-2 */}
         <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
@@ -1855,10 +1836,10 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
           ></div>
         </div>
 
-        {/* Content */}
-        <div className="relative z-10 p-6 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary-40 scrollbar-track-app-tertiary">
-          <form onSubmit={currentStep === 2 ? handleDeploy : (e) => e.preventDefault()}>
-            <div className="min-h-[300px]">
+          {/* Content */}
+          <div className="space-y-6">
+            <form onSubmit={currentStep === 2 ? handleDeploy : (e) => e.preventDefault()}>
+              <div className="min-h-[300px]">
               {configNeeded ? (
                 <div className="space-y-6 animate-[fadeIn_0.3s_ease]">
                   <div className="flex items-center space-x-3 mb-2">
@@ -1870,11 +1851,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                     </h3>
                   </div>
                   
-                  <div className="bg-app-primary border border-yellow-500/40 rounded-lg shadow-lg modal-glow">
-                    <div className="p-6 space-y-4 relative">
-                      <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
-                      
-                      <div className="relative z-10 space-y-4">
+                  <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                    <div className="space-y-4">
                         <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                           <Info size={20} className="text-yellow-500 mt-0.5 flex-shrink-0" />
                           <div className="space-y-2">
@@ -1914,14 +1892,18 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                         </div>
                         
                         <div className="flex gap-3 pt-4">
-                          <button
+                          <motion.button
                             type="button"
+                            variants={buttonVariants}
+                            initial="rest"
+                            whileHover="hover"
+                            whileTap="tap"
                             onClick={handleSendSharedConfigTransaction}
                             disabled={isSendingConfig}
-                            className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-all font-mono tracking-wider ${
+                            className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-mono text-sm ${
                               isSendingConfig
-                                ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50'
-                                : 'bg-app-primary-color hover:bg-primary-60 text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                                ? 'bg-app-primary-color/50 text-app-quaternary cursor-not-allowed opacity-50'
+                                : 'bg-gradient-to-r from-app-primary-color to-app-primary-light text-app-quaternary hover:from-app-primary-light hover:to-app-primary-color disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg disabled:shadow-none'
                             }`}
                           >
                             {isSendingConfig ? (
@@ -1935,10 +1917,14 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                                 INITIALIZE SHARED FEES CONFIG
                               </>
                             )}
-                          </button>
+                          </motion.button>
                           
-                          <button
+                          <motion.button
                             type="button"
+                            variants={buttonVariants}
+                            initial="rest"
+                            whileHover="hover"
+                            whileTap="tap"
                             onClick={() => {
                               setConfigNeeded(false);
                               setConfigTransaction('');
@@ -1946,12 +1932,11 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                               setFeeShareInfo(null);
                             }}
                             disabled={isSendingConfig}
-                            className="px-4 py-3 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all font-mono tracking-wider modal-btn-cyberpunk"
+                            className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30 color-primary hover-color-primary-light transition-colors duration-200 font-mono text-sm hover:bg-app-quaternary"
                           >
                             CANCEL
-                          </button>
+                          </motion.button>
                         </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1960,59 +1945,62 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
               )}
             </div>
 
-            <div className="flex justify-between mt-8 pt-4 border-t border-app-primary-30">
-              <button
-                type="button"
-                onClick={currentStep === 0 ? onClose : handleBack}
-                disabled={isSubmitting}
-                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
-              >
-                {currentStep === 0 ? 'CANCEL' : 'BACK'}
-              </button>
+              <div className="flex gap-3 pt-4 border-t border-app-primary-20">
+                <motion.button
+                  type="button"
+                  variants={buttonVariants}
+                  initial="rest"
+                  whileHover="hover"
+                  whileTap="tap"
+                  onClick={currentStep === 0 ? onClose : handleBack}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30 color-primary hover-color-primary-light transition-colors duration-200 font-mono text-sm hover:bg-app-quaternary"
+                >
+                  {currentStep === 0 ? 'CANCEL' : 'BACK'}
+                </motion.button>
 
-              <button
-                type={currentStep === 2 ? 'submit' : 'button'}
-                onClick={currentStep === 2 ? undefined : handleNext}
-                disabled={currentStep === 2 ? (isSubmitting || !isConfirmed) : isSubmitting}
-                className={`px-5 py-2.5 rounded-lg flex items-center transition-all shadow-lg font-mono tracking-wider ${
-                  currentStep === 2 && (isSubmitting || !isConfirmed)
-                    ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50'
-                    : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'
-                }`}
-              >
-                {currentStep === 2 ? (
-                  isSubmitting ? (
-                    <>
-                      <div className="h-4 w-4 rounded-full border-2 border-app-primary-80 border-t-transparent animate-spin mr-2"></div>
-                      <span>
-                        {deploymentStep === 'step1' ? (
-                          isStep1Processing ? 'CREATING TOKEN...' : 'CREATING TOKEN & CONFIG...'
-                        ) : (
-                          'LAUNCHING TOKEN...'
-                        )}
-                      </span>
-                    </>
+                <motion.button
+                  type={currentStep === 2 ? 'submit' : 'button'}
+                  variants={buttonVariants}
+                  initial="rest"
+                  whileHover="hover"
+                  whileTap="tap"
+                  onClick={currentStep === 2 ? undefined : handleNext}
+                  disabled={currentStep === 2 ? (isSubmitting || !isConfirmed) : isSubmitting}
+                  className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center font-mono text-sm ${
+                    currentStep === 2 && (isSubmitting || !isConfirmed)
+                      ? 'bg-app-primary-color/50 text-app-quaternary cursor-not-allowed opacity-50'
+                      : 'bg-gradient-to-r from-app-primary-color to-app-primary-light text-app-quaternary hover:from-app-primary-light hover:to-app-primary-color disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg disabled:shadow-none'
+                  }`}
+                >
+                  {currentStep === 2 ? (
+                    isSubmitting ? (
+                      <>
+                        <div className="h-4 w-4 rounded-full border-2 border-app-quaternary border-t-transparent animate-spin mr-2"></div>
+                        <span>
+                          {deploymentStep === 'step1' ? (
+                            isStep1Processing ? 'CREATING TOKEN...' : 'CREATING TOKEN & CONFIG...'
+                          ) : (
+                            'LAUNCHING TOKEN...'
+                          )}
+                        </span>
+                      </>
+                    ) : (
+                      deploymentStep === 'step1' ? 'CREATE TOKEN & CONFIG' : 'LAUNCH TOKEN'
+                    )
                   ) : (
-                    deploymentStep === 'step1' ? 'CREATE TOKEN & CONFIG' : 'LAUNCH TOKEN'
-                  )
-                ) : (
-                  <span className="flex items-center">
-                    NEXT
-                    <ChevronRight size={16} className="ml-1" />
-                  </span>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-        
-        {/* Cyberpunk decorative corner elements */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
-      </div>
-    </div>,
+                    <span className="flex items-center">
+                      NEXT
+                      <ChevronRight size={16} className="ml-1" />
+                    </span>
+                  )}
+                </motion.button>
+              </div>
+            </form>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
     document.body
   );
 };

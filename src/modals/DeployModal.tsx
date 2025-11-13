@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Rocket, Zap, X, Utensils } from 'lucide-react';
 import { DeployPumpModal } from './DeployPumpModal';
 import { DeployBonkModal } from './DeployBonkModal';
@@ -8,7 +9,7 @@ import { DeployMoonModal } from './DeployMoonModal';
 import { DeployBoopModal } from './DeployBoopModal';
 import { DeployBagsModal } from './DeployBagsModal';
 import { DeployBagsSharedFeesModal } from './DeployBagsSharedModal';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -35,156 +36,190 @@ export const DeployModal: React.FC<DeployModalProps> = ({
 
   if (!isOpen) return null;
 
+  const buttonVariants = {
+    rest: { scale: 1 },
+    hover: { scale: 1.05 },
+    tap: { scale: 0.95 }
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-app-primary-99">
-      <div className="relative bg-app-primary border-2 border-app-primary-40 rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden transform modal-glow">
-        {/* Header */}
-        <div className="relative z-10 p-5 flex justify-between items-center border-b border-app-primary-40">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary-20">
-              <Rocket size={20} className="color-primary" />
-            </div>
-            <h2 className="text-xl font-bold text-app-primary font-mono">
-              <span className="color-primary">/</span> SELECT DEPLOY TYPE <span className="color-primary">/</span>
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          className="bg-app-primary border border-app-primary-30 rounded-xl p-6 
+                     w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-app-primary-20">
+            <h2 className="text-lg font-mono color-primary font-bold tracking-wider flex items-center gap-2">
+              <Rocket size={16} />
+              SELECT DEPLOY TYPE
             </h2>
-          </div>
-          <button 
-            onClick={onClose}
-            className="text-app-secondary hover:color-primary-light transition-colors p-1.5 hover:bg-primary-20 rounded-lg"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Deployment Options */}
-        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Pump Deploy Option */}
-          <div 
-            onClick={() => setSelectedDeployType('pump')}
-            className="group relative cursor-pointer bg-app-tertiary border-2 border-app-primary-30 rounded-xl p-4 transition-all duration-300 hover-border-primary hover:shadow-lg hover:shadow-app-primary-20"
-          >
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-lg bg-primary-20 flex items-center justify-center">
-                <Zap size={24} className="color-primary group-hover:animate-pulse" />
-              </div>
-              <h3 className="text-lg font-bold text-app-primary font-mono">PUMP.FUN</h3>
-              <p className="text-app-secondary text-xs leading-relaxed">
-                Create a new pump.fun token with customizable parameters. Includes liquidity setup.
-              </p>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
+            <button
+              onClick={onClose}
+              className="color-primary hover-color-primary-light transition-colors p-1"
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          {/* Bonk Deploy Option */}
-          <div 
-            onClick={() => setSelectedDeployType('bonk')}
-            className="group relative cursor-pointer bg-app-tertiary border-2 border-app-primary-30 rounded-xl p-4 transition-all duration-300 hover-border-primary hover:shadow-lg hover:shadow-app-primary-20"
-          >
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-lg bg-primary-20 flex items-center justify-center">
-                <Rocket size={24} className="color-primary group-hover:animate-pulse" />
+          {/* Deployment Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {/* Pump Deploy Option */}
+            <motion.div 
+              onClick={() => setSelectedDeployType('pump')}
+              variants={buttonVariants}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className="cursor-pointer bg-app-quaternary border border-app-primary-20 rounded-lg p-4 transition-all duration-300 hover:border-app-primary-60 touch-manipulation flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-app-primary border border-app-primary-30 flex items-center justify-center">
+                  <Zap size={20} className="color-primary" />
+                </div>
+                <h3 className="text-base font-bold color-primary font-mono">PUMP.FUN</h3>
+                <p className="text-xs text-app-secondary-80 leading-relaxed">
+                  Create a new pump.fun token with customizable parameters. Includes liquidity setup.
+                </p>
               </div>
-              <h3 className="text-lg font-bold text-app-primary font-mono">LETSBONK.FUN</h3>
-              <p className="text-app-secondary text-xs leading-relaxed">
-                Create a new letsbonk.fun token with customizable parameters. Includes liquidity setup.
-              </p>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
-          </div>
+            </motion.div>
 
-          {/* bags.fm Deploy Option */}
-          <div 
-            onClick={() => setSelectedDeployType('bags')}
-            className="group relative cursor-pointer bg-app-tertiary border-2 border-app-primary-30 rounded-xl p-4 transition-all duration-300 hover-border-primary hover:shadow-lg hover:shadow-app-primary-20"
-          >
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-lg bg-primary-20 flex items-center justify-center">
-                <Utensils size={24} className="color-primary group-hover:animate-pulse" />
+            {/* Bonk Deploy Option */}
+            <motion.div 
+              onClick={() => setSelectedDeployType('bonk')}
+              variants={buttonVariants}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className="cursor-pointer bg-app-quaternary border border-app-primary-20 rounded-lg p-4 transition-all duration-300 hover:border-app-primary-60 touch-manipulation flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-app-primary border border-app-primary-30 flex items-center justify-center">
+                  <Rocket size={20} className="color-primary" />
+                </div>
+                <h3 className="text-base font-bold color-primary font-mono">LETSBONK.FUN</h3>
+                <p className="text-xs text-app-secondary-80 leading-relaxed">
+                  Create a new letsbonk.fun token with customizable parameters. Includes liquidity setup.
+                </p>
               </div>
-              <h3 className="text-lg font-bold text-app-primary font-mono">BAGS.FM</h3>
-              <p className="text-app-secondary text-xs leading-relaxed">
-              Create a new bags.fm token.
-              </p>
-              
-              {/* Shared Fees Toggle */}
-              <div 
-                className="relative z-10 flex items-center justify-between pt-2 border-t border-app-primary-20"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSharedFeesEnabled(!sharedFeesEnabled);
-                }}
-              >
-                <span className="text-xs font-medium text-app-secondary font-mono cursor-pointer">SHARED FEES</span>
-                <button
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none pointer-events-none ${
-                    sharedFeesEnabled ? 'bg-primary-50' : 'bg-app-primary-30'
-                  }`}
+            </motion.div>
+
+            {/* bags.fm Deploy Option */}
+            <motion.div 
+              onClick={() => setSelectedDeployType('bags')}
+              variants={buttonVariants}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className="cursor-pointer bg-app-quaternary border border-app-primary-20 rounded-lg p-4 transition-all duration-300 hover:border-app-primary-60 touch-manipulation flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-app-primary border border-app-primary-30 flex items-center justify-center">
+                  <Utensils size={20} className="color-primary" />
+                </div>
+                <h3 className="text-base font-bold color-primary font-mono">BAGS.FM</h3>
+                <p className="text-xs text-app-secondary-80 leading-relaxed">
+                  Create a new bags.fm token.
+                </p>
+                
+                {/* Shared Fees Toggle */}
+                <div 
+                  className="relative z-10 flex items-center justify-between pt-3 border-t border-app-primary-20 mt-3"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSharedFeesEnabled(!sharedFeesEnabled);
+                  }}
                 >
-                  <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                      sharedFeesEnabled ? 'translate-x-5' : 'translate-x-1'
+                  <span className="text-xs font-medium text-app-secondary-80 font-mono cursor-pointer">SHARED FEES</span>
+                  <button
+                    className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors focus:outline-none pointer-events-none ${
+                      sharedFeesEnabled ? 'bg-app-primary-color' : 'bg-app-primary-30'
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        sharedFeesEnabled ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
+            </motion.div>
+
+            {/* Cook.Meme Deploy Option */}
+            <motion.div 
+              onClick={() => setSelectedDeployType('cook')}
+              variants={buttonVariants}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className="cursor-pointer bg-app-quaternary border border-app-primary-20 rounded-lg p-4 transition-all duration-300 hover:border-app-primary-60 touch-manipulation flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-app-primary border border-app-primary-30 flex items-center justify-center">
+                  <Utensils size={20} className="color-primary" />
+                </div>
+                <h3 className="text-base font-bold color-primary font-mono">COOK.MEME</h3>
+                <p className="text-xs text-app-secondary-80 leading-relaxed">
+                  Create a new cook.meme token with customizable parameters. Includes liquidity setup.
+                </p>
+              </div>
+            </motion.div>
+            
+            {/* moon.it Deploy Option */}
+            <motion.div 
+              onClick={() => setSelectedDeployType('moon')}
+              variants={buttonVariants}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className="cursor-pointer bg-app-quaternary border border-app-primary-20 rounded-lg p-4 transition-all duration-300 hover:border-app-primary-60 touch-manipulation flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-app-primary border border-app-primary-30 flex items-center justify-center">
+                  <Utensils size={20} className="color-primary" />
+                </div>
+                <h3 className="text-base font-bold color-primary font-mono">MOON.IT</h3>
+                <p className="text-xs text-app-secondary-80 leading-relaxed">
+                  Create a new moon.it token with customizable parameters. Includes liquidity setup.
+                </p>
+              </div>
+            </motion.div>
+            
+            {/* boop.fun Deploy Option */}
+            <motion.div 
+              onClick={() => setSelectedDeployType('boop')}
+              variants={buttonVariants}
+              initial="rest"
+              whileHover="hover"
+              whileTap="tap"
+              className="cursor-pointer bg-app-quaternary border border-app-primary-20 rounded-lg p-4 transition-all duration-300 hover:border-app-primary-60 touch-manipulation flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="w-10 h-10 rounded-lg bg-app-primary border border-app-primary-30 flex items-center justify-center">
+                  <Utensils size={20} className="color-primary" />
+                </div>
+                <h3 className="text-base font-bold color-primary font-mono">BOOP.FUN</h3>
+                <p className="text-xs text-app-secondary-80 leading-relaxed">
+                  Create a new boop.fun token with customizable parameters. Includes liquidity setup.
+                </p>
+              </div>
+            </motion.div>
           </div>
 
-          {/* Cook.Meme Deploy Option */}
-          <div 
-            onClick={() => setSelectedDeployType('cook')}
-            className="group relative cursor-pointer bg-app-tertiary border-2 border-app-primary-30 rounded-xl p-4 transition-all duration-300 hover-border-primary hover:shadow-lg hover:shadow-app-primary-20"
-          >
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-lg bg-primary-20 flex items-center justify-center">
-                <Utensils size={24} className="color-primary group-hover:animate-pulse" />
-              </div>
-              <h3 className="text-lg font-bold text-app-primary font-mono">COOK.MEME</h3>
-              <p className="text-app-secondary text-xs leading-relaxed">
-              Create a new cook.meme token with customizable parameters. Includes liquidity setup.
-              </p>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
-          </div>
-          
-          {/* moon.it Deploy Option */}
-          <div 
-            onClick={() => setSelectedDeployType('moon')}
-            className="group relative cursor-pointer bg-app-tertiary border-2 border-app-primary-30 rounded-xl p-4 transition-all duration-300 hover-border-primary hover:shadow-lg hover:shadow-app-primary-20"
-          >
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-lg bg-primary-20 flex items-center justify-center">
-                <Utensils size={24} className="color-primary group-hover:animate-pulse" />
-              </div>
-              <h3 className="text-lg font-bold text-app-primary font-mono">MOON.IT</h3>
-              <p className="text-app-secondary text-xs leading-relaxed">
-              Create a new moon.it token with customizable parameters. Includes liquidity setup.
-              </p>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
-          </div>
-          
-          {/* boop.fun Deploy Option */}
-          <div 
-            onClick={() => setSelectedDeployType('boop')}
-            className="group relative cursor-pointer bg-app-tertiary border-2 border-app-primary-30 rounded-xl p-4 transition-all duration-300 hover-border-primary hover:shadow-lg hover:shadow-app-primary-20"
-          >
-            <div className="space-y-3">
-              <div className="w-12 h-12 rounded-lg bg-primary-20 flex items-center justify-center">
-                <Utensils size={24} className="color-primary group-hover:animate-pulse" />
-              </div>
-              <h3 className="text-lg font-bold text-app-primary font-mono">BOOP.FUN</h3>
-              <p className="text-app-secondary text-xs leading-relaxed">
-              Create a new boop.fun token with customizable parameters. Includes liquidity setup.
-              </p>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
-          </div>          
-        </div>
-
-        {/* Render selected modal */}
-        {selectedDeployType === 'pump' && (
+          {/* Render selected modal */}
+          {selectedDeployType === 'pump' && (
           <DeployPumpModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
@@ -254,9 +289,10 @@ export const DeployModal: React.FC<DeployModalProps> = ({
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />
-        )}
-      </div>
-    </div>,
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
     document.body
   );
 };

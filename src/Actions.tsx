@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
    ChevronDown, 
    Share2,
@@ -13,14 +13,14 @@ import {
 import { brand } from './config/brandConfig';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import { WalletType } from "./Utils";
-import { useToast } from "./Notifications";
+import { useToast } from "./components/Notifications";
 import { countActiveWallets, getScriptName } from './utils/wallets';
-import TradingCard from './TradingForm';
+import TradingCard from './components/TradingForm';
 import { Tooltip } from './components/Tooltip';
 
 import { executeTrade } from './utils/trading';
 
-// Enhanced cyberpunk-styled Switch component (simplified)
+//  cyberpunk-styled Switch component (simplified)
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
@@ -339,7 +339,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   // Auto-buy settings
   const [autoBuyEnabled, setAutoBuyEnabled] = useState(true);
   const [autoBuyAmount, setAutoBuyAmount] = useState('0.01'); // Default SOL amount for auto-buy
-  const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(false); // Auto redirect to token after buy
+  const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true); // Auto redirect to token after buy
 
 
   // Wrapper function to match TradingForm's expected signature
@@ -392,6 +392,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     }
   }, [tokenAddress, selectedDex, solBalances, showToast, setIsLoading]);
 
+  // Track last processed message to prevent duplicates
+  const lastProcessedMessageRef = useRef<{tokenMint: string, timestamp: number} | null>(null);
+
   // Handle iframe messages for TOKEN_SELECTED and TOKEN_BUY
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -406,6 +409,21 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         const tokenMint = event.data.tokenMint || event.data.tokenAddress || event.data.token || event.data.mint;
         
         if (tokenMint) {
+          // Check if this is a duplicate message (same token within 2 seconds)
+          const now = Date.now();
+          const lastProcessed = lastProcessedMessageRef.current;
+          
+          if (lastProcessed && 
+              lastProcessed.tokenMint === tokenMint && 
+              now - lastProcessed.timestamp < 2000) {
+            // This is a duplicate message, ignore it
+            console.log('Ignoring duplicate TOKEN_BUY message for', tokenMint);
+            return;
+          }
+          
+          // Update last processed message
+          lastProcessedMessageRef.current = { tokenMint, timestamp: now };
+          
           // Get active wallets
           const activeWallets = wallets.filter(wallet => wallet.isActive);
           
@@ -539,31 +557,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               <div className="absolute bottom-0 right-0 w-8 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
             </div>
             <div className="space-y-6">
-              {/* Auto redirect toggle */}
-              <div className="flex items-center justify-between bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
-                {/* Cyberpunk corner accents - smaller version */}
-                <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
-                  <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-                  <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-                </div>
-                <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none opacity-60">
-                  <div className="absolute top-0 right-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-                  <div className="absolute top-0 right-0 w-4 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-                </div>
-                
-                <div>
-                  <div className="text-app-secondary font-mono text-xs tracking-wide flex items-center">
-                    <span className="mr-2 text-app-primary-color">⟁</span>
-                    <span>AUTO REDIRECT TOKEN</span>
-                  </div>
-                  <div className="text-xs text-app-secondary-60 mt-2 ml-5">Redirect to token after buy</div>
-                </div>
-                <Switch 
-                  checked={autoRedirectEnabled} 
-                  onCheckedChange={setAutoRedirectEnabled}
-                />
-              </div>
-              
               {/* SOL amount input */}
               <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
                 {/* Cyberpunk corner accents - smaller version */}
@@ -599,6 +592,36 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                     SOL
                   </div>
                 </div>
+                
+                {/* Auto redirect toggle - thin flag */}
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-app-primary-20">
+                  <SwitchPrimitive.Root
+                    checked={autoRedirectEnabled}
+                    onCheckedChange={setAutoRedirectEnabled}
+                    className={`
+                      peer inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full
+                      border-2 border-app-primary-40 transition-colors duration-300
+                      focus-visible:outline-none focus-visible:ring-2
+                      focus-visible:ring-app-primary-color focus-visible:ring-offset-2
+                      focus-visible:ring-offset-app-primary disabled:cursor-not-allowed
+                      disabled:opacity-50 data-[state=checked]:bg-app-primary-color data-[state=unchecked]:bg-app-secondary
+                      relative overflow-hidden
+                    `}
+                  >
+                    <SwitchPrimitive.Thumb
+                      className={`
+                        pointer-events-none block h-3 w-3 rounded-full
+                        bg-white shadow-lg ring-0 transition-transform
+                        data-[state=checked]:translate-x-3 data-[state=checked]:bg-app-primary
+                        data-[state=unchecked]:translate-x-0 data-[state=unchecked]:bg-app-secondary-color
+                      `}
+                    />
+                  </SwitchPrimitive.Root>
+                  <div className="flex items-center gap-1.5 text-app-secondary-60 text-[10px] font-mono">
+                    <span className="text-app-primary-color">⟁</span>
+                    <span>Auto redirect to token after buy</span>
+                  </div>
+                </div>
               </div>
               
               {/* Active wallets info */}
@@ -626,7 +649,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 {countActiveWallets(wallets) === 0 && (
                   <div className="mt-3 text-warning text-xs font-mono flex items-center bg-app-primary-dark-50 p-2 rounded border border-warning-40">
                     <span className="inline-block w-2 h-2 bg-warning rounded-full mr-2 animate-pulse"></span>
-                    No active wallets. Enable wallets to use auto-buy.
+                    No active wallets.
                   </div>
                 )}
               </div>
@@ -743,7 +766,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
 
       <br></br>
       
-      {/* Enhanced GitHub & Website Section */}
+      {/*  GitHub & Website Section */}
       <div className="mb-4 mx-auto max-w-4xl">
         <div className="bg-gradient-to-br from-app-secondary-50 to-app-primary-dark-50 backdrop-blur-sm 
                      rounded-xl p-4 relative overflow-hidden border border-app-primary-10 

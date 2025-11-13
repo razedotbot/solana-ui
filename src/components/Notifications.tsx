@@ -1,4 +1,4 @@
-import React, { useEffect, useState, createContext, useContext } from "react"
+import React, { useEffect, useState, createContext, useContext, useRef } from "react"
 import { AlertCircle, X, ZapIcon } from "lucide-react"
 
 interface Toast {
@@ -115,9 +115,11 @@ export const ToastContext = createContext<{
 
 export const ToastProvider = ({ children }: ToastProviderProps) => {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const counterRef = useRef(0)
 
   const showToast = (message: string, type: 'success' | 'error') => {
-    const id = Date.now()
+    const id = Date.now() + counterRef.current
+    counterRef.current += 1
     setToasts(prev => [...prev, { id, message, type }])
   }
 

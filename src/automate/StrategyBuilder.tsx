@@ -18,6 +18,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
   const [conditions, setConditions] = useState<TradingCondition[]>(strategy?.conditions || []);
   const [actions, setActions] = useState<TradingAction[]>(strategy?.actions || []);
   const [cooldown, setCooldown] = useState(strategy?.cooldown || 5);
+  const [cooldownUnit, setCooldownUnit] = useState<'milliseconds' | 'seconds' | 'minutes'>(strategy?.cooldownUnit || 'minutes');
   const [maxExecutions, setMaxExecutions] = useState(strategy?.maxExecutions || undefined);
   const [isActive, setIsActive] = useState(strategy?.isActive || false);
   const [whitelistedAddresses, setWhitelistedAddresses] = useState<string[]>(strategy?.whitelistedAddresses || []);
@@ -81,6 +82,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
       actions,
       isActive,
       cooldown,
+      cooldownUnit,
       maxExecutions,
       executionCount: strategy?.executionCount || 0,
       lastExecuted: strategy?.lastExecuted,
@@ -103,6 +105,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
       actions,
       isActive,
       cooldown,
+      cooldownUnit,
       maxExecutions,
       executionCount: strategy?.executionCount || 0,
       lastExecuted: strategy?.lastExecuted,
@@ -146,6 +149,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
         setConditions(importedStrategy.conditions || []);
         setActions(importedStrategy.actions || []);
         setCooldown(importedStrategy.cooldown || 5);
+        setCooldownUnit(importedStrategy.cooldownUnit || 'minutes');
         setMaxExecutions(importedStrategy.maxExecutions);
         setIsActive(importedStrategy.isActive || false);
         setWhitelistedAddresses(importedStrategy.whitelistedAddresses || []);
@@ -195,14 +199,26 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
       {/* Strategy Settings */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-mono color-primary mb-2">Cooldown (minutes)</label>
-          <input
-            type="number"
-            value={cooldown}
-            onChange={(e) => setCooldown(Number(e.target.value))}
-            min="1"
-              className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
-          />
+          <label className="block text-sm font-mono color-primary mb-2">Cooldown</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={cooldown}
+              onChange={(e) => setCooldown(Number(e.target.value))}
+              min="0"
+              step={cooldownUnit === 'milliseconds' ? '1' : cooldownUnit === 'seconds' ? '0.1' : '0.01'}
+              className="flex-1 px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
+            />
+            <select
+              value={cooldownUnit}
+              onChange={(e) => setCooldownUnit(e.target.value as 'milliseconds' | 'seconds' | 'minutes')}
+              className="px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
+            >
+              <option value="milliseconds">ms</option>
+              <option value="seconds">sec</option>
+              <option value="minutes">min</option>
+            </select>
+          </div>
         </div>
         <div>
           <label className="block text-sm font-mono color-primary mb-2">Max Executions (optional)</label>

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Move, Search, ArrowDown, Trash2, Users, Wallet, Settings, Plus, Play, Pause, Edit, Minimize2, Maximize2, Download, Upload } from 'lucide-react';
-import { getWalletDisplayName, WalletType, saveTradingStrategiesToCookies, loadTradingStrategiesFromCookies } from './Utils';
-import { formatAddress, formatSolBalance, formatTokenBalance, formatPrice, formatLargeNumber, formatCount } from './utils/formatting';
-import { TradingCondition, TradingAction, TradingStrategy, StrategyBuilder } from './automate';
-import { generateStrategyId } from './automate/utils';
-import { executeTrade, TradingConfig, FormattedWallet } from './utils/trading';
+import { getWalletDisplayName, WalletType, saveTradingStrategiesToCookies, loadTradingStrategiesFromCookies } from '../Utils';
+import { formatAddress, formatSolBalance, formatTokenBalance, formatPrice, formatLargeNumber, formatCount } from '../utils/formatting';
+import { TradingCondition, TradingAction, TradingStrategy, StrategyBuilder } from '../automate';
+import { generateStrategyId } from '../automate/utils';
+import { executeTrade, TradingConfig, FormattedWallet } from '../utils/trading';
 
 interface NonWhitelistedTrade {
   type: 'buy' | 'sell';
@@ -86,6 +86,8 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 }) => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Volume tracking state
   const [cumulativeBuyVolume, setCumulativeBuyVolume] = useState(0);
@@ -152,8 +154,24 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     return solBalance < 0.01;
   }, [getWalletBalance]);
 
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setIsMinimized(false); // Don't allow minimize on mobile
+        setIsSidebarOpen(false); // Close sidebar by default on mobile
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Minimize/Maximize functions
   const handleMinimize = () => {
+    if (isMobile) return; // Don't minimize on mobile
     setIsMinimized(true);
     // Position at bottom right when minimized
     onPositionChange({ x: window.innerWidth - 200, y: window.innerHeight - 80 });
@@ -161,8 +179,13 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
   const handleMaximize = () => {
     setIsMinimized(false);
-    // Return to center when maximized
-    onPositionChange({ x: window.innerWidth / 2 - 400, y: window.innerHeight / 2 - 300 });
+    if (isMobile) {
+      // Fullscreen on mobile
+      onPositionChange({ x: 0, y: 0 });
+    } else {
+      // Return to center when maximized
+      onPositionChange({ x: window.innerWidth / 2 - 400, y: window.innerHeight / 2 - 300 });
+    }
   };
 
   const toggleAllStrategies = (activate: boolean) => {
@@ -316,7 +339,23 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     // Check cooldown
     if (strategy.lastExecuted) {
       const timeSinceLastExecution = Date.now() - strategy.lastExecuted;
-      const cooldownMs = strategy.cooldown * 60 * 1000;
+      const cooldownUnit = strategy.cooldownUnit || 'minutes'; // Default to minutes for backward compatibility
+      let cooldownMs: number;
+      
+      switch (cooldownUnit) {
+        case 'milliseconds':
+          cooldownMs = strategy.cooldown;
+          break;
+        case 'seconds':
+          cooldownMs = strategy.cooldown * 1000;
+          break;
+        case 'minutes':
+          cooldownMs = strategy.cooldown * 60 * 1000;
+          break;
+        default:
+          cooldownMs = strategy.cooldown * 60 * 1000; // Default to minutes
+      }
+      
       if (timeSinceLastExecution < cooldownMs) return false;
     }
     
@@ -375,14 +414,14 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   // Handle window resize to keep minimized card positioned correctly
   useEffect(() => {
     const handleResize = () => {
-      if (isMinimized) {
+      if (isMinimized && !isMobile) {
         onPositionChange({ x: window.innerWidth - 200, y: window.innerHeight - 80 });
       }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [isMinimized, onPositionChange]);
+  }, [isMinimized, isMobile, onPositionChange]);
 
   // Strategy monitoring and execution
   useEffect(() => {
@@ -695,8 +734,8 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
   if (!isOpen) return null;
 
-  // Minimized UI
-  if (isMinimized) {
+  // Minimized UI (desktop only)
+  if (isMinimized && !isMobile) {
     return (
       <div 
         ref={cardRef}
@@ -722,14 +761,14 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
             <div className="flex items-center gap-1">
               <button
                 onClick={handleMaximize}
-                className="p-1 rounded hover:bg-primary-20 transition-colors"
+                className="p-1 rounded hover:bg-primary-20 transition-colors touch-manipulation"
                 title="Maximize"
               >
                 <Maximize2 size={12} className="text-app-secondary-60 hover:color-primary" />
               </button>
               <button
                 onClick={onClose}
-                className="p-1 rounded hover:bg-primary-20 transition-colors"
+                className="p-1 rounded hover:bg-primary-20 transition-colors touch-manipulation"
                 title="Close"
               >
                 <X size={12} className="text-app-secondary-60 hover:color-primary" />
@@ -745,7 +784,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
             <div className="flex gap-1">
               <button
                 onClick={() => toggleAllStrategies(true)}
-                className="flex-1 px-2 py-1 bg-app-accent text-white rounded text-xs font-mono hover:bg-app-accent-80 transition-colors flex items-center justify-center gap-1"
+                className="flex-1 px-2 py-1 bg-app-accent text-white rounded text-xs font-mono hover:bg-app-accent-80 transition-colors flex items-center justify-center gap-1 touch-manipulation"
                 title="Start All Strategies"
               >
                 <Play size={10} />
@@ -753,7 +792,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
               </button>
               <button
                 onClick={() => toggleAllStrategies(false)}
-                className="flex-1 px-2 py-1 bg-error-alt text-white rounded text-xs font-mono hover:bg-error-alt-80 transition-colors flex items-center justify-center gap-1"
+                className="flex-1 px-2 py-1 bg-error-alt text-white rounded text-xs font-mono hover:bg-error-alt-80 transition-colors flex items-center justify-center gap-1 touch-manipulation"
                 title="Stop All Strategies"
               >
                 <Pause size={10} />
@@ -771,55 +810,85 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
   // Full UI
   return (
-    <div 
-      ref={cardRef}
-      className="fixed z-[9999] select-none"
-      style={{
-        left: position.x,
-        top: position.y,
-        cursor: isDragging ? 'grabbing' : 'default'
-      }}
-      onMouseDown={handleMouseDown}
-    >
+    <>
+      {/* Mobile backdrop */}
+      {isMobile && isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black-80 z-[9998] md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
       <div 
-        className="relative overflow-hidden rounded-lg min-w-[800px] max-w-[1200px] h-[600px] bg-app-primary-99 backdrop-blur-md border border-app-primary-30 shadow-lg shadow-black-80 flex flex-col"
+        ref={cardRef}
+        className={`fixed z-[9999] select-none ${
+          isMobile 
+            ? 'inset-0 w-full h-full' 
+            : 'rounded-lg'
+        }`}
+        style={isMobile ? {} : {
+          left: position.x,
+          top: position.y,
+          cursor: isDragging ? 'grabbing' : 'default'
+        }}
+        onMouseDown={handleMouseDown}
       >
+        <div 
+          className={`relative overflow-hidden ${
+            isMobile 
+              ? 'w-full h-full rounded-none' 
+              : 'rounded-lg min-w-[800px] max-w-[1200px] h-[600px]'
+          } bg-app-primary-99 backdrop-blur-md border border-app-primary-30 shadow-lg shadow-black-80 flex flex-col`}
+        >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-app-primary-30">
+        <div className="flex items-center justify-between p-3 md:p-4 border-b border-app-primary-30 flex-shrink-0">
           <div 
             ref={dragHandleRef}
-            className="flex items-center gap-2 cursor-grab active:cursor-grabbing"
-            title="Drag to move"
+            className={`flex items-center gap-2 ${
+              isMobile ? '' : 'cursor-grab active:cursor-grabbing'
+            }`}
+            title={isMobile ? '' : 'Drag to move'}
           >
-            <Move size={16} className="text-app-secondary-60" />
-            <h3 className="text-lg font-mono font-semibold color-primary">Token Automation</h3>
+            {!isMobile && <Move size={16} className="text-app-secondary-60" />}
+            <h3 className="text-base md:text-lg font-mono font-semibold color-primary">Token Automation</h3>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleMinimize}
-              className="p-1.5 rounded hover:bg-primary-20 transition-colors"
-              title="Minimize"
-            >
-              <Minimize2 size={16} className="text-app-secondary-60 hover:color-primary" />
-            </button>
+            {isMobile && (
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2 md:p-1.5 rounded hover:bg-primary-20 transition-colors touch-manipulation"
+                title="Toggle Wallets"
+              >
+                <Wallet size={18} className="text-app-secondary-60 hover:color-primary" />
+              </button>
+            )}
+            {!isMobile && (
+              <button
+                onClick={handleMinimize}
+                className="p-1.5 rounded hover:bg-primary-20 transition-colors touch-manipulation"
+                title="Minimize"
+              >
+                <Minimize2 size={16} className="text-app-secondary-60 hover:color-primary" />
+              </button>
+            )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded hover:bg-primary-20 transition-colors"
+              className="p-2 md:p-1.5 rounded hover:bg-primary-20 transition-colors touch-manipulation"
               title="Close"
             >
-              <X size={16} className="text-app-secondary-60 hover:color-primary" />
+              <X size={18} className="text-app-secondary-60 hover:color-primary" />
             </button>
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
           {/* Main Content */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             {/* Tab Navigation */}
-            <div className="flex border-b border-app-primary-30 bg-app-primary">
+            <div className="flex border-b border-app-primary-30 bg-app-primary flex-shrink-0">
               <button
                 onClick={() => setActiveTab('data')}
-                className={`px-4 py-3 font-mono text-sm transition-colors ${
+                className={`flex-1 md:flex-none px-3 md:px-4 py-2.5 md:py-3 font-mono text-xs md:text-sm transition-colors touch-manipulation ${
                   activeTab === 'data'
                     ? 'color-primary border-b-2 border-app-primary bg-app-primary-60'
                     : 'text-app-secondary-60 hover:color-primary hover:bg-app-primary-60'
@@ -829,64 +898,66 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
               </button>
               <button
                 onClick={() => setActiveTab('strategies')}
-                className={`px-4 py-3 font-mono text-sm transition-colors flex items-center gap-2 ${
+                className={`flex-1 md:flex-none px-3 md:px-4 py-2.5 md:py-3 font-mono text-xs md:text-sm transition-colors flex items-center justify-center gap-1 md:gap-2 touch-manipulation ${
                   activeTab === 'strategies'
                     ? 'color-primary border-b-2 border-app-primary bg-app-primary-60'
                     : 'text-app-secondary-60 hover:color-primary hover:bg-app-primary-60'
                 }`}
               >
-                <Settings className="w-4 h-4" />
-                Trading Strategies ({tradingStrategies.length})
+                <Settings className="w-3 h-3 md:w-4 md:h-4" />
+                <span className="hidden sm:inline">Trading Strategies</span>
+                <span className="sm:hidden">Strategies</span>
+                <span className="ml-1">({tradingStrategies.length})</span>
               </button>
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 p-4 overflow-y-auto">
+            <div className="flex-1 p-3 md:p-4 overflow-y-auto">
               {activeTab === 'data' && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-mono font-semibold color-primary">Latest Data</h4>
+                <div className="mb-4 md:mb-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 mb-3 md:mb-4">
+                    <h4 className="text-base md:text-lg font-mono font-semibold color-primary">Latest Data</h4>
                     <button
                       onClick={() => {
                         setCumulativeBuyVolume(0);
                         setCumulativeSellVolume(0);
                         setProcessedTradeSignatures(new Set());
                       }}
-                      className="px-3 py-1.5 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-sm hover:bg-app-secondary hover:border-app-primary transition-colors"
+                      className="w-full sm:w-auto px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm hover:bg-app-secondary hover:border-app-primary transition-colors touch-manipulation"
                     >
                       Reset Volume
                     </button>
                   </div>
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {/* Volume Summary */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
                   <div 
-                    className="bg-app-primary-60 border border-app-primary-40 p-4 rounded-lg cursor-pointer hover:bg-app-primary-40 transition-colors"
+                    className="bg-app-primary-60 border border-app-primary-40 p-3 md:p-4 rounded-lg cursor-pointer hover:bg-app-primary-40 transition-colors touch-manipulation"
                     onClick={() => setShowUSD(!showUSD)}
                     title="Click to toggle between SOL and USD"
                   >
-                    <div className="text-sm text-app-secondary-60 font-mono mb-1">Total Buy Volume</div>
-                    <div className="color-primary font-mono font-semibold">
+                    <div className="text-xs md:text-sm text-app-secondary-60 font-mono mb-1">Total Buy Volume</div>
+                    <div className="color-primary font-mono font-semibold text-sm md:text-base">
                       {formatVolumeDisplay(cumulativeBuyVolume)}
                     </div>
                   </div>
                   <div 
-                    className="bg-app-primary-60 border border-error-alt-40 p-4 rounded-lg cursor-pointer hover:bg-app-primary-40 transition-colors"
+                    className="bg-app-primary-60 border border-error-alt-40 p-3 md:p-4 rounded-lg cursor-pointer hover:bg-app-primary-40 transition-colors touch-manipulation"
                     onClick={() => setShowUSD(!showUSD)}
                     title="Click to toggle between SOL and USD"
                   >
-                    <div className="text-sm text-error-alt-60 font-mono mb-1">Total Sell Volume</div>
-                    <div className="text-error-alt font-mono font-semibold">
+                    <div className="text-xs md:text-sm text-error-alt-60 font-mono mb-1">Total Sell Volume</div>
+                    <div className="text-error-alt font-mono font-semibold text-sm md:text-base">
                       {formatVolumeDisplay(cumulativeSellVolume)}
                     </div>
                   </div>
                   <div 
-                    className="bg-app-primary-60 border border-app-primary-40 p-4 rounded-lg cursor-pointer hover:bg-app-primary-40 transition-colors"
+                    className="bg-app-primary-60 border border-app-primary-40 p-3 md:p-4 rounded-lg cursor-pointer hover:bg-app-primary-40 transition-colors touch-manipulation"
                     onClick={() => setShowUSD(!showUSD)}
                     title="Click to toggle between SOL and USD"
                   >
-                    <div className="text-sm text-app-secondary-60 font-mono mb-1">Net Volume</div>
-                    <div className={`font-mono font-semibold ${
+                    <div className="text-xs md:text-sm text-app-secondary-60 font-mono mb-1">Net Volume</div>
+                    <div className={`font-mono font-semibold text-sm md:text-base ${
                       cumulativeBuyVolume - cumulativeSellVolume >= 0 ? 'text-app-accent' : 'text-error-alt'
                     }`}>
                       {formatVolumeDisplay(cumulativeBuyVolume - cumulativeSellVolume)}
@@ -896,7 +967,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                 
                 {/* Latest Trade */}
                 <div 
-                  className="bg-app-primary border border-app-primary-40 rounded-lg p-4 cursor-pointer hover:bg-app-primary-60 transition-colors"
+                  className="bg-app-primary border border-app-primary-40 rounded-lg p-3 md:p-4 cursor-pointer hover:bg-app-primary-60 transition-colors touch-manipulation"
                   onClick={() => setShowUSD(!showUSD)}
                   title="Click to toggle between SOL and USD"
                 >
@@ -907,32 +978,32 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                     
                     if (!latestTrade) {
                       return (
-                        <div className="text-app-secondary-60 font-mono text-center py-4">
+                        <div className="text-app-secondary-60 font-mono text-center py-4 text-xs md:text-sm">
                           No non-whitelisted trades found for this token
                         </div>
                       );
                     }
                     
                     return (
-                      <div className="flex justify-between items-center">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2 mb-2">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <span className={`px-2 py-1 rounded text-xs font-mono font-semibold ${
                               latestTrade.type === 'buy' ? 'bg-app-primary-60 border border-app-primary-40 color-primary' : 'bg-app-primary-60 border border-error-alt-40 text-error-alt'
                             }`}>
                               {latestTrade.type.toUpperCase()}
                             </span>
-                            <span className="color-primary font-mono font-semibold">{formatVolumeDisplay(latestTrade.solAmount)}</span>
+                            <span className="color-primary font-mono font-semibold text-sm md:text-base">{formatVolumeDisplay(latestTrade.solAmount)}</span>
                           </div>
-                          <div className="text-sm text-app-secondary-60 font-mono">
+                          <div className="text-xs md:text-sm text-app-secondary-60 font-mono">
                             Avg: {formatPrice(latestTrade.avgPrice)} | {formatLargeNumber(latestTrade.marketCap)} MC
                           </div>
                           <div className="text-xs text-app-secondary-60 font-mono">
                             {new Date(latestTrade.timestamp).toLocaleString()}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="color-primary font-mono text-sm">
+                        <div className="text-left sm:text-right w-full sm:w-auto">
+                          <div className="color-primary font-mono text-xs md:text-sm break-all sm:break-normal">
                             {formatAddress(latestTrade.address)}
                           </div>
                         </div>
@@ -946,11 +1017,11 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
               )}
 
               {activeTab === 'strategies' && (
-                <div className="space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   {/* Strategy Management Header */}
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-mono font-semibold color-primary">Trading Strategies</h4>
-                    <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-2">
+                    <h4 className="text-base md:text-lg font-mono font-semibold color-primary">Trading Strategies</h4>
+                    <div className="flex gap-2 w-full sm:w-auto">
                       <button
                         onClick={() => {
                           // Create a file input element
@@ -977,6 +1048,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                                 setTradingStrategies(prev => [...prev, {
                                   ...importedStrategy,
                                   id: importedStrategy.id || generateStrategyId(),
+                                  cooldownUnit: importedStrategy.cooldownUnit || 'minutes', // Default to minutes for backward compatibility
                                   createdAt: importedStrategy.createdAt || Date.now(),
                                   updatedAt: Date.now(),
                                   executionCount: importedStrategy.executionCount || 0
@@ -1000,25 +1072,26 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                           document.body.appendChild(fileInput);
                           fileInput.click();
                         }}
-                        className="px-3 py-1.5 border border-app-primary-40 rounded color-primary font-mono text-sm hover:bg-app-primary-40 transition-colors flex items-center gap-2"
+                        className="flex-1 sm:flex-none px-3 py-2 border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm hover:bg-app-primary-40 transition-colors flex items-center justify-center gap-2 touch-manipulation"
                         title="Import strategy from JSON file"
                       >
-                        <Upload className="w-4 h-4" />
-                        Import
+                        <Upload className="w-3 h-3 md:w-4 md:h-4" />
+                        <span className="hidden sm:inline">Import</span>
                       </button>
                       <button
                         onClick={() => setIsCreatingStrategy(!isCreatingStrategy)}
-                        className="px-3 py-1.5 bg-app-accent border border-app-primary-40 rounded color-primary font-mono text-sm hover:bg-app-primary hover:border-app-primary transition-colors flex items-center gap-2"
+                        className="flex-1 sm:flex-none px-3 py-2 bg-app-accent border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm hover:bg-app-primary hover:border-app-primary transition-colors flex items-center justify-center gap-2 touch-manipulation"
                       >
-                        {isCreatingStrategy ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                        {isCreatingStrategy ? 'Cancel' : 'New Strategy'}
+                        {isCreatingStrategy ? <X className="w-3 h-3 md:w-4 md:h-4" /> : <Plus className="w-3 h-3 md:w-4 md:h-4" />}
+                        <span className="hidden sm:inline">{isCreatingStrategy ? 'Cancel' : 'New Strategy'}</span>
+                        <span className="sm:hidden">{isCreatingStrategy ? 'Cancel' : 'New'}</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Inline Strategy Creation Form */}
                   {isCreatingStrategy && (
-                    <div className="bg-app-primary border border-app-primary-40 rounded-lg p-6">
+                    <div className="bg-app-primary border border-app-primary-40 rounded-lg p-3 md:p-6">
                       <StrategyBuilder
                         strategy={null}
                         onSave={(strategy) => {
@@ -1033,16 +1106,16 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                   {/* Active Strategies List */}
                   <div className="space-y-3">
                     {tradingStrategies.map(strategy => (
-                      <div key={strategy.id} className="bg-app-primary border border-app-primary-40 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
+                      <div key={strategy.id} className="bg-app-primary border border-app-primary-40 rounded-lg p-3 md:p-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 mb-2">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                             <button
                               onClick={() => {
                                 setTradingStrategies(prev => prev.map(s => 
                                   s.id === strategy.id ? { ...s, isActive: !s.isActive } : s
                                 ));
                               }}
-                              className={`p-1 rounded transition-colors ${
+                              className={`p-1.5 sm:p-1 rounded transition-colors touch-manipulation flex-shrink-0 ${
                                 strategy.isActive 
                                   ? 'bg-app-accent text-app-primary hover:bg-app-primary-60' 
                                   : 'bg-app-primary-60 text-app-secondary-60 hover:bg-app-secondary'
@@ -1050,12 +1123,12 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                             >
                               {strategy.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                             </button>
-                            <div>
-                              <h5 className="font-mono font-semibold color-primary">{strategy.name}</h5>
-                              <p className="text-sm text-app-secondary-60 font-mono">{strategy.description}</p>
+                            <div className="min-w-0 flex-1">
+                              <h5 className="font-mono font-semibold color-primary text-sm md:text-base truncate">{strategy.name}</h5>
+                              <p className="text-xs md:text-sm text-app-secondary-60 font-mono truncate">{strategy.description}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end">
                             <span className={`px-2 py-1 rounded text-xs font-mono ${
                               strategy.isActive 
                                 ? 'bg-app-accent text-app-primary' 
@@ -1087,7 +1160,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                                 document.body.removeChild(a);
                                 URL.revokeObjectURL(url);
                               }}
-                              className="p-1 rounded hover:bg-app-primary-60 transition-colors"
+                              className="p-1.5 sm:p-1 rounded hover:bg-app-primary-60 transition-colors touch-manipulation"
                               title="Export strategy as JSON file"
                             >
                               <Download className="w-4 h-4 text-app-secondary-60 hover:color-primary" />
@@ -1101,7 +1174,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                                   setIsCreatingStrategy(false);
                                 }
                               }}
-                              className="p-1 rounded hover:bg-app-primary-60 transition-colors"
+                              className="p-1.5 sm:p-1 rounded hover:bg-app-primary-60 transition-colors touch-manipulation"
                             >
                               {editingStrategy?.id === strategy.id ? <X className="w-4 h-4 text-app-secondary-60 hover:color-primary" /> : <Edit className="w-4 h-4 text-app-secondary-60 hover:color-primary" />}
                             </button>
@@ -1109,7 +1182,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                               onClick={() => {
                                 setTradingStrategies(prev => prev.filter(s => s.id !== strategy.id));
                               }}
-                              className="p-1 rounded hover:bg-error-alt-60 transition-colors"
+                              className="p-1.5 sm:p-1 rounded hover:bg-error-alt-60 transition-colors touch-manipulation"
                             >
                               <Trash2 className="w-4 h-4 text-app-secondary-60 hover:text-error-alt" />
                             </button>
@@ -1119,7 +1192,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                         {/* Strategy Details */}
                         {editingStrategy?.id !== strategy.id && (
                           <div className="mt-3 pt-3 border-t border-app-primary-30">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-2 gap-3 md:gap-4 text-xs md:text-sm">
                               <div>
                                 <span className="text-app-secondary-60 font-mono">Conditions: </span>
                                 <span className="color-primary font-mono">{strategy.conditions.length}</span>
@@ -1134,7 +1207,12 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                               </div>
                               <div>
                                 <span className="text-app-secondary-60 font-mono">Cooldown: </span>
-                                <span className="color-primary font-mono">{strategy.cooldown}m</span>
+                                <span className="color-primary font-mono">
+                                  {strategy.cooldown}
+                                  {strategy.cooldownUnit === 'milliseconds' ? 'ms' : 
+                                   strategy.cooldownUnit === 'seconds' ? 's' : 
+                                   strategy.cooldownUnit === 'minutes' ? 'm' : 'm'}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -1159,11 +1237,11 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                     ))}
                     
                     {tradingStrategies.length === 0 && !isCreatingStrategy && (
-                      <div className="text-center py-8">
-                        <div className="text-app-secondary-60 font-mono mb-4">No trading strategies configured</div>
+                      <div className="text-center py-6 md:py-8">
+                        <div className="text-app-secondary-60 font-mono mb-4 text-sm md:text-base">No trading strategies configured</div>
                         <button
                           onClick={() => setIsCreatingStrategy(true)}
-                          className="px-4 py-2 bg-app-accent border border-app-primary-40 rounded color-primary font-mono text-sm hover:bg-app-primary hover:border-app-primary transition-colors flex items-center gap-2 mx-auto"
+                          className="px-4 py-2 bg-app-accent border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm hover:bg-app-primary hover:border-app-primary transition-colors flex items-center gap-2 mx-auto touch-manipulation"
                         >
                           <Plus className="w-4 h-4" />
                           Create Your First Strategy
@@ -1175,20 +1253,20 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                   {/* Execution Log */}
                   {strategyExecutionLog.length > 0 && (
                     <div className="space-y-3">
-                      <h5 className="font-mono font-semibold color-primary">Execution Log</h5>
-                      <div className="bg-app-primary border border-app-primary-40 rounded-lg p-4 max-h-48 overflow-y-auto">
+                      <h5 className="font-mono font-semibold color-primary text-sm md:text-base">Execution Log</h5>
+                      <div className="bg-app-primary border border-app-primary-40 rounded-lg p-3 md:p-4 max-h-48 overflow-y-auto">
                         {strategyExecutionLog.slice(0, 10).map((log, index) => (
-                          <div key={index} className="flex items-center justify-between py-2 border-b border-app-primary-30 last:border-b-0">
-                            <div className="flex items-center gap-3">
-                              <span className={`w-2 h-2 rounded-full ${
+                          <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 py-2 border-b border-app-primary-30 last:border-b-0">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                                 log.result === 'success' ? 'bg-app-accent' : 'bg-error-alt'
                               }`} />
-                              <div>
-                                <div className="font-mono text-sm color-primary">{log.action}</div>
-                                <div className="font-mono text-xs text-app-secondary-60">{log.message}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-mono text-xs md:text-sm color-primary break-words">{log.action}</div>
+                                <div className="font-mono text-xs text-app-secondary-60 break-words">{log.message}</div>
                               </div>
                             </div>
-                            <div className="text-xs text-app-secondary-60 font-mono">
+                            <div className="text-xs text-app-secondary-60 font-mono flex-shrink-0">
                               {new Date(log.timestamp).toLocaleTimeString()}
                             </div>
                           </div>
@@ -1202,34 +1280,48 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           </div>
 
           {/* Wallet Sidebar */}
-          {showSidebar && (
-            <div className="w-80 border-l border-app-primary-30 bg-app-primary flex flex-col h-full">
-              <div className="p-4 border-b border-app-primary-30 flex-shrink-0">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-mono font-semibold color-primary flex items-center gap-2">
-                    <Wallet className="w-5 h-5" />
+          {(!isMobile && showSidebar) || (isMobile && isSidebarOpen) ? (
+            <div className={`${
+              isMobile 
+                ? `fixed top-0 right-0 h-full w-full sm:w-96 z-[10000] transform transition-transform duration-300 ease-in-out ${
+                    isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+                  }`
+                : 'w-80'
+            } border-l border-app-primary-30 bg-app-primary flex flex-col h-full`}>
+              <div className="p-3 md:p-4 border-b border-app-primary-30 flex-shrink-0">
+                <div className="flex items-center justify-between mb-3 md:mb-4">
+                  <h4 className="text-base md:text-lg font-mono font-semibold color-primary flex items-center gap-2">
+                    <Wallet className="w-4 h-4 md:w-5 md:h-5" />
                     Wallets
                   </h4>
+                  {isMobile && (
+                    <button
+                      onClick={() => setIsSidebarOpen(false)}
+                      className="p-1.5 rounded hover:bg-primary-20 transition-colors touch-manipulation"
+                    >
+                      <X size={18} className="text-app-secondary-60 hover:color-primary" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Wallet Search */}
-                <div className="relative mb-4">
+                <div className="relative mb-3 md:mb-4">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-app-secondary-60" />
                   <input
                     type="text"
                     placeholder="Search wallets..."
                     value={walletSearchTerm}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWalletSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-app-tertiary border border-app-primary-40 rounded-lg color-primary placeholder-app-secondary-60 font-mono text-sm focus:outline-none focus:border-app-primary"
+                    className="w-full pl-10 pr-4 py-2 bg-app-tertiary border border-app-primary-40 rounded-lg color-primary placeholder-app-secondary-60 font-mono text-xs md:text-sm focus:outline-none focus:border-app-primary"
                   />
                 </div>
 
                 {/* Wallet Filters */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="grid grid-cols-2 gap-2 mb-3 md:mb-4">
                   <select
                     value={walletSortOption}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setWalletSortOption(e.target.value)}
-                    className="px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-sm focus:outline-none focus:border-app-primary"
+                    className="px-2 md:px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm focus:outline-none focus:border-app-primary"
                   >
                     <option value="address">Sort by Address</option>
                     <option value="balance">Sort by SOL</option>
@@ -1237,7 +1329,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                   </select>
                   <button
                     onClick={() => setWalletSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-                    className="px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-sm hover:bg-app-secondary hover:border-app-primary transition-colors flex items-center justify-center gap-1"
+                    className="px-2 md:px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm hover:bg-app-secondary hover:border-app-primary transition-colors flex items-center justify-center gap-1 touch-manipulation"
                   >
                     <ArrowDown className={`w-3 h-3 transition-transform ${walletSortDirection === 'desc' ? 'rotate-180' : ''}`} />
                     {walletSortDirection === 'asc' ? 'Asc' : 'Desc'}
@@ -1247,22 +1339,22 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                 <select
                   value={walletBalanceFilter}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setWalletBalanceFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-sm focus:outline-none focus:border-app-primary mb-4"
+                  className="w-full px-2 md:px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm focus:outline-none focus:border-app-primary mb-3 md:mb-4"
                 >
                   <option value="all">All Wallets</option>
                   <option value="nonZero">Non-Zero SOL</option>
                   <option value="highBalance">High Balance (≥0.1 SOL)</option>
-                  <option value="lowBalance">Low Balance (0.1 SOL)</option>
+                  <option value="lowBalance">Low Balance (&lt;0.1 SOL)</option>
                   <option value="hasTokens">Has Tokens</option>
                 </select>
               </div>
 
               {/* Selected Wallets */}
               {selectedWallets.length > 0 && (
-                <div className="p-4 border-b border-app-primary-30 flex-shrink-0">
+                <div className="p-3 md:p-4 border-b border-app-primary-30 flex-shrink-0">
                   <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-semibold color-primary flex items-center gap-2 font-mono">
-                      <Users className="w-4 h-4" />
+                    <h5 className="text-xs md:text-sm font-semibold color-primary flex items-center gap-2 font-mono">
+                      <Users className="w-3 h-3 md:w-4 md:h-4" />
                       Selected ({selectedWallets.length})
                     </h5>
                   </div>
@@ -1270,7 +1362,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                     {selectedWallets.map((wallet, index) => (
                       <div key={index} className="flex items-center justify-between p-2 bg-app-tertiary border border-app-primary-30 rounded">
                         <div className="flex-1 min-w-0">
-                          <div className="color-primary text-sm font-mono truncate">
+                          <div className="color-primary text-xs md:text-sm font-mono truncate">
                             {formatAddress(wallet.address)}
                           </div>
                           <div className="text-xs text-app-secondary-60">
@@ -1279,7 +1371,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                         </div>
                         <button
                           onClick={() => removeWallet(index)}
-                          className="ml-2 p-1 hover:bg-app-secondary rounded transition-colors"
+                          className="ml-2 p-1.5 hover:bg-app-secondary rounded transition-colors touch-manipulation"
                         >
                           <Trash2 className="w-3 h-3 text-error-alt" />
                         </button>
@@ -1291,18 +1383,18 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
               {/* Available Wallets */}
               <div className="flex-1 overflow-hidden flex flex-col">
-                <div className="p-4 flex-shrink-0">
-                  <h5 className="text-sm font-semibold color-primary mb-2 font-mono">
+                <div className="p-3 md:p-4 flex-shrink-0">
+                  <h5 className="text-xs md:text-sm font-semibold color-primary mb-2 font-mono">
                     Available Wallets ({getAvailableWallets().length})
                   </h5>
                 </div>
-                <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-0 scrollbar-thin scrollbar-thumb-app-primary-40 scrollbar-track-transparent hover:scrollbar-thumb-app-primary-60">
+                <div className="flex-1 overflow-y-auto px-3 md:px-4 pb-3 md:pb-4 min-h-0 scrollbar-thin scrollbar-thumb-app-primary-40 scrollbar-track-transparent hover:scrollbar-thumb-app-primary-60">
                   <div className="space-y-2">
                     {filterWallets(getAvailableWallets(), walletSearchTerm).map((wallet, index) => (
                       <div
                         key={index}
                         onClick={() => addWallet(wallet)}
-                        className={`p-3 rounded-lg border cursor-pointer transition-all hover:bg-app-secondary ${
+                        className={`p-2.5 md:p-3 rounded-lg border cursor-pointer transition-all hover:bg-app-secondary touch-manipulation ${
                           hasInsufficientSOL(wallet.address)
                             ? 'border-error-alt-40 bg-error-alt-99'
                             : 'border-app-primary-40 bg-app-tertiary hover:border-app-primary'
@@ -1310,7 +1402,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                       >
                         <div className="flex justify-between items-start">
                           <div className="flex-1 min-w-0">
-                            <div className="color-primary text-sm font-mono truncate">
+                            <div className="color-primary text-xs md:text-sm font-mono truncate">
                               {formatAddress(wallet.address)}
                             </div>
                             <div className="text-xs text-app-secondary-60 mt-1">
@@ -1331,17 +1423,12 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                   </div>
                 </div>
               </div>
-              </div>
-            )}
-
-
-
-
-              
-
             </div>
-          </div>
-    </div>
+          ) : null}
+        </div>
+        </div>
+      </div>
+    </>
   );
 };
 

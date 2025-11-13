@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import logo from './logo.png';
-import { brand } from './config/brandConfig';
-import { Tooltip } from './components/Tooltip';
+import logo from '../logo.png';
+import { brand } from '../config/brandConfig';
+import { Tooltip } from './Tooltip';
 
 interface CyberpunkServiceButtonProps {
   icon: React.ReactNode;

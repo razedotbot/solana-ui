@@ -21,10 +21,21 @@ const loadBrandCSS = async () => {
 
 // Load brand CSS immediately
 loadBrandCSS();
-import { ToastProvider } from "./Notifications";
-import ServerConfig from './ServerConfig';
+import { ToastProvider, useToast } from "./components/Notifications";
+import BeRightBack from './components/BeRightBack';
 import IntroModal from './modals/IntroModal';
+import { Connection } from '@solana/web3.js';
+import { 
+  loadWalletsFromCookies, 
+  loadConfigFromCookies, 
+  saveConfigToCookies,
+  saveWalletsToCookies,
+  WalletType, 
+  ConfigType 
+} from './Utils';
 const App = lazy(() => import('./App'));
+const SettingsModal = lazy(() => import('./modals/SettingsModal'));
+const WalletOverview = lazy(() => import('./modals/WalletsModal'));
 
 declare global {
   interface Window {
@@ -140,6 +151,17 @@ const Root = () => {
   const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showIntroModal, setShowIntroModal] = useState(false);
+  
+  // Modal states for offline access
+  const [isWalletsModalOpen, setIsWalletsModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  
+  // Load wallets and config for offline modal access
+  const [wallets, setWallets] = useState<WalletType[]>([]);
+  const [config, setConfig] = useState<ConfigType | null>(null);
+  const [solBalances, setSolBalances] = useState<Map<string, number>>(new Map());
+  const [tokenBalances, setTokenBalances] = useState<Map<string, number>>(new Map());
+  const [connection, setConnection] = useState<Connection | null>(null);
 
   // Disable right-click and text selection globally
   useEffect(() => {
@@ -292,39 +314,6 @@ const Root = () => {
     return false;
   };
 
-  const handleServerUrlSubmit = async (url: string) => {
-    setIsChecking(true);
-    setError(null);
-    
-    try {
-      const isConnected = await checkServerConnection(url);
-      if (isConnected) {
-        // Create a custom server object for manual URLs
-        const customServer: ServerInfo = {
-          id: 'custom',
-          name: 'Custom Server',
-          url: url,
-          region: 'Custom',
-          flag: '🔧'
-        };
-        
-        setCurrentServer(customServer);
-        setServerUrl(url);
-        window.tradingServerUrl = url;
-        window.serverRegion = 'Custom';
-        Cookies.set(SERVER_URL_COOKIE, url, { expires: 30 });
-        Cookies.set(SERVER_REGION_COOKIE, 'custom', { expires: 30 });
-      } else {
-        setError('Could not connect to server. Please check the address and try again.');
-        setServerUrl(null);
-      }
-    } catch (err) {
-      setError('Connection error. Please verify the server is running and try again.');
-      setServerUrl(null);
-    } finally {
-      setIsChecking(false);
-    }
-  };
 
   // Handler for completing the intro
   const handleIntroComplete = () => {
@@ -470,6 +459,73 @@ const Root = () => {
     }
   }, [availableServers]);
 
+  // Load wallets and config for offline access
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const savedWallets = loadWalletsFromCookies();
+        if (savedWallets && savedWallets.length > 0) {
+          setWallets(savedWallets);
+        }
+        
+        const savedConfig = loadConfigFromCookies();
+        if (savedConfig) {
+          setConfig(savedConfig);
+          
+          // Try to create connection if RPC endpoint is available
+          if (savedConfig.rpcEndpoint) {
+            try {
+              const conn = new Connection(savedConfig.rpcEndpoint, 'confirmed');
+              setConnection(conn);
+            } catch (err) {
+              console.log('Could not create connection:', err);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading wallets/config:', error);
+      }
+    };
+    
+    loadData();
+  }, []);
+
+  // Toast wrapper
+  const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { showToast } = useToast();
+    
+    // Expose showToast globally for modals
+    useEffect(() => {
+      (window as any).showToast = showToast;
+      return () => {
+        delete (window as any).showToast;
+      };
+    }, [showToast]);
+    
+    return <>{children}</>;
+  };
+
+  // Config change handler
+  const handleConfigChange = (key: keyof ConfigType, value: string) => {
+    if (!config) return;
+    const updatedConfig = { ...config, [key]: value };
+    setConfig(updatedConfig);
+    saveConfigToCookies(updatedConfig);
+  };
+
+  // Save settings handler
+  const handleSaveSettings = () => {
+    if (config) {
+      saveConfigToCookies(config);
+    }
+  };
+
+  // Wallet update handler
+  const handleWalletsUpdate = (updatedWallets: WalletType[]) => {
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  };
+
   // Force modal to appear with keyboard shortcut for debugging
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -489,26 +545,68 @@ const Root = () => {
 
   return (
     <ToastProvider>
-      {serverUrl ? (
-        <>
-          {/* The App component without blur effect */}
-          <div className={showIntroModal ? 'filter blur-sm' : ''} 
-               style={{ pointerEvents: showIntroModal ? 'none' : 'auto' }}>
-            <Suspense fallback={<ServerCheckLoading />}>
-              <App />
-            </Suspense>
-          </div>
-          
-          {/* Our custom modal portal implementation */}
-          <ModalPortal
-            isOpen={showIntroModal}
-            onComplete={handleIntroComplete}
-            onSkip={handleIntroSkip}
+      <ToastWrapper>
+        {serverUrl ? (
+          <>
+            {/* The App component without blur effect */}
+            <div className={showIntroModal ? 'filter blur-sm' : ''} 
+                 style={{ pointerEvents: showIntroModal ? 'none' : 'auto' }}>
+              <Suspense fallback={<ServerCheckLoading />}>
+                <App />
+              </Suspense>
+            </div>
+            
+            {/* Our custom modal portal implementation */}
+            <ModalPortal
+              isOpen={showIntroModal}
+              onComplete={handleIntroComplete}
+              onSkip={handleIntroSkip}
+            />
+          </>
+        ) : (
+          <BeRightBack 
+            onOpenWallets={() => setIsWalletsModalOpen(true)}
+            onOpenSettings={() => {
+              setIsSettingsModalOpen(true);
+            }}
           />
-        </>
-      ) : (
-        <ServerConfig onSubmit={handleServerUrlSubmit} />
-      )}
+        )}
+        
+        {/* Modals accessible even when server is unreachable */}
+        <Suspense fallback={null}>
+          <WalletOverview
+            isOpen={isWalletsModalOpen}
+            onClose={() => setIsWalletsModalOpen(false)}
+            wallets={wallets}
+            setWallets={handleWalletsUpdate}
+            solBalances={solBalances}
+            setSolBalances={setSolBalances}
+            tokenBalances={tokenBalances}
+            setTokenBalances={setTokenBalances}
+            tokenAddress=""
+            connection={connection}
+            handleRefresh={() => {}}
+            isRefreshing={false}
+            showToast={(window as any).showToast || (() => {})}
+            onOpenSettings={() => {
+              setIsWalletsModalOpen(false);
+              setIsSettingsModalOpen(true);
+            }}
+          />
+          
+          {config && (
+            <SettingsModal
+              isOpen={isSettingsModalOpen}
+              onClose={() => setIsSettingsModalOpen(false)}
+              config={config}
+              onConfigChange={handleConfigChange}
+              onSave={handleSaveSettings}
+              connection={connection}
+              showToast={(window as any).showToast || (() => {})}
+            />
+          )}
+        </Suspense>
+      </ToastWrapper>
     </ToastProvider>
   );
 };

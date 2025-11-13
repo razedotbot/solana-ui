@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, X, Move, Edit3, Check } from 'lucide-react';
-import { WalletType } from './Utils';
-import { ScriptType } from './utils/wallets';
-import { formatNumber } from './utils/formatting';
+import { WalletType } from '../Utils';
+import { ScriptType } from '../utils/wallets';
+import { formatNumber } from '../utils/formatting';
 
 // Hook to detect mobile viewport
 const useIsMobile = () => {

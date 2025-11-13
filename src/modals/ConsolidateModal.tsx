@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, X, CheckCircle, DollarSign, Info, Search, ChevronRight } from 'lucide-react';
 import { Connection } from '@solana/web3.js';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 import { WalletType, getWalletDisplayName } from '../Utils';
 import { formatAddress, formatSolBalance } from '../utils/formatting';
 import { consolidateSOL, validateConsolidationInputs } from '../utils/consolidate';

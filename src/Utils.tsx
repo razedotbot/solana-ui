@@ -12,6 +12,7 @@ export interface WalletType {
   isActive: boolean;
   tokenBalance?: number;
   label?: string;
+  isArchived?: boolean;
 }
 
 export interface ConfigType {
@@ -728,7 +729,12 @@ export const loadTradingStrategiesFromCookies = (): TradingStrategy[] => {
   const savedStrategies = Cookies.get(TRADING_STRATEGIES_COOKIE_KEY);
   if (savedStrategies) {
     try {
-      return JSON.parse(savedStrategies);
+      const strategies = JSON.parse(savedStrategies) as TradingStrategy[];
+      // Add default cooldownUnit for backward compatibility
+      return strategies.map(strategy => ({
+        ...strategy,
+        cooldownUnit: strategy.cooldownUnit || 'minutes'
+      }));
     } catch (error) {
       console.error('Error parsing saved trading strategies:', error);
       return [];

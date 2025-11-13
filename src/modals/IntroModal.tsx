@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, Settings, Rocket, BarChart3, DollarSign } from 'lucide-react';
-import { StepVisualization, StylesAppender } from '../StepVisualizations';
+import { StepVisualization, StylesAppender } from '../components/StepVisualizations';
 
 // Updated Types for our component - removed action props
 interface IntroductionModalProps {

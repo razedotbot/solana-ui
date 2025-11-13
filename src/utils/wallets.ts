@@ -10,27 +10,28 @@ export type ScriptType =
 /**
  * Counts the number of active wallets in the provided wallet array
  * @param wallets Array of wallet objects
- * @returns Number of active wallets
+ * @returns Number of active wallets (excludes archived wallets)
  */
 export const countActiveWallets = (wallets: WalletType[]): number => {
-  return wallets.filter(wallet => wallet.isActive).length;
+  return wallets.filter(wallet => wallet.isActive && !wallet.isArchived).length;
 };
 
 /**
  * Returns an array of only the active wallets
  * @param wallets Array of wallet objects
- * @returns Array of active wallets
+ * @returns Array of active wallets (excludes archived wallets)
  */
 export const getActiveWallets = (wallets: WalletType[]): WalletType[] => {
-  return wallets.filter(wallet => wallet.isActive);
+  return wallets.filter(wallet => wallet.isActive && !wallet.isArchived);
 };
 
 // New function to toggle all wallets regardless of balance
 export const toggleAllWallets = (wallets: WalletType[]): WalletType[] => {
-  const allActive = wallets.every(wallet => wallet.isActive);
+  const nonArchivedWallets = wallets.filter(wallet => !wallet.isArchived);
+  const allActive = nonArchivedWallets.every(wallet => wallet.isActive);
   return wallets.map(wallet => ({
     ...wallet,
-    isActive: !allActive
+    isActive: wallet.isArchived ? wallet.isActive : !allActive
   }));
 };
 
@@ -39,16 +40,16 @@ export const toggleAllWalletsWithBalance = (
   wallets: WalletType[],
   solBalances: Map<string, number>
 ): WalletType[] => {
-  // Check if all wallets with balance are already active
+  // Check if all non-archived wallets with balance are already active
   const walletsWithBalance = wallets.filter(wallet => 
-    (solBalances.get(wallet.address) || 0) > 0
+    !wallet.isArchived && (solBalances.get(wallet.address) || 0) > 0
   );
   const allWithBalanceActive = walletsWithBalance.every(wallet => wallet.isActive);
   
   // Toggle based on current state
   return wallets.map(wallet => ({
     ...wallet,
-    isActive: (solBalances.get(wallet.address) || 0) > 0 
+    isActive: !wallet.isArchived && (solBalances.get(wallet.address) || 0) > 0 
       ? !allWithBalanceActive 
       : wallet.isActive
   }));
@@ -62,9 +63,11 @@ export const toggleWalletsByBalance = (
 ): WalletType[] => {
   return wallets.map(wallet => ({
     ...wallet,
-    isActive: showWithTokens 
-      ? (tokenBalances.get(wallet.address) || 0) > 0  // Select wallets with tokens
-      : (solBalances.get(wallet.address) || 0) > 0 && (tokenBalances.get(wallet.address) || 0) === 0  // Select wallets with only SOL
+    isActive: wallet.isArchived ? false : (
+      showWithTokens 
+        ? (tokenBalances.get(wallet.address) || 0) > 0  // Select wallets with tokens
+        : (solBalances.get(wallet.address) || 0) > 0 && (tokenBalances.get(wallet.address) || 0) === 0  // Select wallets with only SOL
+    )
   }));
 };
 

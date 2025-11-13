@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink } from 'lucide-react';
 import { getWallets, getWalletDisplayName, WalletType } from '../Utils';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 import { executeMoonCreate, WalletForMoonCreate } from '../utils/mooncreate';
 
 const STEPS_DEPLOY = ["Token Details", "Select Wallets", "Review"];

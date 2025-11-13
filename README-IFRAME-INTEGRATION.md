@@ -781,7 +781,7 @@ interface ErrorResponse {
   code?: string;
 }
 
-// Enhanced message handler with error handling
+//  message handler with error handling
 function handleMessage(data: IframeResponse | ErrorResponse): void {
   if (data.type === 'ERROR') {
     console.error('Iframe error:', data.message);

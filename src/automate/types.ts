@@ -30,7 +30,8 @@ export interface TradingStrategy {
   conditions: TradingCondition[];
   conditionLogic: 'and' | 'or'; // how to combine multiple conditions
   actions: TradingAction[];
-  cooldown: number; // minutes between executions
+  cooldown: number; // cooldown value
+  cooldownUnit: 'milliseconds' | 'seconds' | 'minutes'; // unit for cooldown
   maxExecutions?: number; // max times this strategy can execute
   executionCount: number;
   lastExecuted?: number; // timestamp

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUpDown, X, CheckCircle, DollarSign, Info, Search, ChevronRight, Coins } from 'lucide-react';
 import { 
   Connection, 
@@ -10,7 +11,7 @@ import {
   MessageV0
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 import { WalletType, getWalletDisplayName } from '../Utils';
 import { formatAddress, formatSolBalance, formatTokenBalance } from '../utils/formatting';
 import { Buffer } from 'buffer';
@@ -62,7 +63,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const [currentTransferIndex, setCurrentTransferIndex] = useState(0);
   const [batchProcessing, setBatchProcessing] = useState(false);
   
-  // States for enhanced functionality
+  // States for  functionality
   const [sourceSearchTerm, setSourceSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');

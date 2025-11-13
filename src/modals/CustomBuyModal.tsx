@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, ChevronRight, DollarSign, X, Info, Search } from 'lucide-react';
 import { getWallets, getWalletDisplayName } from '../Utils';
-import { useToast } from "../Notifications";
+import { useToast } from "../components/Notifications";
 
 const STEPS_CUSTOMBUY = ['Select Wallets', 'Configure Buy', 'Review'];
 

@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { RefreshCw, DollarSign, Activity, Zap, TrendingDown } from 'lucide-react';
 import { saveWalletsToCookies, WalletType, copyToClipboard, toggleWallet, getWalletDisplayName } from './Utils';
 import { formatAddress, formatTokenBalance } from './utils/formatting';
-import { useToast } from "./Notifications";
+import { useToast } from "./components/Notifications";
 import { Connection } from '@solana/web3.js';
-import { WalletOperationsButtons } from './OperationsWallets';
+import { WalletOperationsButtons } from './components/OperationsWallets';
 import { executeBuy, createBuyConfig, validateBuyInputs } from './utils/buy';
 import { executeSell, createSellConfig, validateSellInputs } from './utils/sell';
 import { 
@@ -369,7 +369,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
       {/* Cyberpunk scanline effect - pointer-events-none ensures it doesn't block clicks */}
       <div className="absolute top-0 left-0 w-full h-full cyberpunk-scanline pointer-events-none z-1 opacity-30"></div>
       
-      {/* Enhanced header */}
+      {/*  header */}
       <div className="top-0 sticky bg-app-primary-99 backdrop-blur-sm border-b border-app-primary-40 z-10 shadow-sm">
         {/* Compact buttons row */}
         <div className="px-2 py-1 border-b border-app-primary-20">
@@ -438,12 +438,12 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
         </div>
       </div>
       
-      {/* Wallets table with enhanced visual selection */}
+      {/* Wallets table with  visual selection */}
       <div className="pt-2 relative">
         <div className="min-w-full overflow-auto relative">
           <table className="w-full border-separate border-spacing-0">
             <tbody className="text-sm">
-              {wallets.map((wallet) => (
+              {wallets.filter(wallet => !wallet.isArchived).map((wallet) => (
                 <tr 
                   key={wallet.id}
                   onClick={() => {
@@ -464,7 +464,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
 
                   `}
                 >
-                  {/* Enhanced Selection Indicator */}
+                  {/*  Selection Indicator */}
                   <td className="py-3 pl-3 pr-1 w-12">
                     <div className="flex items-center gap-2">
                       
@@ -507,7 +507,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                     </div>
                   </td>
                   
-                  {/* Enhanced Address Display */}
+                  {/*  Address Display */}
                   <td className="py-3 px-2 font-mono">
                     <div className="flex items-center justify-between">
                       <Tooltip 
@@ -542,7 +542,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                     </div>
                   </td>
                   
-                  {/* Enhanced SOL Balance */}
+                  {/*  SOL Balance */}
                   <td className="py-3 px-2 text-right font-mono">
                     <div className="flex items-center justify-end gap-1">
                       <span className={`font-medium transition-colors duration-300 ${
@@ -555,7 +555,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                     </div>
                   </td>
                   
-                  {/* Enhanced Token Balance */}
+                  {/*  Token Balance */}
                   {tokenAddress && (
                     <td className="py-3 px-2 text-right font-mono">
                       <div className="flex items-center justify-end gap-1">
