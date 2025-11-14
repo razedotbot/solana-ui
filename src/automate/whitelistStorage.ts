@@ -17,7 +17,7 @@ export const loadWhitelistLists = (): WhitelistList[] => {
   try {
     const savedListsJson = localStorage.getItem(STORAGE_KEY);
     if (savedListsJson) {
-      return JSON.parse(savedListsJson);
+      return JSON.parse(savedListsJson) as WhitelistList[];
     }
   } catch (error) {
     console.error('Error loading whitelist lists:', error);

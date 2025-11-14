@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// Tooltip Component with cyberpunk styling
+// Tooltip Component with  styling
 export const WalletTooltip: React.FC<{ 
   children: React.ReactNode;
   content: string;
@@ -29,7 +29,7 @@ export const WalletTooltip: React.FC<{
       </div>
       {isVisible && (
         <div className={`absolute z-50 ${positionClasses[position]}`}>
-          <div className="bg-app-quaternary cyberpunk-border color-primary text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+          <div className="bg-app-quaternary border color-primary text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
             {content}
           </div>
         </div>
@@ -39,7 +39,8 @@ export const WalletTooltip: React.FC<{
 };
 
 // Define the application styles that will be injected
-export const initStyles = () => {
+// eslint-disable-next-line react-refresh/only-export-components
+export const initStyles = (): string => {
   return `
   /* Background grid animation */
   @keyframes grid-pulse {
@@ -48,18 +49,18 @@ export const initStyles = () => {
     100% { opacity: 0.1; }
   }
 
-  .cyberpunk-bg {
+  .bg {
     background-color: var(--color-bg-primary);
     background-image: 
       linear-gradient(var(--color-primary-05) 1px, transparent 1px),
       linear-gradient(90deg, var(--color-primary-05) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-size: var(--grid-size) var(--grid-size);
     background-position: center center;
     position: relative;
     overflow: hidden;
   }
 
-  .cyberpunk-bg::before {
+  .bg::before {
     content: "";
     position: absolute;
     top: 0;
@@ -69,23 +70,10 @@ export const initStyles = () => {
     background-image: 
       linear-gradient(var(--color-primary-05) 1px, transparent 1px),
       linear-gradient(90deg, var(--color-primary-05) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-size: var(--grid-size) var(--grid-size);
     background-position: center center;
-    animation: grid-pulse 4s infinite;
+    animation: grid-pulse var(--grid-pulse-speed) infinite;
     z-index: 0;
-  }
-
-  /* Glowing border effect */
-  @keyframes border-glow {
-    0% { box-shadow: 0 0 5px var(--color-primary-50), inset 0 0 5px var(--color-primary-20); }
-    50% { box-shadow: 0 0 10px var(--color-primary-80), inset 0 0 10px var(--color-primary-30); }
-    100% { box-shadow: 0 0 5px var(--color-primary-50), inset 0 0 5px var(--color-primary-20); }
-  }
-
-  .cyberpunk-border {
-    border: 1px solid var(--color-primary-50);
-    border-radius: 4px;
-    animation: border-glow 4s infinite;
   }
 
   /* Button hover animations */
@@ -95,17 +83,17 @@ export const initStyles = () => {
     100% { box-shadow: 0 0 5px var(--color-primary); }
   }
 
-  .cyberpunk-btn {
-    transition: all 0.3s ease;
+  .btn {
+    transition: all var(--transition-speed) ease;
     position: relative;
     overflow: hidden;
   }
 
-  .cyberpunk-btn:hover {
-    animation: btn-glow 2s infinite;
+  .btn:hover {
+    animation: btn-glow var(--glow-speed) infinite;
   }
 
-  .cyberpunk-btn::after {
+  .btn::after {
     content: "";
     position: absolute;
     top: -50%;
@@ -119,11 +107,11 @@ export const initStyles = () => {
       transparent 100%
     );
     transform: rotate(45deg);
-    transition: all 0.5s ease;
+    transition: all var(--hover-speed) ease;
     opacity: 0;
   }
 
-  .cyberpunk-btn:hover::after {
+  .btn:hover::after {
     opacity: 1;
     transform: rotate(45deg) translate(50%, 50%);
   }
@@ -136,26 +124,26 @@ export const initStyles = () => {
     64%, 66% { transform: translate(0, 0) skew(-0.33deg); }
   }
 
-  .cyberpunk-glitch {
+  .glitch {
     position: relative;
   }
 
-  .cyberpunk-glitch:hover {
+  .glitch:hover {
     animation: glitch 2s infinite;
   }
 
   /* Input focus effect */
-  .cyberpunk-input:focus {
+  .input:focus {
     box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
-    transition: all 0.3s ease;
+    transition: all var(--transition-speed) ease;
   }
 
   /* Card hover effect */
-  .cyberpunk-card {
-    transition: all 0.3s ease;
+  .card {
+    transition: all var(--transition-speed) ease;
   }
 
-  .cyberpunk-card:hover {
+  .card:hover {
     transform: translateY(-3px);
     box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3), 0 0 15px var(--color-primary-30);
   }
@@ -172,12 +160,12 @@ export const initStyles = () => {
     }
   }
 
-  .cyberpunk-scanline {
+  .scanline {
     position: relative;
     overflow: hidden;
   }
 
-  .cyberpunk-scanline::before {
+  .scanline::before {
     content: "";
     position: absolute;
     width: 100%;
@@ -187,14 +175,23 @@ export const initStyles = () => {
       var(--color-primary-20) 50%,
       transparent 100%);
     z-index: 10;
-    animation: scanline 8s linear infinite;
+    animation: scanline var(--scanline-speed) linear infinite;
   }
 
   /* Split gutter styling */
   .split-custom .gutter {
-    background-color: transparent;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      var(--color-primary-10) 50%, 
+      transparent 100%
+    );
     position: relative;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
 
   .split-custom .gutter-horizontal {
@@ -202,51 +199,70 @@ export const initStyles = () => {
   }
 
   .split-custom .gutter-horizontal:hover {
-    background-color: var(--color-primary-30);
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      var(--color-primary-20) 50%, 
+      transparent 100%
+    );
   }
 
-  .split-custom .gutter-horizontal::before,
-  .split-custom .gutter-horizontal::after {
-    content: "";
-    position: absolute;
-    width: 1px;
-    height: 15px;
-    background-color: var(--color-primary-70);
-    left: 50%;
-    transform: translateX(-50%);
+  .split-custom .gutter-horizontal:active {
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      var(--color-primary-30) 50%, 
+      transparent 100%
+    );
+  }
+
+  /* Animated dots pattern */
+  .gutter-dot {
+    width: 3px;
+    height: 3px;
+    background-color: var(--color-primary-60);
+    border-radius: 50%;
+    opacity: 0.4;
     transition: all 0.3s ease;
   }
 
-  .split-custom .gutter-horizontal::before {
-    top: calc(50% - 10px);
+  .split-custom .gutter-horizontal:hover .gutter-dot {
+    background-color: var(--color-primary-70);
+    opacity: 0.7;
   }
 
-  .split-custom .gutter-horizontal::after {
-    top: calc(50% + 10px);
-  }
-
-  .split-custom .gutter-horizontal:hover::before,
-  .split-custom .gutter-horizontal:hover::after {
+  .split-custom .gutter-horizontal:active .gutter-dot {
     background-color: var(--color-primary);
-    box-shadow: 0 0 10px var(--color-primary-70);
+    opacity: 1;
+    box-shadow: 0 0 12px var(--color-primary);
+    animation: gutterPulseActive 0.4s ease-in-out infinite;
+  }
+
+  @keyframes gutterPulseActive {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.8);
+      opacity: 0.8;
+    }
   }
 
   /* Neo-futuristic table styling */
-  .cyberpunk-table {
+  .table {
     border-collapse: separate;
     border-spacing: 0;
   }
 
-  .cyberpunk-table thead th {
+  .table thead th {
     background-color: var(--color-primary-10);
     border-bottom: 2px solid var(--color-primary-50);
   }
 
-  .cyberpunk-table tbody tr {
-    transition: all 0.2s ease;
+  .table tbody tr {
+    transition: all var(--hover-speed) ease;
   }
 
-  .cyberpunk-table tbody tr:hover {
+  .table tbody tr:hover {
     background-color: var(--color-primary-05);
   }
 
@@ -280,7 +296,7 @@ export const initStyles = () => {
   }
 
   /* Button click effect */
-  .cyberpunk-btn:active {
+  .btn:active {
     transform: scale(0.95);
     box-shadow: 0 0 15px var(--color-primary-70);
   }

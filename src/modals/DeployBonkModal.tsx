@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink } from 'lucide-react';
-import { getWallets, getWalletDisplayName, WalletType } from '../Utils';
-import { useToast } from "../components/Notifications";
-import { executeBonkCreate, WalletForBonkCreate, TokenMetadata, BonkCreateConfig } from '../utils/bonkcreate';
+import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw } from 'lucide-react';
+import { getWallets, getWalletDisplayName } from '../Utils';
+import type { WalletType } from '../Utils';
+import { useToast } from "../components/useToast";
+import type { TokenMetadata, BonkCreateConfig } from '../utils/bonkcreate';
+import { executeBonkCreate } from '../utils/bonkcreate';
+import type { WalletForBonkCreate } from '../utils/bonkcreate';
 
 const STEPS_DEPLOY = ["Token Details", "Select Wallets", "Review"];
 const MAX_WALLETS = 5; // Maximum number of wallets that can be selected
@@ -15,7 +18,6 @@ interface BaseModalProps {
 }
 
 interface DeployBonkModalProps extends BaseModalProps {
-  onDeploy: (data: any) => void;
   handleRefresh: () => void;
   solBalances: Map<string, number>;
 }
@@ -23,8 +25,6 @@ interface DeployBonkModalProps extends BaseModalProps {
 export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
   isOpen,
   onClose,
-  onDeploy,
-  handleRefresh,
   solBalances,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -33,6 +33,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showInfoTip] = useState(false);
 
   const [tokenData, setTokenData] = useState<TokenMetadata>({
     name: '',
@@ -50,14 +51,13 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
   });
   const [walletAmounts, setWalletAmounts] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [showInfoTip, setShowInfoTip] = useState(false);
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');
   const [balanceFilter, setBalanceFilter] = useState('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Function to handle image upload
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -97,7 +97,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
       
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
+          const response = JSON.parse(xhr.responseText) as { url: string };
           setTokenData(prev => ({ ...prev, uri: response.url }));
           showToast("Image uploaded successfully", "success");
         } else {
@@ -122,7 +122,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
   };
 
   // Trigger file input click
-  const triggerFileInput = () => {
+  const triggerFileInput = (): void => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -135,7 +135,6 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      handleRefresh();
       // Reset states when opening modal
       setCurrentStep(0);
       setSelectedWallets([]);
@@ -145,7 +144,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
   }, [isOpen]);
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // Apply search filter
     let filtered = walletList;
     if (search) {
@@ -180,7 +179,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
     });
   };
 
-  const handleWalletSelection = (privateKey: string) => {
+  const handleWalletSelection = (privateKey: string): void => {
     setSelectedWallets(prev => {
       if (prev.includes(privateKey)) {
         return prev.filter(key => key !== privateKey);
@@ -194,7 +193,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
     });
   };
 
-  const handleAmountChange = (privateKey: string, amount: string) => {
+  const handleAmountChange = (privateKey: string, amount: string): void => {
     if (amount === '' || /^\d*\.?\d*$/.test(amount)) {
       setWalletAmounts(prev => ({
         ...prev,
@@ -203,15 +202,16 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
     }
   };
 
-  const validateStep = () => {
+  const validateStep = (): boolean => {
     switch (currentStep) {
-      case 0:
+      case 0: {
         if (!tokenData.name || !tokenData.symbol || !tokenData.uri || !tokenData.description) {
           showToast("Name, symbol, description and logo image are required", "error");
           return false;
         }
         break;
-      case 1:
+      }
+      case 1: {
         if (selectedWallets.length < MIN_WALLETS) {
           showToast("Please select at least 2 wallets (developer + 1 buyer)", "error");
           return false;
@@ -228,20 +228,21 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
           return false;
         }
         break;
+      }
     }
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = (): void => {
     if (!validateStep()) return;
     setCurrentStep(prev => Math.min(prev + 1, STEPS_DEPLOY.length - 1));
   };
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
-  const handleDeploy = async (e: React.FormEvent) => {
+  const handleDeploy = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
 
@@ -281,7 +282,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
         type: tokenData.type || 'meme'
       };
       
-      console.log(`Starting token creation with ${buyerWallets.length + 1} wallets`);
+      console.info(`Starting token creation with ${buyerWallets.length + 1} wallets`);
       
       // Call our bonk create execution function
       const result = await executeBonkCreate(
@@ -337,28 +338,32 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
   };
 
   // Format wallet address for display
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string): string => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
   // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
+  const formatSolBalance = (balance: number): string => {
     return balance.toFixed(4);
   };
+  
+  // Suppress unused variable warnings
+  void showInfoTip;
+  void formatAddress;
 
   // Calculate total SOL to be used
-  const calculateTotalAmount = () => {
+  const calculateTotalAmount = (): number => {
     return selectedWallets.reduce((total, wallet) => {
       return total + (parseFloat(walletAmounts[wallet]) || 0);
     }, 0);
   };
 
   // Get wallet by private key
-  const getWalletByPrivateKey = (privateKey: string) => {
+  const getWalletByPrivateKey = (privateKey: string): WalletType | undefined => {
     return wallets.find(wallet => wallet.privateKey === privateKey);
   };
 
-  const renderStepContent = () => {
+  const renderStepContent = (): JSX.Element | null => {
     switch (currentStep) {
       case 0:
         return (
@@ -375,7 +380,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
               <div className="p-6 space-y-6 relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
               
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
                   <div className="space-y-2">
@@ -386,7 +391,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                       type="text"
                       value={tokenData.name}
                       onChange={(e) => setTokenData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN NAME"
                     />
                   </div>
@@ -398,7 +403,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                       type="text"
                       value={tokenData.symbol}
                       onChange={(e) => setTokenData(prev => ({ ...prev, symbol: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN SYMBOL"
                     />
                   </div>
@@ -424,7 +429,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                       className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all ${
                         isUploading 
                           ? 'bg-app-tertiary text-app-secondary cursor-not-allowed border border-app-primary-20' 
-                          : 'bg-app-tertiary hover:bg-app-secondary border border-app-primary-40 hover:border-app-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                          : 'bg-app-tertiary hover:bg-app-secondary border border-app-primary-40 hover:border-app-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-'
                       }`}
                     >
                       {isUploading ? (
@@ -467,7 +472,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                   {isUploading && (
                     <div className="w-full bg-app-tertiary rounded-full h-1.5 mt-2">
                       <div 
-                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-cyberpunk"
+                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
                     </div>
@@ -482,7 +487,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                   <textarea
                     value={tokenData.description}
                     onChange={(e) => setTokenData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input-cyberpunk min-h-24 font-mono"
+                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input- min-h-24 font-mono"
                     placeholder="DESCRIBE YOUR TOKEN"
                     rows={3}
                   />
@@ -528,7 +533,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                         type="text"
                         value={tokenData.telegram}
                         onChange={(e) => setTokenData(prev => ({ ...prev, telegram: e.target.value }))}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input- font-mono"
                         placeholder="T.ME/YOURGROUP"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -547,7 +552,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                         type="text"
                         value={tokenData.twitter}
                         onChange={(e) => setTokenData(prev => ({ ...prev, twitter: e.target.value }))}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input- font-mono"
                         placeholder="@YOURHANDLE"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -566,7 +571,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                         type="text"
                         value={tokenData.website}
                         onChange={(e) => setTokenData(prev => ({ ...prev, website: e.target.value }))}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://YOURSITE.COM"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -624,13 +629,13 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input- font-mono"
                   placeholder="SEARCH WALLETS..."
                 />
               </div>
               
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
               >
@@ -639,14 +644,14 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
               </select>
               
               <button
-                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:border-app-primary hover:color-primary transition-all modal-btn-cyberpunk flex items-center justify-center"
+                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:border-app-primary hover:color-primary transition-all modal-btn- flex items-center justify-center"
                 onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
               >
                 {sortDirection === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
               </button>
 
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                 value={balanceFilter}
                 onChange={(e) => setBalanceFilter(e.target.value)}
               >
@@ -687,7 +692,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
 
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
               {/* Ambient grid background */}
-              <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+              <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
               
               <div className="p-4 relative z-10">
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
@@ -697,7 +702,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                       <div className="text-sm font-medium text-app-secondary mb-2 font-mono uppercase tracking-wider">
                         <span className="color-primary">&#62;</span> Selected Wallets <span className="color-primary">&#60;</span>
                       </div>
-                      {selectedWallets.map((privateKey, index) => {
+                      {selectedWallets.map((privateKey, index): JSX.Element => {
                         const wallet = getWalletByPrivateKey(privateKey);
                         const solBalance = wallet ? solBalances.get(wallet.address) || 0 : 0;
                         
@@ -719,7 +724,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                                       }
                                     }}
                                     disabled={index === 0}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowUp size={16} className="text-app-primary" />
                                   </button>
@@ -733,7 +738,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                                       }
                                     }}
                                     disabled={index === selectedWallets.length - 1}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowDown size={16} className="text-app-primary" />
                                   </button>
@@ -759,13 +764,13 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                                     value={walletAmounts[privateKey] || ''}
                                     onChange={(e) => handleAmountChange(privateKey, e.target.value)}
                                     placeholder="AMOUNT"
-                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all modal-input- font-mono"
                                   />
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => handleWalletSelection(privateKey)}
-                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-cyberpunk"
+                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-"
                                 >
                                   <X size={18} className="text-app-secondary hover:text-app-primary" />
                                 </button>
@@ -783,7 +788,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                       <div className="text-sm font-medium text-app-secondary mb-2 font-mono uppercase tracking-wider">
                         <span className="color-primary">&#62;</span> Available Wallets <span className="color-primary">&#60;</span>
                       </div>
-                      {filterWallets(wallets.filter(w => !selectedWallets.includes(w.privateKey)), searchTerm).map((wallet: WalletType) => {
+                      {filterWallets(wallets.filter(w => !selectedWallets.includes(w.privateKey)), searchTerm).map((wallet: WalletType): JSX.Element => {
                         const solBalance = solBalances.get(wallet.address) || 0;
                         
                         return (
@@ -850,7 +855,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
               {/* Left column - Token Details */}
               <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="p-6 space-y-4 relative z-10">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
@@ -929,7 +934,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                   </div>
                 </div>
                 
-                {/* Cyberpunk decorative corner elements */}
+                {/*  decorative corner elements */}
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
                 <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
                 <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
@@ -939,14 +944,14 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
               {/* Right column - Selected Wallets */}
               <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="p-6 space-y-4 relative z-10">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
                     <span className="color-primary">&#62;</span> Selected Wallets <span className="color-primary">&#60;</span>
                   </h4>
                   <div className="max-h-64 overflow-y-auto pr-1">
-                    {selectedWallets.map((key, index) => {
+                    {selectedWallets.map((key, index): JSX.Element => {
                       const wallet = getWalletByPrivateKey(key);
                       const solBalance = wallet ? solBalances.get(wallet.address) || 0 : 0;
                       
@@ -968,7 +973,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                   </div>
                 </div>
                 
-                {/* Cyberpunk decorative corner elements */}
+                {/*  decorative corner elements */}
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
                 <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
                 <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
@@ -979,7 +984,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
               <div className="p-4 relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="flex items-center gap-4 relative z-10">
                   <div 
@@ -1004,14 +1009,15 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
           </div>
         );
       
-      // New Success Step
+      default:
+        return null;
     }
   };
   
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements - updated to use CSS variables
+  // Animation keyframes for  elements - updated to use CSS variables
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -1035,16 +1041,16 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -1062,18 +1068,18 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -1091,21 +1097,21 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -1145,10 +1151,10 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
         {/* Header */}
         <div className="relative z-10 p-4 flex justify-between items-center border-b border-app-primary-40">
@@ -1169,7 +1175,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: `${(currentStep + 1) / 3 * 100}%` }}
@@ -1188,7 +1194,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                 type="button"
                 onClick={currentStep === 0 ? onClose : handleBack}
                 disabled={isSubmitting}
-                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
               >
                 {currentStep === 0 ? 'CANCEL' : 'BACK'}
               </button>
@@ -1200,7 +1206,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
                 className={`px-5 py-2.5 rounded-lg flex items-center transition-all shadow-lg font-mono tracking-wider ${
                   currentStep === 2 && (isSubmitting || !isConfirmed)
                     ? 'bg-primary-50 cursor-not-allowed opacity-50'
-                    : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                    : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'
                 } text-app-primary`}
               >
                 {currentStep === 2 ? (
@@ -1221,7 +1227,7 @@ export const DeployBonkModal: React.FC<DeployBonkModalProps> = ({
           </form>
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

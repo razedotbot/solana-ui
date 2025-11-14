@@ -5,17 +5,12 @@ import {
   ArrowUpDown, 
   ArrowUp, 
   ArrowDown, 
-  Copy, 
   Download, 
   Trash2, 
   Search, 
-  Filter,
-  RefreshCw,
   CheckSquare,
   Square,
-  MoreVertical,
   Wallet,
-  Settings,
   X,
   Edit3,
   Check,
@@ -26,24 +21,23 @@ import {
   ArrowRight,
   Archive
 } from 'lucide-react';
-import { Connection } from '@solana/web3.js';
+import type { Connection } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { WalletTooltip } from '../styles/Styles';
+import type { WalletType, WalletCategory } from '../Utils';
 import { 
-  WalletType, 
   formatAddress, 
   copyToClipboard, 
   downloadPrivateKey,
   deleteWallet,
   saveWalletsToCookies,
-  getWalletDisplayName,
   createNewWallet,
   importWallet,
   fetchSolBalance,
   fetchTokenBalance,
-  downloadAllWallets
+  downloadAllWallets,
+  handleCleanupWallets
 } from '../Utils';
-import { handleCleanupWallets, handleSortWallets } from '../Utils';
 
 interface WalletOverviewProps {
   isOpen: boolean;
@@ -62,6 +56,8 @@ interface WalletOverviewProps {
   onOpenSettings: () => void;
 }
 
+// Prefix unused parameters with underscore to satisfy linting rules
+
 type SortField = 'solBalance' | 'tokenBalance';
 type SortDirection = 'asc' | 'desc';
 
@@ -76,10 +72,10 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
   setTokenBalances,
   tokenAddress,
   connection,
-  handleRefresh,
-  isRefreshing,
+  handleRefresh: _handleRefresh,
+  isRefreshing: _isRefreshing,
   showToast,
-  onOpenSettings
+  onOpenSettings: _onOpenSettings
 }) => {
   // All hooks must be called before any conditional returns
   const [sortField, setSortField] = useState<SortField>('solBalance');
@@ -89,9 +85,9 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
   const [labelSearchTerm, setLabelSearchTerm] = useState('');
   const [showLabelSearch, setShowLabelSearch] = useState(false);
   const [selectedWallets, setSelectedWallets] = useState<Set<number>>(new Set());
-  const [showPrivateKeys, setShowPrivateKeys] = useState(true);
   const [editingLabel, setEditingLabel] = useState<number | null>(null);
   const [editLabelValue, setEditLabelValue] = useState<string>('');
+  const [editingCategory, setEditingCategory] = useState<number | null>(null);
   const [isCreatingWallets, setIsCreatingWallets] = useState(false);
   const [walletQuantity, setWalletQuantity] = useState('1');
   const [importKey, setImportKey] = useState('');
@@ -105,7 +101,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
   const createInputRef = useRef<HTMLInputElement>(null);
 
   // Wallet creation and import handlers
-  const handleCreateMultipleWallets = async () => {
+  const handleCreateMultipleWallets = async (): Promise<void> => {
     if (!connection) return;
     
     const quantity = parseInt(walletQuantity);
@@ -122,7 +118,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
       const newTokenBalances = new Map(tokenBalances);
       
       for (let i = 0; i < quantity; i++) {
-        const newWallet = await createNewWallet();
+        const newWallet = createNewWallet();
         newWallets.push(newWallet);
         
         const solBalance = await fetchSolBalance(connection, newWallet.address);
@@ -154,14 +150,14 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     }
   };
 
-  const handleImportWallet = async () => {
+  const handleImportWallet = async (): Promise<void> => {
     if (!connection || !importKey.trim()) {
       setImportError('Please enter a private key');
       return;
     }
     
     try {
-      const { wallet, error } = await importWallet(importKey.trim());
+      const { wallet, error } = importWallet(importKey.trim());
       
       if (error) {
         setImportError(error);
@@ -221,7 +217,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     }
   }, [showCreateInput]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0];
     if (!file || !connection) return;
 
@@ -241,26 +237,26 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
         }
       } else if (fileExtension === 'json') {
         try {
-          const jsonData = JSON.parse(text);
+          const jsonData: unknown = JSON.parse(text);
           
           if (Array.isArray(jsonData) && jsonData.length === 64) {
-            const secretKey = new Uint8Array(jsonData);
+            const secretKey = new Uint8Array(jsonData as number[]);
             const privateKey = bs58.encode(secretKey);
             foundKeys = [privateKey];
           } else if (Array.isArray(jsonData)) {
             for (const item of jsonData) {
               if (Array.isArray(item) && item.length === 64) {
-                const secretKey = new Uint8Array(item);
+                const secretKey = new Uint8Array(item as number[]);
                 const privateKey = bs58.encode(secretKey);
                 foundKeys.push(privateKey);
               }
             }
-          } else if (jsonData.secretKey && Array.isArray(jsonData.secretKey)) {
-            const secretKey = new Uint8Array(jsonData.secretKey);
+          } else if (typeof jsonData === 'object' && jsonData !== null && 'secretKey' in jsonData && Array.isArray((jsonData as { secretKey: unknown }).secretKey)) {
+            const secretKey = new Uint8Array((jsonData as { secretKey: number[] }).secretKey);
             const privateKey = bs58.encode(secretKey);
             foundKeys = [privateKey];
           }
-        } catch (jsonError) {
+        } catch {
           setImportError('Invalid JSON format');
           setIsProcessingFile(false);
           return;
@@ -284,7 +280,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
       
       for (const key of foundKeys) {
         try {
-          const { wallet, error } = await importWallet(key);
+          const { wallet, error } = importWallet(key);
           
           if (error || !wallet) continue;
           
@@ -332,7 +328,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
 
   // Filter and sort wallets - useMemo must also be called before conditional return
   const filteredAndSortedWallets = useMemo(() => {
-    let filtered = wallets.filter(wallet => {
+    const filtered = wallets.filter(wallet => {
       // Archive filter - show only archived or only non-archived based on showArchived state
       const matchesArchivedFilter = showArchived ? wallet.isArchived === true : !wallet.isArchived;
       
@@ -388,14 +384,14 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
   if (!isOpen) return null;
 
   // Sorting function
-  const handleSort = (field: SortField) => {
+  const handleSort = (field: SortField): void => {
     const newDirection = sortField === field && sortDirection === 'asc' ? 'desc' : 'asc';
     setSortField(field);
     setSortDirection(newDirection);
   };
 
   // Selection functions
-  const toggleWalletSelection = (walletId: number) => {
+  const toggleWalletSelection = (walletId: number): void => {
     const newSelected = new Set(selectedWallets);
     if (newSelected.has(walletId)) {
       newSelected.delete(walletId);
@@ -405,22 +401,22 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     setSelectedWallets(newSelected);
   };
 
-  const selectAllVisible = () => {
+  const selectAllVisible = (): void => {
     const newSelected = new Set(filteredAndSortedWallets.map(w => w.id));
     setSelectedWallets(newSelected);
   };
 
-  const clearSelection = () => {
+  const clearSelection = (): void => {
     setSelectedWallets(new Set());
   };
 
   // Label editing functions
-  const startEditingLabel = (wallet: WalletType) => {
+  const startEditingLabel = (wallet: WalletType): void => {
     setEditingLabel(wallet.id);
     setEditLabelValue(wallet.label || '');
   };
 
-  const saveLabel = (walletId: number) => {
+  const saveLabel = (walletId: number): void => {
     const updatedWallets = wallets.map(wallet => 
       wallet.id === walletId 
         ? { ...wallet, label: editLabelValue.trim() || undefined }
@@ -433,12 +429,12 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     showToast('Label updated', 'success');
   };
 
-  const cancelEditingLabel = () => {
+  const cancelEditingLabel = (): void => {
     setEditingLabel(null);
     setEditLabelValue('');
   };
 
-  const handleLabelKeyPress = (e: React.KeyboardEvent, walletId: number) => {
+  const handleLabelKeyPress = (e: React.KeyboardEvent, walletId: number): void => {
     if (e.key === 'Enter') {
       saveLabel(walletId);
     } else if (e.key === 'Escape') {
@@ -446,8 +442,21 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     }
   };
 
+  // Category editing functions
+  const saveCategory = (walletId: number, category: WalletCategory): void => {
+    const updatedWallets = wallets.map(wallet => 
+      wallet.id === walletId 
+        ? { ...wallet, category }
+        : wallet
+    );
+    saveWalletsToCookies(updatedWallets);
+    setWallets(updatedWallets);
+    setEditingCategory(null);
+    showToast('Category updated', 'success');
+  };
+
   // Bulk operations
-  const deleteSelectedWallets = () => {
+  const deleteSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
     
     const newWallets = wallets.filter(w => !selectedWallets.has(w.id));
@@ -458,7 +467,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     setSelectedWallets(new Set());
   };
 
-  const downloadSelectedWallets = () => {
+  const downloadSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
     
     const selectedWalletData = wallets
@@ -479,7 +488,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     showToast(`Downloaded ${selectedWallets.size} wallet${selectedWallets.size > 1 ? 's' : ''}`, 'success');
   };
 
-  const archiveSelectedWallets = () => {
+  const archiveSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
     
     const newWallets = wallets.map(w => 
@@ -492,7 +501,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     setSelectedWallets(new Set());
   };
 
-  const unarchiveSelectedWallets = () => {
+  const unarchiveSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
     
     const newWallets = wallets.map(w => 
@@ -505,7 +514,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     setSelectedWallets(new Set());
   };
 
-  const archiveWallet = (walletId: number) => {
+  const archiveWallet = (walletId: number): void => {
     const newWallets = wallets.map(w => 
       w.id === walletId ? { ...w, isArchived: true, isActive: false } : w
     );
@@ -514,7 +523,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     showToast('Wallet archived', 'success');
   };
 
-  const unarchiveWallet = (walletId: number) => {
+  const unarchiveWallet = (walletId: number): void => {
     const newWallets = wallets.map(w => 
       w.id === walletId ? { ...w, isArchived: false } : w
     );
@@ -523,7 +532,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
     showToast('Wallet unarchived', 'success');
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const SortIcon = ({ field }: { field: SortField }): JSX.Element => {
     if (sortField !== field) return <ArrowUpDown size={14} className="text-app-secondary-80" />;
     return sortDirection === 'asc' 
       ? <ArrowUp size={14} className="color-primary" />
@@ -601,9 +610,9 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
                     max="100"
                     value={walletQuantity}
                     onChange={(e) => setWalletQuantity(e.target.value)}
-                    onKeyDown={(e) => {
+                    onKeyDown={(e): void => {
                       if (e.key === 'Enter' && walletQuantity.trim()) {
-                        handleCreateMultipleWallets();
+                        void handleCreateMultipleWallets();
                       } else if (e.key === 'Escape') {
                         setShowCreateInput(false);
                         setWalletQuantity('1');
@@ -632,7 +641,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
                     !connection
                       ? 'bg-primary-20 cursor-not-allowed text-app-secondary-80'
-                      : 'bg-app-primary-color hover:bg-app-primary-dark text-black font-bold cyberpunk-btn'
+                      : 'bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn'
                   }`}
                 >
                   <Plus size={16} />
@@ -654,9 +663,9 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
                         setImportKey(e.target.value);
                         setImportError(null);
                       }}
-                      onKeyDown={(e) => {
+                      onKeyDown={(e): void => {
                         if (e.key === 'Enter' && importKey.trim()) {
-                          handleImportWallet();
+                          void handleImportWallet();
                         } else if (e.key === 'Escape') {
                           setShowImportInput(false);
                           setImportKey('');
@@ -870,6 +879,11 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
                     )}
                   </th>
                   <th className="p-2 sm:p-3 text-left bg-app-primary">
+                    <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
+                      <span className="text-app-secondary-80">QUICKMODE</span>
+                    </div>
+                  </th>
+                  <th className="p-2 sm:p-3 text-left bg-app-primary">
                     {showAddressSearch ? (
                       <div className="flex items-center gap-1 text-[10px] sm:text-xs">
                         <input
@@ -935,7 +949,7 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
 
               {/* Body */}
               <tbody>
-                {filteredAndSortedWallets.map((wallet, index) => {
+                {filteredAndSortedWallets.map((wallet) => {
                   const isSelected = selectedWallets.has(wallet.id);
                   const solBalance = solBalances.get(wallet.address) || 0;
                   const tokenBalance = tokenBalances.get(wallet.address) || 0;
@@ -987,6 +1001,49 @@ const WalletOverview: React.FC<WalletOverviewProps> = ({
                             </span>
                             <button
                               onClick={() => startEditingLabel(wallet)}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 opacity-60 hover:opacity-100 touch-manipulation"
+                            >
+                              <Edit3 size={12} className="color-primary" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        {editingCategory === wallet.id ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={wallet.category || 'Medium'}
+                              onChange={(e) => {
+                                const value = e.target.value as WalletCategory;
+                                saveCategory(wallet.id, value);
+                              }}
+                              onBlur={() => setEditingCategory(null)}
+                              autoFocus
+                              className="bg-app-quaternary border border-app-primary-20 rounded-lg px-2 py-1.5 sm:py-1 text-xs sm:text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
+                            >
+                              <option value="Soft">Soft</option>
+                              <option value="Medium">Medium</option>
+                              <option value="Hard">Hard</option>
+                            </select>
+                            <button
+                              onClick={() => setEditingCategory(null)}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary border border-app-primary-20 rounded-lg transition-all duration-300 touch-manipulation"
+                            >
+                              <XCircle size={14} className="text-red-500" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded ${
+                              wallet.category === 'Soft' ? 'bg-green-500/20 text-green-400' :
+                              wallet.category === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                              wallet.category === 'Hard' ? 'bg-red-500/20 text-red-400' :
+                              'bg-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {wallet.category || 'Medium'}
+                            </span>
+                            <button
+                              onClick={() => setEditingCategory(wallet.id)}
                               className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 opacity-60 hover:opacity-100 touch-manipulation"
                             >
                               <Edit3 size={12} className="color-primary" />

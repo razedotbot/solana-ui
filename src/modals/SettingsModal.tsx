@@ -1,11 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Settings, Globe, Zap, Save } from 'lucide-react';
-import { Connection } from '@solana/web3.js';
-import { 
-  ConfigType
-} from '../Utils';
+import type { Connection } from '@solana/web3.js';
+import type { ConfigType } from '../Utils';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -34,8 +32,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     tap: { scale: 0.95 }
   };
 
-  const handleSaveAndClose = () => {
+  const handleSaveAndClose = (): void => {
     onSave();
+    showToast('Settings saved successfully', 'success');
     onClose();
   };
 
@@ -89,7 +88,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="text"
                       value={config.rpcEndpoint}
                       onChange={(e) => onConfigChange('rpcEndpoint', e.target.value)}
-                      className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono touch-manipulation"
+                      className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
                       placeholder="Enter RPC endpoint URL"
                     />
                   </div>
@@ -102,7 +101,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="text"
                       value={config.transactionFee}
                       onChange={(e) => onConfigChange('transactionFee', e.target.value)}
-                      className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono touch-manipulation"
+                      className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
                       placeholder="0.000005"
                     />
                   </div>
@@ -145,7 +144,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="text"
                         value={config.tradingServerUrl || 'http://localhost:4444'}
                         onChange={(e) => onConfigChange('tradingServerUrl', e.target.value)}
-                        className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono touch-manipulation"
+                        className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
                         placeholder="http://localhost:4444"
                       />
                       <div className="text-[10px] sm:text-xs text-app-secondary-80 font-mono mt-1">
@@ -226,7 +225,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         step="50"
                         value={config.singleDelay || '200'}
                         onChange={(e) => onConfigChange('singleDelay', e.target.value)}
-                        className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono touch-manipulation"
+                        className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
                         placeholder="200"
                       />
                       <div className="text-[10px] sm:text-xs text-app-secondary-80 font-mono mt-1">
@@ -245,7 +244,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         step="100"
                         value={config.batchDelay || '1000'}
                         onChange={(e) => onConfigChange('batchDelay', e.target.value)}
-                        className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono touch-manipulation"
+                        className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
                         placeholder="1000"
                       />
                       <div className="text-[10px] sm:text-xs text-app-secondary-80 font-mono mt-1">
@@ -269,7 +268,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         const bps = Math.round(percentage * 100).toString();
                         onConfigChange('slippageBps', bps);
                       }}
-                      className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none cyberpunk-input font-mono touch-manipulation"
+                      className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
                       placeholder="99.0"
                     />
                     <div className="text-[10px] sm:text-xs text-app-secondary-80 font-mono mt-1">

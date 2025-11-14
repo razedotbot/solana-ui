@@ -57,3 +57,5 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 shrinkwrap.yaml
+/.kiro
+/.vercel

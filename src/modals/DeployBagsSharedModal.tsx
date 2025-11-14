@@ -1,22 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink, Users, Percent } from 'lucide-react';
-import { getWallets, getWalletDisplayName, loadConfigFromCookies, WalletType } from '../Utils';
-import { useToast } from "../components/Notifications";
+import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Users, Percent, Copy } from 'lucide-react';
+import { getWallets, getWalletDisplayName, loadConfigFromCookies } from '../Utils';
+import type { WalletType } from '../Utils';
+import { useToast } from "../components/useToast";
+import type { 
+  BagsSharedTokenCreateConfig,
+  WalletForBagsSharedCreate
+} from '../utils/bagscreateshared';
 import { 
   executeSharedFeesBagsCreate, 
-  WalletForBagsSharedCreate, 
   createSharedFeesConfig, 
   createSharedCreateConfig, 
-  BagsSharedFeesConfig,
-  BagsSharedCreateConfig,
-  checkSharedFeesConfig, 
   signAndSendSharedConfigTransaction, 
-  BagsSharedConfigResponse,
   createTokenAndConfig,
-  BagsSharedTokenCreateConfig,
-  BagsSharedTokenCreateResponse,
   sendLaunchTransactions
 } from '../utils/bagscreateshared';
 
@@ -36,7 +34,6 @@ interface BaseModalProps {
 }
 
 interface DeployBagsSharedFeesModalProps extends BaseModalProps {
-  onDeploy: (data: any) => void;
   handleRefresh: () => void;
   solBalances: Map<string, number>;
 }
@@ -61,8 +58,6 @@ interface SharedFeesConfig {
 export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps> = ({
   isOpen,
   onClose,
-  onDeploy,
-  handleRefresh,
   solBalances,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -71,6 +66,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showInfoTip] = useState(false);
   const [tokenData, setTokenData] = useState<TokenMetadata>({
     name: '',
     symbol: '',
@@ -81,7 +77,6 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   });
   const [walletAmounts, setWalletAmounts] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [showInfoTip, setShowInfoTip] = useState(false);
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');
   const [balanceFilter, setBalanceFilter] = useState('all');
@@ -99,8 +94,13 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   const [configTransaction, setConfigTransaction] = useState<string>('');
   const [configInstructions, setConfigInstructions] = useState<string>('');
   const [configKey, setConfigKey] = useState<string>('');
-  const [feeShareInfo, setFeeShareInfo] = useState<any>(null);
-  const [isCheckingConfig, setIsCheckingConfig] = useState(false);
+  const [feeShareInfo, setFeeShareInfo] = useState<{
+    twitterHandle: string;
+    feeSplit: {
+      creator: number;
+      feeClaimer: number;
+    };
+  } | null>(null);
   const [isSendingConfig, setIsSendingConfig] = useState(false);
   
   // Two-step process state
@@ -109,9 +109,12 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   const [step1Completed, setStep1Completed] = useState(false);
   const [isStep1Processing, setIsStep1Processing] = useState(false);
   const [deploymentStep, setDeploymentStep] = useState<'step1' | 'step2'>('step1');
+  
+  // Suppress unused variable warning
+  void metadataUrl;
 
   // Function to handle image upload
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -151,7 +154,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
+          const response = JSON.parse(xhr.responseText) as { url: string };
           setTokenData(prev => ({ ...prev, imageUrl: response.url }));
           showToast("Image uploaded successfully", "success");
         } else {
@@ -176,13 +179,13 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   };
 
   // Update social links when fields change
-  const updateSocialLinks = (type: 'twitter' | 'telegram' | 'website', value: string) => {
+  const updateSocialLinks = (type: 'twitter' | 'telegram' | 'website', value: string): void => {
     setTokenData(prev => {
       // Remove old link of this type if it exists
       const filteredLinks = prev.links.filter(link => link.label !== type);
       
       // Add new link if value is not empty
-      let newLinks = [...filteredLinks];
+      const newLinks = [...filteredLinks];
       if (value) {
         let url = value;
         let label = '';
@@ -210,23 +213,23 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   };
 
   // Helper functions to get social values from links array
-  const getTwitter = () => {
+  const getTwitter = (): string => {
     const twitterLink = tokenData.links.find(link => link.label === 'twitter');
     return twitterLink ? twitterLink.url : '';
   };
   
-  const getWebsite = () => {
+  const getWebsite = (): string => {
     const websiteLink = tokenData.links.find(link => link.label === 'website');
     return websiteLink ? websiteLink.url : '';
   };
 
-  const getTelegram = () => {
+  const getTelegram = (): string => {
     const telegramLink = tokenData.links.find(link => link.label === 'telegram');
     return telegramLink ? telegramLink.url : '';
   };
 
   // Handle fee split changes
-  const handleFeeSplitChange = (field: 'creatorFeeBps' | 'feeClaimerFeeBps', value: string) => {
+  const handleFeeSplitChange = (field: 'creatorFeeBps' | 'feeClaimerFeeBps', value: string): void => {
     const numValue = parseInt(value) || 0;
     
     setSharedFeesConfig(prev => {
@@ -245,7 +248,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   };
 
   // Trigger file input click
-  const triggerFileInput = () => {
+  const triggerFileInput = (): void => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -258,7 +261,6 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
 
   useEffect(() => {
     if (isOpen) {
-      handleRefresh();
       // Reset states when opening modal
       setCurrentStep(0);
       setSelectedWallets([]);
@@ -272,7 +274,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   }, [isOpen]);
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // Apply search filter
     let filtered = walletList;
     if (search) {
@@ -307,7 +309,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
     });
   };
 
-  const handleWalletSelection = (privateKey: string) => {
+  const handleWalletSelection = (privateKey: string): void => {
     setSelectedWallets(prev => {
       if (prev.includes(privateKey)) {
         return prev.filter(key => key !== privateKey);
@@ -321,7 +323,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
     });
   };
 
-  const handleAmountChange = (privateKey: string, amount: string) => {
+  const handleAmountChange = (privateKey: string, amount: string): void => {
     if (amount === '' || /^\d*\.?\d*$/.test(amount)) {
       setWalletAmounts(prev => ({
         ...prev,
@@ -330,9 +332,9 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
     }
   };
 
-  const validateStep = () => {
+  const validateStep = (): boolean => {
     switch (currentStep) {
-      case 0:
+      case 0: {
         if (!tokenData.name || !tokenData.symbol || !tokenData.imageUrl || !tokenData.description) {
           showToast("Name, symbol, description and logo image are required", "error");
           return false;
@@ -346,7 +348,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
           return false;
         }
         break;
-      case 1:
+      }
+      case 1: {
         if (selectedWallets.length < MIN_WALLETS) {
           showToast("Please select at least 2 wallets (developer + 1 buyer)", "error");
           return false;
@@ -363,20 +366,21 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
           return false;
         }
         break;
+      }
     }
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = (): void => {
     if (!validateStep()) return;
     setCurrentStep(prev => Math.min(prev + 1, STEPS_DEPLOY.length - 1));
   };
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
-  const handleDeploy = async (e: React.FormEvent) => {
+  const handleDeploy = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
 
@@ -425,13 +429,13 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
           rpcUrl: rpcEndpoint
         };
         
-        console.log('Step 1: Creating token and fee share configuration');
+        console.info('Step 1: Creating token and fee share configuration');
         const step1Result = await createTokenAndConfig(step1Config);
         
         if (step1Result.success) {
           // Check if we have ready-to-send transactions (new format)
           if (step1Result.transactions && step1Result.transactions.length > 0) {
-            console.log('Backend returned ready-to-send transactions, proceeding with launch');
+            console.info('Backend returned ready-to-send transactions, proceeding with launch');
             
             // Format wallets for sending transactions
             const walletObjs: WalletForBagsSharedCreate[] = selectedWallets.map(privateKey => {
@@ -463,11 +467,11 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
               
               // Show URLs if available
               if (step1Result.urls) {
-                console.log('Token URLs:', step1Result.urls);
+                console.info('Token URLs:', step1Result.urls);
               }
               
               // After config bundle is sent, proceed to step 2: fetch and send create transactions
-              console.log('Step 1 completed, proceeding to step 2: fetching create transactions');
+              console.info('Step 1 completed, proceeding to step 2: fetching create transactions');
               
               try {
                 // Format wallets for step 2
@@ -512,7 +516,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                 });
                 
                 // Execute step 2: get transactions from create endpoint and send them
-                console.log('Fetching step 2 transactions from create endpoint...');
+                console.info('Fetching step 2 transactions from create endpoint...');
                 const step2Result = await executeSharedFeesBagsCreate(
                   walletObjs, 
                   createSharedFeesConfig({
@@ -590,7 +594,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
             setStep1Completed(true);
             setIsStep1Processing(false);
             
-            console.log('Step 1 completed:', {
+            console.info('Step 1 completed:', {
               tokenMint: step1Result.tokenMint,
               configKey: step1Result.configKey
             });
@@ -599,9 +603,10 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
             setDeploymentStep('step2');
             
             // Small delay to allow UI to update, then trigger step 2
-            setTimeout(async () => {
-              try {
-                console.log('Auto-triggering Step 2: Creating launch transactions');
+            setTimeout(() => {
+              void (async () => {
+                try {
+                  console.info('Auto-triggering Step 2: Creating launch transactions');
                 
                 // Format wallets for Bags
                 const walletObjs: WalletForBagsSharedCreate[] = selectedWallets.map(privateKey => {
@@ -711,6 +716,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
               } finally {
                 setIsSubmitting(false);
               }
+              })();
             }, 1000);
             
             return; // Exit early to prevent further execution
@@ -745,7 +751,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   };
 
   // Handle shared fees config transaction signing and sending
-  const handleSendSharedConfigTransaction = async () => {
+  const handleSendSharedConfigTransaction = async (): Promise<void> => {
     if (!configTransaction || selectedWallets.length === 0) {
       showToast("No config transaction or owner wallet available", "error");
       return;
@@ -890,28 +896,32 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   };
 
   // Format wallet address for display
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string): string => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
   // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
+  const formatSolBalance = (balance: number): string => {
     return balance.toFixed(4);
   };
+  
+  // Suppress unused variable warnings
+  void showInfoTip;
+  void formatAddress;
 
   // Calculate total SOL to be used
-  const calculateTotalAmount = () => {
+  const calculateTotalAmount = (): number => {
     return selectedWallets.reduce((total, wallet) => {
       return total + (parseFloat(walletAmounts[wallet]) || 0);
     }, 0);
   };
 
   // Get wallet by private key
-  const getWalletByPrivateKey = (privateKey: string) => {
+  const getWalletByPrivateKey = (privateKey: string): WalletType | undefined => {
     return wallets.find(wallet => wallet.privateKey === privateKey);
   };
 
-  const renderStepContent = () => {
+  const renderStepContent = (): JSX.Element | null => {
     switch (currentStep) {
       case 0:
         return (
@@ -936,7 +946,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                       type="text"
                       value={tokenData.name}
                       onChange={(e) => setTokenData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN NAME"
                     />
                   </div>
@@ -948,7 +958,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                       type="text"
                       value={tokenData.symbol}
                       onChange={(e) => setTokenData(prev => ({ ...prev, symbol: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN SYMBOL"
                     />
                   </div>
@@ -974,7 +984,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                       className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all ${
                         isUploading 
                           ? 'bg-app-tertiary text-app-secondary-70 cursor-not-allowed border border-app-primary-20' 
-                          : 'bg-app-tertiary hover-bg-secondary border border-app-primary-40 hover-border-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                          : 'bg-app-tertiary hover-bg-secondary border border-app-primary-40 hover-border-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-'
                       }`}
                     >
                       {isUploading ? (
@@ -1017,7 +1027,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                   {isUploading && (
                     <div className="w-full bg-app-tertiary rounded-full h-1.5 mt-2">
                       <div 
-                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-cyberpunk"
+                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
                     </div>
@@ -1032,7 +1042,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                   <textarea
                     value={tokenData.description}
                     onChange={(e) => setTokenData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk min-h-24 font-mono"
+                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- min-h-24 font-mono"
                     placeholder="DESCRIBE YOUR TOKEN"
                     rows={3}
                   />
@@ -1048,7 +1058,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                         type="text"
                         value={getTwitter()}
                         onChange={(e) => updateSocialLinks('twitter', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://X.COM/YOURHANDLE"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1067,7 +1077,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                         type="text"
                         value={getTelegram()}
                         onChange={(e) => updateSocialLinks('telegram', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://T.ME/YOURCHANNEL"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1086,7 +1096,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                         type="text"
                         value={getWebsite()}
                         onChange={(e) => updateSocialLinks('website', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://YOURSITE.COM"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1119,7 +1129,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                           type="text"
                           value={sharedFeesConfig.feeClaimerTwitterHandle}
                           onChange={(e) => setSharedFeesConfig(prev => ({ ...prev, feeClaimerTwitterHandle: e.target.value }))}
-                          className="w-full bg-app-primary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                          className="w-full bg-app-primary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                           placeholder="@ELONMUSK"
                         />
                         <p className="text-xs text-app-secondary font-mono">Twitter username of fee recipient</p>
@@ -1136,7 +1146,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                             max="100"
                             value={sharedFeesConfig.creatorFeeBps / 100}
                             onChange={(e) => handleFeeSplitChange('creatorFeeBps', (parseFloat(e.target.value) * 100).toString())}
-                            className="w-full bg-app-primary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                            className="w-full bg-app-primary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                             placeholder="10"
                           />
                           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -1157,7 +1167,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                             max="100"
                             value={sharedFeesConfig.feeClaimerFeeBps / 100}
                             onChange={(e) => handleFeeSplitChange('feeClaimerFeeBps', (parseFloat(e.target.value) * 100).toString())}
-                            className="w-full bg-app-primary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                            className="w-full bg-app-primary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                             placeholder="90"
                           />
                           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -1232,13 +1242,13 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                   placeholder="SEARCH WALLETS..."
                 />
               </div>
               
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
               >
@@ -1247,14 +1257,14 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
               </select>
               
               <button
-                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover-border-primary hover:color-primary transition-all modal-btn-cyberpunk flex items-center justify-center"
+                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover-border-primary hover:color-primary transition-all modal-btn- flex items-center justify-center"
                 onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
               >
                 {sortDirection === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
               </button>
 
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                 value={balanceFilter}
                 onChange={(e) => setBalanceFilter(e.target.value)}
               >
@@ -1324,7 +1334,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                                       }
                                     }}
                                     disabled={index === 0}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowUp size={16} className="text-app-primary" />
                                   </button>
@@ -1338,7 +1348,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                                       }
                                     }}
                                     disabled={index === selectedWallets.length - 1}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowDown size={16} className="text-app-primary" />
                                   </button>
@@ -1364,13 +1374,13 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                                     value={walletAmounts[privateKey] || ''}
                                     onChange={(e) => handleAmountChange(privateKey, e.target.value)}
                                     placeholder="AMOUNT"
-                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                                   />
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => handleWalletSelection(privateKey)}
-                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-cyberpunk"
+                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-"
                                 >
                                   <X size={18} className="text-app-secondary hover:text-app-primary" />
                                 </button>
@@ -1534,7 +1544,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                           <button
                             type="button"
                             onClick={() => {
-                              navigator.clipboard.writeText(tokenMint);
+                              void navigator.clipboard.writeText(tokenMint);
                               showToast('Token mint copied to clipboard', 'success');
                             }}
                             className="text-xs color-primary hover:text-app-primary-dark font-mono flex items-center gap-1"
@@ -1662,13 +1672,16 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
               </div>
             </div>
         );
+      
+      default:
+        return null;
     }
   };
   
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements (same as original)
+  // Animation keyframes for  elements (same as original)
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -1692,16 +1705,16 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -1719,18 +1732,18 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -1748,21 +1761,21 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -1829,7 +1842,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
           </div>
 
         {/* Progress Indicator - Only show for steps 0-2 */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: `${(currentStep + 1) / 3 * 100}%` }}

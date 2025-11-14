@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, X, CheckCircle, DollarSign, Info, Search, ChevronRight } from 'lucide-react';
-import { Connection } from '@solana/web3.js';
-import { useToast } from "../components/Notifications";
-import { WalletType, getWalletDisplayName } from '../Utils';
+import type { Connection } from '@solana/web3.js';
+import { useToast } from "../components/useToast";
+import type { WalletType } from '../Utils';
+import { getWalletDisplayName } from '../Utils';
 import { formatAddress, formatSolBalance } from '../utils/formatting';
 import { consolidateSOL, validateConsolidationInputs } from '../utils/consolidate';
 
@@ -51,18 +52,18 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   };
 
   // Get wallet by address
-  const getWalletByAddress = (address: string) => {
+  const getWalletByAddress = (address: string): WalletType | undefined => {
     return wallets.find(wallet => wallet.address === address);
   };
 
   // Get wallet private key by address
-  const getPrivateKeyByAddress = (address: string) => {
+  const getPrivateKeyByAddress = (address: string): string => {
     const wallet = getWalletByAddress(address);
     return wallet ? wallet.privateKey : '';
   };
 
   // Reset form state
-  const resetForm = () => {
+  const resetForm = (): void => {
     setCurrentStep(0);
     setIsConfirmed(false);
     setSelectedRecipientWallet('');
@@ -76,14 +77,14 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   };
 
   // Calculate total amount to be consolidated
-  const getTotalConsolidationAmount = () => {
+  const getTotalConsolidationAmount = (): number => {
     return selectedSourceWallets.reduce((total, address) => {
       const balance = getWalletBalance(address) || 0;
       return total + (balance * parseFloat(amount) / 100);
     }, 0);
   };
 
-  const handleConsolidate = async (e: React.FormEvent) => {
+  const handleConsolidate = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
     setIsSubmitting(true);
@@ -149,7 +150,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   };
 
   // Function to handle source wallet selection toggles for consolidate
-  const toggleSourceWalletSelection = (address: string) => {
+  const toggleSourceWalletSelection = (address: string): void => {
     setSelectedSourceWallets(prev => {
       if (prev.includes(address)) {
         return prev.filter(a => a !== address);
@@ -160,7 +161,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   };
 
   // Get available wallets for consolidate source selection (exclude recipient)
-  const getAvailableSourceWallets = () => {
+  const getAvailableSourceWallets = (): WalletType[] => {
     return wallets.filter(wallet => 
       wallet.address !== selectedRecipientWallet && 
       (getWalletBalance(wallet.address) || 0) > 0
@@ -168,7 +169,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   };
 
   // Get available wallets for recipient selection in consolidate (exclude sources)
-  const getAvailableRecipientWalletsForConsolidate = () => {
+  const getAvailableRecipientWalletsForConsolidate = (): WalletType[] => {
     return wallets.filter(wallet => 
       !selectedSourceWallets.includes(wallet.address) && 
       (getWalletBalance(wallet.address) || 0) > 0
@@ -176,7 +177,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   };
   
   // Handle select/deselect all for source wallets
-  const handleSelectAllSources = () => {
+  const handleSelectAllSources = (): void => {
     if (selectedSourceWallets.length === getAvailableSourceWallets().length) {
       // If all are selected, deselect all
       setSelectedSourceWallets([]);
@@ -187,7 +188,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   };
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // First apply search filter
     let filtered = walletList;
     if (search) {
@@ -223,7 +224,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements
+  // Animation keyframes for  elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -254,16 +255,16 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
       100% { transform: translateY(20px); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -281,18 +282,18 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -310,21 +311,21 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -399,10 +400,10 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-6xl overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-6xl overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid">
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid">
         </div>
 
         {/* Header */}
@@ -424,7 +425,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: currentStep === 0 ? '50%' : '100%' }}
@@ -462,13 +463,13 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                           type="text"
                           value={recipientSearchTerm}
                           onChange={(e) => setRecipientSearchTerm(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                          className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input- font-mono"
                           placeholder="SEARCH RECIPIENT..."
                         />
                       </div>
                       
                       <select 
-                        className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input-cyberpunk font-mono"
+                        className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                         value={sortOption}
                         onChange={(e) => setSortOption(e.target.value)}
                       >
@@ -477,7 +478,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                       </select>
                       
                       <button
-                        className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary hover:border-app-primary transition-all modal-btn-cyberpunk"
+                        className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary hover:border-app-primary transition-all modal-btn-"
                         onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
                       >
                         {sortDirection === 'asc' ? '↑' : '↓'}
@@ -542,13 +543,13 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                           type="text"
                           value={sourceSearchTerm}
                           onChange={(e) => setSourceSearchTerm(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                          className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input- font-mono"
                           placeholder="SEARCH SOURCES..."
                         />
                       </div>
                       
                       <select 
-                        className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input-cyberpunk font-mono"
+                        className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                         value={balanceFilter}
                         onChange={(e) => setBalanceFilter(e.target.value)}
                       >
@@ -642,7 +643,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                               setAmount(value);
                             }
                           }}
-                          className="w-full px-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus:border-app-primary focus:ring-1 focus:ring-primary-50 focus:outline-none transition-all duration-200 modal-input-cyberpunk font-mono tracking-wider"
+                          className="w-full px-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus:border-app-primary focus:ring-1 focus:ring-primary-50 focus:outline-none transition-all duration-200 modal-input- font-mono tracking-wider"
                           placeholder="ENTER PERCENTAGE (E.G. 90)"
                         />
                         <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-app-primary-30 transition-all duration-300"></div>
@@ -725,7 +726,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                 <div className="flex justify-end gap-3 mt-4">
                   <button
                     onClick={onClose}
-                    className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                    className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
                   >
                     CANCEL
                   </button>
@@ -735,7 +736,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                     className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider
                               ${!selectedRecipientWallet || !amount || selectedSourceWallets.length === 0
                                 ? 'bg-primary-50 cursor-not-allowed opacity-50 text-app-primary-80' 
-                                : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                                : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
                   >
                     <span>REVIEW</span>
                     <ChevronRight size={16} className="ml-1" />
@@ -857,7 +858,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setCurrentStep(0)}
-                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
               >
                 BACK
               </button>
@@ -867,7 +868,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                 className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider
                           ${!isConfirmed || isSubmitting
                             ? 'bg-primary-50 cursor-not-allowed opacity-50 text-app-primary-80' 
-                            : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                            : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
               >
                 {isSubmitting ? (
                   <>
@@ -882,7 +883,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
           )}
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

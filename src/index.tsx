@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 // Separate import for createPortal
 import { createPortal } from 'react-dom';
@@ -6,9 +6,10 @@ import { Buffer } from 'buffer';
 import Cookies from 'js-cookie';
 window.Buffer = Buffer;
 import { brand } from './config/brandConfig';
+import type { WindowWithToast } from './types/api';
 
 // Dynamic CSS loading based on brand configuration using Vite's import
-const loadBrandCSS = async () => {
+const loadBrandCSS = async (): Promise<void> => {
   try {
     // Use dynamic import for CSS files in Vite based on theme name
     await import(`./styles/${brand.theme.name}.css`);
@@ -20,8 +21,9 @@ const loadBrandCSS = async () => {
 };
 
 // Load brand CSS immediately
-loadBrandCSS();
-import { ToastProvider, useToast } from "./components/Notifications";
+void loadBrandCSS();
+import ToastProvider from "./components/Notifications";
+import { useToast } from "./components/useToast";
 import BeRightBack from './components/BeRightBack';
 import IntroModal from './modals/IntroModal';
 import { Connection } from '@solana/web3.js';
@@ -29,10 +31,9 @@ import {
   loadWalletsFromCookies, 
   loadConfigFromCookies, 
   saveConfigToCookies,
-  saveWalletsToCookies,
-  WalletType, 
-  ConfigType 
+  saveWalletsToCookies
 } from './Utils';
+import type { WalletType, ConfigType } from './Utils';
 const App = lazy(() => import('./App'));
 const SettingsModal = lazy(() => import('./modals/SettingsModal'));
 const WalletOverview = lazy(() => import('./modals/WalletsModal'));
@@ -65,7 +66,7 @@ const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
   { id: 'de', name: 'Germany', url: 'https://de.fury.bot/', region: 'DE', flag: '🇩🇪' },
 ];
 
-const ServerCheckLoading = () => {
+export const ServerCheckLoading = (): JSX.Element => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-app-primary">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-t-2 spinner-app-primary"></div>
@@ -83,10 +84,10 @@ interface ModalPortalProps {
   onSkip: () => void;
 }
 
-const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onComplete, onSkip }) => {
+export const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onComplete }): JSX.Element | null => {
   const [modalRoot, setModalRoot] = useState<HTMLElement | null>(null);
   
-  useEffect(() => {
+  useEffect((): (() => void) => {
     // Create or get the modal root element when component mounts
     let rootElement = document.getElementById('modal-root');
     
@@ -99,7 +100,7 @@ const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onComplete, onSkip })
     setModalRoot(rootElement);
     
     // Clean up function
-    return () => {
+    return (): void => {
       // Only remove if we created it
       if (rootElement && rootElement.parentNode && !isOpen) {
         document.body.removeChild(rootElement);
@@ -108,7 +109,7 @@ const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onComplete, onSkip })
   }, [isOpen]);
   
   // Apply styles only when modal is open
-  useEffect(() => {
+  useEffect((): void => {
     if (!modalRoot) return;
     
     if (isOpen) {
@@ -144,12 +145,10 @@ const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onComplete, onSkip })
   );
 };
 
-const Root = () => {
+export const Root = (): JSX.Element => {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
-  const [currentServer, setCurrentServer] = useState<ServerInfo | null>(null);
   const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
   const [isChecking, setIsChecking] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showIntroModal, setShowIntroModal] = useState(false);
   
   // Modal states for offline access
@@ -164,7 +163,7 @@ const Root = () => {
   const [connection, setConnection] = useState<Connection | null>(null);
 
   // Disable right-click and text selection globally
-  useEffect(() => {
+  useEffect((): (() => void) => {
     // Add global styles to disable text selection
     const style = document.createElement('style');
     style.textContent = `
@@ -188,13 +187,13 @@ const Root = () => {
     document.head.appendChild(style);
 
     // Disable right-click context menu
-    const handleContextMenu = (e: MouseEvent) => {
+    const handleContextMenu = (e: MouseEvent): boolean => {
       e.preventDefault();
       return false;
     };
 
     // Disable text selection with mouse
-    const handleSelectStart = (e: Event) => {
+    const handleSelectStart = (e: Event): boolean => {
       const target = e.target as HTMLElement;
       // Allow selection in input fields and textareas
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') {
@@ -205,7 +204,7 @@ const Root = () => {
     };
 
     // Disable drag and drop
-    const handleDragStart = (e: DragEvent) => {
+    const handleDragStart = (e: DragEvent): boolean => {
       e.preventDefault();
       return false;
     };
@@ -216,7 +215,7 @@ const Root = () => {
     document.addEventListener('dragstart', handleDragStart);
 
     // Cleanup function
-    return () => {
+    return (): void => {
       document.head.removeChild(style);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('selectstart', handleSelectStart);
@@ -232,7 +231,7 @@ const Root = () => {
       const checkUrl = `${baseUrl}${healthEndpoint}`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout((): void => controller.abort(), 5000);
 
       await fetch(checkUrl, {
         signal: controller.signal,
@@ -244,7 +243,7 @@ const Root = () => {
       
       clearTimeout(timeoutId);
       return Date.now() - startTime;
-    } catch (error) {
+    } catch (ignore) {
       return Infinity; // Return infinite ping if unreachable
     }
   };
@@ -255,10 +254,10 @@ const Root = () => {
       const healthEndpoint = '/health';
       const checkUrl = `${baseUrl}${healthEndpoint}`;
       
-      console.log('Checking connection to:', checkUrl);
+      console.info('Checking connection to:', checkUrl);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout((): void => controller.abort(), 3000);
 
       const response = await fetch(checkUrl, {
         signal: controller.signal,
@@ -271,11 +270,11 @@ const Root = () => {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        console.log('Server response not OK:', response.status);
+        console.info('Server response not OK:', response.status);
         return false;
       }
       
-      const data = await response.json();
+      const data = await response.json() as { status?: string };
       return data.status === 'healthy';
     } catch (error) {
       console.error('Connection check error:', error);
@@ -283,18 +282,17 @@ const Root = () => {
     }
   };
 
-  const switchToServer = async (serverId: string): Promise<boolean> => {
-    const server = availableServers.find(s => s.id === serverId);
+  const switchToServer = useCallback(async (serverId: string): Promise<boolean> => {
+    const server = availableServers.find((s): boolean => s.id === serverId);
     if (!server) {
       console.error('Server not found:', serverId);
       return false;
     }
 
-    console.log('Switching to server:', server.name, server.url);
+    console.info('Switching to server:', server.name, server.url);
     const isConnected = await checkServerConnection(server.url);
     if (isConnected) {
       setServerUrl(server.url);
-      setCurrentServer(server);
       window.tradingServerUrl = server.url;
       window.serverRegion = server.region;
       Cookies.set(SERVER_URL_COOKIE, server.url, { expires: 30 });
@@ -306,18 +304,18 @@ const Root = () => {
       });
       window.dispatchEvent(event);
       
-      console.log('Successfully switched to server:', server.name);
+      console.info('Successfully switched to server:', server.name);
       return true;
     }
     
     console.error('Failed to connect to server:', server.name);
     return false;
-  };
+  }, [availableServers]);
 
 
   // Handler for completing the intro
-  const handleIntroComplete = () => {
-    console.log("Intro completed");
+  const handleIntroComplete = (): void => {
+    console.info("Intro completed");
     Cookies.set(INTRO_COMPLETED_COOKIE, 'true', { expires: 365 });
     setShowIntroModal(false);
     
@@ -326,8 +324,8 @@ const Root = () => {
   };
 
   // Handler for skipping the intro
-  const handleIntroSkip = () => {
-    console.log("Intro skipped");
+  const handleIntroSkip = (): void => {
+    console.info("Intro skipped");
     Cookies.set(INTRO_COMPLETED_COOKIE, 'true', { expires: 365 });
     setShowIntroModal(false);
     
@@ -336,7 +334,7 @@ const Root = () => {
   };
   
   // Function to clean up any modal-related elements
-  const cleanupModalElements = () => {
+  const cleanupModalElements = (): void => {
     // Force pointer-events to be enabled on the body and html
     document.body.style.pointerEvents = 'auto';
     document.documentElement.style.pointerEvents = 'auto';
@@ -349,60 +347,59 @@ const Root = () => {
   };
 
   // Forcefully show the modal after a short delay
-  const forceShowIntroModal = () => {
+  const forceShowIntroModal = (): void => {
     // Make sure intro hasn't been completed
     const introCompleted = Cookies.get(INTRO_COMPLETED_COOKIE);
     if (!introCompleted) {
-      console.log('Forcing intro modal to show...');
-      setTimeout(() => {
+      console.info('Forcing intro modal to show...');
+      setTimeout((): void => {
         setShowIntroModal(true);
       }, 800); // Longer delay to ensure everything has loaded
     }
   };
 
   // Initialize server connection
-  useEffect(() => {
-    const initializeServer = async () => {
-      console.log('Initializing server connection...');
+  useEffect((): void => {
+    const initializeServer = async (): Promise<void> => {
+      console.info('Initializing server connection...');
       
       // Always discover all available servers first
-      console.log('Discovering all available servers...');
+      console.info('Discovering all available servers...');
       const allServersWithPing = await Promise.all(
-        DEFAULT_REGIONAL_SERVERS.map(async (server) => {
+        DEFAULT_REGIONAL_SERVERS.map(async (server): Promise<ServerInfo> => {
           const isConnected = await checkServerConnection(server.url);
           if (!isConnected) {
             return { ...server, ping: Infinity };
           }
           
           const ping = await measurePing(server.url);
-          console.log(`${server.name} (${server.region}): ${ping}ms`);
+          console.info(`${server.name} (${server.region}): ${ping}ms`);
           return { ...server, ping };
         })
       );
 
       // Filter out unreachable servers and sort by ping
-      const reachableServers = allServersWithPing.filter(server => server.ping !== Infinity);
-      reachableServers.sort((a, b) => a.ping! - b.ping!);
+      const reachableServers = allServersWithPing.filter((server): boolean => server.ping !== Infinity);
+      reachableServers.sort((a, b): number => a.ping! - b.ping!);
       
       // Always set available servers regardless of saved server
       setAvailableServers(reachableServers);
       window.availableServers = reachableServers;
       
-      console.log('Available servers discovered:', reachableServers.map(s => `${s.name} (${s.ping}ms)`));
+      console.info('Available servers discovered:', reachableServers.map(s => `${s.name} (${s.ping}ms)`));
       
       // Check if there's a saved server preference
       const savedUrl = Cookies.get(SERVER_URL_COOKIE);
       const savedRegion = Cookies.get(SERVER_REGION_COOKIE);
       
       if (savedUrl && savedRegion) {
-        console.log('Found saved server:', savedUrl, savedRegion);
+        console.info('Found saved server:', savedUrl, savedRegion);
         // Check if the saved server is in our reachable servers
-        const savedServer = reachableServers.find(s => s.id === savedRegion && s.url === savedUrl);
+        const savedServer = reachableServers.find((s): boolean => s.id === savedRegion && s.url === savedUrl);
         
         if (savedServer) {
-          console.log('Saved server is reachable, using it:', savedServer.name);
+          console.info('Saved server is reachable, using it:', savedServer.name);
           setServerUrl(savedUrl);
-          setCurrentServer(savedServer);
           window.tradingServerUrl = savedUrl;
           window.serverRegion = savedServer.region;
           setIsChecking(false);
@@ -416,16 +413,15 @@ const Root = () => {
           forceShowIntroModal();
           return;
         } else {
-          console.log('Saved server is not reachable or not in our list, finding best server...');
+          console.info('Saved server is not reachable or not in our list, finding best server...');
         }
       }
 
       // No saved server or it failed, use the best available one
       if (reachableServers.length > 0) {
         const bestServer = reachableServers[0];
-        console.log('Using best available server:', bestServer.name);
+        console.info('Using best available server:', bestServer.name);
         setServerUrl(bestServer.url);
-        setCurrentServer(bestServer);
         window.tradingServerUrl = bestServer.url;
         window.serverRegion = bestServer.region;
         Cookies.set(SERVER_URL_COOKIE, bestServer.url, { expires: 30 });
@@ -439,29 +435,28 @@ const Root = () => {
         window.dispatchEvent(event);
         
         forceShowIntroModal();
-        console.log('Server initialization completed with:', bestServer.name);
+        console.info('Server initialization completed with:', bestServer.name);
         return;
       }
       
       console.error('No server connection found');
-      setError('No server connection found. Please enter your server URL.');
       setIsChecking(false);
     };
 
-    initializeServer();
+    void initializeServer();
   }, []);
 
   // Expose server switching function globally for the App component
-  useEffect(() => {
+  useEffect((): void => {
     if (availableServers.length > 0) {
       window.availableServers = availableServers;
       window.switchServer = switchToServer;
     }
-  }, [availableServers]);
+  }, [availableServers, switchToServer]);
 
   // Load wallets and config for offline access
-  useEffect(() => {
-    const loadData = async () => {
+  useEffect((): void => {
+    const loadData = (): void => {
       try {
         const savedWallets = loadWalletsFromCookies();
         if (savedWallets && savedWallets.length > 0) {
@@ -478,7 +473,7 @@ const Root = () => {
               const conn = new Connection(savedConfig.rpcEndpoint, 'confirmed');
               setConnection(conn);
             } catch (err) {
-              console.log('Could not create connection:', err);
+              console.info('Could not create connection:', err);
             }
           }
         }
@@ -491,14 +486,14 @@ const Root = () => {
   }, []);
 
   // Toast wrapper
-  const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({ children }): JSX.Element => {
     const { showToast } = useToast();
     
     // Expose showToast globally for modals
-    useEffect(() => {
-      (window as any).showToast = showToast;
-      return () => {
-        delete (window as any).showToast;
+    useEffect((): (() => void) => {
+      (window as WindowWithToast).showToast = showToast;
+      return (): void => {
+        delete (window as WindowWithToast).showToast;
       };
     }, [showToast]);
     
@@ -506,7 +501,7 @@ const Root = () => {
   };
 
   // Config change handler
-  const handleConfigChange = (key: keyof ConfigType, value: string) => {
+  const handleConfigChange = (key: keyof ConfigType, value: string): void => {
     if (!config) return;
     const updatedConfig = { ...config, [key]: value };
     setConfig(updatedConfig);
@@ -514,29 +509,29 @@ const Root = () => {
   };
 
   // Save settings handler
-  const handleSaveSettings = () => {
+  const handleSaveSettings = (): void => {
     if (config) {
       saveConfigToCookies(config);
     }
   };
 
   // Wallet update handler
-  const handleWalletsUpdate = (updatedWallets: WalletType[]) => {
+  const handleWalletsUpdate = (updatedWallets: WalletType[]): void => {
     setWallets(updatedWallets);
     saveWalletsToCookies(updatedWallets);
   };
 
   // Force modal to appear with keyboard shortcut for debugging
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+  useEffect((): (() => void) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       // Ctrl + Shift + M to toggle modal for debugging
       if (e.ctrlKey && e.shiftKey && e.key === 'M') {
-        setShowIntroModal(prev => !prev);
+        setShowIntroModal((prev): boolean => !prev);
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return (): void => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   if (isChecking) {
@@ -587,7 +582,7 @@ const Root = () => {
             connection={connection}
             handleRefresh={() => {}}
             isRefreshing={false}
-            showToast={(window as any).showToast || (() => {})}
+            showToast={(window as WindowWithToast).showToast || (() => {})}
             onOpenSettings={() => {
               setIsWalletsModalOpen(false);
               setIsSettingsModalOpen(true);
@@ -602,7 +597,7 @@ const Root = () => {
               onConfigChange={handleConfigChange}
               onSave={handleSaveSettings}
               connection={connection}
-              showToast={(window as any).showToast || (() => {})}
+              showToast={(window as WindowWithToast).showToast || (() => {})}
             />
           )}
         </Suspense>

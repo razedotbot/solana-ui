@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink } from 'lucide-react';
-import { getWallets, getWalletDisplayName, loadConfigFromCookies, WalletType } from '../Utils';
-import { useToast } from "../components/Notifications";
-import { executeBagsCreate, WalletForBagsCreate, createBagsConfig, BagsCreateConfig, checkDeveloperConfig, signAndSendConfigTransaction, BagsConfigResponse } from '../utils/bagscreate';
+import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw } from 'lucide-react';
+import { getWallets, getWalletDisplayName, loadConfigFromCookies } from '../Utils';
+import type { WalletType } from '../Utils';
+import { useToast } from "../components/useToast";
+import { executeBagsCreate, createBagsConfig, signAndSendConfigTransaction } from '../utils/bagscreate';
+import type { WalletForBagsCreate } from '../utils/bagscreate';
 
 const STEPS_DEPLOY = ["Token Details", "Select Wallets", "Review"];
 const MAX_WALLETS = 5; // Maximum number of wallets that can be selected
@@ -15,7 +17,6 @@ interface BaseModalProps {
 }
 
 interface DeployBagsModalProps extends BaseModalProps {
-  onDeploy: (data: any) => void;
   handleRefresh: () => void;
   solBalances: Map<string, number>;
 }
@@ -33,8 +34,6 @@ interface TokenMetadata {
 export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   isOpen,
   onClose,
-  onDeploy,
-  handleRefresh,
   solBalances,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -43,6 +42,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showInfoTip] = useState(false);
   const [tokenData, setTokenData] = useState<TokenMetadata>({
     name: '',
     symbol: '',
@@ -53,7 +53,6 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   });
   const [walletAmounts, setWalletAmounts] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [showInfoTip, setShowInfoTip] = useState(false);
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');
   const [balanceFilter, setBalanceFilter] = useState('all');
@@ -63,11 +62,10 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   const [configNeeded, setConfigNeeded] = useState(false);
   const [configTransaction, setConfigTransaction] = useState<string>('');
   const [configInstructions, setConfigInstructions] = useState<string>('');
-  const [isCheckingConfig, setIsCheckingConfig] = useState(false);
   const [isSendingConfig, setIsSendingConfig] = useState(false);
 
   // Function to handle image upload
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -107,7 +105,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
       
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
+          const response = JSON.parse(xhr.responseText) as { url: string };
           setTokenData(prev => ({ ...prev, imageUrl: response.url })); // Changed from uri to imageUrl
           showToast("Image uploaded successfully", "success");
         } else {
@@ -132,13 +130,13 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   };
 
   // Update social links when fields change
-  const updateSocialLinks = (type: 'twitter' | 'telegram' | 'website', value: string) => {
+  const updateSocialLinks = (type: 'twitter' | 'telegram' | 'website', value: string): void => {
     setTokenData(prev => {
       // Remove old link of this type if it exists
       const filteredLinks = prev.links.filter(link => link.label !== type);
       
       // Add new link if value is not empty
-      let newLinks = [...filteredLinks];
+      const newLinks = [...filteredLinks];
       if (value) {
         let url = value;
         let label = '';
@@ -166,23 +164,23 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   };
 
   // Helper functions to get social values from links array
-  const getTwitter = () => {
+  const getTwitter = (): string => {
     const twitterLink = tokenData.links.find(link => link.label === 'twitter');
     return twitterLink ? twitterLink.url : '';
   };
   
-  const getWebsite = () => {
+  const getWebsite = (): string => {
     const websiteLink = tokenData.links.find(link => link.label === 'website');
     return websiteLink ? websiteLink.url : '';
   };
 
-  const getTelegram = () => {
+  const getTelegram = (): string => {
     const telegramLink = tokenData.links.find(link => link.label === 'telegram');
     return telegramLink ? telegramLink.url : '';
   };
 
   // Trigger file input click
-  const triggerFileInput = () => {
+  const triggerFileInput = (): void => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -195,7 +193,6 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      handleRefresh();
       // Reset states when opening modal
       setCurrentStep(0);
       setSelectedWallets([]);
@@ -205,7 +202,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   }, [isOpen]);
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // Apply search filter
     let filtered = walletList;
     if (search) {
@@ -240,7 +237,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
     });
   };
 
-  const handleWalletSelection = (privateKey: string) => {
+  const handleWalletSelection = (privateKey: string): void => {
     setSelectedWallets(prev => {
       if (prev.includes(privateKey)) {
         return prev.filter(key => key !== privateKey);
@@ -254,7 +251,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
     });
   };
 
-  const handleAmountChange = (privateKey: string, amount: string) => {
+  const handleAmountChange = (privateKey: string, amount: string): void => {
     if (amount === '' || /^\d*\.?\d*$/.test(amount)) {
       setWalletAmounts(prev => ({
         ...prev,
@@ -263,15 +260,16 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
     }
   };
 
-  const validateStep = () => {
+  const validateStep = (): boolean => {
     switch (currentStep) {
-      case 0:
+      case 0: {
         if (!tokenData.name || !tokenData.symbol || !tokenData.imageUrl || !tokenData.description) {
           showToast("Name, symbol, description and logo image are required", "error");
           return false;
         }
         break;
-      case 1:
+      }
+      case 1: {
         if (selectedWallets.length < MIN_WALLETS) {
           showToast("Please select at least 2 wallets (developer + 1 buyer)", "error");
           return false;
@@ -288,20 +286,21 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
           return false;
         }
         break;
+      }
     }
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = (): void => {
     if (!validateStep()) return;
     setCurrentStep(prev => Math.min(prev + 1, STEPS_DEPLOY.length - 1));
   };
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
-  const handleDeploy = async (e: React.FormEvent) => {
+  const handleDeploy = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
 
@@ -355,7 +354,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
         website: getWebsite()
       });
       
-      console.log(`Starting token creation with ${walletObjs.length} wallets`);
+      console.info(`Starting token creation with ${walletObjs.length} wallets`);
       
       // Call our bags create execution function
       const result = await executeBagsCreate(
@@ -413,7 +412,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   };
 
   // Handle config transaction signing and sending
-  const handleSendConfigTransaction = async () => {
+  const handleSendConfigTransaction = async (): Promise<void> => {
     if (!configTransaction || selectedWallets.length === 0) {
       showToast("No config transaction or owner wallet available", "error");
       return;
@@ -457,28 +456,32 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   };
 
   // Format wallet address for display
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string): string => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
+  
+  // Suppress unused variable warning
+  void showInfoTip;
+  void formatAddress;
 
   // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
+  const formatSolBalance = (balance: number): string => {
     return balance.toFixed(4);
   };
 
   // Calculate total SOL to be used
-  const calculateTotalAmount = () => {
+  const calculateTotalAmount = (): number => {
     return selectedWallets.reduce((total, wallet) => {
       return total + (parseFloat(walletAmounts[wallet]) || 0);
     }, 0);
   };
 
   // Get wallet by private key
-  const getWalletByPrivateKey = (privateKey: string) => {
+  const getWalletByPrivateKey = (privateKey: string): WalletType | undefined => {
     return wallets.find(wallet => wallet.privateKey === privateKey);
   };
 
-  const renderStepContent = () => {
+  const renderStepContent = (): JSX.Element | null => {
     switch (currentStep) {
       case 0:
         return (
@@ -495,7 +498,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
               <div className="p-6 space-y-6 relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
               
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
                   <div className="space-y-2">
@@ -506,7 +509,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                       type="text"
                       value={tokenData.name}
                       onChange={(e) => setTokenData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN NAME"
                     />
                   </div>
@@ -518,7 +521,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                       type="text"
                       value={tokenData.symbol}
                       onChange={(e) => setTokenData(prev => ({ ...prev, symbol: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN SYMBOL"
                     />
                   </div>
@@ -544,7 +547,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                       className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all ${
                         isUploading 
                           ? 'bg-app-tertiary text-app-secondary-70 cursor-not-allowed border border-app-primary-20' 
-                          : 'bg-app-tertiary hover-bg-secondary border border-app-primary-40 hover-border-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                          : 'bg-app-tertiary hover-bg-secondary border border-app-primary-40 hover-border-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-'
                       }`}
                     >
                       {isUploading ? (
@@ -587,7 +590,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                   {isUploading && (
                     <div className="w-full bg-app-tertiary rounded-full h-1.5 mt-2">
                       <div 
-                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-cyberpunk"
+                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
                     </div>
@@ -602,7 +605,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                   <textarea
                     value={tokenData.description}
                     onChange={(e) => setTokenData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk min-h-24 font-mono"
+                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- min-h-24 font-mono"
                     placeholder="DESCRIBE YOUR TOKEN"
                     rows={3}
                   />
@@ -618,7 +621,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                         type="text"
                         value={getTwitter()}
                         onChange={(e) => updateSocialLinks('twitter', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://X.COM/YOURHANDLE"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -637,7 +640,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                         type="text"
                         value={getTelegram()}
                         onChange={(e) => updateSocialLinks('telegram', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://T.ME/YOURCHANNEL"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -656,7 +659,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                         type="text"
                         value={getWebsite()}
                         onChange={(e) => updateSocialLinks('website', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://YOURSITE.COM"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -714,13 +717,13 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                   placeholder="SEARCH WALLETS..."
                 />
               </div>
               
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
               >
@@ -729,14 +732,14 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
               </select>
               
               <button
-                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover-border-primary hover:color-primary transition-all modal-btn-cyberpunk flex items-center justify-center"
+                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover-border-primary hover:color-primary transition-all modal-btn- flex items-center justify-center"
                 onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
               >
                 {sortDirection === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
               </button>
 
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                 value={balanceFilter}
                 onChange={(e) => setBalanceFilter(e.target.value)}
               >
@@ -777,7 +780,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
 
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
               {/* Ambient grid background */}
-              <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+              <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
               
               <div className="p-4 relative z-10">
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary-40 scrollbar-track-app-tertiary">
@@ -809,7 +812,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                                       }
                                     }}
                                     disabled={index === 0}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowUp size={16} className="text-app-primary" />
                                   </button>
@@ -823,7 +826,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                                       }
                                     }}
                                     disabled={index === selectedWallets.length - 1}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowDown size={16} className="text-app-primary" />
                                   </button>
@@ -849,13 +852,13 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                                     value={walletAmounts[privateKey] || ''}
                                     onChange={(e) => handleAmountChange(privateKey, e.target.value)}
                                     placeholder="AMOUNT"
-                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                                   />
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => handleWalletSelection(privateKey)}
-                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-cyberpunk"
+                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-"
                                 >
                                   <X size={18} className="text-app-secondary hover:text-app-primary" />
                                 </button>
@@ -940,7 +943,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
               {/* Left column - Token Details */}
               <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="p-6 space-y-4 relative z-10">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
@@ -1020,7 +1023,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                   </div>
                 </div>
                 
-                {/* Cyberpunk decorative corner elements */}
+                {/*  decorative corner elements */}
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
                 <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
                 <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
@@ -1030,7 +1033,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
               {/* Right column - Selected Wallets */}
               <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="p-6 space-y-4 relative z-10">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
@@ -1059,7 +1062,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                   </div>
                 </div>
                 
-                {/* Cyberpunk decorative corner elements */}
+                {/*  decorative corner elements */}
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
                 <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
                 <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
@@ -1070,7 +1073,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
               <div className="p-4 relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="flex items-center gap-4 relative z-10">
                   <div 
@@ -1094,13 +1097,16 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
             </div>
           </div>
         );
+      
+      default:
+        return null;
     }
   };
   
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements
+  // Animation keyframes for  elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -1124,16 +1130,16 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -1151,18 +1157,18 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -1180,21 +1186,21 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -1234,10 +1240,10 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
         {/* Header */}
         <div className="relative z-10 p-4 flex justify-between items-center border-b border-app-primary-40">
@@ -1258,7 +1264,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
         </div>
 
         {/* Progress Indicator - Only show for steps 0-2 */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: `${(currentStep + 1) / 3 * 100}%` }}
@@ -1282,7 +1288,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                   
                   <div className="bg-app-primary border border-yellow-500/40 rounded-lg shadow-lg modal-glow">
                     <div className="p-6 space-y-4 relative">
-                      <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                      <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                       
                       <div className="relative z-10 space-y-4">
                         <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
@@ -1312,7 +1318,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                             className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-all font-mono tracking-wider ${
                               isSendingConfig
                                 ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50'
-                                : 'bg-app-primary-color hover:bg-primary-60 text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                                : 'bg-app-primary-color hover:bg-primary-60 text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-'
                             }`}
                           >
                             {isSendingConfig ? (
@@ -1336,7 +1342,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                               setConfigInstructions('');
                             }}
                             disabled={isSendingConfig}
-                            className="px-4 py-3 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all font-mono tracking-wider modal-btn-cyberpunk"
+                            className="px-4 py-3 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all font-mono tracking-wider modal-btn-"
                           >
                             CANCEL
                           </button>
@@ -1355,7 +1361,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                 type="button"
                 onClick={currentStep === 0 ? onClose : handleBack}
                 disabled={isSubmitting}
-                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
               >
                 {currentStep === 0 ? 'CANCEL' : 'BACK'}
               </button>
@@ -1367,7 +1373,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
                 className={`px-5 py-2.5 rounded-lg flex items-center transition-all shadow-lg font-mono tracking-wider ${
                   currentStep === 2 && (isSubmitting || !isConfirmed)
                     ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50'
-                    : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                    : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'
                 }`}
               >
                 {currentStep === 2 ? (
@@ -1388,7 +1394,7 @@ export const DeployBagsModal: React.FC<DeployBagsModalProps> = ({
           </form>
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

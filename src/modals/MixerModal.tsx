@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowsUpFromLine, DollarSign, X, CheckCircle, Info, Search, ChevronRight, Settings } from 'lucide-react';
-import { Connection } from '@solana/web3.js';
-import { useToast } from "../components/Notifications";
-import { WalletType, getWalletDisplayName } from '../Utils';
+import type { Connection } from '@solana/web3.js';
+import { useToast } from "../components/useToast";
+import { getWalletDisplayName } from '../Utils';
+import type { WalletType } from '../Utils';
 import { batchMixSOL, validateMixingInputs } from '../utils/mixer';
 
 interface MixerModalProps {
@@ -45,12 +46,12 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   const [balanceFilter, setBalanceFilter] = useState('all');
   
   // Get wallet SOL balance by address
-  const getWalletBalance = (address: string) => {
-    return solBalances.has(address) ? solBalances.get(address) : 0;
-  };
+  const getWalletBalance = useCallback((address: string): number => {
+    return solBalances.has(address) ? solBalances.get(address) || 0 : 0;
+  }, [solBalances]);
 
   // Calculate total amount for all recipients
-  const calculateTotalAmount = () => {
+  const calculateTotalAmount = (): number => {
     if (useCustomAmounts) {
       return walletAmounts.reduce((total, item) => {
         return total + (parseFloat(item.amount) || 0);
@@ -61,7 +62,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   };
   
   // Function to highlight recipients with missing amounts
-  const hasEmptyAmounts = () => {
+  const hasEmptyAmounts = (): boolean => {
     if (!useCustomAmounts) return false;
     
     return walletAmounts.some(wallet => 
@@ -75,65 +76,8 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   const senderBalance = getWalletBalance(selectedSenderWallet) || 0;
   const hasEnoughBalance = totalAmount <= senderBalance;
 
-  // Reset form when modal opens/closes
-  useEffect(() => {
-    if (isOpen) {
-      resetForm();
-    }
-  }, [isOpen]);
-
-  // Update walletAmounts when selectedRecipientWallets change
-  useEffect(() => {
-    updateWalletAmounts();
-  }, [selectedRecipientWallets]);
-
-  // Update wallet amounts when toggling between common/custom amounts
-  useEffect(() => {
-    updateWalletAmounts();
-  }, [useCustomAmounts, commonAmount]);
-
-  // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
-    return balance.toFixed(4);
-  };
-
-  // Get wallet by address
-  const getWalletByAddress = (address: string) => {
-    return wallets.find(wallet => wallet.address === address);
-  };
-
-  // Get wallet private key by address
-  const getPrivateKeyByAddress = (address: string) => {
-    const wallet = getWalletByAddress(address);
-    return wallet ? wallet.privateKey : '';
-  };
-
-  // Update wallet amounts based on selected wallets
-  const updateWalletAmounts = () => {
-    if (useCustomAmounts) {
-      // Maintain existing amounts for wallets that remain selected
-      const existingAmounts = new Map(walletAmounts.map(w => [w.address, w.amount]));
-      
-      // Create a new walletAmounts array with currently selected wallets
-      const newWalletAmounts = selectedRecipientWallets.map(address => ({
-        address,
-        amount: existingAmounts.get(address) || commonAmount || ''
-      }));
-      
-      setWalletAmounts(newWalletAmounts);
-    } else {
-      // When using common amount, just create entries with the common amount
-      const newWalletAmounts = selectedRecipientWallets.map(address => ({
-        address,
-        amount: commonAmount
-      }));
-      
-      setWalletAmounts(newWalletAmounts);
-    }
-  };
-
   // Reset form state
-  const resetForm = () => {
+  const resetForm = useCallback((): void => {
     setCurrentStep(0);
     setIsConfirmed(false);
     setSelectedRecipientWallets([]);
@@ -146,10 +90,69 @@ export const MixerModal: React.FC<MixerModalProps> = ({
     setSortOption('address');
     setSortDirection('asc');
     setBalanceFilter('all');
+  }, []);
+
+  // Update wallet amounts based on selected wallets
+  const updateWalletAmounts = useCallback((): void => {
+    setWalletAmounts(prevWalletAmounts => {
+      if (useCustomAmounts) {
+        // Maintain existing amounts for wallets that remain selected
+        const existingAmounts = new Map(prevWalletAmounts.map(w => [w.address, w.amount]));
+        
+        // Create a new walletAmounts array with currently selected wallets
+        const newWalletAmounts = selectedRecipientWallets.map(address => ({
+          address,
+          amount: existingAmounts.get(address) || commonAmount || ''
+        }));
+        
+        return newWalletAmounts;
+      } else {
+        // When using common amount, just create entries with the common amount
+        const newWalletAmounts = selectedRecipientWallets.map(address => ({
+          address,
+          amount: commonAmount
+        }));
+        
+        return newWalletAmounts;
+      }
+    });
+  }, [useCustomAmounts, selectedRecipientWallets, commonAmount]);
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen, resetForm]);
+
+  // Update walletAmounts when selectedRecipientWallets change
+  useEffect(() => {
+    updateWalletAmounts();
+  }, [selectedRecipientWallets, updateWalletAmounts]);
+
+  // Update wallet amounts when toggling between common/custom amounts
+  useEffect(() => {
+    updateWalletAmounts();
+  }, [useCustomAmounts, commonAmount, updateWalletAmounts]);
+
+  // Format SOL balance for display
+  const formatSolBalance = (balance: number): string => {
+    return balance.toFixed(4);
+  };
+
+  // Get wallet by address
+  const getWalletByAddress = (address: string): WalletType | undefined => {
+    return wallets.find(wallet => wallet.address === address);
+  };
+
+  // Get wallet private key by address
+  const getPrivateKeyByAddress = (address: string): string => {
+    const wallet = getWalletByAddress(address);
+    return wallet ? wallet.privateKey : '';
   };
 
   // Handle wallet amount change
-  const handleWalletAmountChange = (address: string, value: string) => {
+  const handleWalletAmountChange = (address: string, value: string): void => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setWalletAmounts(prev => 
         prev.map(wallet => 
@@ -162,7 +165,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   };
 
   // Handle mixer operation
-  const handleMixer = async (e: React.FormEvent) => {
+  const handleMixer = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
 
@@ -227,7 +230,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   };
 
   // Function to handle recipient wallet selection toggles for mixer
-  const toggleRecipientWalletSelection = (address: string) => {
+  const toggleRecipientWalletSelection = (address: string): void => {
     setSelectedRecipientWallets(prev => {
       if (prev.includes(address)) {
         return prev.filter(a => a !== address);
@@ -238,12 +241,12 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   };
 
   // Get available wallets for mixer recipient selection (exclude sender)
-  const getAvailableRecipientWallets = () => {
+  const getAvailableRecipientWallets = (): WalletType[] => {
     return wallets.filter(wallet => wallet.address !== selectedSenderWallet);
   };
 
   // Get available wallets for sender selection in mixer (exclude recipients and zero balance wallets)
-  const getAvailableSenderWallets = () => {
+  const getAvailableSenderWallets = (): WalletType[] => {
     return wallets.filter(wallet => 
       !selectedRecipientWallets.includes(wallet.address) && 
       (getWalletBalance(wallet.address) || 0) > 0
@@ -251,7 +254,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   };
   
   // Handle select/deselect all for recipient wallets
-  const handleSelectAllRecipients = () => {
+  const handleSelectAllRecipients = (): void => {
     if (selectedRecipientWallets.length === getAvailableRecipientWallets().length) {
       setSelectedRecipientWallets([]);
     } else {
@@ -260,14 +263,14 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   };
 
   // Apply common amount to all selected wallets
-  const applyCommonAmountToAll = () => {
+  const applyCommonAmountToAll = (): void => {
     setWalletAmounts(prev => 
       prev.map(wallet => ({ ...wallet, amount: commonAmount }))
     );
   };
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // First apply search filter
     let filtered = walletList;
     if (search) {
@@ -303,12 +306,12 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   };
 
   // Format wallet address for display
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string): string => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
   // Get wallet amount by address
-  const getWalletAmount = (address: string) => {
+  const getWalletAmount = (address: string): string => {
     const wallet = walletAmounts.find(w => w.address === address);
     return wallet ? wallet.amount : '';
   };
@@ -316,7 +319,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements
+  // Animation keyframes for  elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -340,16 +343,16 @@ export const MixerModal: React.FC<MixerModalProps> = ({
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -367,18 +370,18 @@ export const MixerModal: React.FC<MixerModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -396,21 +399,21 @@ export const MixerModal: React.FC<MixerModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -487,12 +490,12 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   `;
   document.head.appendChild(modalStyleElement);
 
-  // Render the modal with cyberpunk styling
+  // Render the modal with  styling
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-6xl overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-6xl overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid">
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid">
         </div>
 
         {/* Header */}
@@ -514,7 +517,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: currentStep === 0 ? '50%' : '100%' }}
@@ -551,13 +554,13 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                         type="text"
                         value={senderSearchTerm}
                         onChange={(e) => setSenderSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                         placeholder="SEARCH SENDER WALLETS..."
                       />
                     </div>
                     
                     <select 
-                      className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                      className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                       value={sortOption}
                       onChange={(e) => setSortOption(e.target.value)}
                     >
@@ -566,7 +569,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                     </select>
                     
                     <button
-                      className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary-light hover-border-primary transition-all modal-btn-cyberpunk"
+                      className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary-light hover-border-primary transition-all modal-btn-"
                       onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
                     >
                       {sortDirection === 'asc' ? '↑' : '↓'}
@@ -626,13 +629,13 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                         placeholder="SEARCH RECIPIENT WALLETS..."
                       />
                     </div>
                     
                     <select 
-                      className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                      className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                       value={balanceFilter}
                       onChange={(e) => setBalanceFilter(e.target.value)}
                     >
@@ -684,7 +687,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                                       handleWalletAmountChange(wallet.address, value);
                                     }
                                   }}
-                                  className="w-full pl-6 pr-2 py-1 bg-app-secondary border border-app-primary-30 rounded text-xs text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                                  className="w-full pl-6 pr-2 py-1 bg-app-secondary border border-app-primary-30 rounded text-xs text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                                   placeholder="0.00"
                                 />
                               </div>
@@ -762,7 +765,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                               setCommonAmount(value);
                             }
                           }}
-                          className={`w-full pl-9 pr-4 py-2.5 bg-app-tertiary border rounded-lg text-app-primary focus:outline-none transition-all duration-200 modal-input-cyberpunk font-mono
+                          className={`w-full pl-9 pr-4 py-2.5 bg-app-tertiary border rounded-lg text-app-primary focus:outline-none transition-all duration-200 modal-input- font-mono
                                     ${hasEnoughBalance ? 'border-app-primary-30 focus-border-primary' : 'border-error-alt'}`}
                           placeholder="0.001"
                         />
@@ -808,7 +811,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                                 setCommonAmount(value);
                               }
                             }}
-                            className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                            className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                             placeholder="SET COMMON AMOUNT"
                           />
                         </div>
@@ -818,7 +821,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                           className={`whitespace-nowrap px-3 py-2 text-sm rounded-lg transition-all font-mono border
                                     ${!commonAmount 
                                       ? 'bg-app-tertiary text-app-secondary-60 border-app-primary-20 cursor-not-allowed' 
-                                      : 'bg-app-tertiary hover-bg-secondary text-app-primary border-app-primary-30 hover-border-primary modal-btn-cyberpunk'}`}
+                                      : 'bg-app-tertiary hover-bg-secondary text-app-primary border-app-primary-30 hover-border-primary modal-btn-'}`}
                         >
                           APPLY TO ALL
                         </button>
@@ -852,7 +855,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={onClose}
-                  className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                  className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
                 >
                   CANCEL
                 </button>
@@ -872,7 +875,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                               (useCustomAmounts && (totalAmount === 0 || hasEmptyAmounts())) ||
                               (!useCustomAmounts && !commonAmount)
                               ? 'bg-primary-50 cursor-not-allowed opacity-50' 
-                              : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                              : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
                 >
                   {hasEmptyAmounts() && (
                     <span className="text-xs mr-2 bg-error-alt-20 text-error-alt px-2 py-0.5 rounded font-mono">MISSING AMOUNTS</span>
@@ -998,7 +1001,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setCurrentStep(0)}
-                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover-bg-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
               >
                 BACK
               </button>
@@ -1008,7 +1011,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                 className={`px-5 py-2.5 text-app-primary rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider 
                           ${!isConfirmed || isSubmitting
                             ? 'bg-primary-50 cursor-not-allowed opacity-50' 
-                            : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                            : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
               >
                 {isSubmitting ? (
                   <>
@@ -1023,7 +1026,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
           )}
         </div>
 
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

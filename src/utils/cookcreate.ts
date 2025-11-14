@@ -86,13 +86,23 @@ const checkRateLimit = async (): Promise<void> => {
   rateLimitState.count++;
 };
 
+interface BundleResponse {
+  result?: unknown;
+  error?: {
+    message?: string;
+  };
+}
+
+interface WindowWithTradingServer {
+  tradingServerUrl?: string;
+}
+
 /**
  * Send bundle to Jito block engine through backend proxy with improved error handling
  */
-const sendBundle = async (encodedBundle: string[]): Promise<any> => {
+const sendBundle = async (encodedBundle: string[]): Promise<unknown> => {
   try {
-    
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = ((window as WindowWithTradingServer).tradingServerUrl?.replace(/\/+$/, '') || '');
     
     // Send to our backend proxy instead of directly to Jito
     const response = await fetch(`${baseUrl}/solana/send`, {
@@ -107,7 +117,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<any> => {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as BundleResponse;
     
     if (data.error) {
       throw new Error(data.error.message || 'Unknown error from bundle server');
@@ -162,13 +172,13 @@ const getPartiallyPreparedCookTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as CookCreateResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially prepared cook transactions');
     }
     
-    return data as CookCreateResponse;
+    return data;
     
   } catch (error) {
     console.error('Error getting partially prepared cook transactions:', error);
@@ -184,7 +194,7 @@ const decodeTransaction = (transactionStr: string): Uint8Array => {
   if (transactionStr.match(/^[A-Za-z0-9+/=]+$/) && transactionStr.length % 4 === 0) {
     try {
       return Buffer.from(transactionStr, 'base64');
-    } catch (error) {
+    } catch (ignore) {
       // Fall through to base58 attempt
     }
   }
@@ -192,14 +202,14 @@ const decodeTransaction = (transactionStr: string): Uint8Array => {
   // Try base58 (default)
   try {
     return bs58.decode(transactionStr);
-  } catch (error) {
+  } catch (ignore) {
     try {
       // If base58 fails, try base64 again
       return Buffer.from(transactionStr, 'base64');
-    } catch (error) {
+    } catch (ignore) {
       // If both fail, log more context and rethrow
       console.error('Failed to decode transaction. First few characters:', transactionStr.substring(0, 20));
-      throw new Error(`Could not decode transaction: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Could not decode transaction: ${ignore instanceof Error ? ignore.message : String(ignore)}`);
     }
   }
 };
@@ -277,8 +287,8 @@ const signBuyerTransactions = (
 /**
  * Send first bundle with extensive retry logic - this is critical for success
  */
-const sendFirstBundle = async (bundle: string[]): Promise<{success: boolean, result?: any, error?: string}> => {
-  console.log(`Sending first bundle with ${bundle.length} transactions (critical)...`);
+const sendFirstBundle = async (bundle: string[]): Promise<{success: boolean, result?: unknown, error?: string}> => {
+  console.info(`Sending first bundle with ${bundle.length} transactions (critical)...`);
   
   let attempt = 0;
   let consecutiveErrors = 0;
@@ -292,7 +302,7 @@ const sendFirstBundle = async (bundle: string[]): Promise<{success: boolean, res
       const result = await sendBundle(bundle);
       
       // Success!
-      console.log(`First bundle sent successfully on attempt ${attempt + 1}`);
+      console.info(`First bundle sent successfully on attempt ${attempt + 1}`);
       return { success: true, result };
     } catch (error) {
       consecutiveErrors++;
@@ -315,6 +325,12 @@ const sendFirstBundle = async (bundle: string[]): Promise<{success: boolean, res
   };
 };
 
+interface CookCreateResult {
+  totalBundles: number;
+  successCount: number;
+  failureCount: number;
+}
+
 /**
  * Execute cook token creation operation
  */
@@ -326,11 +342,11 @@ export const executeCookCreate = async (
   success: boolean; 
   mintAddress?: string; 
   poolId?: string;
-  result?: any; 
+  result?: CookCreateResult; 
   error?: string 
 }> => {
   try {
-    console.log(`Preparing to create token with name: ${config.tokenMetadata.name} using ${buyerWallets.length} buyer wallets`);
+    console.info(`Preparing to create token with name: ${config.tokenMetadata.name} using ${buyerWallets.length} buyer wallets`);
     
     // Step 1: Get partially prepared transactions from backend
     const preparedData = await getPartiallyPreparedCookTransactions(
@@ -342,8 +358,8 @@ export const executeCookCreate = async (
       throw new Error(preparedData.error || 'Failed to prepare cook token creation');
     }
     
-    console.log(`Token mint address: ${preparedData.tokenCreation.mint}`);
-    console.log(`Pool ID: ${preparedData.tokenCreation.poolId}`);
+    console.info(`Token mint address: ${preparedData.tokenCreation.mint}`);
+    console.info(`Pool ID: ${preparedData.tokenCreation.poolId}`);
     
     // Step 2: Create keypairs from private keys
     const ownerKeypair = Keypair.fromSecretKey(bs58.decode(ownerWallet.privateKey));
@@ -372,7 +388,7 @@ export const executeCookCreate = async (
     // Add owner transaction first followed by all buyer transactions
     const allTransactions = [signedOwnerTx, ...signedBuyerTxs];
     
-    console.log(`Creating one bundle with ${allTransactions.length} transactions (1 owner + ${signedBuyerTxs.length} buyer transactions)`);
+    console.info(`Creating one bundle with ${allTransactions.length} transactions (1 owner + ${signedBuyerTxs.length} buyer transactions)`);
     
     // Step 5: Send the single bundle with all transactions
     // This ensures all transactions land in the same block
@@ -384,7 +400,7 @@ export const executeCookCreate = async (
       };
     }
     
-    console.log("✅ All transactions sent successfully in one bundle!");
+    console.info("✅ All transactions sent successfully in one bundle!");
     
     // Simple result count
     const successCount = 1; // Count as one successful bundle

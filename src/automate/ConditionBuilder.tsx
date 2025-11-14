@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
-import { TradingCondition } from './types';
+import type { TradingCondition } from './types';
 
 interface ConditionBuilderProps {
   condition: TradingCondition;
@@ -53,7 +53,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
           <label className="block text-xs font-mono color-primary mb-1">Type</label>
           <select
             value={condition.type}
-            onChange={(e) => onUpdate({ type: e.target.value as any })}
+            onChange={(e) => onUpdate({ type: e.target.value as TradingCondition['type'] })}
             className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
           >
             {conditionTypes.map(type => (
@@ -66,7 +66,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
           <label className="block text-xs font-mono color-primary mb-1">Operator</label>
           <select
             value={condition.operator}
-            onChange={(e) => onUpdate({ operator: e.target.value as any })}
+            onChange={(e) => onUpdate({ operator: e.target.value as TradingCondition['operator'] })}
             className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
           >
             {operators.map(op => (
@@ -82,7 +82,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
           </label>
           {condition.type === 'lastTradeType' ? (
             <select
-              value={condition.value as number}
+              value={condition.value}
               onChange={(e) => onUpdate({ value: Number(e.target.value) })}
               className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
             >
@@ -104,7 +104,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, index, o
           ) : (
             <input
               type="number"
-              value={condition.value as number}
+              value={condition.value}
               onChange={(e) => onUpdate({ value: Number(e.target.value) })}
               className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
               placeholder="0"

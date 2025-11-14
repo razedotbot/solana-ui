@@ -2,7 +2,6 @@ import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 
 // Constants
-const JITO_ENDPOINT = 'https://mainnet.block-engine.jito.wtf/solana/v1/block-engine';
 const MAX_BUNDLES_PER_SECOND = 2;
 
 // Rate limiting state
@@ -53,12 +52,16 @@ const checkRateLimit = async (): Promise<void> => {
   rateLimitState.count++;
 };
 
+interface WindowWithConfig {
+  tradingServerUrl?: string;
+}
+
 /**
  * Send bundle to Jito block engine through our backend proxy
  */
 const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
     
     // Send to our backend proxy instead of directly to Jito
     const response = await fetch(`${baseUrl}/solana/send`, {
@@ -69,7 +72,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json() as { result: BundleResult };
     
     return data.result;
   } catch (error) {
@@ -104,13 +107,20 @@ const getPartiallyPreparedTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { success: boolean; error?: string; transactions?: string[]; data?: { transactions?: string[] } };
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially prepared transactions');
     }
     
-    return data.transactions; // Array of base58 encoded partially prepared transactions
+    // Handle different response formats
+    const transactions = (data as unknown as { data?: { transactions?: string[] } }).data?.transactions || data.transactions;
+    
+    if (!transactions || !Array.isArray(transactions)) {
+      throw new Error('No transactions returned from backend');
+    }
+    
+    return transactions; // Array of base58 encoded partially prepared transactions
   } catch (error) {
     console.error('Error getting partially prepared transactions:', error);
     throw error;
@@ -183,10 +193,8 @@ export const consolidateSOL = async (
   sourceWallets: WalletConsolidation[],
   receiverWallet: WalletConsolidation,
   percentage: number
-): Promise<{ success: boolean; result?: any; error?: string }> => {
+): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    console.log(`Preparing to consolidate ${percentage}% of SOL from ${sourceWallets.length} wallets to ${receiverWallet.address}`);
-    
     // Extract source addresses
     const sourceAddresses = sourceWallets.map(wallet => wallet.address);
     
@@ -196,7 +204,6 @@ export const consolidateSOL = async (
       receiverWallet.address,
       percentage
     );
-    console.log(`Received ${partiallyPreparedTransactions.length} partially prepared transactions from backend`);
     
     // Step 2: Create keypairs from private keys
     const receiverKeypair = Keypair.fromSecretKey(bs58.decode(receiverWallet.privateKey));
@@ -214,17 +221,14 @@ export const consolidateSOL = async (
       sourceKeypairsMap,
       receiverKeypair
     );
-    console.log(`Completed signing for ${fullySignedTransactions.length} transactions`);
     
     // Step 4: Prepare consolidation bundles
     const consolidationBundles = prepareConsolidationBundles(fullySignedTransactions);
-    console.log(`Prepared ${consolidationBundles.length} consolidation bundles`);
     
     // Step 5: Send bundles
-    let results: BundleResult[] = [];
+    const results: BundleResult[] = [];
     for (let i = 0; i < consolidationBundles.length; i++) {
       const bundle = consolidationBundles[i];
-      console.log(`Sending bundle ${i+1}/${consolidationBundles.length} with ${bundle.transactions.length} transactions`);
       
       await checkRateLimit();
       const result = await sendBundle(bundle.transactions);

@@ -34,14 +34,21 @@ export interface SellConfig {
   singleDelay?: number; // Delay between wallets in milliseconds (for single mode)
 }
 
+export interface ServerResponse {
+  success?: boolean;
+  data?: unknown;
+  error?: string;
+  [key: string]: unknown;
+}
+
 export interface SellBundle {
   transactions: string[]; // Base58 encoded transaction data
-  serverResponse?: any; // For self-hosted server responses
+  serverResponse?: ServerResponse; // For self-hosted server responses
 }
 
 export interface SellResult {
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
 }
 
@@ -77,6 +84,10 @@ const checkRateLimit = async (): Promise<void> => {
   rateLimitState.count++;
 };
 
+interface WindowWithConfig {
+  tradingServerUrl?: string;
+}
+
 /**
  * Send bundle to Jito block engine through our backend proxy
  */
@@ -89,7 +100,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
     if (config?.tradingServerEnabled === 'true' && config?.tradingServerUrl) {
       baseUrl = config.tradingServerUrl.replace(/\/+$/, '');
     } else {
-      baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+      baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
     }
     
     // Send to our backend proxy instead of directly to Jito
@@ -101,9 +112,9 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       }),
     });
 
-    const data = await response.json();
+    const data: BundleResult = await response.json() as BundleResult;
     
-    return data.result;
+    return data;
   } catch (error) {
     console.error('Error sending bundle:', error);
     throw error;
@@ -126,62 +137,62 @@ const getPartiallyPreparedSellTransactions = async (
     if (config?.tradingServerEnabled === 'true' && config?.tradingServerUrl) {
       baseUrl = config.tradingServerUrl.replace(/\/+$/, '');
     } else {
-      baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+      baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
     }
     
-    const requestBody: any = {
+    const requestBody: Record<string, unknown> = {
       tokenAddress: sellConfig.tokenAddress
     };
     
     // If self-hosted trading server is enabled, send private keys instead of addresses
     if (config?.tradingServerEnabled === 'true') {
       // For self-hosted server, send private keys so server can sign and send
-      requestBody.walletPrivateKeys = wallets.map(wallet => wallet.privateKey);
+      requestBody['walletPrivateKeys'] = wallets.map(wallet => wallet.privateKey);
     } else {
       // For regular server, send wallet addresses
-      requestBody.walletAddresses = wallets.map(wallet => wallet.address);
+      requestBody['walletAddresses'] = wallets.map(wallet => wallet.address);
     }
     
     // Add either percentage or tokens amount
     if (sellConfig.tokensAmount !== undefined) {
-      requestBody.tokensAmount = sellConfig.tokensAmount;
+      requestBody['tokensAmount'] = sellConfig.tokensAmount;
     } else {
-      requestBody.percentage = sellConfig.sellPercent;
+      requestBody['percentage'] = sellConfig.sellPercent;
     }
 
     // Always include slippageBps
     if (sellConfig.slippageBps !== undefined) {
-      requestBody.slippageBps = sellConfig.slippageBps;
+      requestBody['slippageBps'] = sellConfig.slippageBps;
     } else if (config?.slippageBps) {
       // Use default slippage from app config if available
-      requestBody.slippageBps = parseInt(config.slippageBps);
+      requestBody['slippageBps'] = parseInt(config.slippageBps);
     } else {
       // Default slippage if not set in config
-      requestBody.slippageBps = 9900;
+      requestBody['slippageBps'] = 9900;
     }
 
     // Use transactionsFeeLamports when wallets.length < 2, otherwise use jitoTipLamports
     if (wallets.length < 2) {
       // Single wallet: use transactionsFeeLamports (transaction fee / 3)
       if (sellConfig.transactionsFeeLamports !== undefined) {
-        requestBody.transactionsFeeLamports = sellConfig.transactionsFeeLamports;
+        requestBody['transactionsFeeLamports'] = sellConfig.transactionsFeeLamports;
       } else {
         const feeInSol = config?.transactionFee || '0.005';
-        requestBody.transactionsFeeLamports = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
+        requestBody['transactionsFeeLamports'] = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
       }
     } else {
       // Multiple wallets: use jitoTipLamports
       if (sellConfig.jitoTipLamports !== undefined) {
-        requestBody.jitoTipLamports = sellConfig.jitoTipLamports;
+        requestBody['jitoTipLamports'] = sellConfig.jitoTipLamports;
       } else {
         const feeInSol = config?.transactionFee || '0.005';
-        requestBody.jitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
+        requestBody['jitoTipLamports'] = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
       }
     }
 
     // Add outputMint if provided
     if (sellConfig.outputMint) {
-      requestBody.outputMint = sellConfig.outputMint;
+      requestBody['outputMint'] = sellConfig.outputMint;
     }
 
     const response = await fetch(`${baseUrl}/solana/sell`, {
@@ -196,31 +207,44 @@ const getPartiallyPreparedSellTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     
-    const data = await response.json();
+    const data: ServerResponse = await response.json() as ServerResponse;
     
     if (!data.success) {
-      throw new Error(data.error || 'Failed to get partially prepared transactions');
+      throw new Error((data.error ? String(data.error) : undefined) || 'Failed to get partially prepared transactions');
     }
     
     // Handle different response formats to ensure compatibility
     // Check for self-hosted trading server response format first
     if (config?.tradingServerEnabled === 'true' && data.data) {
       // Self-hosted server response format: {success: true, data: {bundlesSent: 1, results: [...]}}
-      console.log('Self-hosted server response received:', data);
+      console.info('Self-hosted server response received:', data);
       // For self-hosted server, store the response data in a special format
       // We'll use a special property to pass the server response through
       return [{ transactions: [], serverResponse: data }];
-    } else if (data.bundles && Array.isArray(data.bundles)) {
+    } else if (data.data && typeof data.data === 'object' && data.data !== null) {
+      const responseData = data.data as { bundles?: unknown[]; transactions?: string[] };
+      if ('bundles' in responseData && Array.isArray(responseData.bundles)) {
+        // Wrap any bundle that is a plain array
+        return responseData.bundles.map((bundle: unknown) =>
+          Array.isArray(bundle) ? { transactions: bundle as string[] } : (bundle as SellBundle)
+        );
+      } else if ('transactions' in responseData && Array.isArray(responseData.transactions)) {
+        // If we get a flat array of transactions, create a single bundle
+        return [{ transactions: responseData.transactions }];
+      }
+    }
+    
+    if ('bundles' in data && Array.isArray(data['bundles'])) {
       // Wrap any bundle that is a plain array
-      return data.bundles.map((bundle: any) =>
-        Array.isArray(bundle) ? { transactions: bundle } : bundle
+      return (data['bundles'] as unknown[]).map((bundle: unknown) =>
+        Array.isArray(bundle) ? { transactions: bundle as string[] } : (bundle as SellBundle)
       );
-    } else if (data.transactions && Array.isArray(data.transactions)) {
+    } else if ('transactions' in data && Array.isArray(data['transactions'])) {
       // If we get a flat array of transactions, create a single bundle
-      return [{ transactions: data.transactions }];
+      return [{ transactions: data['transactions'] as string[] }];
     } else if (Array.isArray(data)) {
       // Legacy format where data itself is an array
-      return [{ transactions: data }];
+      return [{ transactions: data as string[] }];
     } else {
       throw new Error('No transactions returned from backend');
     }
@@ -281,7 +305,7 @@ const completeBundleSigning = (
       console.error(`Error signing transaction:`, error);
       return null;
     }
-  }).filter((tx): tx is string => tx !== null); // Filter out any null transactions with type guard
+  }).filter((tx): tx is string => tx !== null);
   
   return { transactions: signedTransactions };
 };
@@ -319,13 +343,13 @@ const executeSellSingleMode = async (
   wallets: WalletSell[],
   sellConfig: SellConfig
 ): Promise<SellResult> => {
-  let results: BundleResult[] = [];
+  const results: BundleResult[] = [];
   let successfulWallets = 0;
   let failedWallets = 0;
 
   for (let i = 0; i < wallets.length; i++) {
     const wallet = wallets[i];
-    console.log(`Processing wallet ${i + 1}/${wallets.length}: ${wallet.address.substring(0, 8)}...`);
+    console.info(`Processing wallet ${i + 1}/${wallets.length}: ${wallet.address.substring(0, 8)}...`);
 
     try {
       // Get transactions for single wallet
@@ -379,7 +403,7 @@ const executeSellBatchMode = async (
 ): Promise<SellResult> => {
   const batchSize = 5;
   const batchDelay = sellConfig.batchDelay || 1000; // Default 1 second delay
-  let results: BundleResult[] = [];
+  const results: BundleResult[] = [];
   let successfulBatches = 0;
   let failedBatches = 0;
 
@@ -389,11 +413,11 @@ const executeSellBatchMode = async (
     batches.push(wallets.slice(i, i + batchSize));
   }
 
-  console.log(`Processing ${batches.length} batches of up to ${batchSize} wallets each`);
+  console.info(`Processing ${batches.length} batches of up to ${batchSize} wallets each`);
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
-    console.log(`Processing batch ${i + 1}/${batches.length} with ${batch.length} wallets`);
+    console.info(`Processing batch ${i + 1}/${batches.length} with ${batch.length} wallets`);
 
     try {
       // Get transactions for this batch
@@ -451,7 +475,7 @@ const executeSellAllInOneMode = async (
   wallets: WalletSell[],
   sellConfig: SellConfig
 ): Promise<SellResult> => {
-  console.log(`Preparing all ${wallets.length} wallets for simultaneous execution`);
+  console.info(`Preparing all ${wallets.length} wallets for simultaneous execution`);
 
   const config = loadConfigFromCookies();
   
@@ -460,14 +484,14 @@ const executeSellAllInOneMode = async (
   
   // If self-hosted trading server is enabled, the server handles everything
   if (config?.tradingServerEnabled === 'true') {
-    console.log('Self-hosted server handled signing and sending');
+    console.info('Self-hosted server handled signing and sending');
     // Check if we have a server response in the bundles
     if (partiallyPreparedBundles.length > 0 && partiallyPreparedBundles[0].serverResponse) {
       const serverResponse = partiallyPreparedBundles[0].serverResponse;
       return {
-        success: serverResponse.success,
+        success: serverResponse.success ?? false,
         result: serverResponse.data,
-        error: serverResponse.success ? undefined : serverResponse.error
+        error: serverResponse.success ? undefined : (serverResponse.error ? String(serverResponse.error) : undefined)
       };
     } else {
       return {
@@ -505,7 +529,7 @@ const executeSellAllInOneMode = async (
     };
   }
 
-  console.log(`Sending all ${validSignedBundles.length} bundles simultaneously with 100ms delays`);
+  console.info(`Sending all ${validSignedBundles.length} bundles simultaneously with 100ms delays`);
 
   // Send all bundles simultaneously with 100ms delays to avoid rate limits
   const bundlePromises = validSignedBundles.map(async (bundle, index) => {
@@ -514,7 +538,7 @@ const executeSellAllInOneMode = async (
     
     try {
       const result = await sendBundle(bundle.transactions);
-      console.log(`Bundle ${index + 1} sent successfully`);
+      console.info(`Bundle ${index + 1} sent successfully`);
       return { success: true, result };
     } catch (error) {
       console.error(`Error sending bundle ${index + 1}:`, error);
@@ -526,7 +550,7 @@ const executeSellAllInOneMode = async (
   const bundleResults = await Promise.allSettled(bundlePromises);
   
   // Process results
-  let results: BundleResult[] = [];
+  const results: BundleResult[] = [];
   let successfulBundles = 0;
   let failedBundles = 0;
 
@@ -565,10 +589,10 @@ export const executeSell = async (
     // If self-hosted trading server is enabled, force all-in-one mode
     if (config?.tradingServerEnabled === 'true') {
       bundleMode = 'all-in-one';
-      console.log(`Self-hosted trading server enabled, forcing all-in-one mode`);
+      console.info(`Self-hosted trading server enabled, forcing all-in-one mode`);
     }
     
-    console.log(`Preparing to sell ${sellConfig.sellPercent}% of ${sellConfig.tokenAddress} using ${wallets.length} wallets with ${bundleMode} mode`);
+    console.info(`Preparing to sell ${sellConfig.sellPercent}% of ${sellConfig.tokenAddress} using ${wallets.length} wallets with ${bundleMode} mode`);
     
     // Execute based on bundle mode
     switch (bundleMode) {
@@ -582,7 +606,7 @@ export const executeSell = async (
         return await executeSellAllInOneMode(wallets, sellConfig);
       
       default:
-        throw new Error(`Invalid bundle mode: ${bundleMode}. Must be 'single', 'batch', or 'all-in-one'`);
+        throw new Error(`Invalid bundle mode: ${String(bundleMode)}. Must be 'single', 'batch', or 'all-in-one'`);
     }
   } catch (error) {
     console.error('Sell error:', error);

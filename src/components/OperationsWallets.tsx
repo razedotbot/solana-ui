@@ -1,20 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   RefreshCw, Coins, CheckSquare, Square, ArrowDownAZ, ArrowUpAZ, 
   Wallet, Share2, Network, Send, HandCoins, DollarSign, 
   Menu, X, ChevronRight,
   Share, Zap
 } from 'lucide-react';
-import { Connection } from '@solana/web3.js';
-import { WalletType, saveWalletsToCookies } from '../Utils';
+import type { Connection } from '@solana/web3.js';
+import type { WalletType, WalletCategory } from '../Utils';
+import { saveWalletsToCookies } from '../Utils';
 import { DistributeModal } from '../modals/DistributeModal';
 import { ConsolidateModal } from '../modals/ConsolidateModal';
 import { TransferModal } from '../modals/TransferModal';
 import { DepositModal } from '../modals/DepositModal';
 import { MixerModal } from '../modals/MixerModal';
-import { QuickTradeModal } from '../modals/QuickTradeModal';
+import { QuickTradeModal, type CategoryQuickTradeSettings } from '../modals/QuickTradeModal';
+import Cookies from 'js-cookie';
 
 interface WalletOperationsButtonsProps {
   wallets: WalletType[];
@@ -33,23 +34,11 @@ interface WalletOperationsButtonsProps {
   handleSortWallets: () => void;
   setIsModalOpen: (open: boolean) => void;
   quickBuyAmount?: number;
-  setQuickBuyAmount?: (amount: number) => void;
   quickBuyEnabled?: boolean;
-  setQuickBuyEnabled?: (enabled: boolean) => void;
   quickBuyMinAmount?: number;
-  setQuickBuyMinAmount?: (amount: number) => void;
   quickBuyMaxAmount?: number;
-  setQuickBuyMaxAmount?: (amount: number) => void;
   useQuickBuyRange?: boolean;
-  setUseQuickBuyRange?: (useRange: boolean) => void;
-  quickSellPercentage?: number;
-  setQuickSellPercentage?: (percentage: number) => void;
-  quickSellMinPercentage?: number;
-  setQuickSellMinPercentage?: (percentage: number) => void;
-  quickSellMaxPercentage?: number;
-  setQuickSellMaxPercentage?: (percentage: number) => void;
-  useQuickSellRange?: boolean;
-  setUseQuickSellRange?: (useRange: boolean) => void;
+  onCategorySettingsChange?: (settings: Record<WalletCategory, CategoryQuickTradeSettings>) => void;
 }
 
 type OperationTab = 'distribute' | 'consolidate' | 'transfer' | 'deposit' | 'mixer' | 'fund';
@@ -69,24 +58,12 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
   sortDirection,
   handleSortWallets,
   setIsModalOpen,
-  quickBuyAmount = 0.01,
-  setQuickBuyAmount,
-  quickBuyEnabled = true,
-  setQuickBuyEnabled,
-  quickBuyMinAmount = 0.01,
-  setQuickBuyMinAmount,
-  quickBuyMaxAmount = 0.05,
-  setQuickBuyMaxAmount,
-  useQuickBuyRange = false,
-  setUseQuickBuyRange,
-  quickSellPercentage = 100,
-  setQuickSellPercentage,
-  quickSellMinPercentage = 25,
-  setQuickSellMinPercentage,
-  quickSellMaxPercentage = 100,
-  setQuickSellMaxPercentage,
-  useQuickSellRange = false,
-  setUseQuickSellRange
+  quickBuyAmount: _quickBuyAmount = 0.01,
+  quickBuyEnabled: _quickBuyEnabled = true,
+  quickBuyMinAmount: _quickBuyMinAmount = 0.01,
+  quickBuyMaxAmount: _quickBuyMaxAmount = 0.05,
+  useQuickBuyRange: _useQuickBuyRange = false,
+  onCategorySettingsChange
 }) => {
   // State for active modal
   const [activeModal, setActiveModal] = useState<OperationTab | null>(null);
@@ -100,47 +77,112 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
   // State for quick buy settings modal
   const [isQuickBuySettingsOpen, setIsQuickBuySettingsOpen] = useState(false);
   
+  // Category-based settings
+  const getDefaultCategorySettings = (): Record<WalletCategory, CategoryQuickTradeSettings> => ({
+    Soft: {
+      enabled: true,
+      buyAmount: 0.01,
+      buyMinAmount: 0.01,
+      buyMaxAmount: 0.05,
+      useBuyRange: false,
+      sellPercentage: 100,
+      sellMinPercentage: 25,
+      sellMaxPercentage: 100,
+      useSellRange: false
+    },
+    Medium: {
+      enabled: true,
+      buyAmount: 0.05,
+      buyMinAmount: 0.05,
+      buyMaxAmount: 0.15,
+      useBuyRange: false,
+      sellPercentage: 100,
+      sellMinPercentage: 50,
+      sellMaxPercentage: 100,
+      useSellRange: false
+    },
+    Hard: {
+      enabled: true,
+      buyAmount: 0.1,
+      buyMinAmount: 0.1,
+      buyMaxAmount: 0.5,
+      useBuyRange: false,
+      sellPercentage: 100,
+      sellMinPercentage: 75,
+      sellMaxPercentage: 100,
+      useSellRange: false
+    }
+  });
+
+  const loadCategorySettings = (): Record<WalletCategory, CategoryQuickTradeSettings> => {
+    try {
+      const saved = Cookies.get('categoryQuickTradeSettings');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<WalletCategory, Partial<CategoryQuickTradeSettings>>;
+        const defaults = getDefaultCategorySettings();
+        return {
+          Soft: { ...defaults.Soft, ...parsed.Soft },
+          Medium: { ...defaults.Medium, ...parsed.Medium },
+          Hard: { ...defaults.Hard, ...parsed.Hard }
+        };
+      }
+    } catch (error) {
+      console.error('Error loading category settings:', error);
+    }
+    return getDefaultCategorySettings();
+  };
+
+  const [categorySettings, setCategorySettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings>>(() => loadCategorySettings());
+
+  // Save category settings to cookies and notify parent
+  useEffect(() => {
+    Cookies.set('categoryQuickTradeSettings', JSON.stringify(categorySettings), { expires: 365 });
+    if (onCategorySettingsChange) {
+      onCategorySettingsChange(categorySettings);
+    }
+  }, [categorySettings, onCategorySettingsChange]);
+  
   // Function to toggle drawer
-  const toggleDrawer = () => {
+  const toggleDrawer = (): void => {
     setIsDrawerOpen(prev => !prev);
   };
   
   // Function to open a specific modal
-  const openModal = (modal: OperationTab) => {
+  const openModal = (modal: OperationTab): void => {
     setActiveModal(modal);
     setIsDrawerOpen(false); // Close drawer when opening modal
   };
   
   // Function to close the active modal
-  const closeModal = () => {
+  const closeModal = (): void => {
     setActiveModal(null);
   };
   
   // Function to open fund wallets modal
-  const openFundModal = () => {
+  const openFundModal = (): void => {
     setIsFundModalOpen(true);
     setIsDrawerOpen(false);
   };
   
   // Function to close fund wallets modal
-  const closeFundModal = () => {
+  const closeFundModal = (): void => {
     setIsFundModalOpen(false);
   };
   
   // Function to open distribute from fund modal
-  const openDistributeFromFund = () => {
+  const openDistributeFromFund = (): void => {
     setIsFundModalOpen(false);
     setActiveModal('distribute');
   };
   
   // Function to open mixer from fund modal
-  const openMixerFromFund = () => {
+  const openMixerFromFund = (): void => {
     setIsFundModalOpen(false);
     setActiveModal('mixer');
   };
   
   // Function to open quick buy settings
-  const openQuickBuySettings = () => {
+  const openQuickBuySettings = (): void => {
     setIsQuickBuySettingsOpen(true);
     setIsDrawerOpen(false);
   };
@@ -149,7 +191,7 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
   const allWalletsActive = wallets.every(wallet => wallet.isActive);
 
   // Function to toggle all wallets
-  const toggleAllWalletsHandler = () => {
+  const toggleAllWalletsHandler = (): void => {
     const allActive = wallets.every(wallet => wallet.isActive);
     const newWallets = wallets.map(wallet => ({
       ...wallet,
@@ -160,7 +202,7 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
   };
 
   // Function to open wallets modal
-  const openWalletsModal = () => {
+  const openWalletsModal = (): void => {
     setIsModalOpen(true);
   };
 
@@ -217,32 +259,10 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
     }
   ];
 
-  // Animation variants
-  const drawerVariants = {
-    hidden: { 
-      y: 20, 
-      opacity: 0,
-      height: 0,
-      marginBottom: 0
-    },
-    visible: {
-      y: 0,
-      opacity: 1,
-      height: 'auto',
-      marginBottom: 12,
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 30
-      }
-    }
-  };
-  
-  const buttonVariants = {
-    rest: { scale: 1 },
-    hover: { scale: 1.05 },
-    tap: { scale: 0.95 }
-  };
+  // CSS classes for transitions
+  const drawerClass = isDrawerOpen 
+    ? 'max-h-96 opacity-100 mb-3' 
+    : 'max-h-0 opacity-0 mb-0';
 
   return (
     <>
@@ -291,71 +311,55 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
       
       {/* Fund Wallets Modal */}
       {isFundModalOpen && createPortal(
-        <AnimatePresence>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50"
-            onClick={closeFundModal}
+        <div
+          className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 animate-fadeIn"
+          onClick={closeFundModal}
+        >
+          <div
+            className="bg-app-primary border border-app-primary-30 rounded-lg p-6 max-w-md w-full mx-4 animate-scaleIn"
+            onClick={(e) => e.stopPropagation()}
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-app-primary border border-app-primary-30 rounded-lg p-6 max-w-md w-full mx-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-mono color-primary tracking-wider">Fund Wallets</h2>
-                <button
-                  onClick={closeFundModal}
-                  className="color-primary hover-color-primary-light transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-mono color-primary tracking-wider">Fund Wallets</h2>
+              <button
+                onClick={closeFundModal}
+                className="color-primary hover-color-primary-light transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={openDistributeFromFund}
+                className="w-full flex items-center gap-3 p-4 rounded-md
+                         bg-app-quaternary border border-app-primary-30 hover-border-primary-60
+                         color-primary hover-color-primary-light transition-all duration-200
+                         hover:shadow-md hover:shadow-app-primary-15 active:scale-95"
+              >
+                <Share2 size={20} />
+                <div className="text-left">
+                  <div className="font-mono text-sm tracking-wider">Distribute SOL</div>
+                  <div className="text-xs text-app-secondary-80 mt-1">Send SOL from main wallet to multiple wallets</div>
+                </div>
+              </button>
               
-              <div className="space-y-3">
-                <motion.button
-                  variants={buttonVariants}
-                  initial="rest"
-                  whileHover="hover"
-                  whileTap="tap"
-                  onClick={openDistributeFromFund}
-                  className="w-full flex items-center gap-3 p-4 rounded-md
-                           bg-app-quaternary border border-app-primary-30 hover-border-primary-60
-                           color-primary hover-color-primary-light transition-all duration-300
-                           hover:shadow-md hover:shadow-app-primary-15"
-                >
-                  <Share2 size={20} />
-                  <div className="text-left">
-                    <div className="font-mono text-sm tracking-wider">Distribute SOL</div>
-                    <div className="text-xs text-app-secondary-80 mt-1">Send SOL from main wallet to multiple wallets</div>
-                  </div>
-                </motion.button>
-                
-                <motion.button
-                  variants={buttonVariants}
-                  initial="rest"
-                  whileHover="hover"
-                  whileTap="tap"
-                  onClick={openMixerFromFund}
-                  className="w-full flex items-center gap-3 p-4 rounded-md
-                           bg-app-quaternary border border-app-primary-30 hover-border-primary-60
-                           color-primary hover-color-primary-light transition-all duration-300
-                           hover:shadow-md hover:shadow-app-primary-15"
-                >
-                  <Share size={20} />
-                  <div className="text-left">
-                    <div className="font-mono text-sm tracking-wider">Mixer SOL</div>
-                    <div className="text-xs text-app-secondary-80 mt-1">Mix SOL between wallets for privacy</div>
-                  </div>
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        </AnimatePresence>,
+              <button
+                onClick={openMixerFromFund}
+                className="w-full flex items-center gap-3 p-4 rounded-md
+                         bg-app-quaternary border border-app-primary-30 hover-border-primary-60
+                         color-primary hover-color-primary-light transition-all duration-200
+                         hover:shadow-md hover:shadow-app-primary-15 active:scale-95"
+              >
+                <Share size={20} />
+                <div className="text-left">
+                  <div className="font-mono text-sm tracking-wider">Mixer SOL</div>
+                  <div className="text-xs text-app-secondary-80 mt-1">Mix SOL between wallets for privacy</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>,
         document.body
       )}
       
@@ -363,177 +367,122 @@ export const WalletOperationsButtons: React.FC<WalletOperationsButtonsProps> = (
       <QuickTradeModal
         isOpen={isQuickBuySettingsOpen}
         onClose={() => setIsQuickBuySettingsOpen(false)}
-        quickBuyEnabled={quickBuyEnabled}
-        setQuickBuyEnabled={setQuickBuyEnabled || (() => {})}
-        quickBuyAmount={quickBuyAmount}
-        setQuickBuyAmount={setQuickBuyAmount || (() => {})}
-        quickBuyMinAmount={quickBuyMinAmount}
-        setQuickBuyMinAmount={setQuickBuyMinAmount || (() => {})}
-        quickBuyMaxAmount={quickBuyMaxAmount}
-        setQuickBuyMaxAmount={setQuickBuyMaxAmount || (() => {})}
-        useQuickBuyRange={useQuickBuyRange}
-        setUseQuickBuyRange={setUseQuickBuyRange || (() => {})}
-        quickSellPercentage={quickSellPercentage}
-        setQuickSellPercentage={setQuickSellPercentage || (() => {})}
-        quickSellMinPercentage={quickSellMinPercentage}
-        setQuickSellMinPercentage={setQuickSellMinPercentage || (() => {})}
-        quickSellMaxPercentage={quickSellMaxPercentage}
-        setQuickSellMaxPercentage={setQuickSellMaxPercentage || (() => {})}
-        useQuickSellRange={useQuickSellRange}
-        setUseQuickSellRange={setUseQuickSellRange || (() => {})}
+        categorySettings={categorySettings}
+        setCategorySettings={setCategorySettings}
       />
 
       {/* Main controls bar - slimmer and more minimal */}
-      <div className="w-full mb-1 bg-app-primary-80 backdrop-blur-sm rounded-md p-0.5 
+      <div className="w-full bg-app-primary-80 backdrop-blur-sm rounded-md p-0.5 
                     border border-app-primary-20">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-stretch h-8">
           {/* Primary action buttons - without tooltips */}
           <div className="flex items-center gap-0.5 flex-1">
             {wallets.length === 0 ? (
-              <motion.button
-                variants={buttonVariants}
-                initial="rest"
-                whileHover="hover"
-                whileTap="tap"
+              <button
                 onClick={openWalletsModal}
                 className="flex items-center text-xs font-mono tracking-wider color-primary 
                            hover-color-primary-light px-2 py-1 rounded bg-app-quaternary border 
-                           border-app-primary-30 hover-border-primary-60 transition-colors duration-200"
+                           border-app-primary-30 hover-border-primary-60 transition-all duration-150 active:scale-95"
               >
                 <span>Start Here &gt;</span>
-              </motion.button>
+              </button>
             ) : (
               primaryActions.map((action, index) => (
-                <motion.button
+                <button
                   key={index}
-                  variants={buttonVariants}
-                  initial="rest"
-                  whileHover="hover"
-                  whileTap="tap"
                   onClick={action.onClick}
                   disabled={action.disabled}
                   className="p-1.5 color-primary hover-color-primary-light disabled:opacity-50 
                            bg-app-quaternary border border-app-primary-20 hover-border-primary-40 rounded 
-                           transition-colors duration-200 flex-shrink-0 flex items-center justify-center"
+                           transition-all duration-150 flex-shrink-0 flex items-center justify-center active:scale-95"
                 >
                   <span>{action.icon}</span>
-                </motion.button>
+                </button>
               ))
             )}
           </div>
           
           {/* Quick Buy Settings and Menu toggle buttons */}
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-stretch gap-0.5">
             {wallets.length > 0 && (
-              <motion.button
-                variants={buttonVariants}
-                initial="rest"
-                whileHover="hover"
-                whileTap="tap"
+              <button
                 onClick={openQuickBuySettings}
-                className={`flex items-center gap-1 px-2 py-1.5 text-xs font-mono tracking-wider
-                         bg-app-quaternary border rounded transition-colors duration-200 ${
-                  quickBuyEnabled 
+                className={`flex items-center gap-1 px-2 h-full text-xs font-mono tracking-wider
+                         bg-app-quaternary border rounded transition-all duration-150 active:scale-95 ${
+                  categorySettings.Medium.enabled 
                     ? 'color-primary hover-color-primary-light border-app-primary-20 hover-border-primary-40'
                     : 'color-primary-40 border-app-primary-10 opacity-60'
                 }`}
               >
                 <Zap size={12} />
                 <span>
-                  {quickBuyEnabled 
-                    ? (useQuickBuyRange 
-                        ? `${quickBuyMinAmount?.toFixed(3)}-${quickBuyMaxAmount?.toFixed(3)} SOL` 
-                        : `${quickBuyAmount} SOL`
+                  {categorySettings.Medium.enabled 
+                    ? (categorySettings.Medium.useBuyRange 
+                        ? `${categorySettings.Medium.buyMinAmount.toFixed(3)}-${categorySettings.Medium.buyMaxAmount.toFixed(3)}` 
+                        : `${categorySettings.Medium.buyAmount}`
                       ) 
                     : 'OFF'
                   }
                 </span>
-              </motion.button>
+              </button>
             )}
             
-            <motion.button
-              variants={buttonVariants}
-              initial="rest"
-              whileHover="hover"
-              whileTap="tap"
+            <button
               onClick={toggleDrawer}
-              className="ml-0.5 p-1.5 flex items-center justify-center rounded
+              className="ml-0.5 px-1.5 h-full flex items-center justify-center rounded
                        bg-gradient-to-r from-app-primary-color to-app-primary-dark 
                        text-app-quaternary hover-from-app-primary-light hover-to-app-primary-color
-                       transition-colors duration-200"
+                       transition-all duration-150 active:scale-95"
             >
               {isDrawerOpen ? <X size={14} /> : <Menu size={14} />}
-            </motion.button>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Operations drawer - expandable */}
-      <AnimatePresence>
+      <div 
+        className={`bg-app-primary-80 backdrop-blur-sm rounded-lg overflow-hidden
+                   border border-app-primary-30 shadow-lg shadow-app-primary-10
+                   transition-all duration-200 ${drawerClass}`}
+      >
         {isDrawerOpen && (
-          <motion.div 
-            variants={drawerVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            className="bg-app-primary-80 backdrop-blur-sm rounded-lg overflow-hidden
-                     border border-app-primary-30 shadow-lg shadow-app-primary-10"
-          >
-            <div className="p-3">
-              {/* Drawer header */}
-              <div className="flex justify-between items-center mb-3 pb-2 border-b border-app-primary-20">
-                <div className="flex items-center gap-2">
-                  <motion.div 
-                    className="w-1 h-4 bg-app-primary-color"
-                    animate={{ 
-                      height: [4, 16, 4],
-                    }}
-                    transition={{ 
-                      duration: 1.5, 
-                      repeat: Infinity,
-                      repeatType: "mirror" 
-                    }}
-                  />
-                  <span className="text-xs font-mono tracking-wider color-primary uppercase">Wallet Operations</span>
-                </div>
-              </div>
-              
-              {/* Operation buttons - Single column slim layout */}
-              <div className="flex flex-col space-y-1">
-                {operations.map((op, index) => (
-                  <motion.button
-                    key={index}
-                    variants={buttonVariants}
-                    initial="rest"
-                    whileHover="hover"
-                    whileTap="tap"
-                    onClick={op.onClick}
-                    className="flex justify-between items-center w-full py-2 px-3 rounded-md
-                             bg-app-quaternary border border-app-primary-30 hover-border-primary-60
-                             color-primary hover-color-primary-light transition-all duration-300
-                             hover:shadow-md hover:shadow-app-primary-15 relative overflow-hidden"
-                  >
-                    {/* Subtle glow effect */}
-                    <motion.div 
-                      className="absolute inset-0 bg-app-primary-color"
-                      initial={{ opacity: 0 }}
-                      whileHover={{ opacity: 0.05 }}
-                    />
-                    <div className="flex items-center gap-3 relative z-10">
-                      <span>{op.icon}</span>
-                      <span className="text-xs font-mono tracking-wider">{op.label}</span>
-                    </div>
-                    <ChevronRight size={14} className="relative z-10 text-app-secondary-80" />
-                  </motion.button>
-                ))}
+          <div className="p-3">
+            {/* Drawer header */}
+            <div className="flex justify-between items-center mb-3 pb-2 border-b border-app-primary-20">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 bg-app-primary-color" />
+                <span className="text-xs font-mono tracking-wider color-primary uppercase">Wallet Operations</span>
               </div>
             </div>
-            
-            {/* Decorative bottom edge */}
-            <div className="h-1 w-full bg-gradient-to-r from-transparent via-app-primary-40 to-transparent"/>
-          </motion.div>
+
+            {/* Operation buttons - Single column slim layout */}
+            <div className="flex flex-col space-y-1">
+              {operations.map((op, index) => (
+                <button
+                  key={index}
+                  onClick={op.onClick}
+                  className="flex justify-between items-center w-full py-2 px-3 rounded-md
+                           bg-app-quaternary border border-app-primary-30 hover-border-primary-60
+                           color-primary hover-color-primary-light transition-all duration-150
+                           hover:shadow-md hover:shadow-app-primary-15 active:scale-95"
+                >
+                  <div className="flex items-center gap-3">
+                    <span>{op.icon}</span>
+                    <span className="text-xs font-mono tracking-wider">{op.label}</span>
+                  </div>
+                  <ChevronRight size={14} className="text-app-secondary-80" />
+                </button>
+              ))}
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+        
+        {/* Decorative bottom edge */}
+        {isDrawerOpen && (
+          <div className="h-1 w-full bg-gradient-to-r from-transparent via-app-primary-40 to-transparent"/>
+        )}
+      </div>
     </>
   );
 };

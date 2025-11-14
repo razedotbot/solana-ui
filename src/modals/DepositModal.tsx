@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, X, CheckCircle, Wallet, Info, Search, ChevronRight } from 'lucide-react';
-import { Connection, PublicKey, LAMPORTS_PER_SOL, SystemProgram, Transaction } from '@solana/web3.js';
+import { DollarSign, X, CheckCircle, Info, Search, ChevronRight } from 'lucide-react';
+import type { Connection } from '@solana/web3.js';
+import { PublicKey, LAMPORTS_PER_SOL, SystemProgram, Transaction } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { useToast } from "../components/Notifications";
-import { WalletType, getWalletDisplayName } from '../Utils';
+import { useToast } from "../components/useToast";
+import type { WalletType } from '../Utils';
+import { getWalletDisplayName } from '../Utils';
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -46,12 +47,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   }, [isOpen]);
 
   // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
+  const formatSolBalance = (balance: number): string => {
     return balance.toFixed(4);
   };
 
   // Format wallet address for display
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string): string => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
@@ -80,22 +81,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     return walletBalance < depositAmount;
   };
 
-  // Get insufficient balance message
-  const getInsufficientBalanceMessage = (): string => {
-    if (!publicKey || !amount) return '';
-    
-    const walletBalance = getConnectedWalletBalance();
-    const depositAmount = parseFloat(amount);
-    
-    if (walletBalance < depositAmount) {
-      return `Insufficient balance. Need ${depositAmount.toFixed(4)} SOL, but only have ${walletBalance.toFixed(4)} SOL`;
-    }
-    
-    return '';
-  };
-
   // Reset form state
-  const resetForm = () => {
+  const resetForm = (): void => {
     setCurrentStep(0);
     setSelectedWallet('');
     setAmount('');
@@ -108,15 +95,15 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   };
 
   // Function to get recent blockhash (for deposit operation)
-  const getRecentBlockhash = async () => {
+  const getRecentBlockhash = async (): Promise<string> => {
     const { blockhash } = await connection.getLatestBlockhash('finalized');
     return blockhash;
   };
 
   // Connect to Phantom wallet
-  const connectPhantomWallet = async () => {
+  const connectPhantomWallet = async (): Promise<boolean> => {
     try {
-      const { solana } = window as any;
+      const { solana } = window as { solana?: { isPhantom?: boolean; connect: () => Promise<{ publicKey: { toString: () => string } }>; request: (params: { method: string; params: { message: string } }) => Promise<string> } };
       if (!solana?.isPhantom) {
         throw new Error("Phantom wallet not found");
       }
@@ -127,19 +114,20 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       
       // Fetch balance for the connected wallet
       try {
-        const balance = await connection.getBalance(response.publicKey, "processed");
+        const pubKey = new PublicKey(response.publicKey.toString());
+        const balance = await connection.getBalance(pubKey, "processed");
         const solBalance = balance / 1e9; // Convert lamports to SOL
         
-        console.log(`Fetched balance for connected Phantom wallet ${walletAddress}: ${solBalance} SOL`); // Debug log
+        console.info(`Fetched balance for connected Phantom wallet ${walletAddress}: ${solBalance} SOL`);
         
         // Update the solBalances map with the connected wallet's balance
         if (setSolBalances) {
           const newSolBalances = new Map(solBalances);
           newSolBalances.set(walletAddress, solBalance);
           setSolBalances(newSolBalances);
-          console.log('Updated solBalances map for connected wallet'); // Debug log
+          console.info('Updated solBalances map for connected wallet');
         } else {
-          console.log('setSolBalances is not available'); // Debug log
+          console.info('setSolBalances is not available');
         }
       } catch (balanceError) {
         console.error('Error fetching wallet balance:', balanceError);
@@ -155,7 +143,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   };
 
   // Handle deposit operation
-  const handleDeposit = async (e: React.FormEvent) => {
+  const handleDeposit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!selectedWallet || !amount || !publicKey || !isConfirmed) return;
 
@@ -167,7 +155,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
  
     setIsSubmitting(true);
     try {
-      const { solana } = window as any;
+      const { solana } = window as { solana?: { isPhantom?: boolean; request: (params: { method: string; params: { message: string } }) => Promise<string> } };
       if (!solana?.isPhantom) {
         throw new Error("Phantom wallet not found");
       }
@@ -205,7 +193,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       const encodedTransaction = bs58.encode(serializedTransaction);
  
       // Send transaction request to Phantom
-      const signature = await solana.request({
+      await solana.request({
         method: 'signAndSendTransaction',
         params: {
           message: encodedTransaction
@@ -227,7 +215,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   };
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // First apply search filter
     let filtered = walletList;
     if (search) {
@@ -265,7 +253,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements
+  // Animation keyframes for  elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -289,16 +277,16 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -316,18 +304,18 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -345,21 +333,21 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -399,10 +387,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-md overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-md overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid">
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid">
         </div>
 
         {/* Header */}
@@ -424,7 +412,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: currentStep === 0 ? '50%' : '100%' }}
@@ -438,7 +426,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <div>
                 <button
                   onClick={connectPhantomWallet}
-                  className="w-full px-4 py-3 bg-app-tertiary border border-app-primary-40 hover-border-primary text-app-primary rounded-lg flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-cyberpunk"
+                  className="w-full px-4 py-3 bg-app-tertiary border border-app-primary-40 hover-border-primary text-app-primary rounded-lg flex items-center justify-center gap-2 transition-all duration-300 shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-"
                 >
                   <svg width="22" height="22" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect width="128" height="128" rx="64" fill="#050a0e"/>
@@ -484,13 +472,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                       placeholder="SEARCH WALLETS..."
                     />
                   </div>
                   
                   <select 
-                    className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                    className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                     value={sortOption}
                     onChange={(e) => setSortOption(e.target.value)}
                   >
@@ -499,7 +487,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   </select>
                   
                   <button
-                    className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary hover-border-primary transition-all modal-btn-cyberpunk"
+                    className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary hover-border-primary transition-all modal-btn-"
                     onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
                   >
                     {sortDirection === 'asc' ? '↑' : '↓'}
@@ -570,7 +558,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                         setAmount(value);
                       }
                     }}
-                    className="w-full px-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus-border-primary focus:ring-1 focus:ring-primary-50 focus:outline-none transition-all duration-200 modal-input-cyberpunk font-mono tracking-wider"
+                    className="w-full px-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus-border-primary focus:ring-1 focus:ring-primary-50 focus:outline-none transition-all duration-200 modal-input- font-mono tracking-wider"
                     placeholder="ENTER AMOUNT TO DEPOSIT"
                   />
                   <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-app-primary-30 transition-all duration-300"></div>
@@ -588,7 +576,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={onClose}
-                  className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                  className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
                 >
                   CANCEL
                 </button>
@@ -598,7 +586,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   className={`px-5 py-2.5 text-app-primary rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider 
                             ${!publicKey || !selectedWallet || !amount
                               ? 'bg-primary-50 cursor-not-allowed opacity-50' 
-                              : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                              : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
                 >
                   <span>REVIEW</span>
                   <ChevronRight size={16} className="ml-1" />
@@ -672,7 +660,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={() => setCurrentStep(0)}
-                  className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                  className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
                 >
                   BACK
                 </button>
@@ -682,7 +670,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider
                             ${!isConfirmed || isSubmitting || hasInsufficientBalance()
                               ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50' 
-                              : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                              : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
                 >
                   {isSubmitting ? (
                     <>
@@ -700,7 +688,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
           )}
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

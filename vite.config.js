@@ -2,10 +2,20 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
+import checker from 'vite-plugin-checker';
 
 export default defineConfig({
   plugins: [
     react(),
+    checker({
+      overlay: true,
+      typescript: {
+        tsconfigPath: 'tsconfig.json',
+      },
+      eslint: {
+        lintCommand: 'eslint "./src/**/*.{ts,tsx}"',
+      },
+    }),
     visualizer({
       filename: 'dist/stats.html',
       open: true,
@@ -56,9 +66,9 @@ export default defineConfig({
           
           // Core components
           'components': [
-            './src/FloatingTradingCard.tsx',
-            './src/TradingForm.tsx',
-            './src/PnlCard.tsx'
+            './src/components/FloatingTradingCard.tsx',
+            './src/components/TradingForm.tsx',
+            './src/components/PnlCard.tsx'
           ]
         },
         
@@ -91,6 +101,19 @@ export default defineConfig({
     port: 3000,
     host: true,
     
-    allowedHosts: ['localhost', '127.0.0.1', '.ngrok-free.app']
+    allowedHosts: ['localhost', '127.0.0.1', '.ngrok-free.app'],
+    
+    // Add Permissions Policy headers for clipboard access
+    headers: {
+      'Permissions-Policy': 'clipboard-read=*, clipboard-write=*'
+    }
+  },
+  
+  // Preview server configuration (for production builds)
+  preview: {
+    port: 3000,
+    headers: {
+      'Permissions-Policy': 'clipboard-read=*, clipboard-write=*'
+    }
   }
 });

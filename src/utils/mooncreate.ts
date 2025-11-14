@@ -21,7 +21,7 @@ export interface WalletForMoonCreate {
 }
 
 export interface TokenCreationConfig {
-  config: any; // The full config object with tokenCreation metadata
+  config: Record<string, unknown>; // The full config object with tokenCreation metadata
 }
 
 export interface MoonCreateBundle {
@@ -71,7 +71,7 @@ const checkRateLimit = async (): Promise<void> => {
  */
 const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = ((window as Window & { tradingServerUrl?: string }).tradingServerUrl?.replace(/\/+$/, '') || '');
     
     // Send to our backend proxy instead of directly to Jito
     const response = await fetch(`${baseUrl}/solana/send`, {
@@ -86,10 +86,14 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { result?: BundleResult; error?: { message?: string } };
     
     if (data.error) {
       throw new Error(data.error.message || 'Unknown error from bundle server');
+    }
+    
+    if (!data.result) {
+      throw new Error('No result returned from bundle server');
     }
     
     return data.result;
@@ -126,7 +130,7 @@ const getPartiallyPreparedTransactions = async (
         walletAddresses,
         config: tokenCreationConfig.config,
         amounts, // Optional custom amounts per wallet
-        rpcUrl: (window as any).rpcUrl || undefined
+        rpcUrl: (window as Window & { rpcUrl?: string }).rpcUrl || undefined
       }),
     });
 
@@ -134,34 +138,39 @@ const getPartiallyPreparedTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data: MoonCreateResponse = await response.json();
+    const data = await response.json() as MoonCreateResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially prepared transactions');
     }
     
-    if (!data.mintAddress) {
+    // Handle different response formats
+    const responseData = (data as unknown as { data?: { transactions?: string[]; mintAddress?: string } }).data;
+    const transactions = responseData?.transactions || (data as unknown as { transactions?: string[] }).transactions;
+    const mintAddress = responseData?.mintAddress || data.mintAddress;
+    
+    if (!mintAddress) {
       throw new Error('No mint address returned from backend');
     }
     
-    if (!data.transactions || !Array.isArray(data.transactions) || data.transactions.length === 0) {
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
       throw new Error('No transactions returned from backend');
     }
     
-    console.log(`Received ${data.transactions.length} transactions for mint ${data.mintAddress}`);
+    console.info(`Received ${transactions.length} transactions for mint ${mintAddress}`);
     
     // Group transactions into bundles of max 5 transactions per bundle
     const MAX_TX_PER_BUNDLE = 5;
     const bundles: MoonCreateBundle[] = [];
     
-    for (let i = 0; i < data.transactions.length; i += MAX_TX_PER_BUNDLE) {
+    for (let i = 0; i < transactions.length; i += MAX_TX_PER_BUNDLE) {
       bundles.push({
-        transactions: data.transactions.slice(i, i + MAX_TX_PER_BUNDLE)
+        transactions: transactions.slice(i, i + MAX_TX_PER_BUNDLE)
       });
     }
     
     return {
-      mintAddress: data.mintAddress,
+      mintAddress,
       bundles
     };
   } catch (error) {
@@ -176,7 +185,7 @@ const getPartiallyPreparedTransactions = async (
 const completeBundleSigning = (
   bundle: MoonCreateBundle, 
   walletKeypairs: Keypair[],
-  isFirstBundle: boolean = false
+  _isFirstBundle: boolean = false
 ): MoonCreateBundle => {
   // Check if the bundle has a valid transactions array
   if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
@@ -196,7 +205,7 @@ const completeBundleSigning = (
       );
       
       if (isFullySigned) {
-        console.log(`Transaction ${index} is already fully signed, skipping.`);
+        console.info(`Transaction ${index} is already fully signed, skipping.`);
         return txBase58;
       }
       
@@ -244,13 +253,20 @@ const completeBundleSigning = (
 /**
  * Execute moon create operation on the frontend with improved reliability
  */
+interface ExecuteResult {
+  totalBundles: number;
+  successCount: number;
+  failureCount: number;
+  results: BundleResult[];
+}
+
 export const executeMoonCreate = async (
   wallets: WalletForMoonCreate[],
   tokenCreationConfig: TokenCreationConfig,
   customAmounts?: number[]
-): Promise<{ success: boolean; mintAddress?: string; result?: any; error?: string }> => {
+): Promise<{ success: boolean; mintAddress?: string; result?: ExecuteResult; error?: string }> => {
   try {
-    console.log(`Preparing to create token using ${wallets.length} wallets`);
+    console.info(`Preparing to create token using ${wallets.length} wallets`);
     
     // Extract wallet addresses
     const walletAddresses = wallets.map(wallet => wallet.address);
@@ -261,7 +277,7 @@ export const executeMoonCreate = async (
       tokenCreationConfig,
       customAmounts
     );
-    console.log(`Received ${bundles.length} bundles from backend for mint ${mintAddress}`);
+    console.info(`Received ${bundles.length} bundles from backend for mint ${mintAddress}`);
     
     // Step 2: Create keypairs from private keys
     const walletKeypairs = wallets.map(wallet => 
@@ -272,10 +288,10 @@ export const executeMoonCreate = async (
     const signedBundles = bundles.map((bundle, index) =>
       completeBundleSigning(bundle, walletKeypairs, index === 0) // Mark first bundle
     );
-    console.log(`Completed signing for ${signedBundles.length} bundles`);
+    console.info(`Completed signing for ${signedBundles.length} bundles`);
     
     // Step 4: Send each bundle with improved retry logic and dynamic delays
-    let results: BundleResult[] = [];
+    const results: BundleResult[] = [];
     let successCount = 0;
     let failureCount = 0;
     
@@ -283,9 +299,9 @@ export const executeMoonCreate = async (
     if (signedBundles.length > 0) {
       const firstBundleResult = await sendFirstBundle(signedBundles[0]);
       if (firstBundleResult.success) {
-        results.push(firstBundleResult.result);
+        results.push(firstBundleResult.result as BundleResult);
         successCount++;
-        console.log("✅ First bundle landed successfully!");
+        console.info("✅ First bundle landed successfully!");
       } else {
         console.error("❌ Critical error: First bundle failed to land:", firstBundleResult.error);
         return {
@@ -307,7 +323,7 @@ export const executeMoonCreate = async (
         
         results.push(result);
         successCount++;
-        console.log(`Bundle ${i + 1}/${signedBundles.length} sent successfully`);
+        console.info(`Bundle ${i + 1}/${signedBundles.length} sent successfully`);
       } catch (error) {
         failureCount++;
         console.error(`Bundle ${i + 1}/${signedBundles.length} failed:`, error);
@@ -336,8 +352,8 @@ export const executeMoonCreate = async (
 /**
  * Send first bundle with extensive retry logic - this is critical for success
  */
-const sendFirstBundle = async (bundle: MoonCreateBundle): Promise<{success: boolean, result?: any, error?: string}> => {
-  console.log(`Sending first bundle with ${bundle.transactions.length} transactions (critical)...`);
+const sendFirstBundle = async (bundle: MoonCreateBundle): Promise<{success: boolean, result?: BundleResult, error?: string}> => {
+  console.info(`Sending first bundle with ${bundle.transactions.length} transactions (critical)...`);
   
   let attempt = 0;
   let consecutiveErrors = 0;
@@ -351,7 +367,7 @@ const sendFirstBundle = async (bundle: MoonCreateBundle): Promise<{success: bool
       const result = await sendBundle(bundle.transactions);
       
       // Success!
-      console.log(`First bundle sent successfully on attempt ${attempt + 1}`);
+      console.info(`First bundle sent successfully on attempt ${attempt + 1}`);
       return { success: true, result };
     } catch (error) {
       consecutiveErrors++;

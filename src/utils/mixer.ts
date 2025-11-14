@@ -23,12 +23,16 @@ interface BundleResult {
 }
 
 
+interface WindowWithConfig {
+  tradingServerUrl?: string;
+}
+
 /**
  * Send bundle to Jito block engine
  */
 const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
     try {
-      const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+      const baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
       
       // Send to our backend proxy instead of directly to Jito
       const response = await fetch(`${baseUrl}/solana/send`, {
@@ -39,7 +43,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
         }),
       });
   
-      const data = await response.json();
+      const data = await response.json() as { result: BundleResult };
       
       return data.result;
     } catch (error) {
@@ -72,13 +76,20 @@ const getPartiallySignedTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { success: boolean; error?: string; transactions?: string[]; data?: { transactions?: string[] } };
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially signed transactions');
     }
     
-    return data.transactions; // Array of base58 encoded partially signed transactions
+    // Handle different response formats
+    const transactions = (data as unknown as { data?: { transactions?: string[] } }).data?.transactions || data.transactions;
+    
+    if (!transactions || !Array.isArray(transactions)) {
+      throw new Error('No transactions returned from backend');
+    }
+    
+    return transactions; // Array of base58 encoded partially signed transactions
   } catch (error) {
     console.error('Error getting partially signed transactions:', error);
     throw error;
@@ -101,21 +112,21 @@ const completeTransactionSigning = (
       const txBuffer = bs58.decode(txBase58);
       const transaction = VersionedTransaction.deserialize(txBuffer);
       
-      console.log(`Signing transaction ${index + 1}/${partiallySignedTransactionsBase58.length}`);
+      console.info(`Signing transaction ${index + 1}/${partiallySignedTransactionsBase58.length}`);
       
       // Determine which keypair to use based on transaction index
       if (index === 0) {
         // First transaction: signed by depositor (sender)
-        console.log(`Transaction ${index + 1}: Signing with depositor wallet`);
+        console.info(`Transaction ${index + 1}: Signing with depositor wallet`);
         transaction.sign([senderKeypair]);
       } else if (index === 1 && recipientKeypairs.size > 0) {
         // Second transaction: signed by receiver (recipient)
         const recipientKeypair = Array.from(recipientKeypairs.values())[0]; // Get the first (and should be only) recipient keypair
-        console.log(`Transaction ${index + 1}: Signing with receiver wallet`);
+        console.info(`Transaction ${index + 1}: Signing with receiver wallet`);
         transaction.sign([recipientKeypair]);
       } else {
         // For any additional transactions, fall back to analyzing required signers
-        console.log(`Transaction ${index + 1}: Analyzing required signers`);
+        console.info(`Transaction ${index + 1}: Analyzing required signers`);
         const message = transaction.message;
         const requiredSigners: Keypair[] = [];
         
@@ -134,7 +145,7 @@ const completeTransactionSigning = (
           requiredSigners.push(senderKeypair);
         }
         
-        console.log(`Transaction ${index + 1}: Signing with ${requiredSigners.length} keypair(s)`);
+        console.info(`Transaction ${index + 1}: Signing with ${requiredSigners.length} keypair(s)`);
         transaction.sign(requiredSigners);
       }
       
@@ -164,9 +175,9 @@ const prepareMixingBundles = (signedTransactions: string[]): MixingBundle[] => {
 export const mixSOLToSingleRecipient = async (
   senderWallet: WalletMixing,
   recipientWallet: WalletMixing
-): Promise<{ success: boolean; result?: any; error?: string }> => {
+): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    console.log(`Preparing to mix ${recipientWallet.amount} SOL from ${senderWallet.address} to ${recipientWallet.address}`);
+    console.info(`Preparing to mix ${recipientWallet.amount} SOL from ${senderWallet.address} to ${recipientWallet.address}`);
     
     // Convert single recipient wallet to backend format
     const recipients = [{
@@ -180,7 +191,7 @@ export const mixSOLToSingleRecipient = async (
       senderWallet.address, 
       recipients
     );
-    console.log(`Received ${partiallySignedTransactions.length} partially signed transactions from backend`);
+    console.info(`Received ${partiallySignedTransactions.length} partially signed transactions from backend`);
     
     // Step 2: Create keypairs from private keys
     const senderKeypair = Keypair.fromSecretKey(bs58.decode(senderWallet.privateKey));
@@ -196,17 +207,17 @@ export const mixSOLToSingleRecipient = async (
       senderKeypair, 
       recipientKeypairsMap
     );
-    console.log(`Completed signing for ${fullySignedTransactions.length} transactions`);
+    console.info(`Completed signing for ${fullySignedTransactions.length} transactions`);
     
     // Step 4: Prepare mixing bundles
     const mixingBundles = prepareMixingBundles(fullySignedTransactions);
-    console.log(`Prepared ${mixingBundles.length} mixing bundles`);
+    console.info(`Prepared ${mixingBundles.length} mixing bundles`);
     
     // Step 5: Send bundles
-    let results: BundleResult[] = [];
+    const results: BundleResult[] = [];
     for (let i = 0; i < mixingBundles.length; i++) {
       const bundle = mixingBundles[i];
-      console.log(`Sending bundle ${i+1}/${mixingBundles.length} with ${bundle.transactions.length} transactions`);
+      console.info(`Sending bundle ${i+1}/${mixingBundles.length} with ${bundle.transactions.length} transactions`);
       
       const result = await sendBundle(bundle.transactions);
       results.push(result);
@@ -236,7 +247,7 @@ export const mixSOLToSingleRecipient = async (
 export const mixSOL = async (
   senderWallet: WalletMixing,
   recipientWallets: WalletMixing[]
-): Promise<{ success: boolean; result?: any; error?: string }> => {
+): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   // If only one recipient, use the optimized single recipient function
   if (recipientWallets.length === 1) {
     return await mixSOLToSingleRecipient(senderWallet, recipientWallets[0]);
@@ -339,9 +350,9 @@ export const validateMixingInputs = (
 export const batchMixSOL = async (
   senderWallet: WalletMixing,
   recipientWallets: WalletMixing[]
-): Promise<{ success: boolean; results?: any[]; error?: string }> => {
+): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
-    console.log(`Starting batch SOL mixing to ${recipientWallets.length} recipients (1 recipient per batch)`);
+    console.info(`Starting batch SOL mixing to ${recipientWallets.length} recipients (1 recipient per batch)`);
     
     // Return early if no recipients
     if (recipientWallets.length === 0) {
@@ -349,10 +360,10 @@ export const batchMixSOL = async (
     }
     
     // Process each recipient individually
-    const results: any[] = [];
+    const results: unknown[] = [];
     for (let i = 0; i < recipientWallets.length; i++) {
       const recipientWallet = recipientWallets[i];
-      console.log(`Processing recipient ${i+1}/${recipientWallets.length}: ${recipientWallet.address} (${recipientWallet.amount} SOL)`);
+      console.info(`Processing recipient ${i+1}/${recipientWallets.length}: ${recipientWallet.address} (${recipientWallet.amount} SOL)`);
       
       // Execute mixing to single recipient
       const result = await mixSOLToSingleRecipient(senderWallet, recipientWallet);
@@ -370,12 +381,12 @@ export const batchMixSOL = async (
       
       // Add delay between recipients (except after the last one)
       if (i < recipientWallets.length - 1) {
-        console.log(`Waiting 3 seconds before processing next recipient...`);
+        console.info(`Waiting 3 seconds before processing next recipient...`);
         await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay between recipients
       }
     }
     
-    console.log(`Successfully completed mixing to all ${recipientWallets.length} recipients`);
+    console.info(`Successfully completed mixing to all ${recipientWallets.length} recipients`);
     return {
       success: true,
       results

@@ -1,5 +1,5 @@
-import { FormattedWallet } from './trading';
-import { Transaction, Keypair, VersionedTransaction } from '@solana/web3.js';
+import type { FormattedWallet } from './trading';
+import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 
 // Type definition for config to avoid circular dependency
@@ -19,7 +19,7 @@ const getDefaultConfig = (): AppConfig | null => {
     
     if (configCookie) {
       const configValue = configCookie.split('=')[1];
-      return JSON.parse(decodeURIComponent(configValue));
+      return JSON.parse(decodeURIComponent(configValue)) as AppConfig;
     }
     return null;
   } catch (error) {
@@ -56,11 +56,22 @@ export interface CancelOrderRequest {
   jitoTipLamports?: number;
 }
 
+export interface OrderConfig {
+  inputMint: string;
+  outputMint: string;
+  maker: string;
+  makingAmount: string;
+  takingAmount: string;
+  slippageBps?: number;
+  expiredAt?: number;
+  base?: 'input' | 'output';
+}
+
 export interface LimitOrderResponse {
   success: boolean;
   order?: string;
   requestId?: string;
-  orderConfig?: any;
+  orderConfig?: OrderConfig;
   transaction?: string;
   error?: string;
 }
@@ -70,7 +81,7 @@ export interface MultipleLimitOrdersResponse {
   orders?: Array<{
     order: string;
     requestId: string;
-    orderConfig: any;
+    orderConfig: OrderConfig;
   }>;
   transactions?: string[];
   errors?: string[];
@@ -120,14 +131,18 @@ export interface BundleSigningRequest {
   orders: Array<{
     order: string;
     requestId: string;
-    orderConfig: any;
+    orderConfig: OrderConfig;
   }>;
   transactions: string[];
   errors: string[];
 }
 
+interface WindowWithConfig {
+  tradingServerUrl?: string;
+}
+
 // API Base URL - This should be configured based on your backend
-const getBaseUrl = () => (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+const getBaseUrl = (): string => (window as unknown as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
 
 // Create multiple limit orders
 export const createMultipleLimitOrders = async (
@@ -168,7 +183,7 @@ export const createMultipleLimitOrders = async (
       body: JSON.stringify(requestConfig)
     });
 
-    const data = await response.json();
+    const data = await response.json() as MultipleLimitOrdersResponse;
     
     if (!response.ok) {
       return {
@@ -215,7 +230,7 @@ export const getActiveOrders = async (
       }
     });
 
-    const data = await response.json();
+    const data = await response.json() as ActiveOrdersResponse;
     
     if (!response.ok) {
       return {
@@ -257,7 +272,7 @@ export const cancelOrder = async (
       body: JSON.stringify(requestConfig)
     });
 
-    const data = await response.json();
+    const data = await response.json() as CancelOrderResponse;
     
     if (!response.ok) {
       return {
@@ -397,7 +412,7 @@ export const validateLimitOrderConfig = (config: LimitOrderConfig): { valid: boo
  * Create a map of wallet addresses to Keypair objects from FormattedWallet array
  */
 export const createKeypairMap = (wallets: FormattedWallet[]): Map<string, Keypair> => {
-  console.log(`Creating keypair map for ${wallets.length} wallets`);
+  console.info(`Creating keypair map for ${wallets.length} wallets`);
   const keypairMap = new Map<string, Keypair>();
   
   wallets.forEach((wallet, index) => {
@@ -410,13 +425,13 @@ export const createKeypairMap = (wallets: FormattedWallet[]): Map<string, Keypai
       keypairMap.set(wallet.address, keypair);
       keypairMap.set(keypair.publicKey.toBase58(), keypair);
       
-      console.log(`✅ Wallet ${index + 1}: ${wallet.address} -> keypair created`);
+      console.info(`✅ Wallet ${index + 1}: ${wallet.address} -> keypair created`);
     } catch (error) {
       console.error(`❌ Error creating keypair for wallet ${index + 1} (${wallet.address}):`, error);
     }
   });
   
-  console.log(`Keypair map created with ${keypairMap.size} entries`);
+  console.info(`Keypair map created with ${keypairMap.size} entries`);
   return keypairMap;
 };
 
@@ -434,7 +449,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       };
     }
 
-    console.log(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/solana/send`);
+    console.info(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/solana/send`);
     
     const response = await fetch(`${baseUrl}/solana/send`, {
       method: 'POST',
@@ -455,8 +470,8 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       };
     }
 
-    const data = await response.json();
-    console.log('Bundle send response:', data);
+    const data = await response.json() as BundleResult;
+    console.info('Bundle send response:', data);
     return data;
   } catch (error) {
     console.error('Error sending bundle:', error);
@@ -474,7 +489,7 @@ export const completeBundleSigning = (
   bundleData: BundleSigningRequest,
   walletKeypairs: Map<string, Keypair>
 ): LimitOrderBundle => {
-  console.log(`Starting bundle signing with ${bundleData.transactions?.length || 0} transactions and ${walletKeypairs.size} wallet keypairs`);
+  console.info(`Starting bundle signing with ${bundleData.transactions?.length || 0} transactions and ${walletKeypairs.size} wallet keypairs`);
   
   // Check if the bundle has valid transactions array
   if (!bundleData.transactions || !Array.isArray(bundleData.transactions)) {
@@ -541,7 +556,7 @@ export const sendBundleWithOrders = async (
   walletKeypairs: Map<string, Keypair>
 ): Promise<BundleResult> => {
   try {
-    console.log(`Processing bundle with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`);
+    console.info(`Processing bundle with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`);
     
     // Complete the bundle signing using the internal function
     const signedBundle = completeBundleSigning(bundleData, walletKeypairs);
@@ -553,17 +568,17 @@ export const sendBundleWithOrders = async (
       };
     }
 
-    console.log(`Successfully signed ${signedBundle.transactions.length} transactions`);
+    console.info(`Successfully signed ${signedBundle.transactions.length} transactions`);
     
     // Send the signed bundle
     const result = await sendBundle(signedBundle.transactions);
     
     if (result.success) {
-      console.log('✅ Bundle sent successfully!');
+      console.info('✅ Bundle sent successfully!');
       
       // Log order details for confirmation
       bundleData.orders.forEach((order, index) => {
-        console.log(`Order ${index + 1}: ${order.order} (Request ID: ${order.requestId})`);
+        console.info(`Order ${index + 1}: ${order.order} (Request ID: ${order.requestId})`);
       });
     } else {
       console.error('❌ Bundle failed to send:', result.error);
@@ -611,9 +626,9 @@ export const processLimitOrderBundle = async (
   wallets: FormattedWallet[]
 ): Promise<BundleResult> => {
   try {
-    console.log('🚀 Starting processLimitOrderBundle...');
-    console.log('Response:', limitOrderResponse);
-    console.log('Wallets count:', wallets.length);
+    console.info('🚀 Starting processLimitOrderBundle...');
+    console.info('Response:', limitOrderResponse);
+    console.info('Wallets count:', wallets.length);
     
     // Validate the response
     if (!limitOrderResponse.success || !limitOrderResponse.orders || !limitOrderResponse.transactions) {
@@ -635,13 +650,13 @@ export const processLimitOrderBundle = async (
       errors: limitOrderResponse.errors || []
     };
 
-    console.log(`📦 Created bundle data with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`);
+    console.info(`📦 Created bundle data with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`);
 
     // Complete bundle signing and send
     const result = await completeBundleSigningAndSend(bundleData, wallets);
     
     if (result.success) {
-      console.log(`✅ Successfully processed limit order bundle with ${bundleData.orders.length} orders`);
+      console.info(`✅ Successfully processed limit order bundle with ${bundleData.orders.length} orders`);
     } else {
       console.error(`❌ Failed to process limit order bundle: ${result.error}`);
     }
@@ -665,8 +680,8 @@ export const processCancelOrderTransaction = async (
   wallet: FormattedWallet
 ): Promise<BundleResult> => {
   try {
-    console.log('🚀 Processing cancel order transaction...');
-    console.log('Cancel response:', cancelResponse);
+    console.info('🚀 Processing cancel order transaction...');
+    console.info('Cancel response:', cancelResponse);
     
     // Validate the response
     if (!cancelResponse.success || !cancelResponse.transaction) {
@@ -685,14 +700,14 @@ export const processCancelOrderTransaction = async (
     try {
       // Try to decode as base58 first
       bs58.decode(cancelResponse.transaction);
-      console.log('Transaction is already in base58 format');
+      console.info('Transaction is already in base58 format');
     } catch {
       // If base58 decode fails, assume it's base64 and convert to base58
       try {
-        console.log('Converting transaction from base64 to base58...');
+        console.info('Converting transaction from base64 to base58...');
         const transactionBuffer = new Uint8Array(Buffer.from(cancelResponse.transaction, 'base64'));
         transactionBase58 = bs58.encode(transactionBuffer);
-        console.log('✅ Successfully converted transaction to base58');
+        console.info('✅ Successfully converted transaction to base58');
       } catch (conversionError) {
         console.error('❌ Failed to convert transaction encoding:', conversionError);
         return {
@@ -719,13 +734,13 @@ export const processCancelOrderTransaction = async (
       errors: []
     };
 
-    console.log(`📦 Created bundle data with 1 cancel transaction (base58 encoded)`);
+    console.info(`📦 Created bundle data with 1 cancel transaction (base58 encoded)`);
 
     // Complete bundle signing and send
     const result = await sendBundleWithOrders(bundleData, walletKeypairs);
     
     if (result.success) {
-      console.log(`✅ Successfully processed cancel order transaction`);
+      console.info(`✅ Successfully processed cancel order transaction`);
     } else {
       console.error(`❌ Failed to process cancel order transaction: ${result.error}`);
     }
@@ -748,7 +763,7 @@ export const cancelOrderWithBundle = async (
   wallet: FormattedWallet
 ): Promise<BundleResult> => {
   try {
-    console.log('🚀 Starting cancel order with bundle processing...');
+    console.info('🚀 Starting cancel order with bundle processing...');
     
     // First, get the cancel transaction from the API
     const cancelResponse = await cancelOrder(config);

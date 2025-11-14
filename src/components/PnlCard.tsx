@@ -4,74 +4,47 @@ import logoImage from '../logo.png';
 import { brand } from '../config/brandConfig';
 
 // Define proper types
-interface PnlDataItem {
-  profit: number;
-  timestamp: string;
-}
-
 interface PnlCardProps {
-  pnlData: Record<string, PnlDataItem | undefined>;
+  totalPnl: number;
+  bought: number;
+  sold: number;
+  holdingsValue: number;
+  totalWallets: number;
+  trades: number;
   tokenAddress: string;
   backgroundImageUrl?: string;
 }
 
 const PnlCard: React.FC<PnlCardProps> = ({ 
-  pnlData,
+  totalPnl,
+  bought,
+  sold,
+  holdingsValue,
+  totalWallets,
+  trades,
 }) => {
   const cardRef = useRef(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Calculate summary statistics from PNL data
-  const calculateSummary = () => {
-    if (!pnlData || Object.keys(pnlData).length === 0) {
-      return {
-        totalProfit: 0,
-        profitableWallets: 0,
-        unprofitableWallets: 0,
-        totalWallets: 0,
-        bestProfit: 0,
-        worstProfit: 0
-      };
-    }
-
-    let totalProfit = 0;
-    let bestProfit = -Infinity;
-    let worstProfit = Infinity;
-
-    Object.values(pnlData).forEach(data => {
-      if (data && typeof data.profit === 'number') {
-        totalProfit += data.profit;
-        
-        if (data.profit > bestProfit) {
-          bestProfit = data.profit;
-        }
-        
-        if (data.profit < worstProfit) {
-          worstProfit = data.profit;
-        }
-      }
-    });
-
-    return {
-      totalProfit,
-      profitableWallets: Object.values(pnlData).filter(data => data && typeof data.profit === 'number' && data.profit > 0).length,
-      unprofitableWallets: Object.values(pnlData).filter(data => data && typeof data.profit === 'number' && data.profit < 0).length,
-      totalWallets: Object.keys(pnlData).length,
-      bestProfit: bestProfit !== -Infinity ? bestProfit : 0,
-      worstProfit: worstProfit !== Infinity ? worstProfit : 0
-    };
+  // Calculate summary statistics from overall PNL data
+  const summary = {
+    totalProfit: totalPnl,
+    totalWallets: totalWallets,
+    trades: trades,
+    bought: bought,
+    sold: sold,
+    holdingsValue: holdingsValue
   };
 
-  const summary = calculateSummary();
-
   // Format currency
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: number): string => {
     if (amount > 0) return `+${amount.toFixed(5)}`;
+    if (amount < 0) return amount.toFixed(5);
     return amount.toFixed(5);
   };
 
   // Download the card as image
-  const downloadAsImage = async () => {
+  const downloadAsImage = async (): Promise<void> => {
     setIsDownloading(true);
     
     try {
@@ -174,42 +147,31 @@ const PnlCard: React.FC<PnlCardProps> = ({
           </div>
           
           {/* Stats Grid */}
-          <div className={`grid gap-4 mb-6 ${
-            (summary.profitableWallets > 0 && summary.unprofitableWallets > 0) ? 'grid-cols-2' :
-            (summary.profitableWallets > 0 || summary.unprofitableWallets > 0) ? 'grid-cols-3' : 'grid-cols-2'
-          }`}>
+          <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-app-primary-05 backdrop-blur-sm rounded-xl p-4 border border-app-primary-10">
               <div className="text-app-muted text-xs font-medium mb-1">Total Wallets</div>
               <div className="text-app-primary text-xl font-bold">{summary.totalWallets}</div>
             </div>
             <div className="bg-app-primary-05 backdrop-blur-sm rounded-xl p-4 border border-app-primary-10">
-              <div className="text-app-muted text-xs font-medium mb-1">Win Rate</div>
+              <div className="text-app-muted text-xs font-medium mb-1">Total Trades</div>
               <div className={`text-xl font-bold ${
                 isNegative ? 'text-error-alt' : 'color-primary'
               }`}>
-                {summary.totalWallets > 0 ? Math.round((summary.profitableWallets / summary.totalWallets) * 100) : 0}%
+                {summary.trades}
               </div>
             </div>
-            {summary.profitableWallets > 0 && (
-              <div className="bg-app-primary-05 backdrop-blur-sm rounded-xl p-4 border border-app-primary-10">
-                <div className="text-app-muted text-xs font-medium mb-1">Best Trade</div>
-                <div className={`text-lg font-bold ${
-                  summary.bestProfit >= 0 ? 'color-primary' : 'text-error-alt'
-                }`}>
-                  {formatAmount(summary.bestProfit)}
-                </div>
+            <div className="bg-app-primary-05 backdrop-blur-sm rounded-xl p-4 border border-app-primary-10">
+              <div className="text-app-muted text-xs font-medium mb-1">Bought</div>
+              <div className="text-lg font-bold color-primary">
+                {formatAmount(summary.bought)}
               </div>
-            )}
-            {summary.unprofitableWallets > 0 && (
-              <div className="bg-app-primary-05 backdrop-blur-sm rounded-xl p-4 border border-app-primary-10">
-                <div className="text-app-muted text-xs font-medium mb-1">Worst Trade</div>
-                <div className={`text-lg font-bold ${
-                  summary.worstProfit >= 0 ? 'color-primary' : 'text-error-alt'
-                }`}>
-                  {formatAmount(summary.worstProfit)}
-                </div>
+            </div>
+            <div className="bg-app-primary-05 backdrop-blur-sm rounded-xl p-4 border border-app-primary-10">
+              <div className="text-app-muted text-xs font-medium mb-1">Sold</div>
+              <div className="text-lg font-bold text-warning">
+                {formatAmount(summary.sold)}
               </div>
-            )}
+            </div>
           </div>
           
 

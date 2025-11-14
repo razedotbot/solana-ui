@@ -1,5 +1,6 @@
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
+import type { ApiResponse, BundleResult, ServerConfig } from '../types/api';
 
 // Constants for rate limiting
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -22,21 +23,36 @@ export interface WalletForPumpCreate {
 
 export interface TokenCreationConfig {
   mintPubkey: string;
-  config: any; // The full config object
+  config: Record<string, unknown>; // The full config object
 }
 
 export interface PumpCreateBundle {
   transactions: string[]; // Base58 encoded transaction data
 }
 
-interface BundleResult {
-  jsonrpc: string;
-  id: number;
-  result?: string;
-  error?: {
-    code: number;
-    message: string;
+interface PartiallyPreparedResponse {
+  success: boolean;
+  error?: string;
+  bundles?: Array<PumpCreateBundle | string[]>;
+  transactions?: string[];
+}
+
+interface ExecutePumpCreateResult {
+  success: boolean;
+  mintAddress?: string;
+  result?: {
+    totalBundles: number;
+    successCount: number;
+    failureCount: number;
+    results: BundleResult[];
   };
+  error?: string;
+}
+
+interface SendBundleResult {
+  success: boolean;
+  result?: BundleResult;
+  error?: string;
 }
 
 /**
@@ -65,7 +81,8 @@ const checkRateLimit = async (): Promise<void> => {
  */
 const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const windowWithConfig = window as Window & Partial<ServerConfig>;
+    const baseUrl = windowWithConfig.tradingServerUrl?.replace(/\/+$/, '') || '';
     
     // Send to our backend proxy instead of directly to Jito
     const response = await fetch(`${baseUrl}/solana/send`, {
@@ -80,13 +97,13 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: ApiResponse<BundleResult> = await response.json() as ApiResponse<BundleResult>;
     
     if (data.error) {
-      throw new Error(data.error.message || 'Unknown error from bundle server');
+      throw new Error(data.error || 'Unknown error from bundle server');
     }
     
-    return data.result;
+    return data.result as BundleResult;
   } catch (error) {
     console.error('Error sending bundle:', error);
     throw error;
@@ -128,26 +145,34 @@ const getPartiallyPreparedTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: PartiallyPreparedResponse = await response.json() as PartiallyPreparedResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially prepared transactions');
     }
     
     // Handle different response formats to ensure compatibility
-    if (data.bundles && Array.isArray(data.bundles)) {
+    const responseData = (data as unknown as { data?: { bundles?: Array<PumpCreateBundle | string[]>; transactions?: string[] } }).data;
+    
+    if (responseData?.bundles && Array.isArray(responseData.bundles)) {
       // Wrap any bundle that is a plain array
-      return data.bundles.map((bundle: any) =>
+      return responseData.bundles.map((bundle: PumpCreateBundle | string[]) =>
+        Array.isArray(bundle) ? { transactions: bundle } : bundle
+      );
+    } else if (responseData?.transactions && Array.isArray(responseData.transactions)) {
+      // New format: single flat array of transactions in data.data.transactions
+      console.info(`Received ${responseData.transactions.length} transactions in nested data format`);
+      return [{ transactions: responseData.transactions }];
+    } else if (data.bundles && Array.isArray(data.bundles)) {
+      // Wrap any bundle that is a plain array
+      return data.bundles.map((bundle: PumpCreateBundle | string[]) =>
         Array.isArray(bundle) ? { transactions: bundle } : bundle
       );
     } else if (data.transactions && Array.isArray(data.transactions)) {
       // New format: single flat array of transactions in data.transactions
       // Create a single bundle with all transactions
-      console.log(`Received ${data.transactions.length} transactions in flat array format`);
+      console.info(`Received ${data.transactions.length} transactions in flat array format`);
       return [{ transactions: data.transactions }];
-    } else if (Array.isArray(data)) {
-      // Legacy format where data itself is an array
-      return [{ transactions: data }];
     } else {
       throw new Error('No transactions returned from backend');
     }
@@ -185,7 +210,7 @@ const completeBundleSigning = (
       );
       
       if (hasSignature) {
-        console.log("First transaction already partially signed by PumpFun API, preserving signature");
+        console.info("First transaction already partially signed by PumpFun API, preserving signature");
         
         // Find remaining required signers
         const requiredSigners: Keypair[] = [];
@@ -245,10 +270,12 @@ export const executePumpCreate = async (
   wallets: WalletForPumpCreate[],
   tokenCreationConfig: TokenCreationConfig,
   customAmounts?: number[]
-): Promise<{ success: boolean; mintAddress?: string; result?: any; error?: string }> => {
+): Promise<ExecutePumpCreateResult> => {
   try {
-    const isMayhemMode = tokenCreationConfig.config?.tokenCreation?.isMayhemMode || false;
-    console.log(`Preparing to create token ${tokenCreationConfig.mintPubkey} using ${wallets.length} wallets${isMayhemMode ? ' (Mayhem Mode enabled)' : ''}`);
+    const configData = tokenCreationConfig.config;
+    const tokenCreation = configData?.['tokenCreation'] as Record<string, unknown> | undefined;
+    const isMayhemMode = (tokenCreation?.['isMayhemMode'] as boolean) || false;
+    console.info(`Preparing to create token ${tokenCreationConfig.mintPubkey} using ${wallets.length} wallets${isMayhemMode ? ' (Mayhem Mode enabled)' : ''}`);
     
     // Extract wallet addresses
     const walletAddresses = wallets.map(wallet => wallet.address);
@@ -259,7 +286,7 @@ export const executePumpCreate = async (
       tokenCreationConfig,
       customAmounts
     );
-    console.log(`Received ${partiallyPreparedBundles.length} bundles from backend`);
+    console.info(`Received ${partiallyPreparedBundles.length} bundles from backend`);
     
     // Step 2: Create keypairs from private keys
     const walletKeypairs = wallets.map(wallet => 
@@ -270,26 +297,26 @@ export const executePumpCreate = async (
     const signedBundles = partiallyPreparedBundles.map((bundle, index) =>
       completeBundleSigning(bundle, walletKeypairs, index === 0) // Mark first bundle
     );
-    console.log(`Completed signing for ${signedBundles.length} bundles`);
+    console.info(`Completed signing for ${signedBundles.length} bundles`);
     
     // Step 4: Send each bundle with improved retry logic and dynamic delays
-    let results: BundleResult[] = [];
+    const results: BundleResult[] = [];
     let successCount = 0;
-    let failureCount = 0;
+    const failureCount = 0;
     
     // Send first bundle - critical for token creation
     if (signedBundles.length > 0) {
       const firstBundleResult = await sendFirstBundle(signedBundles[0]);
-      if (firstBundleResult.success) {
+      if (firstBundleResult.success && firstBundleResult.result) {
         results.push(firstBundleResult.result);
         successCount++;
-        console.log("✅ First bundle landed successfully!");
+        console.info("✅ First bundle landed successfully!");
       } else {
         console.error("❌ Critical error: First bundle failed to land:", firstBundleResult.error);
         return {
           success: false,
           mintAddress: tokenCreationConfig.mintPubkey,
-          error: `First bundle failed: ${firstBundleResult.error}`
+          error: `First bundle failed: ${firstBundleResult.error || 'Unknown error'}`
         };
       }
     }
@@ -317,8 +344,8 @@ export const executePumpCreate = async (
 /**
  * Send first bundle with extensive retry logic - this is critical for success
  */
-const sendFirstBundle = async (bundle: PumpCreateBundle): Promise<{success: boolean, result?: any, error?: string}> => {
-  console.log(`Sending first bundle with ${bundle.transactions.length} transactions (critical)...`);
+const sendFirstBundle = async (bundle: PumpCreateBundle): Promise<SendBundleResult> => {
+  console.info(`Sending first bundle with ${bundle.transactions.length} transactions (critical)...`);
   
   let attempt = 0;
   let consecutiveErrors = 0;
@@ -332,7 +359,7 @@ const sendFirstBundle = async (bundle: PumpCreateBundle): Promise<{success: bool
       const result = await sendBundle(bundle.transactions);
       
       // Success!
-      console.log(`First bundle sent successfully on attempt ${attempt + 1}`);
+      console.info(`First bundle sent successfully on attempt ${attempt + 1}`);
       return { success: true, result };
     } catch (error) {
       consecutiveErrors++;

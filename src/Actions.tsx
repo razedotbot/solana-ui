@@ -1,26 +1,23 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-   ChevronDown, 
-   Share2,
    Blocks,
    Trash2,
    ChartSpline,
    Workflow,
    Activity,
-   Coins,
    Bot
  } from 'lucide-react';
 import { brand } from './config/brandConfig';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
-import { WalletType } from "./Utils";
-import { useToast } from "./components/Notifications";
-import { countActiveWallets, getScriptName } from './utils/wallets';
+import type { WalletType } from "./Utils";
+import { useToast } from "./components/useToast";
+import { countActiveWallets } from './utils/wallets';
 import TradingCard from './components/TradingForm';
-import { Tooltip } from './components/Tooltip';
+import type { IframeData } from './types/api';
 
 import { executeTrade } from './utils/trading';
 
-//  cyberpunk-styled Switch component (simplified)
+//  styled Switch component (simplified)
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
@@ -70,52 +67,12 @@ interface ActionsPageProps {
   setAutomateCardPosition: (position: { x: number; y: number }) => void;
   isAutomateCardDragging: boolean;
   setAutomateCardDragging: (dragging: boolean) => void;
-  iframeData?: {
-    tradingStats: any;
-    solPrice: number | null;
-    currentWallets: any[];
-    recentTrades: {
-      type: 'buy' | 'sell';
-      address: string;
-      tokensAmount: number;
-      avgPrice: number;
-      solAmount: number;
-      timestamp: number;
-      signature: string;
-    }[];
-    tokenPrice: {
-      tokenPrice: number;
-      tokenMint: string;
-      timestamp: number;
-      tradeType: 'buy' | 'sell';
-      volume: number;
-    } | null;
-  } | null;
+  iframeData: IframeData | null;
 }
 
-// Cyberpunk-themed DataBox with minimal clean column layout
+// themed DataBox with minimal clean column layout
 const DataBox: React.FC<{
-  iframeData?: {
-    tradingStats: any;
-    solPrice: number | null;
-    currentWallets: any[];
-    recentTrades: {
-      type: 'buy' | 'sell';
-      address: string;
-      tokensAmount: number;
-      avgPrice: number;
-      solAmount: number;
-      timestamp: number;
-      signature: string;
-    }[];
-    tokenPrice: {
-      tokenPrice: number;
-      tokenMint: string;
-      timestamp: number;
-      tradeType: 'buy' | 'sell';
-      volume: number;
-    } | null;
-  } | null;
+  iframeData: IframeData | null;
   tokenAddress: string;
   tokenBalances: Map<string, number>;
 }> = React.memo(({ iframeData, tokenAddress, tokenBalances }) => {
@@ -123,7 +80,7 @@ const DataBox: React.FC<{
   
   if (!tokenAddress || !iframeData) return null;
 
-  const { tradingStats, solPrice, currentWallets, recentTrades, tokenPrice } = iframeData;
+  const { tradingStats, solPrice, currentWallets, tokenPrice } = iframeData;
 
   // Calculate holdings value
   const totalTokens = Array.from(tokenBalances.values()).reduce((sum, balance) => sum + balance, 0);
@@ -131,14 +88,14 @@ const DataBox: React.FC<{
   const holdingsValue = totalTokens * currentTokenPrice;
   
   // Currency conversion helper
-  const formatValue = (solValue: number) => {
+  const formatValue = (solValue: number): string => {
     if (showUSD && solPrice) {
       return (solValue * solPrice).toFixed(2);
     }
     return solValue.toFixed(2);
   };
   
-  const handleCurrencyToggle = () => {
+  const handleCurrencyToggle = (): void => {
     setShowUSD(!showUSD);
   };
 
@@ -149,7 +106,7 @@ const DataBox: React.FC<{
         className="bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-app-primary-20 relative overflow-hidden cursor-pointer hover:border-app-primary-40 transition-all duration-300"
       >
         
-        {/* Cyberpunk accent lines */}
+        {/*  accent lines */}
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-app-primary-40 to-transparent"></div>
         <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-app-primary-40 to-transparent"></div>
         
@@ -305,8 +262,6 @@ DataBox.displayName = 'DataBox';
 export const ActionsPage: React.FC<ActionsPageProps> = ({ 
   tokenAddress, 
   setTokenAddress,
-  transactionFee, 
-  handleRefresh, 
   wallets, 
   solBalances, 
   tokenBalances, 
@@ -318,12 +273,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   onOpenFloating,
   isFloatingCardOpen,
   // Automate card state props
-  isAutomateCardOpen,
   setAutomateCardOpen,
-  automateCardPosition,
-  setAutomateCardPosition,
-  isAutomateCardDragging,
-  setAutomateCardDragging,
   iframeData
 }) => {
   // State management
@@ -332,12 +282,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const [selectedDex, setSelectedDex] = useState('auto'); // Default to auto
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [tokenPrice, setTokenPrice] = useState<string | null>(null);
-  const [priceLoading, setPriceLoading] = useState(false);
   const { showToast } = useToast();
   
   // Auto-buy settings
-  const [autoBuyEnabled, setAutoBuyEnabled] = useState(true);
   const [autoBuyAmount, setAutoBuyAmount] = useState('0.01'); // Default SOL amount for auto-buy
   const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true); // Auto redirect to token after buy
 
@@ -397,16 +344,27 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
 
   // Handle iframe messages for TOKEN_SELECTED and TOKEN_BUY
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent): void => {
+      // Type guard for message data
+      interface TokenMessage {
+        type: string;
+        tokenMint?: string;
+        tokenAddress?: string;
+        token?: string;
+        mint?: string;
+      }
+      
+      const data = event.data as TokenMessage;
+      
       // Handle TOKEN_SELECTED message (only for token selection, no auto-buy)
-      if (event.data && event.data.type === 'TOKEN_SELECTED') {
+      if (data && data.type === 'TOKEN_SELECTED') {
         // Message received
       }
       
       // Handle TOKEN_BUY message for quick buy functionality
-      if (event.data && event.data.type === 'TOKEN_BUY') {
+      if (data && data.type === 'TOKEN_BUY') {
         // Try different possible property names for the token address
-        const tokenMint = event.data.tokenMint || event.data.tokenAddress || event.data.token || event.data.mint;
+        const tokenMint = data.tokenMint || data.tokenAddress || data.token || data.mint;
         
         if (tokenMint) {
           // Check if this is a duplicate message (same token within 2 seconds)
@@ -417,7 +375,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               lastProcessed.tokenMint === tokenMint && 
               now - lastProcessed.timestamp < 2000) {
             // This is a duplicate message, ignore it
-            console.log('Ignoring duplicate TOKEN_BUY message for', tokenMint);
+            console.info('Ignoring duplicate TOKEN_BUY message for', tokenMint);
             return;
           }
           
@@ -429,8 +387,8 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           
           if (activeWallets.length > 0) {
             // Execute buy with the specified amount and token address from the message
-            handleTradeSubmit(activeWallets, true, 'auto', autoBuyAmount, undefined, tokenMint);
-            showToast(`Quick buying ${autoBuyAmount} SOL of token ${tokenMint.substring(0, 8)}...`, "success");
+            void handleTradeSubmit(activeWallets, true, 'auto', autoBuyAmount, undefined, tokenMint);
+            showToast(`Quick buying ${autoBuyAmount} SOL`, "success");
             
             // Auto redirect to token if enabled
             if (autoRedirectEnabled && setTokenAddress) {
@@ -439,11 +397,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               }, 1000); // Wait 1 seconds after buy to redirect
             }
           } else {
-            showToast("No active wallets for quick buy", "error");
+            showToast("No active wallets", "error");
           }
         } else {
-          console.error('TOKEN_BUY message missing token identifier. Available properties:', Object.keys(event.data));
-          showToast("Invalid token for quick buy - missing token identifier", "error");
+          console.error('TOKEN_BUY message missing token identifier. Available properties:', Object.keys(data));
+          showToast("Invalid token", "error");
         }
       }
     };
@@ -455,11 +413,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [autoBuyEnabled, tokenAddress, autoBuyAmount, autoRedirectEnabled, wallets, handleTradeSubmit, showToast, setTokenAddress]);
+  }, [tokenAddress, autoBuyAmount, autoRedirectEnabled, wallets, handleTradeSubmit, showToast, setTokenAddress]);
 
   // Send QUICKBUY_ACTIVATE to iframe when component loads without token set
   useEffect(() => {
-    const sendQuickBuyActivate = () => {
+    const sendQuickBuyActivate = (): void => {
       const iframe = document.querySelector('iframe');
       if (iframe && iframe.contentWindow && !tokenAddress) {
         iframe.contentWindow.postMessage({
@@ -539,7 +497,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           />
         ) : (
           <div className="relative overflow-hidden rounded-xl shadow-xl bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm p-6 border border-app-primary-20">
-            {/* Cyberpunk corner accents */}
+            {/*  corner accents */}
             <div className="absolute top-0 left-0 w-24 h-24 pointer-events-none">
               <div className="absolute top-0 left-0 w-px h-8 bg-gradient-to-b from-app-primary-color to-transparent"></div>
               <div className="absolute top-0 left-0 w-8 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
@@ -559,7 +517,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             <div className="space-y-6">
               {/* SOL amount input */}
               <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
-                {/* Cyberpunk corner accents - smaller version */}
+                {/*  corner accents - smaller version */}
                 <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
                   <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
                   <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
@@ -626,7 +584,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               
               {/* Active wallets info */}
               <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
-                {/* Cyberpunk corner accents - smaller version */}
+                {/*  corner accents - smaller version */}
                 <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
                   <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
                   <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>

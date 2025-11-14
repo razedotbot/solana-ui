@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Move, Search, ArrowDown, Trash2, Users, Wallet, Settings, Plus, Play, Pause, Edit, Minimize2, Maximize2, Download, Upload } from 'lucide-react';
-import { getWalletDisplayName, WalletType, saveTradingStrategiesToCookies, loadTradingStrategiesFromCookies } from '../Utils';
-import { formatAddress, formatSolBalance, formatTokenBalance, formatPrice, formatLargeNumber, formatCount } from '../utils/formatting';
-import { TradingCondition, TradingAction, TradingStrategy, StrategyBuilder } from '../automate';
+import { getWalletDisplayName, saveTradingStrategiesToCookies, loadTradingStrategiesFromCookies } from '../Utils';
+import type { WalletType } from '../Utils';
+import { formatAddress, formatSolBalance, formatTokenBalance, formatPrice, formatLargeNumber } from '../utils/formatting';
+import { StrategyBuilder } from '../automate';
+import type { TradingCondition, TradingAction, TradingStrategy } from '../automate';
 import { generateStrategyId } from '../automate/utils';
-import { executeTrade, TradingConfig, FormattedWallet } from '../utils/trading';
+import { executeTrade } from '../utils/trading';
+import type { TradingConfig } from '../utils/trading';
+import type { IframeData } from '../types/api';
 
 interface NonWhitelistedTrade {
   type: 'buy' | 'sell';
@@ -43,6 +47,12 @@ interface MarketData {
   }>;
 }
 
+interface CurrentWallet {
+  address: string;
+  privateKey?: string;
+  [key: string]: unknown;
+}
+
 interface AutomateFloatingCardProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,23 +61,11 @@ interface AutomateFloatingCardProps {
   isDragging: boolean;
   onDraggingChange: (dragging: boolean) => void;
   tokenAddress: string;
-  wallets: any[];
+  wallets: CurrentWallet[];
   solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
   nonWhitelistedTrades: NonWhitelistedTrade[];
-  iframeData?: {
-    tradingStats: any;
-    solPrice: number | null;
-    currentWallets: any[];
-    tokenPrice: {
-      tokenPrice: number;
-      tokenMint: string;
-      timestamp: number;
-      tradeType: 'buy' | 'sell';
-      volume: number;
-    } | null;
-    marketCap: number | null;
-  } | null;
+  iframeData: IframeData | null;
 }
 
 const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
@@ -96,8 +94,8 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   
   // Wallet selection state
   const [selectedWallets, setSelectedWallets] = useState<SelectedWallet[]>([]);
-  const [showInlineWalletList, setShowInlineWalletList] = useState(true);
-  const [showSidebar, setShowSidebar] = useState(true);
+  // const [showInlineWalletList, setShowInlineWalletList] = useState(true);
+  const [showSidebar] = useState(true);
   const [walletSearchTerm, setWalletSearchTerm] = useState('');
   const [walletSortOption, setWalletSortOption] = useState('address');
   const [walletSortDirection, setWalletSortDirection] = useState('asc');
@@ -109,7 +107,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   
   // Trading strategy state
   const [tradingStrategies, setTradingStrategies] = useState<TradingStrategy[]>([]);
-  const [showStrategyConfig, setShowStrategyConfig] = useState(false);
+  // const [showStrategyConfig, setShowStrategyConfig] = useState(false);
   const [editingStrategy, setEditingStrategy] = useState<TradingStrategy | null>(null);
   const [isCreatingStrategy, setIsCreatingStrategy] = useState(false);
   const [strategyExecutionLog, setStrategyExecutionLog] = useState<Array<{
@@ -156,7 +154,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
   // Mobile detection
   useEffect(() => {
-    const checkMobile = () => {
+    const checkMobile = (): void => {
       setIsMobile(window.innerWidth < 768);
       if (window.innerWidth < 768) {
         setIsMinimized(false); // Don't allow minimize on mobile
@@ -170,14 +168,14 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
   }, []);
 
   // Minimize/Maximize functions
-  const handleMinimize = () => {
+  const handleMinimize = (): void => {
     if (isMobile) return; // Don't minimize on mobile
     setIsMinimized(true);
     // Position at bottom right when minimized
     onPositionChange({ x: window.innerWidth - 200, y: window.innerHeight - 80 });
   };
 
-  const handleMaximize = () => {
+  const handleMaximize = (): void => {
     setIsMinimized(false);
     if (isMobile) {
       // Fullscreen on mobile
@@ -188,7 +186,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     }
   };
 
-  const toggleAllStrategies = (activate: boolean) => {
+  const toggleAllStrategies = (activate: boolean): void => {
     setTradingStrategies(prev => prev.map(strategy => ({
       ...strategy,
       isActive: activate
@@ -274,8 +272,14 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           // Special case: 1 for buy, 0 for sell
           currentValue = addressActivity.lastTrade?.type === 'buy' ? 1 : 0;
           break;
-        default:
+        case undefined:
           return false;
+        default: {
+          // Exhaustive check for whitelistActivityType
+          const _exhaustiveCheck: never = condition.whitelistActivityType;
+          console.error('Unhandled whitelistActivityType:', _exhaustiveCheck);
+          return false;
+        }
       }
     } else {
       // Handle standard condition types
@@ -302,8 +306,16 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
           // Special case: 1 for buy, 0 for sell
           currentValue = marketData.lastTrade?.type === 'buy' ? 1 : 0;
           break;
-        default:
+        case 'whitelistActivity':
           return false;
+        case undefined:
+          return false;
+        default: {
+          // Exhaustive check for condition type
+          const _exhaustiveCheck: never = condition.type;
+          console.error('Unhandled condition type:', _exhaustiveCheck);
+          return false;
+        }
       }
     }
     
@@ -324,8 +336,14 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
       case 'lessEqual':
         result = currentValue <= condition.value;
         break;
-      default:
+      case undefined:
         return false;
+      default: {
+        // Exhaustive check for operator
+        const _exhaustiveCheck: never = condition.operator;
+        console.error('Unhandled operator:', _exhaustiveCheck);
+        return false;
+      }
     }
     
     return result;
@@ -413,7 +431,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
 
   // Handle window resize to keep minimized card positioned correctly
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = (): void => {
       if (isMinimized && !isMobile) {
         onPositionChange({ x: window.innerWidth - 200, y: window.innerHeight - 80 });
       }
@@ -422,47 +440,6 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isMinimized, isMobile, onPositionChange]);
-
-  // Strategy monitoring and execution
-  useEffect(() => {
-    // Clear existing interval first
-    if (strategyMonitorRef.current) {
-      clearInterval(strategyMonitorRef.current);
-      strategyMonitorRef.current = null;
-    }
-    
-    if (tradingStrategies.length === 0) {
-      return;
-    }
-
-    const activeStrategies = tradingStrategies.filter(s => s.isActive);
-    if (activeStrategies.length === 0) {
-      return;
-    }
-
-    // Monitor strategies every 5 seconds
-    strategyMonitorRef.current = setInterval(() => {
-      const marketData = getCurrentMarketData();
-      const currentActiveStrategies = tradingStrategies.filter(s => s.isActive);
-      
-      currentActiveStrategies.forEach(strategy => {
-        if (selectedWallets.length === 0) {
-          return;
-        }
-        
-        if (evaluateStrategy(strategy, marketData)) {
-          executeStrategy(strategy, marketData);
-        }
-      });
-    }, 5000);
-
-    return () => {
-      if (strategyMonitorRef.current) {
-        clearInterval(strategyMonitorRef.current);
-        strategyMonitorRef.current = null;
-      }
-    };
-  }, [tradingStrategies, selectedWallets, tokenAddress]);
 
   const executeAction = useCallback(async (action: TradingAction, strategy: TradingStrategy, marketData: MarketData) => {
     // Use all wallets selected in the sidebar
@@ -516,6 +493,9 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
             case 'netVolume':
               volumeAmount = addressActivity.netVolume;
               break;
+            case undefined:
+              volumeAmount = addressActivity.buyVolume;
+              break;
             default:
               volumeAmount = addressActivity.buyVolume;
           }
@@ -530,6 +510,9 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
               break;
             case 'netVolume':
               volumeAmount = marketData.netVolume;
+              break;
+            case undefined:
+              volumeAmount = marketData.buyVolume;
               break;
             default:
               volumeAmount = marketData.buyVolume;
@@ -630,12 +613,53 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     }
   }, [executeAction, setTradingStrategies, setStrategyExecutionLog]);
 
-  const getAvailableWallets = () => {
+  // Strategy monitoring and execution
+  useEffect(() => {
+    // Clear existing interval first
+    if (strategyMonitorRef.current) {
+      clearInterval(strategyMonitorRef.current);
+      strategyMonitorRef.current = null;
+    }
+    
+    if (tradingStrategies.length === 0) {
+      return;
+    }
+
+    const activeStrategies = tradingStrategies.filter(s => s.isActive);
+    if (activeStrategies.length === 0) {
+      return;
+    }
+
+    // Monitor strategies every 5 seconds
+    strategyMonitorRef.current = setInterval(() => {
+      const marketData = getCurrentMarketData();
+      const currentActiveStrategies = tradingStrategies.filter(s => s.isActive);
+      
+      currentActiveStrategies.forEach(strategy => {
+        if (selectedWallets.length === 0) {
+          return;
+        }
+        
+        if (evaluateStrategy(strategy, marketData)) {
+          void executeStrategy(strategy, marketData);
+        }
+      });
+    }, 5000);
+
+    return () => {
+      if (strategyMonitorRef.current) {
+        clearInterval(strategyMonitorRef.current);
+        strategyMonitorRef.current = null;
+      }
+    };
+  }, [tradingStrategies, selectedWallets, tokenAddress, evaluateStrategy, executeStrategy, getCurrentMarketData]);
+
+  const getAvailableWallets = (): CurrentWallet[] => {
     const selectedWalletKeys = selectedWallets.map(w => w.privateKey);
-    return wallets.filter(wallet => !selectedWalletKeys.includes(wallet.privateKey));
+    return wallets.filter(wallet => wallet.privateKey && !selectedWalletKeys.includes(wallet.privateKey));
   };
 
-  const filterWallets = useCallback((walletList: any[], search: string) => {
+  const filterWallets = useCallback((walletList: CurrentWallet[], search: string): CurrentWallet[] => {
     let filtered = walletList;
     if (search) {
       filtered = filtered.filter(wallet => 
@@ -673,21 +697,29 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
     });
   }, [walletBalanceFilter, walletSortOption, walletSortDirection, getWalletBalance, getWalletTokenBalance]);
 
-  const addWallet = (wallet: any) => {
+  const addWallet = (wallet: CurrentWallet): void => {
+    if (!wallet.privateKey) return;
+    
+    const walletForDisplay: WalletType = {
+      id: Date.now(),
+      address: wallet.address,
+      privateKey: wallet.privateKey,
+      isActive: true
+    };
     const newWallet: SelectedWallet = {
       privateKey: wallet.privateKey,
       address: wallet.address,
-      displayName: getWalletDisplayName(wallet)
+      displayName: getWalletDisplayName(walletForDisplay)
     };
     setSelectedWallets(prev => [...prev, newWallet]);
   };
 
-  const removeWallet = (index: number) => {
+  const removeWallet = (index: number): void => {
     setSelectedWallets(prev => prev.filter((_, i) => i !== index));
   };
   
   // Drag functionality
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>): void => {
     const target = e.target as Node;
     if (!dragHandleRef.current?.contains(target)) return;
     
@@ -730,6 +762,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
+    return undefined;
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   if (!isOpen) return null;
@@ -1023,7 +1056,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                     <h4 className="text-base md:text-lg font-mono font-semibold color-primary">Trading Strategies</h4>
                     <div className="flex gap-2 w-full sm:w-auto">
                       <button
-                        onClick={() => {
+                        onClick={(): void => {
                           // Create a file input element
                           const fileInput = document.createElement('input');
                           fileInput.type = 'file';
@@ -1031,18 +1064,18 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                           fileInput.style.display = 'none';
                           
                           // Handle file selection
-                          fileInput.onchange = (event: Event) => {
+                          fileInput.onchange = (event: Event): void => {
                             const target = event.target as HTMLInputElement;
                             const file = target.files?.[0];
                             if (!file) return;
                             
                             const reader = new FileReader();
-                            reader.onload = (e: ProgressEvent<FileReader>) => {
+                            reader.onload = (e: ProgressEvent<FileReader>): void => {
                               try {
                                 const content = e.target?.result as string;
                                 if (!content) return;
                                 
-                                const importedStrategy = JSON.parse(content);
+                                const importedStrategy = JSON.parse(content) as TradingStrategy;
                                 
                                 // Add the imported strategy to the list
                                 setTradingStrategies(prev => [...prev, {
@@ -1137,7 +1170,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                               {strategy.isActive ? 'Active' : 'Inactive'}
                             </span>
                             <button
-                              onClick={() => {
+                              onClick={(): void => {
                                 // Create a strategy object for export
                                 const strategyToExport = {
                                   ...strategy,
@@ -1328,7 +1361,7 @@ const AutomateFloatingCard: React.FC<AutomateFloatingCardProps> = ({
                     <option value="tokenBalance">Sort by Tokens</option>
                   </select>
                   <button
-                    onClick={() => setWalletSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    onClick={(): void => setWalletSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
                     className="px-2 md:px-3 py-2 bg-app-tertiary border border-app-primary-40 rounded color-primary font-mono text-xs md:text-sm hover:bg-app-secondary hover:border-app-primary transition-colors flex items-center justify-center gap-1 touch-manipulation"
                   >
                     <ArrowDown className={`w-3 h-3 transition-transform ${walletSortDirection === 'desc' ? 'rotate-180' : ''}`} />

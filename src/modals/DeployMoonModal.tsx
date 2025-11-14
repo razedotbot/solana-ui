@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, Check, ExternalLink } from 'lucide-react';
-import { getWallets, getWalletDisplayName, WalletType } from '../Utils';
-import { useToast } from "../components/Notifications";
-import { executeMoonCreate, WalletForMoonCreate } from '../utils/mooncreate';
+import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw } from 'lucide-react';
+import { getWallets, getWalletDisplayName } from '../Utils';
+import type { WalletType } from '../Utils';
+import { useToast } from "../components/useToast";
+import { executeMoonCreate } from '../utils/mooncreate';
+import type { WalletForMoonCreate } from '../utils/mooncreate';
 
 const STEPS_DEPLOY = ["Token Details", "Select Wallets", "Review"];
 const MAX_WALLETS = 5; // Maximum number of wallets that can be selected
@@ -15,7 +17,6 @@ interface BaseModalProps {
 }
 
 interface DeployMoonModalProps extends BaseModalProps {
-  onDeploy: (data: any) => void;
   handleRefresh: () => void;
   solBalances: Map<string, number>;
 }
@@ -33,8 +34,6 @@ interface TokenMetadata {
 export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
   isOpen,
   onClose,
-  onDeploy,
-  handleRefresh,
   solBalances,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -53,14 +52,13 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
   });
   const [walletAmounts, setWalletAmounts] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [showInfoTip, setShowInfoTip] = useState(false);
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');
   const [balanceFilter, setBalanceFilter] = useState('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Function to handle image upload
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -91,16 +89,16 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
       // Upload with progress tracking
       const xhr = new XMLHttpRequest();
       
-      xhr.upload.addEventListener('progress', (event) => {
+      xhr.upload.addEventListener('progress', (event): void => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded / event.total) * 100);
           setUploadProgress(progress);
         }
       });
       
-      xhr.addEventListener('load', () => {
+      xhr.addEventListener('load', (): void => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
+          const response = JSON.parse(xhr.responseText) as { url: string };
           setTokenData(prev => ({ ...prev, imageUrl: response.url })); // Changed from uri to imageUrl
           showToast("Image uploaded successfully", "success");
         } else {
@@ -109,7 +107,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
         setIsUploading(false);
       });
       
-      xhr.addEventListener('error', () => {
+      xhr.addEventListener('error', (): void => {
         showToast("Failed to upload image", "error");
         setIsUploading(false);
       });
@@ -125,7 +123,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
   };
 
   // Update social links when fields change
-  const updateSocialLinks = (type: 'telegram' | 'twitter' | 'website', value: string) => {
+  const updateSocialLinks = (type: 'telegram' | 'twitter' | 'website', value: string): void => {
     setTokenData(prev => {
       // Remove old link of this type if it exists
       const filteredLinks = prev.links.filter(link => 
@@ -133,21 +131,28 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
       );
       
       // Add new link if value is not empty
-      let newLinks = [...filteredLinks];
+      const newLinks = [...filteredLinks];
       if (value) {
         let url = value;
         let label = '';
         
         // Format the URL properly
-        if (type === 'telegram') {
-          url = url.startsWith('https://t.me/') ? url : `https://t.me/${url.replace('@', '').replace('t.me/', '')}`;
-          label = 'telegram';
-        } else if (type === 'twitter') {
-          url = url.startsWith('https://') ? url : `https://x.com/${url.replace('@', '').replace('twitter.com/', '').replace('x.com/', '')}`;
-          label = 'twitter';
-        } else if (type === 'website') {
-          url = url.startsWith('http') ? url : `https://${url}`;
-          label = 'website';
+        switch (type) {
+          case 'telegram': {
+            url = url.startsWith('https://t.me/') ? url : `https://t.me/${url.replace('@', '').replace('t.me/', '')}`;
+            label = 'telegram';
+            break;
+          }
+          case 'twitter': {
+            url = url.startsWith('https://') ? url : `https://x.com/${url.replace('@', '').replace('twitter.com/', '').replace('x.com/', '')}`;
+            label = 'twitter';
+            break;
+          }
+          case 'website': {
+            url = url.startsWith('http') ? url : `https://${url}`;
+            label = 'website';
+            break;
+          }
         }
         
         newLinks.push({ url, label });
@@ -161,23 +166,23 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
   };
 
   // Helper functions to get social values from links array
-  const getTelegram = () => {
+  const getTelegram = (): string => {
     const telegramLink = tokenData.links.find(link => link.label === 'telegram');
     return telegramLink ? telegramLink.url.replace('https://t.me/', '') : '';
   };
   
-  const getTwitter = () => {
+  const getTwitter = (): string => {
     const twitterLink = tokenData.links.find(link => link.label === 'twitter');
     return twitterLink ? twitterLink.url.replace('https://x.com/', '') : '';
   };
   
-  const getWebsite = () => {
+  const getWebsite = (): string => {
     const websiteLink = tokenData.links.find(link => link.label === 'website');
     return websiteLink ? websiteLink.url : '';
   };
 
   // Trigger file input click
-  const triggerFileInput = () => {
+  const triggerFileInput = (): void => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -190,7 +195,6 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      handleRefresh();
       // Reset states when opening modal
       setCurrentStep(0);
       setSelectedWallets([]);
@@ -200,7 +204,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
   }, [isOpen]);
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // Apply search filter
     let filtered = walletList;
     if (search) {
@@ -235,7 +239,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
     });
   };
 
-  const handleWalletSelection = (privateKey: string) => {
+  const handleWalletSelection = (privateKey: string): void => {
     setSelectedWallets(prev => {
       if (prev.includes(privateKey)) {
         return prev.filter(key => key !== privateKey);
@@ -249,7 +253,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
     });
   };
 
-  const handleAmountChange = (privateKey: string, amount: string) => {
+  const handleAmountChange = (privateKey: string, amount: string): void => {
     if (amount === '' || /^\d*\.?\d*$/.test(amount)) {
       setWalletAmounts(prev => ({
         ...prev,
@@ -258,15 +262,16 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
     }
   };
 
-  const validateStep = () => {
+  const validateStep = (): boolean => {
     switch (currentStep) {
-      case 0:
+      case 0: {
         if (!tokenData.name || !tokenData.symbol || !tokenData.imageUrl || !tokenData.description) {
           showToast("Name, symbol, description and logo image are required", "error");
           return false;
         }
         break;
-      case 1:
+      }
+      case 1: {
         if (selectedWallets.length < MIN_WALLETS) {
           showToast("Please select at least 2 wallets (developer + 1 buyer)", "error");
           return false;
@@ -283,20 +288,23 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
           return false;
         }
         break;
+      }
+      default:
+        break;
     }
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = (): void => {
     if (!validateStep()) return;
     setCurrentStep(prev => Math.min(prev + 1, STEPS_DEPLOY.length - 1));
   };
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
-  const handleDeploy = async (e: React.FormEvent) => {
+  const handleDeploy = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
 
@@ -339,7 +347,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
         }
       };
       
-      console.log(`Starting token creation with ${walletObjs.length} wallets`);
+      console.info(`Starting token creation with ${walletObjs.length} wallets`);
       
       // Call our moonshot create execution function
       const result = await executeMoonCreate(
@@ -385,31 +393,26 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
     }
   };
 
-  // Format wallet address for display
-  const formatAddress = (address: string) => {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
-
   // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
+  const formatSolBalance = (balance: number): string => {
     return balance.toFixed(4);
   };
 
   // Calculate total SOL to be used
-  const calculateTotalAmount = () => {
+  const calculateTotalAmount = (): number => {
     return selectedWallets.reduce((total, wallet) => {
       return total + (parseFloat(walletAmounts[wallet]) || 0);
     }, 0);
   };
 
   // Get wallet by private key
-  const getWalletByPrivateKey = (privateKey: string) => {
+  const getWalletByPrivateKey = (privateKey: string): WalletType | undefined => {
     return wallets.find(wallet => wallet.privateKey === privateKey);
   };
 
-  const renderStepContent = () => {
+  const renderStepContent = (): JSX.Element => {
     switch (currentStep) {
-      case 0:
+      case 0: {
         return (
           <div className="space-y-6 animate-[fadeIn_0.3s_ease]">
             <div className="flex items-center space-x-3 mb-2">
@@ -424,7 +427,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
               <div className="p-6 space-y-6 relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
               
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
                   <div className="space-y-2">
@@ -434,8 +437,8 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                     <input
                       type="text"
                       value={tokenData.name}
-                      onChange={(e) => setTokenData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                      onChange={(e): void => setTokenData(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN NAME"
                     />
                   </div>
@@ -446,8 +449,8 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                     <input
                       type="text"
                       value={tokenData.symbol}
-                      onChange={(e) => setTokenData(prev => ({ ...prev, symbol: e.target.value }))}
-                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                      onChange={(e): void => setTokenData(prev => ({ ...prev, symbol: e.target.value }))}
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                       placeholder="ENTER TOKEN SYMBOL"
                     />
                   </div>
@@ -473,7 +476,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                       className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all ${
                         isUploading 
                           ? 'bg-app-tertiary text-app-secondary-70 cursor-not-allowed border border-app-primary-20' 
-                          : 'bg-app-tertiary hover-bg-secondary border border-app-primary-40 hover-border-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                          : 'bg-app-tertiary hover-bg-secondary border border-app-primary-40 hover-border-primary text-app-primary shadow-lg hover:shadow-app-primary-40 transform hover:-translate-y-0.5 modal-btn-'
                       }`}
                     >
                       {isUploading ? (
@@ -496,7 +499,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                             src={tokenData.imageUrl}
                             alt="Logo Preview"
                             className="max-h-full max-w-full object-contain"
-                            onError={(e) => {
+                            onError={(e): void => {
                               e.currentTarget.src = '/solana/placeholder/48/48';
                               e.currentTarget.alt = 'Failed to load';
                             }}
@@ -504,7 +507,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                         </div>
                         <button
                           type="button"
-                          onClick={() => setTokenData(prev => ({ ...prev, imageUrl: '' }))}
+                          onClick={(): void => setTokenData(prev => ({ ...prev, imageUrl: '' }))}
                           className="p-1.5 rounded-full hover:bg-app-tertiary text-app-secondary hover:text-app-primary transition-all"
                         >
                           <X size={14} />
@@ -516,7 +519,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                   {isUploading && (
                     <div className="w-full bg-app-tertiary rounded-full h-1.5 mt-2">
                       <div 
-                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-cyberpunk"
+                        className="bg-app-primary-color h-1.5 rounded-full transition-all duration-300 progress-bar-"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
                     </div>
@@ -530,8 +533,8 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                   </label>
                   <textarea
                     value={tokenData.description}
-                    onChange={(e) => setTokenData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk min-h-24 font-mono"
+                    onChange={(e): void => setTokenData(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- min-h-24 font-mono"
                     placeholder="DESCRIBE YOUR TOKEN"
                     rows={3}
                   />
@@ -546,8 +549,8 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                       <input
                         type="text"
                         value={getTelegram()}
-                        onChange={(e) => updateSocialLinks('telegram', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        onChange={(e): void => updateSocialLinks('telegram', e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="T.ME/YOURGROUP"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -565,8 +568,8 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                       <input
                         type="text"
                         value={getTwitter()}
-                        onChange={(e) => updateSocialLinks('twitter', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        onChange={(e): void => updateSocialLinks('twitter', e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="@YOURHANDLE"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -584,8 +587,8 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                       <input
                         type="text"
                         value={getWebsite()}
-                        onChange={(e) => updateSocialLinks('website', e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                        onChange={(e): void => updateSocialLinks('website', e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                         placeholder="HTTPS://YOURSITE.COM"
                       />
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -600,8 +603,9 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
             </div>
           </div>
         );
+      }
         
-      case 1:
+      case 1: {
         return (
           <div className="space-y-6 animate-[fadeIn_0.3s_ease]">
             <div className="flex items-center justify-between mb-2">
@@ -616,7 +620,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
               <div className="flex items-center space-x-4">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(): void => {
                     if (selectedWallets.length === wallets.length || selectedWallets.length > 0) {
                       setSelectedWallets([]);
                     } else {
@@ -642,32 +646,32 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                  onChange={(e): void => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                   placeholder="SEARCH WALLETS..."
                 />
               </div>
               
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                 value={sortOption}
-                onChange={(e) => setSortOption(e.target.value)}
+                onChange={(e): void => setSortOption(e.target.value)}
               >
                 <option value="address">ADDRESS</option>
                 <option value="balance">BALANCE</option>
               </select>
               
               <button
-                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover-border-primary hover:color-primary transition-all modal-btn-cyberpunk flex items-center justify-center"
-                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="p-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover-border-primary hover:color-primary transition-all modal-btn- flex items-center justify-center"
+                onClick={(): void => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
               >
                 {sortDirection === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
               </button>
 
               <select 
-                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2.5 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                 value={balanceFilter}
-                onChange={(e) => setBalanceFilter(e.target.value)}
+                onChange={(e): void => setBalanceFilter(e.target.value)}
               >
                 <option value="all">ALL BALANCES</option>
                 <option value="nonZero">NON-ZERO</option>
@@ -706,7 +710,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
 
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
               {/* Ambient grid background */}
-              <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+              <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
               
               <div className="p-4 relative z-10">
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary-40 scrollbar-track-app-tertiary">
@@ -730,7 +734,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => {
+                                    onClick={(): void => {
                                       if (index > 0) {
                                         const newOrder = [...selectedWallets];
                                         [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
@@ -738,13 +742,13 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                                       }
                                     }}
                                     disabled={index === 0}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === 0 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowUp size={16} className="text-app-primary" />
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => {
+                                    onClick={(): void => {
                                       if (index < selectedWallets.length - 1) {
                                         const newOrder = [...selectedWallets];
                                         [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
@@ -752,7 +756,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                                       }
                                     }}
                                     disabled={index === selectedWallets.length - 1}
-                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-cyberpunk'}`}
+                                    className={`p-1 rounded hover:bg-app-tertiary transition-all ${index === selectedWallets.length - 1 ? 'opacity-50 cursor-not-allowed' : 'modal-btn-'}`}
                                   >
                                     <ArrowDown size={16} className="text-app-primary" />
                                   </button>
@@ -776,15 +780,15 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                                   <input
                                     type="text"
                                     value={walletAmounts[privateKey] || ''}
-                                    onChange={(e) => handleAmountChange(privateKey, e.target.value)}
+                                    onChange={(e): void => handleAmountChange(privateKey, e.target.value)}
                                     placeholder="AMOUNT"
-                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                                    className="w-32 pl-9 pr-2 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary placeholder-app-secondary-70 focus:outline-none focus:ring-1 focus:ring-primary-50 focus-border-primary transition-all modal-input- font-mono"
                                   />
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => handleWalletSelection(privateKey)}
-                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-cyberpunk"
+                                  onClick={(): void => handleWalletSelection(privateKey)}
+                                  className="p-1 rounded hover:bg-app-tertiary transition-all modal-btn-"
                                 >
                                   <X size={18} className="text-app-secondary hover:text-app-primary" />
                                 </button>
@@ -809,7 +813,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                           <div
                             key={wallet.id}
                             className="flex items-center justify-between p-3 rounded-lg border border-app-primary-40 hover-border-primary hover:bg-app-tertiary transition-all duration-200 mb-2 cursor-pointer"
-                            onClick={() => handleWalletSelection(wallet.privateKey)}
+                            onClick={(): void => handleWalletSelection(wallet.privateKey)}
                           >
                             <div className="flex items-center gap-4">
                               <div className="w-5 h-5 rounded-full border border-app-primary-40 flex items-center justify-center cursor-pointer hover-border-primary transition-all">
@@ -852,8 +856,9 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
             </div>
           </div>
         );
+      }
   
-      case 2:
+      case 2: {
         return (
           <div className="space-y-6 animate-[fadeIn_0.3s_ease]">
             <div className="flex items-center space-x-3 mb-2">
@@ -869,7 +874,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
               {/* Left column - Token Details */}
               <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="p-6 space-y-4 relative z-10">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
@@ -901,7 +906,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                             src={tokenData.imageUrl}
                             alt="Token Logo"
                             className="max-w-full max-h-full rounded object-contain"
-                            onError={(e) => {
+                            onError={(e): void => {
                               e.currentTarget.src = '/solana/placeholder/48/48';
                               e.currentTarget.alt = 'Failed to load';
                             }}
@@ -949,7 +954,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                   </div>
                 </div>
                 
-                {/* Cyberpunk decorative corner elements */}
+                {/*  decorative corner elements */}
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
                 <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
                 <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
@@ -959,7 +964,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
               {/* Right column - Selected Wallets */}
               <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="p-6 space-y-4 relative z-10">
                   <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono uppercase tracking-wider">
@@ -988,7 +993,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                   </div>
                 </div>
                 
-                {/* Cyberpunk decorative corner elements */}
+                {/*  decorative corner elements */}
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
                 <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
                 <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
@@ -999,11 +1004,11 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
             <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
               <div className="p-4 relative">
                 {/* Ambient grid background */}
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
                 <div className="flex items-center gap-4 relative z-10">
                   <div 
-                    onClick={() => setIsConfirmed(!isConfirmed)}
+                    onClick={(): void => setIsConfirmed(!isConfirmed)}
                     className="relative w-5 h-5 cursor-pointer"
                   >
                     <div className={`w-5 h-5 border rounded transition-all ${isConfirmed ? 'bg-app-primary-color border-app-primary' : 'border-app-primary-40'}`}></div>
@@ -1012,7 +1017,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                     )}
                   </div>
                   <label 
-                    onClick={() => setIsConfirmed(!isConfirmed)}
+                    onClick={(): void => setIsConfirmed(!isConfirmed)}
                     className="text-sm text-app-primary leading-relaxed cursor-pointer select-none font-mono"
                   >
                     I CONFIRM THAT I WANT TO DEPLOY THIS TOKEN USING {selectedWallets.length} WALLET{selectedWallets.length !== 1 ? 'S' : ''}.
@@ -1023,13 +1028,17 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
             </div>
           </div>
         );
+      }
+      default: {
+        return <div>Invalid step</div>;
+      }
     }
   };
   
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements
+  // Animation keyframes for  elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -1053,16 +1062,16 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -1080,18 +1089,18 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -1109,21 +1118,21 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -1163,10 +1172,10 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
         {/* Header */}
         <div className="relative z-10 p-4 flex justify-between items-center border-b border-app-primary-40">
@@ -1187,7 +1196,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
         </div>
 
         {/* Progress Indicator - Only show for steps 0-2 */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: `${(currentStep + 1) / 3 * 100}%` }}
@@ -1206,7 +1215,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
                 type="button"
                 onClick={currentStep === 0 ? onClose : handleBack}
                 disabled={isSubmitting}
-                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                className="px-5 py-2.5 text-app-primary bg-app-tertiary border border-app-primary-30 hover:bg-app-secondary hover-border-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
               >
                 {currentStep === 0 ? 'CANCEL' : 'BACK'}
               </button>
@@ -1214,11 +1223,12 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
               <button
                 type={currentStep === 2 ? 'submit' : 'button'}
                 onClick={currentStep === 2 ? undefined : handleNext}
+                aria-label={currentStep === 2 ? 'Confirm Deploy' : 'Next'}
                 disabled={currentStep === 2 ? (isSubmitting || !isConfirmed) : isSubmitting}
                 className={`px-5 py-2.5 rounded-lg flex items-center transition-all shadow-lg font-mono tracking-wider ${
                   currentStep === 2 && (isSubmitting || !isConfirmed)
                     ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50'
-                    : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'
+                    : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'
                 }`}
               >
                 {currentStep === 2 ? (
@@ -1239,7 +1249,7 @@ export const DeployMoonModal: React.FC<DeployMoonModalProps> = ({
           </form>
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

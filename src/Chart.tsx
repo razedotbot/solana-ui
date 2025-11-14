@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { Search, AlertCircle, BarChart } from 'lucide-react';
-import { WalletType, getWalletDisplayName } from './Utils';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { BarChart } from 'lucide-react';
+import { type WalletType, getWalletDisplayName } from './Utils';
 import { brand } from './config/brandConfig';
 
 interface ChartPageProps {
@@ -9,9 +9,15 @@ interface ChartPageProps {
   tokenAddress: string;
   wallets: WalletType[];
   onDataUpdate?: (data: {
-    tradingStats: any;
+    tradingStats: {
+      bought: number;
+      sold: number;
+      net: number;
+      trades: number;
+      timestamp: number;
+    } | null;
     solPrice: number | null;
-    currentWallets: any[];
+    currentWallets: Wallet[];
     recentTrades: {
       type: 'buy' | 'sell';
       address: string;
@@ -123,7 +129,7 @@ interface WalletsClearedResponse {
 
 interface CurrentWalletsResponse {
   type: 'CURRENT_WALLETS';
-  wallets: any[];
+  wallets: Wallet[];
 }
 
 interface WhitelistTradingStatsResponse {
@@ -177,7 +183,7 @@ const IconButton: React.FC<{
   title: string;
   variant?: 'primary' | 'secondary' | 'solid';
   className?: string;
-}> = React.memo(({ icon, onClick, title, variant = 'primary', className = '' }) => {
+}> = React.memo(({ icon, onClick, variant = 'primary', className = '' }) => {
   const variants = {
     primary: 'bg-primary-20 hover:bg-primary-30 text-app-tertiary',
     secondary: 'bg-app-secondary hover:bg-app-tertiary text-app-primary',
@@ -206,7 +212,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   onNonWhitelistedTrade
 }) => {
   const [frameLoading, setFrameLoading] = useState(true);
-  const [iframeKey, setIframeKey] = useState(Date.now());
+  const [iframeKey] = useState(Date.now());
   const [isIframeReady, setIsIframeReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const messageQueue = useRef<IframeMessage[]>([]);
@@ -220,18 +226,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     timestamp: number;
   } | null>(null);
   const [solPrice, setSolPrice] = useState<number | null>(null);
-  const [currentWallets, setCurrentWallets] = useState<any[]>([]);
-  const [recentNonWhitelistedTrades, setRecentNonWhitelistedTrades] = useState<{
-    type: 'buy' | 'sell';
-    address: string;
-    tokensAmount: number;
-    avgPrice: number;
-    solAmount: number;
-    timestamp: number;
-    signature: string;
-    tokenMint: string;
-    marketCap: number;
-  }[]>([]);
+  const [currentWallets, setCurrentWallets] = useState<Wallet[]>([]);
   const [recentTrades, setRecentTrades] = useState<{
     type: 'buy' | 'sell';
     address: string;
@@ -282,13 +277,22 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     if (onDataUpdate) {
       onDataUpdate(iframeDataObject);
     }
-  }, [iframeDataObject]);
+  }, [iframeDataObject, onDataUpdate]);
 
+  // Send message to iframe
+  const sendMessageToIframe = useCallback((message: IframeMessage): void => {
+    if (!isIframeReady || !iframeRef.current) {
+      messageQueue.current.push(message);
+      return;
+    }
+
+    iframeRef.current.contentWindow?.postMessage(message, '*');
+  }, [isIframeReady]);
 
   
   // Setup iframe message listener
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<IframeResponse>) => {
+    const handleMessage = (event: MessageEvent<IframeResponse>): void => {
       switch (event.data.type) {
         case 'IFRAME_READY':
           setIsIframeReady(true);
@@ -315,19 +319,19 @@ export const ChartPage: React.FC<ChartPageProps> = ({
           break;
         
         case 'WHITELIST_TRADING_STATS': {
-          const response = event.data as WhitelistTradingStatsResponse;
+          const response = event.data;
           setTradingStats(response.data);
           break;
         }
         
         case 'SOL_PRICE_UPDATE': {
-          const response = event.data as SolPriceUpdateResponse;
+          const response = event.data;
           setSolPrice(response.data.solPrice);
           break;
         }
         
         case 'WHITELIST_TRADE': {
-          const response = event.data as WhitelistTradeResponse;
+          const response = event.data;
           setRecentTrades(prev => {
             const newTrades = [response.data, ...prev].slice(0, 10); // Keep only last 10 trades
             return newTrades;
@@ -336,13 +340,13 @@ export const ChartPage: React.FC<ChartPageProps> = ({
         }
         
         case 'TOKEN_PRICE_UPDATE': {
-          const response = event.data as TokenPriceUpdateResponse;
+          const response = event.data;
           setTokenPrice(response.data);
           break;
         }
         
         case 'TOKEN_SELECTED': {
-          const response = event.data as TokenSelectedResponse;
+          const response = event.data;
           if (onTokenSelect) {
             onTokenSelect(response.tokenAddress);
           }
@@ -350,12 +354,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
         }
         
         case 'NON_WHITELIST_TRADE': {
-           const response = event.data as NonWhitelistedTradeResponse;
-
-           setRecentNonWhitelistedTrades(prev => {
-             const newTrades = [response.data, ...prev].slice(0, 10); // Keep only last 10 trades
-             return newTrades;
-           });
+           const response = event.data;
            onNonWhitelistedTrade?.(response.data);
            break;
          }
@@ -364,17 +363,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  // Send message to iframe
-  const sendMessageToIframe = (message: IframeMessage): void => {
-    if (!isIframeReady || !iframeRef.current) {
-      messageQueue.current.push(message);
-      return;
-    }
-
-    iframeRef.current.contentWindow?.postMessage(message, '*');
-  };
+  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe]);
 
   // Memoize wallet addresses for stable dependency comparison
   const walletAddresses = useMemo(() => {
@@ -403,7 +392,9 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     // Only trigger when wallet addresses change, not when isActive changes
     walletAddresses, 
     wallets.length, 
-    isIframeReady
+    isIframeReady,
+    sendMessageToIframe,
+    wallets
   ]);
   
   // Reset loading state and live data when token changes
@@ -422,7 +413,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   }, [tokenAddress]);
   
   // Handle iframe load completion
-  const handleFrameLoad = () => {
+  const handleFrameLoad = (): void => {
     setFrameLoading(false);
   };
 
@@ -455,7 +446,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
 
   
   // Render loader
-  const renderLoader = (loading: boolean) => (
+  const renderLoader = (loading: boolean): React.JSX.Element => (
     <AnimatePresence>
       {loading && (
         <motion.div 
@@ -478,7 +469,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
 
 
   // Render iframe with single frame
-  const renderFrame = (hasToken: boolean = true) => {
+  const renderFrame = (hasToken: boolean = true): React.JSX.Element => {
     const iframeSrc = hasToken 
       ? `https://frame.fury.bot/sol/?tokenMint=${tokenAddress}&theme=${brand.theme.name}`
       : `https://frame.fury.bot/sol/?theme=${brand.theme.name}`;
@@ -497,10 +488,9 @@ export const ChartPage: React.FC<ChartPageProps> = ({
               WebkitOverflowScrolling: 'touch',
               minHeight: '100%'
             }}
-            title="BetterSkill Frame"
             loading="eager"
             onLoad={handleFrameLoad}
-            allow="fullscreen"
+            allow="clipboard-read; clipboard-write; fullscreen"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
             referrerPolicy="no-referrer-when-downgrade"
           />
@@ -523,7 +513,6 @@ export const ChartPage: React.FC<ChartPageProps> = ({
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-app-secondary-80 to-transparent pointer-events-none" />
       
-
       
       <AnimatePresence mode="wait">
         {isLoadingChart ? (

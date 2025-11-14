@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Save, X, List, Download, Upload } from 'lucide-react';
-import { TradingStrategy, TradingCondition, TradingAction } from './types';
+import { Plus, Save, X, List } from 'lucide-react';
+import type { TradingStrategy, TradingCondition, TradingAction } from './types';
 import { generateStrategyId, generateConditionId, generateActionId } from './utils';
 import ConditionBuilder from './ConditionBuilder';
 import ActionBuilder from './ActionBuilder';
@@ -26,7 +26,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
   const [showWhitelistManager, setShowWhitelistManager] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addCondition = () => {
+  const addCondition = (): void => {
     const newCondition: TradingCondition = {
       id: generateConditionId(),
       type: 'marketCap',
@@ -37,15 +37,15 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
     setConditions([...conditions, newCondition]);
   };
 
-  const updateCondition = (id: string, updates: Partial<TradingCondition>) => {
+  const updateCondition = (id: string, updates: Partial<TradingCondition>): void => {
     setConditions(conditions.map(c => c.id === id ? { ...c, ...updates } : c));
   };
 
-  const removeCondition = (id: string) => {
+  const removeCondition = (id: string): void => {
     setConditions(conditions.filter(c => c.id !== id));
   };
 
-  const addAction = () => {
+  const addAction = (): void => {
     const newAction: TradingAction = {
       id: generateActionId(),
       type: 'buy',
@@ -59,15 +59,15 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
     setActions([...actions, newAction]);
   };
 
-  const updateAction = (id: string, updates: Partial<TradingAction>) => {
+  const updateAction = (id: string, updates: Partial<TradingAction>): void => {
     setActions(actions.map(a => a.id === id ? { ...a, ...updates } : a));
   };
 
-  const removeAction = (id: string) => {
+  const removeAction = (id: string): void => {
     setActions(actions.filter(a => a.id !== id));
   };
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     if (!name.trim() || conditions.length === 0 || actions.length === 0) {
       alert('Please provide a name, at least one condition, and at least one action.');
       return;
@@ -94,7 +94,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
     onSave(newStrategy);
   };
   
-  const handleExportStrategy = () => {
+  const handleExportStrategy = (): void => {
     // Create a strategy object for export
     const strategyToExport: TradingStrategy = {
       id: strategy?.id || generateStrategyId(),
@@ -131,12 +131,12 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
     URL.revokeObjectURL(url);
   };
   
-  const handleImportStrategy = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportStrategy = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
     if (!file) return;
     
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (e): void => {
       try {
         const content = e.target?.result as string;
         if (!content) return;
@@ -383,6 +383,20 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
           accept=".json" 
           className="hidden" 
         />
+        <div className="flex gap-3">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-4 py-2 border border-app-primary-40 rounded font-mono text-sm color-primary hover:bg-app-primary-60 transition-colors"
+          >
+            Import
+          </button>
+          <button
+            onClick={handleExportStrategy}
+            className="px-4 py-2 border border-app-primary-40 rounded font-mono text-sm color-primary hover:bg-app-primary-60 transition-colors"
+          >
+            Export
+          </button>
+        </div>
         <div className="flex gap-3">
           <button
             onClick={onCancel}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Save, X, Check, ArrowRight, Download, Upload } from 'lucide-react';
-import { WhitelistList, loadWhitelistLists, saveWhitelistLists, createWhitelistList, deleteWhitelistList, updateWhitelistList } from './whitelistStorage';
+import type { WhitelistList } from './whitelistStorage';
+import { loadWhitelistLists, saveWhitelistLists, createWhitelistList, deleteWhitelistList, updateWhitelistList } from './whitelistStorage';
 
 interface WhitelistListManagerProps {
   onSelectList: (addresses: string[]) => void;
@@ -26,7 +27,7 @@ const WhitelistListManager: React.FC<WhitelistListManagerProps> = ({ onSelectLis
     saveWhitelistLists(savedLists);
   }, [savedLists]);
   
-  const handleSaveCurrentList = () => {
+  const handleSaveCurrentList = (): void => {
     if (!newListName.trim() || currentAddresses.length === 0) {
       return;
     }
@@ -37,7 +38,7 @@ const WhitelistListManager: React.FC<WhitelistListManagerProps> = ({ onSelectLis
     setIsCreatingList(false);
   };
   
-  const handleUpdateListName = (listId: string) => {
+  const handleUpdateListName = (listId: string): void => {
     if (!editedListName.trim()) {
       return;
     }
@@ -53,18 +54,18 @@ const WhitelistListManager: React.FC<WhitelistListManagerProps> = ({ onSelectLis
     setEditedListName('');
   };
   
-  const handleDeleteList = (listId: string) => {
+  const handleDeleteList = (listId: string): void => {
     const newLists = deleteWhitelistList(listId);
     setSavedLists(newLists);
   };
   
-  const handleSelectList = (addresses: string[]) => {
+  const handleSelectList = (addresses: string[]): void => {
     if (onSelectList) {
       onSelectList(addresses);
     }
   };
   
-  const handleExportList = (list: WhitelistList) => {
+  const handleExportList = (list: WhitelistList): void => {
     // Create a text file with one address per line
     const content = list.addresses.join('\n');
     const blob = new Blob([content], { type: 'text/plain' });
@@ -82,12 +83,12 @@ const WhitelistListManager: React.FC<WhitelistListManagerProps> = ({ onSelectLis
     URL.revokeObjectURL(url);
   };
   
-  const handleImportList = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportList = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
     if (!file) return;
     
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (e): void => {
       const content = e.target?.result as string;
       if (!content) return;
       
@@ -110,7 +111,7 @@ const WhitelistListManager: React.FC<WhitelistListManagerProps> = ({ onSelectLis
     }
   };
   
-  const startEditingList = (list: WhitelistList) => {
+  const startEditingList = (list: WhitelistList): void => {
     setIsEditingList(list.id);
     setEditedListName(list.name);
   };

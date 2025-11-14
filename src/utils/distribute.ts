@@ -23,12 +23,16 @@ interface BundleResult {
 }
 
 
+interface WindowWithConfig {
+  tradingServerUrl?: string;
+}
+
 /**
  * Send bundle to Jito block engine
  */
 const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
     try {
-      const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+      const baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
       
       // Send to our backend proxy instead of directly to Jito
       const response = await fetch(`${baseUrl}/solana/send`, {
@@ -39,7 +43,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
         }),
       });
   
-      const data = await response.json();
+      const data = await response.json() as { result: BundleResult };
       
       return data.result;
     } catch (error) {
@@ -72,13 +76,20 @@ const getPartiallySignedTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { success: boolean; error?: string; transactions?: string[]; data?: { transactions?: string[] } };
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially signed transactions');
     }
     
-    return data.transactions; // Array of base58 encoded partially signed transactions
+    // Handle different response formats
+    const transactions = (data as unknown as { data?: { transactions?: string[] } }).data?.transactions || data.transactions;
+    
+    if (!transactions || !Array.isArray(transactions)) {
+      throw new Error('No transactions returned from backend');
+    }
+    
+    return transactions; // Array of base58 encoded partially signed transactions
   } catch (error) {
     console.error('Error getting partially signed transactions:', error);
     throw error;
@@ -144,9 +155,9 @@ const prepareDistributionBundles = (signedTransactions: string[]): DistributionB
 export const distributeSOL = async (
   senderWallet: WalletDistribution,
   recipientWallets: WalletDistribution[]
-): Promise<{ success: boolean; result?: any; error?: string }> => {
+): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    console.log(`Preparing to distribute SOL from ${senderWallet.address} to ${recipientWallets.length} recipients`);
+    console.info(`Preparing to distribute SOL from ${senderWallet.address} to ${recipientWallets.length} recipients`);
     
     // Convert wallet data to recipient format for backend
     const recipients = recipientWallets.map(wallet => ({
@@ -160,7 +171,7 @@ export const distributeSOL = async (
       senderWallet.address, 
       recipients
     );
-    console.log(`Received ${partiallySignedTransactions.length} partially signed transactions from backend`);
+    console.info(`Received ${partiallySignedTransactions.length} partially signed transactions from backend`);
     
     // Step 2: Create keypairs from private keys
     const senderKeypair = Keypair.fromSecretKey(bs58.decode(senderWallet.privateKey));
@@ -178,17 +189,17 @@ export const distributeSOL = async (
       senderKeypair, 
       recipientKeypairsMap
     );
-    console.log(`Completed signing for ${fullySignedTransactions.length} transactions`);
+    console.info(`Completed signing for ${fullySignedTransactions.length} transactions`);
     
     // Step 4: Prepare distribution bundles
     const distributionBundles = prepareDistributionBundles(fullySignedTransactions);
-    console.log(`Prepared ${distributionBundles.length} distribution bundles`);
+    console.info(`Prepared ${distributionBundles.length} distribution bundles`);
     
     // Step 5: Send bundles
-    let results: BundleResult[] = [];
+    const results: BundleResult[] = [];
     for (let i = 0; i < distributionBundles.length; i++) {
       const bundle = distributionBundles[i];
-      console.log(`Sending bundle ${i+1}/${distributionBundles.length} with ${bundle.transactions.length} transactions`);
+      console.info(`Sending bundle ${i+1}/${distributionBundles.length} with ${bundle.transactions.length} transactions`);
       
       const result = await sendBundle(bundle.transactions);
       results.push(result);
@@ -246,11 +257,10 @@ export const validateDistributionInputs = (
   );
   
   // Check if sender has enough balance (including some extra for fees)
-  const estimatedFee = 0.01; // Rough estimate for fees in SOL
-  if (totalAmount + estimatedFee > senderBalance) {
+  if (totalAmount > senderBalance) {
     return {
       valid: false,
-      error: `Insufficient balance. Need at least ${totalAmount + estimatedFee} SOL, but have ${senderBalance} SOL`
+      error: `Insufficient balance. Need at least ${totalAmount} SOL, but have ${senderBalance} SOL`
     };
   }
   
@@ -262,9 +272,9 @@ export const validateDistributionInputs = (
 export const batchDistributeSOL = async (
   senderWallet: WalletDistribution,
   recipientWallets: WalletDistribution[]
-): Promise<{ success: boolean; results?: any[]; error?: string }> => {
+): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
-    console.log(`Starting batch SOL distribution to ${recipientWallets.length} recipients`);
+    console.info(`Starting batch SOL distribution to ${recipientWallets.length} recipients`);
     
     // Return early if no recipients
     if (recipientWallets.length === 0) {
@@ -289,17 +299,13 @@ export const batchDistributeSOL = async (
       batches.push(recipientWallets.slice(i, i + MAX_RECIPIENTS_PER_BATCH));
     }
     
-    console.log(`Split distribution into ${batches.length} batches of max ${MAX_RECIPIENTS_PER_BATCH} recipients each`);
+    console.info(`Split distribution into ${batches.length} batches of max ${MAX_RECIPIENTS_PER_BATCH} recipients each`);
     
     // Execute each batch sequentially
-    const results: any[] = [];
+    const results: unknown[] = [];
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
-      console.log(`Processing batch ${i+1}/${batches.length} with ${batch.length} recipients`);
-      
-      // Calculate batch total to update remaining balance
-      const batchTotal = batch.reduce((sum, wallet) => sum + parseFloat(wallet.amount), 0);
-      const estimatedFee = 0.01 * batch.length; // Rough fee estimate per transaction
+      console.info(`Processing batch ${i+1}/${batches.length} with ${batch.length} recipients`);
       
       // Execute this batch
       const batchResult = await distributeSOL(senderWallet, batch);

@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUpDown, X, CheckCircle, DollarSign, Info, Search, ChevronRight, Coins } from 'lucide-react';
+import { ArrowUpDown, X, CheckCircle, DollarSign, Info, Search, Coins } from 'lucide-react';
+import type { Connection } from '@solana/web3.js';
 import { 
-  Connection, 
-  PublicKey, 
   Keypair, 
   VersionedTransaction, 
-  TransactionMessage,
   MessageV0
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { useToast } from "../components/Notifications";
-import { WalletType, getWalletDisplayName } from '../Utils';
+import { useToast } from "../components/useToast";
+import type { WalletType } from '../Utils';
+import { getWalletDisplayName } from '../Utils';
 import { formatAddress, formatSolBalance, formatTokenBalance } from '../utils/formatting';
 import { Buffer } from 'buffer';
 import { sendToJitoBundleService } from '../utils/jitoService';
@@ -32,7 +30,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   onClose,
   wallets,
   solBalances,
-  connection,
+  connection: _connection,
   tokenAddress = '',
   tokenBalances = new Map()
 }) => {
@@ -68,7 +66,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');
   const [balanceFilter, setBalanceFilter] = useState('all');
-  const [showInfoTip, setShowInfoTip] = useState(false);
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -93,16 +90,17 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
   // Get wallet token balance by address
   const getWalletTokenBalance = (address: string): number => {
-    return tokenBalances.has(address) ? (tokenBalances.get(address) ?? 0) : 0;
+    const balance: number | undefined = tokenBalances.get(address) as number | undefined;
+    return balance ?? 0;
   };
 
   // Get wallet by privateKey
-  const getWalletByPrivateKey = (privateKey: string) => {
+  const getWalletByPrivateKey = (privateKey: string): WalletType | undefined => {
     return wallets.find(wallet => wallet.privateKey === privateKey);
   };
 
   // Helper functions for multi-wallet selection
-  const toggleSourceWallet = (privateKey: string) => {
+  const toggleSourceWallet = (privateKey: string): void => {
     setSourceWallets(prev => 
       prev.includes(privateKey) 
         ? prev.filter(pk => pk !== privateKey)
@@ -110,29 +108,20 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     );
   };
 
-  const toggleRecipientAddress = (address: string) => {
-    setReceiverAddresses(prev => 
-      prev.includes(address) 
-        ? prev.filter(addr => addr !== address)
-        : [...prev, address]
-    );
-  };
-
-  const addRecipientAddress = (address: string) => {
+  const addRecipientAddress = (address: string): void => {
     if (address.trim() && !receiverAddresses.includes(address.trim())) {
       setReceiverAddresses(prev => [...prev, address.trim()]);
       setNewRecipientAddress(''); // Clear the input field
     }
   };
 
-  const removeRecipientAddress = (address: string) => {
+  const removeRecipientAddress = (address: string): void => {
     setReceiverAddresses(prev => prev.filter(addr => addr !== address));
   };
 
   // Calculate transfer amounts based on distribution mode
-  const calculateTransferAmounts = () => {
+  const calculateTransferAmounts = (): string[] => {
     const inputAmount = parseFloat(amount || '0');
-    const numRecipients = receiverAddresses.length;
     
     if (distributionMode === 'percentage') {
       // In percentage mode, the input amount is a percentage (0-100)
@@ -157,7 +146,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   // Create transfer queue from selected wallets and recipients
-  const createTransferQueue = () => {
+  const createTransferQueue = (): typeof transferQueue => {
     const amounts = calculateTransferAmounts();
     const queue: typeof transferQueue = [];
     
@@ -183,7 +172,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   // Reset form state
-  const resetForm = () => {
+  const resetForm = (): void => {
     setCurrentStep(0);
     setIsConfirmed(false);
     setSourceWallets([]);
@@ -203,7 +192,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   // Handle batch transfer operation with local signing and direct RPC submission
-  const handleBatchTransfer = async (e: React.FormEvent) => {
+  const handleBatchTransfer = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
     
@@ -248,7 +237,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
             throw new Error(`HTTP error! status: ${buildResponse.status}`);
           }
 
-          const buildResult = await buildResponse.json();
+          const buildResult = await buildResponse.json() as { success: boolean; error?: string; data: { transaction: string } };
           if (!buildResult.success) {
             throw new Error(buildResult.error);
           }
@@ -268,7 +257,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           
           // Step 4: Send the signed transaction via Jito Bundle Service
           const serializedTransaction = bs58.encode(transaction.serialize());
-          const jitoResult = await sendToJitoBundleService(serializedTransaction);
+          const jitoResult = await sendToJitoBundleService(serializedTransaction) as { signature?: string; txid?: string };
           
           // Extract signature from Jito result
           const signature = jitoResult.signature || jitoResult.txid || 'Unknown';
@@ -326,7 +315,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string) => {
+  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     // Filter based on transfer type and balance
     let filtered = walletList.filter(wallet => {
       if (transferType === 'SOL') {
@@ -382,7 +371,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements
+  // Animation keyframes for  elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -406,16 +395,16 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -433,18 +422,18 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -462,21 +451,21 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -543,10 +532,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-7xl max-h-[90vh] overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-7xl max-h-[90vh] overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid"></div>
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
         {/* Header */}
         <div className="relative z-10 p-4 flex justify-between items-center border-b border-app-primary-40">
@@ -567,7 +556,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: currentStep === 0 ? '50%' : '100%' }}
@@ -590,7 +579,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setTransferType('SOL')}
-                        className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn-cyberpunk ${
+                        className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn- ${
                           transferType === 'SOL'
                             ? 'bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40'
                             : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
@@ -603,7 +592,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                         type="button"
                         onClick={() => setTransferType('TOKEN')}
                         disabled={!tokenAddress}
-                        className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn-cyberpunk ${
+                        className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn- ${
                           transferType === 'TOKEN'
                             ? 'bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40'
                             : tokenAddress
@@ -644,13 +633,13 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                           type="text"
                           value={sourceSearchTerm}
                           onChange={(e) => setSourceSearchTerm(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                          className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                           placeholder="SEARCH WALLETS..."
                         />
                       </div>
                       
                       <select 
-                        className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input-cyberpunk font-mono"
+                        className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                         value={sortOption}
                         onChange={(e) => setSortOption(e.target.value)}
                       >
@@ -659,7 +648,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       </select>
                       
                       <button
-                        className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary hover-border-primary transition-all modal-btn-cyberpunk"
+                        className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary hover-border-primary transition-all modal-btn-"
                         onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
                       >
                         {sortDirection === 'asc' ? '↑' : '↓'}
@@ -730,7 +719,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                             addRecipientAddress(newRecipientAddress.trim());
                           }
                         }}
-                        className="w-full px-4 py-2.5 pr-16 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus-border-primary focus:ring-1 ring-primary-50 focus:outline-none transition-all duration-200 modal-input-cyberpunk font-mono tracking-wider"
+                        className="w-full px-4 py-2.5 pr-16 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus-border-primary focus:ring-1 ring-primary-50 focus:outline-none transition-all duration-200 modal-input- font-mono tracking-wider"
                         placeholder="ENTER RECIPIENT ADDRESS"
                       />
                       <button
@@ -837,7 +826,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       type="number"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="w-full px-4 py-2.5 pr-16 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus-border-primary focus:ring-1 ring-primary-50 focus:outline-none transition-all duration-200 modal-input-cyberpunk font-mono tracking-wider"
+                      className="w-full px-4 py-2.5 pr-16 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus-border-primary focus:ring-1 ring-primary-50 focus:outline-none transition-all duration-200 modal-input- font-mono tracking-wider"
                       placeholder={distributionMode === 'percentage' ? 'ENTER %' : `ENTER ${transferType}`}
                       step={distributionMode === 'percentage' ? '0.1' : (transferType === 'SOL' ? '0.0001' : '1')}
                       min="0"
@@ -935,7 +924,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       className={`w-full mt-4 px-5 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all duration-300 font-mono tracking-wider
                                 ${!isConfirmed || isSubmitting || batchProcessing
                                   ? 'bg-primary-50 text-app-secondary-80 cursor-not-allowed opacity-50' 
-                                  : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                                  : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
                     >
                       {isSubmitting || batchProcessing ? (
                         <>
@@ -986,7 +975,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           </div>
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

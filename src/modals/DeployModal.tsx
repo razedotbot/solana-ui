@@ -9,7 +9,7 @@ import { DeployMoonModal } from './DeployMoonModal';
 import { DeployBoopModal } from './DeployBoopModal';
 import { DeployBagsModal } from './DeployBagsModal';
 import { DeployBagsSharedFeesModal } from './DeployBagsSharedModal';
-import { useToast } from "../components/Notifications";
+
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -17,7 +17,6 @@ interface BaseModalProps {
 }
 
 interface DeployModalProps extends BaseModalProps {
-  onDeploy: (data: any) => void;
   handleRefresh: () => void;
   solBalances: Map<string, number>;
 }
@@ -25,14 +24,11 @@ interface DeployModalProps extends BaseModalProps {
 export const DeployModal: React.FC<DeployModalProps> = ({
   isOpen,
   onClose,
-  onDeploy,
   handleRefresh,
   solBalances,
 }) => {
   const [selectedDeployType, setSelectedDeployType] = useState<'pump' | 'bonk' | 'cook' | 'moon' | 'boop' | 'bags' | 'fury' | null>(null);
   const [sharedFeesEnabled, setSharedFeesEnabled] = useState(false);
-
-  const { showToast } = useToast();
 
   if (!isOpen) return null;
 
@@ -223,7 +219,6 @@ export const DeployModal: React.FC<DeployModalProps> = ({
           <DeployPumpModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
-            onDeploy={onDeploy}
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />
@@ -234,7 +229,6 @@ export const DeployModal: React.FC<DeployModalProps> = ({
           <DeployBonkModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
-            onDeploy={onDeploy}
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />
@@ -245,7 +239,6 @@ export const DeployModal: React.FC<DeployModalProps> = ({
           <DeployCookModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
-            onDeploy={onDeploy}
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />
@@ -255,7 +248,6 @@ export const DeployModal: React.FC<DeployModalProps> = ({
           <DeployMoonModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
-            onDeploy={onDeploy}
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />
@@ -265,7 +257,6 @@ export const DeployModal: React.FC<DeployModalProps> = ({
           <DeployBoopModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
-            onDeploy={onDeploy}
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />
@@ -275,7 +266,6 @@ export const DeployModal: React.FC<DeployModalProps> = ({
           <DeployBagsModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
-            onDeploy={onDeploy}
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />
@@ -285,7 +275,6 @@ export const DeployModal: React.FC<DeployModalProps> = ({
           <DeployBagsSharedFeesModal
             isOpen={true}
             onClose={() => setSelectedDeployType(null)}
-            onDeploy={onDeploy}
             handleRefresh={handleRefresh}
             solBalances={solBalances}
           />

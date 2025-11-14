@@ -10,7 +10,7 @@ const BeRightBack: React.FC<BeRightBackProps> = ({ onOpenWallets, onOpenSettings
   return (
     <div className="fixed inset-0 bg-app-primary flex items-center justify-center p-4 overflow-hidden">
       {/* Animated grid background */}
-      <div className="absolute inset-0 bg-cyberpunk-grid opacity-10"></div>
+      <div className="absolute inset-0 bg-grid opacity-10"></div>
       
       {/* Main content */}
       <div className="relative z-10 text-center max-w-2xl w-full">
@@ -50,14 +50,14 @@ const BeRightBack: React.FC<BeRightBackProps> = ({ onOpenWallets, onOpenSettings
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
           <button
             onClick={onOpenWallets}
-            className="px-6 py-3 bg-app-primary-color hover:bg-app-primary-dark text-black font-bold rounded cyberpunk-btn font-mono tracking-wider transition-all duration-300 flex items-center gap-2"
+            className="px-6 py-3 bg-app-primary-color hover:bg-app-primary-dark text-black font-bold rounded btn font-mono tracking-wider transition-all duration-300 flex items-center gap-2"
           >
             <Wallet size={18} />
             WALLETS
           </button>
           <button
             onClick={onOpenSettings}
-            className="px-6 py-3 bg-app-tertiary border border-app-primary-40 hover-border-primary text-app-primary font-bold rounded cyberpunk-btn font-mono tracking-wider transition-all duration-300 flex items-center gap-2"
+            className="px-6 py-3 bg-app-tertiary border border-app-primary-40 hover-border-primary text-app-primary font-bold rounded btn font-mono tracking-wider transition-all duration-300 flex items-center gap-2"
           >
             <Settings size={18} />
             SETTINGS
@@ -71,7 +71,7 @@ const BeRightBack: React.FC<BeRightBackProps> = ({ onOpenWallets, onOpenSettings
       </div>
       
       {/* Scanline effect overlay */}
-      <div className="cyberpunk-scanline absolute inset-0 pointer-events-none"></div>
+      <div className="scanline absolute inset-0 pointer-events-none"></div>
     </div>
   );
 };

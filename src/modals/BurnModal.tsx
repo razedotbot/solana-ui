@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, ChevronLeft, ChevronRight, Info, Search, X, ArrowDown } from 'lucide-react';
 import { getWallets, getWalletDisplayName } from '../Utils';
-import { useToast } from "../components/Notifications";
+import { useToast } from "../components/useToast";
 import { loadConfigFromCookies } from '../Utils';
 import * as web3 from '@solana/web3.js';
 import bs58 from 'bs58';
 import { sendToJitoBundleService } from '../utils/jitoService';
+import type { ApiResponse } from '../types/api';
 
 const STEPS_BURN = ['Select Source', 'Burn Details', 'Review'];
 
@@ -16,7 +17,6 @@ interface BaseModalProps {
 }
 
 interface BurnModalProps extends BaseModalProps {
-  onBurn: (amount: string) => void;
   handleRefresh: () => void;
   tokenAddress: string; 
   solBalances: Map<string, number>;
@@ -26,8 +26,6 @@ interface BurnModalProps extends BaseModalProps {
 export const BurnModal: React.FC<BurnModalProps> = ({
   isOpen,
   onClose,
-  onBurn,
-  handleRefresh,
   tokenAddress,
   solBalances,
   tokenBalances
@@ -46,33 +44,33 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('address');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [showInfoTip, setShowInfoTip] = useState(false);
   const [balanceFilter, setBalanceFilter] = useState('all');
   const [modalClass, setModalClass] = useState('');
+  const [showInfoTip, setShowInfoTip] = useState(false);
   const [buttonHover, setButtonHover] = useState(false);
   
   const wallets = getWallets();
   const { showToast } = useToast();
 
   // Reset form when modal opens/closes
-  useEffect(() => {
+  useEffect((): (() => void) | undefined => {
     if (isOpen) {
-      handleRefresh();
       resetForm();
       // Add entrance animation class
       setModalClass('animate-modal-in');
       
-      // Simulate a typing/loading effect for a cyberpunk feel
+      // Simulate a typing/loading effect for a  feel
       const timer = setTimeout(() => {
         setModalClass('');
       }, 500);
       
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isOpen]);
 
   // Reset form state
-  const resetForm = () => {
+  const resetForm = (): void => {
     setCurrentStep(0);
     setSourceWallet('');
     setAmount('');
@@ -84,14 +82,14 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   };
 
   // Fetch token accounts when source wallet is selected
-  useEffect(() => {
-    const fetchTokenAccounts = async () => {
+  useEffect((): void => {
+    const fetchTokenAccounts = async (): Promise<void> => {
       if (!sourceWallet) return;
       
       setIsLoadingTokens(true);
       try {
-        const savedConfig = loadConfigFromCookies();
-        const rpcurl = (savedConfig as any).rpcEndpoint
+        const savedConfig = loadConfigFromCookies() as { rpcEndpoint: string };
+        const rpcurl = savedConfig.rpcEndpoint;
         const connection = new web3.Connection(rpcurl);
 
         const keypair = web3.Keypair.fromSecretKey(
@@ -107,8 +105,9 @@ export const BurnModal: React.FC<BurnModalProps> = ({
         );
 
         // Transform the token accounts data - exclude SOL
-        const transformedAccounts = await Promise.all(tokenAccounts.value.map(async (account) => {
-          const parsedInfo = account.account.data.parsed.info;
+        const transformedAccounts = tokenAccounts.value.map((account) => {
+          const accountData = account.account.data as { parsed: { info: { mint: string; tokenAmount: { uiAmount: number } } } };
+          const parsedInfo = accountData.parsed.info;
           const mintAddress = parsedInfo.mint;
           const balance = parsedInfo.tokenAmount.uiAmount;
 
@@ -117,7 +116,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
             balance: balance,
             symbol: mintAddress.slice(0, 4) // Placeholder - you should fetch actual symbols
           };
-        }));
+        });
 
         setTokenAccounts(transformedAccounts.filter(account => account.balance > 0));
       } catch (error) {
@@ -128,10 +127,10 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       }
     };
 
-    fetchTokenAccounts();
-  }, [sourceWallet]);
+    void fetchTokenAccounts();
+  }, [sourceWallet, showToast]);
 
-  const handleNext = () => {
+  const handleNext = (): void => {
     if (currentStep === 0 && !sourceWallet) {
       showToast("Please select source wallet", "error");
       return;
@@ -155,7 +154,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     }, 300);
   };
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     // Add transition animation
     setModalClass('animate-step-back-out');
     setTimeout(() => {
@@ -167,7 +166,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     }, 300);
   };
 
-  const handleBurn = async (e: React.FormEvent) => {
+  const handleBurn = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
 
@@ -192,18 +191,21 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       });
 
       if (!prepareResponse.ok) {
-        const errorData = await prepareResponse.json();
+        const errorData = await prepareResponse.json() as ApiResponse;
         throw new Error(errorData.error || `Failed to prepare transaction: HTTP ${prepareResponse.status}`);
       }
 
-      const prepareResult = await prepareResponse.json();
+      const prepareResult = await prepareResponse.json() as ApiResponse<{ transaction: string }>;
       
-      if (!prepareResult.success) {
+      if (!prepareResult.success || !prepareResult.data) {
         throw new Error(prepareResult.error || 'Failed to prepare transaction');
       }
 
       // 2. Deserialize and sign the transaction (now expecting base58)
       const transactionData = prepareResult.data;
+      if (!transactionData) {
+        throw new Error('No transaction data received');
+      }
       const transactionBuffer = bs58.decode(transactionData.transaction); // Changed from base64 to base58
       
       // Deserialize the transaction
@@ -219,7 +221,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       // 3. Submit the signed transaction to Jito via the bundle service
       try {
         const submitResult = await sendToJitoBundleService(signedTransactionBs58);
-        console.log('Transaction successfully submitted to Jito:', submitResult);
+        console.info('Transaction successfully submitted to Jito:', submitResult);
       } catch (error) {
         console.error('Error submitting transaction:', error);
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -239,35 +241,35 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   };
 
   // Format wallet address for display
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string): string => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
-  // Get wallet by address
-  const getWalletByAddress = (address: string) => {
-    return wallets.find(wallet => wallet.address === address);
-  };
+  // Suppress unused variable warning
+  void buttonHover;
+
+
 
   // Get the token balance for the selected token
-  const getSelectedTokenBalance = () => {
+  const getSelectedTokenBalance = (): number => {
     return tokenAccounts.find(t => t.mint === tokenAddress)?.balance || 0;
   };
 
   // Get the token symbol for the selected token
-  const getSelectedTokenSymbol = () => {
+  const getSelectedTokenSymbol = (): string => {
     return tokenAccounts.find(t => t.mint === tokenAddress)?.symbol || 'TKN';
   };
 
   // Filter wallets based on search and other filters
-  const filterWallets = (walletList: any[], search: string) => {
+  const filterWallets = (walletList: typeof wallets, search: string): typeof wallets => {
     // First filter out wallets with zero token balance
-    let filtered = walletList.filter(wallet => 
+    let filtered = walletList.filter((wallet): boolean => 
       (tokenBalances.get(wallet.address) || 0) > 0
     );
     
     // Then apply search filter
     if (search) {
-      filtered = filtered.filter(wallet => 
+      filtered = filtered.filter((wallet): boolean => 
         wallet.address.toLowerCase().includes(search.toLowerCase())
       );
     }
@@ -275,17 +277,17 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     // Then apply balance filter
     if (balanceFilter !== 'all') {
       if (balanceFilter === 'nonZero') {
-        filtered = filtered.filter(wallet => 
+        filtered = filtered.filter((wallet): boolean => 
           (solBalances.get(wallet.address) || 0) > 0 || 
           (tokenBalances.get(wallet.address) || 0) > 0
         );
       } else if (balanceFilter === 'highBalance') {
-        filtered = filtered.filter(wallet => 
+        filtered = filtered.filter((wallet): boolean => 
           (solBalances.get(wallet.address) || 0) >= 0.1 || 
           (tokenBalances.get(wallet.address) || 0) >= 10
         );
       } else if (balanceFilter === 'lowBalance') {
-        filtered = filtered.filter(wallet => 
+        filtered = filtered.filter((wallet): boolean => 
           ((solBalances.get(wallet.address) || 0) < 0.1 && (solBalances.get(wallet.address) || 0) > 0) ||
           ((tokenBalances.get(wallet.address) || 0) < 10 && (tokenBalances.get(wallet.address) || 0) > 0)
         );
@@ -293,7 +295,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     }
     
     // Finally, sort the wallets
-    return filtered.sort((a, b) => {
+    return filtered.sort((a, b): number => {
       if (sortOption === 'address') {
         return sortDirection === 'asc' 
           ? a.address.localeCompare(b.address)
@@ -314,7 +316,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for cyberpunk elements
+  // Animation keyframes for  elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -338,16 +340,16 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-cyberpunk-container {
+    .modal-container {
       animation: modal-fade-in 0.3s ease;
     }
     
-    .modal-cyberpunk-content {
+    .modal-content {
       animation: modal-slide-up 0.4s ease;
       position: relative;
     }
     
-    .modal-cyberpunk-content::before {
+    .modal-content::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -365,18 +367,18 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       animation: modal-pulse 4s infinite;
     }
     
-    .modal-input-cyberpunk:focus {
+    .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk {
+    .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
     
-    .modal-btn-cyberpunk::after {
+    .modal-btn-::after {
       content: "";
       position: absolute;
       top: -50%;
@@ -394,21 +396,21 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       opacity: 0;
     }
     
-    .modal-btn-cyberpunk:hover::after {
+    .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
     
-    .modal-btn-cyberpunk:active {
+    .modal-btn-:active {
       transform: scale(0.95);
     }
     
-    .progress-bar-cyberpunk {
+    .progress-bar- {
       position: relative;
       overflow: hidden;
     }
     
-    .progress-bar-cyberpunk::after {
+    .progress-bar-::after {
       content: "";
       position: absolute;
       top: 0;
@@ -509,29 +511,29 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       50% { opacity: 0.7; }
     }
     
-    /* Cyberpunk scrollbar */
-    .cyberpunk-scrollbar::-webkit-scrollbar {
+    /*  scrollbar */
+    .scrollbar::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
     
-    .cyberpunk-scrollbar::-webkit-scrollbar-track {
+    .scrollbar::-webkit-scrollbar-track {
       background: var(--color-bg-tertiary);
       border-radius: 3px;
     }
     
-    .cyberpunk-scrollbar::-webkit-scrollbar-thumb {
+    .scrollbar::-webkit-scrollbar-thumb {
       background: var(--color-scrollbar-thumb);
       border-radius: 3px;
     }
     
-    .cyberpunk-scrollbar::-webkit-scrollbar-thumb:hover {
+    .scrollbar::-webkit-scrollbar-thumb:hover {
       background: var(--color-primary);
     }
     
     /* Responsive styles */
     @media (max-width: 768px) {
-      .modal-cyberpunk-content {
+      .modal-content {
         width: 95% !important;
         max-height: 90vh;
         overflow-y: auto;
@@ -541,10 +543,10 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-2xl overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-2xl overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid">
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid">
         </div>
 
         {/* Header */}
@@ -566,7 +568,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: `${((currentStep + 1) / STEPS_BURN.length) * 100}%` }}
@@ -574,7 +576,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="relative z-10 p-5 space-y-5 max-h-[70vh] overflow-y-auto cyberpunk-scrollbar">
+        <div className="relative z-10 p-5 space-y-5 max-h-[70vh] overflow-y-auto scrollbar">
           {/* Step Indicator */}
           <div className="flex w-full mb-6 relative">
             {STEPS_BURN.map((step, index) => (
@@ -645,13 +647,13 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono tracking-wider"
+                      className="w-full pl-9 pr-4 py-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono tracking-wider"
                       placeholder="SEARCH WALLETS_"
                     />
                   </div>
                   
                   <select 
-                    className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                    className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                     value={sortOption}
                     onChange={(e) => setSortOption(e.target.value)}
                   >
@@ -662,7 +664,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                   
                   <button
                     type="button"
-                    className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:text-app-primary hover-border-primary transition-all modal-btn-cyberpunk"
+                    className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:text-app-primary hover-border-primary transition-all modal-btn-"
                     onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
                   >
                     {sortDirection === 'asc' ? '↑' : '↓'}
@@ -671,7 +673,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
                 <div className="mb-3">
                   <select 
-                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono"
+                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                     value={balanceFilter}
                     onChange={(e) => setBalanceFilter(e.target.value)}
                   >
@@ -684,7 +686,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
                 {/* Wallet Selection */}
                 <div className="bg-app-tertiary rounded-lg overflow-hidden border border-app-primary-30">
-                  <div className="max-h-64 overflow-y-auto cyberpunk-scrollbar">
+                  <div className="max-h-64 overflow-y-auto scrollbar">
                     {filterWallets(wallets, searchTerm).length > 0 ? (
                       filterWallets(wallets, searchTerm).map((wallet) => (
                         <div 
@@ -837,7 +839,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Amount Input with cyberpunk design */}
+                    {/* Amount Input with  design */}
                     <div className="space-y-2 relative">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1">
@@ -857,14 +859,14 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                           <button
                             type="button"
                             onClick={() => setAmount(getSelectedTokenBalance().toString())}
-                            className="text-xs px-2 py-0.5 bg-primary-10 hover:bg-primary-20 border border-app-primary-30 color-primary rounded-lg transition-all modal-btn-cyberpunk font-mono"
+                            className="text-xs px-2 py-0.5 bg-primary-10 hover:bg-primary-20 border border-app-primary-30 color-primary rounded-lg transition-all modal-btn- font-mono"
                           >
                             MAX
                           </button>
                         )}
                       </div>
                       <div className="relative">
-                        {/* Decorative elements for cyberpunk input */}
+                        {/* Decorative elements for  input */}
                         <div className="absolute -top-px left-4 right-4 h-px bg-app-primary-50"></div>
                         <div className="absolute -bottom-px left-4 right-4 h-px bg-app-primary-50"></div>
                         <div className="absolute top-3 -left-px bottom-3 w-px bg-app-primary-50"></div>
@@ -880,7 +882,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                             }
                           }}
                           placeholder="ENTER_AMOUNT_TO_BURN"
-                          className="w-full pl-4 pr-16 py-3 bg-app-primary border border-app-primary-30 rounded-lg text-app-primary focus:outline-none focus-border-primary transition-all modal-input-cyberpunk font-mono tracking-wider"
+                          className="w-full pl-4 pr-16 py-3 bg-app-primary border border-app-primary-30 rounded-lg text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono tracking-wider"
                         />
                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm color-primary font-mono">
                           {getSelectedTokenSymbol()}
@@ -891,9 +893,9 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     {/* Summary Box with burn visualization */}
                     {amount && parseFloat(amount) > 0 && (
                       <div className="relative mt-6 rounded-lg overflow-hidden">
-                        {/* Cyberpunk burn effect background */}
+                        {/*  burn effect background */}
                         <div className="absolute inset-0 bg-gradient-to-b from-primary-05 to-transparent"></div>
-                        <div className="absolute inset-0 modal-cyberpunk-content::before pointer-events-none opacity-30"></div>
+                        <div className="absolute inset-0 modal-content::before pointer-events-none opacity-30"></div>
                         
                         <div className="relative p-4 border border-app-primary-30 rounded-lg">
                           <div className="absolute top-0 right-0 p-1 bg-app-primary border-l border-b border-app-primary-30 color-primary text-xs font-mono">
@@ -1012,7 +1014,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     {/* Warning Box */}
                     <div className="relative bg-primary-05 border border-app-primary-20 rounded-lg p-3 overflow-hidden">
                       {/* Scanline effect */}
-                      <div className="absolute inset-0 modal-cyberpunk-content::before pointer-events-none opacity-20"></div>
+                      <div className="absolute inset-0 modal-content::before pointer-events-none opacity-20"></div>
                       
                       <div className="flex items-start color-primary text-sm">
                         <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1068,7 +1070,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                   </div>
                 </div>
 
-                {/* Confirmation Checkbox with cyberpunk style */}
+                {/* Confirmation Checkbox with  style */}
                 <div className="bg-app-tertiary rounded-lg border border-app-primary-30 p-4 mt-4">
                   <div 
                     className="flex items-start gap-3 cursor-pointer"
@@ -1100,7 +1102,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                 type="button"
                 onClick={currentStep === 0 ? onClose : handleBack}
                 disabled={isSubmitting}
-                className={`px-4 py-2 bg-app-tertiary border border-app-primary-30 hover-border-primary rounded-lg transition-all modal-btn-cyberpunk flex items-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`px-4 py-2 bg-app-tertiary border border-app-primary-30 hover-border-primary rounded-lg transition-all modal-btn- flex items-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {currentStep === 0 ? (
                   <span className="font-mono text-app-primary">CANCEL</span>
@@ -1130,7 +1132,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                             (currentStep === 1 && (!amount || parseFloat(amount) <= 0)) ||
                             (currentStep === STEPS_BURN.length - 1 && !isConfirmed))
                               ? 'bg-app-primary-50 text-app-primary-80 cursor-not-allowed opacity-50' 
-                              : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                              : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
               >
                 {/* Button Content */}
                 {currentStep === STEPS_BURN.length - 1 ? (
@@ -1153,7 +1155,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
           </form>
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

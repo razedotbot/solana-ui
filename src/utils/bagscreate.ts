@@ -105,10 +105,11 @@ const checkRateLimit = async (): Promise<void> => {
  */
 const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = (window as unknown as Record<string, unknown>)['tradingServerUrl'] as string | undefined;
+    const cleanBaseUrl = baseUrl?.replace(/\/+$/, '') || '';
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/solana/send`, {
+    const response = await fetch(`${cleanBaseUrl}/solana/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -120,13 +121,13 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as BundleResult & { error?: { message?: string } };
     
     if (data.error) {
       throw new Error(data.error.message || 'Unknown error from bundle server');
     }
     
-    return data.result;
+    return data.result as unknown as BundleResult;
   } catch (error) {
     console.error('Error sending bundle:', error);
     throw error;
@@ -165,7 +166,7 @@ export const checkDeveloperConfig = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data: BagsConfigResponse = await response.json();
+    const data = await response.json() as BagsConfigResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to check developer config');
@@ -187,7 +188,7 @@ export const signAndSendConfigTransaction = async (
   rpcEndpoint?: string
 ): Promise<{ success: boolean; signature?: string; error?: string }> => {
   try {
-    console.log('Signing and sending config transaction...');
+    console.info('Signing and sending config transaction...');
     
     // Deserialize the config transaction
     const txBuffer = bs58.decode(configTransaction);
@@ -250,12 +251,12 @@ export const signAndSendConfigTransaction = async (
     // Send the bundle with both transactions
     const result = await sendBundle([signedTxBase58, feesSignedTxBase58]);
     
-    console.log('bundle has been sent', result);
+    console.info('bundle has been sent', result);
     
     // Handle different response structures
     if (result.success || result.result || result.jito) {
       const signature = result.jito || result.result || 'Bundle sent successfully';
-      console.log('Config and fee transactions sent successfully:', signature);
+      console.info('Config and fee transactions sent successfully:', signature);
       return {
         success: true,
         signature: signature
@@ -280,8 +281,6 @@ const getPartiallyPreparedTransactions = async (
   bagsConfig: BagsCreateConfig
 ): Promise<{ mintAddress: string, bundles: BagsCreateBundle[] }> => {
   try {
-    
-    
     const response = await fetch(`https://utils.fury.bot/solana/bags/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -292,37 +291,42 @@ const getPartiallyPreparedTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data: BagsCreateResponse = await response.json();
+    const data = await response.json() as BagsCreateResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially prepared transactions');
     }
     
-    if (!data.mintAddress) {
+    // Handle different response formats
+    const responseData = (data as unknown as { data?: { transactions?: string[]; mintAddress?: string } }).data;
+    const transactions = responseData?.transactions || (data as unknown as { transactions?: string[] }).transactions;
+    const mintAddress = responseData?.mintAddress || data.mintAddress;
+    
+    if (!mintAddress) {
       throw new Error('No mint address returned from backend');
     }
     
-    if (!data.transactions || !Array.isArray(data.transactions) || data.transactions.length === 0) {
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
       throw new Error('No transactions returned from backend');
     }
     
-    console.log(`Received ${data.transactions.length} transactions for mint ${data.mintAddress}`);
+    console.info(`Received ${transactions.length} transactions for mint ${mintAddress}`);
     
     // Group transactions into bundles of max 5 transactions per bundle
     // IMPORTANT: Maintain original transaction order from backend
     const MAX_TX_PER_BUNDLE = 5;
     const bundles: BagsCreateBundle[] = [];
     
-    for (let i = 0; i < data.transactions.length; i += MAX_TX_PER_BUNDLE) {
-      const bundleTransactions = data.transactions.slice(i, i + MAX_TX_PER_BUNDLE);
+    for (let i = 0; i < transactions.length; i += MAX_TX_PER_BUNDLE) {
+      const bundleTransactions = transactions.slice(i, i + MAX_TX_PER_BUNDLE);
       bundles.push({
         transactions: bundleTransactions
       });
-      console.log(`Created bundle ${bundles.length} with ${bundleTransactions.length} transactions (positions ${i}-${i + bundleTransactions.length - 1})`);
+      console.info(`Created bundle ${bundles.length} with ${bundleTransactions.length} transactions (positions ${i}-${i + bundleTransactions.length - 1})`);
     }
     
     return {
-      mintAddress: data.mintAddress,
+      mintAddress,
       bundles
     };
   } catch (error) {
@@ -337,7 +341,7 @@ const getPartiallyPreparedTransactions = async (
 const completeBundleSigning = (
   bundle: BagsCreateBundle, 
   walletKeypairs: Keypair[],
-  isFirstBundle: boolean = false
+  _isFirstBundle: boolean = false
 ): BagsCreateBundle => {
   // Check if the bundle has a valid transactions array
   if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
@@ -358,7 +362,7 @@ const completeBundleSigning = (
       );
       
       if (isFullySigned) {
-        console.log(`Transaction ${index + 1} in bundle is already fully signed, maintaining order.`);
+        console.info(`Transaction ${index + 1} in bundle is already fully signed, maintaining order.`);
         return txBase58;
       }
       
@@ -391,7 +395,7 @@ const completeBundleSigning = (
       if (!isNowSigned) {
         console.warn(`Transaction ${index + 1} in bundle could not be signed properly.`);
       } else {
-        console.log(`✅ Transaction ${index + 1} in bundle signed successfully`);
+        console.info(`✅ Transaction ${index + 1} in bundle signed successfully`);
       }
       
       // Serialize and encode the fully signed transaction
@@ -411,19 +415,19 @@ const completeBundleSigning = (
 export const executeBagsCreate = async (
   wallets: WalletForBagsCreate[],
   bagsConfig: BagsCreateConfig
-): Promise<{ success: boolean; mintAddress?: string; result?: any; error?: string; configNeeded?: boolean; configTransaction?: string; configInstructions?: string }> => {
+): Promise<{ success: boolean; mintAddress?: string; result?: { totalBundles: number; successCount: number; failureCount: number; results: BundleResult[] }; error?: string; configNeeded?: boolean; configTransaction?: string; configInstructions?: string }> => {
   try {
-    console.log(`Preparing to create token using ${wallets.length} wallets`);
+    console.info(`Preparing to create token using ${wallets.length} wallets`);
     
     // Step 0: Check/create developer wallet config
-    console.log('Checking developer wallet config...');
+    console.info('Checking developer wallet config...');
     const configResult = await checkDeveloperConfig(
       bagsConfig.ownerPublicKey,
       bagsConfig.rpcUrl
     );
     
     if (configResult.needsConfig && configResult.transaction) {
-      console.log('Developer config needed. Config transaction must be signed and sent first.');
+      console.info('Developer config needed. Config transaction must be signed and sent first.');
       return {
         success: false,
         configNeeded: true,
@@ -433,13 +437,13 @@ export const executeBagsCreate = async (
       };
     }
     
-    console.log('Developer config check passed. Proceeding with token creation...');
+    console.info('Developer config check passed. Proceeding with token creation...');
     
     // Step 1: Get partially prepared bundles from backend
     const { mintAddress, bundles } = await getPartiallyPreparedTransactions(
       bagsConfig
     );
-    console.log(`Received ${bundles.length} bundles from backend for mint ${mintAddress}`);
+    console.info(`Received ${bundles.length} bundles from backend for mint ${mintAddress}`);
     
     // Step 2: Create keypairs from private keys
     const walletKeypairs = wallets.map(wallet => 
@@ -449,13 +453,13 @@ export const executeBagsCreate = async (
     // Step 3: Complete transaction signing for each bundle
     // IMPORTANT: Process bundles in received order to maintain transaction sequence
     const signedBundles = bundles.map((bundle, index) => {
-      console.log(`Signing bundle ${index + 1}/${bundles.length} with ${bundle.transactions.length} transactions`);
+      console.info(`Signing bundle ${index + 1}/${bundles.length} with ${bundle.transactions.length} transactions`);
       return completeBundleSigning(bundle, walletKeypairs, index === 0); // Mark first bundle
     });
-    console.log(`Completed signing for ${signedBundles.length} bundles in original order`);
+    console.info(`Completed signing for ${signedBundles.length} bundles in original order`);
     
     // Step 4: Send each bundle with improved retry logic and dynamic delays
-    let results: BundleResult[] = [];
+    const results: BundleResult[] = [];
     let successCount = 0;
     let failureCount = 0;
     
@@ -463,9 +467,9 @@ export const executeBagsCreate = async (
     if (signedBundles.length > 0) {
       const firstBundleResult = await sendFirstBundle(signedBundles[0]);
       if (firstBundleResult.success) {
-        results.push(firstBundleResult.result);
+        results.push(firstBundleResult.result as BundleResult);
         successCount++;
-        console.log("✅ First bundle landed successfully!");
+        console.info("✅ First bundle landed successfully!");
       } else {
         console.error("❌ Critical error: First bundle failed to land:", firstBundleResult.error);
         return {
@@ -483,13 +487,13 @@ export const executeBagsCreate = async (
         // Apply rate limiting
         await checkRateLimit();
         
-        console.log(`Sending bundle ${i + 1}/${signedBundles.length} in sequence...`);
+        console.info(`Sending bundle ${i + 1}/${signedBundles.length} in sequence...`);
         // Send the bundle
         const result = await sendBundle(signedBundles[i].transactions);
         
         results.push(result);
         successCount++;
-        console.log(`✅ Bundle ${i + 1}/${signedBundles.length} sent successfully in order`);
+        console.info(`✅ Bundle ${i + 1}/${signedBundles.length} sent successfully in order`);
       } catch (error) {
         failureCount++;
         console.error(`❌ Bundle ${i + 1}/${signedBundles.length} failed:`, error);
@@ -518,8 +522,8 @@ export const executeBagsCreate = async (
 /**
  * Send first bundle with extensive retry logic - this is critical for success
  */
-const sendFirstBundle = async (bundle: BagsCreateBundle): Promise<{success: boolean, result?: any, error?: string}> => {
-  console.log(`Sending first bundle with ${bundle.transactions.length} transactions (critical)...`);
+const sendFirstBundle = async (bundle: BagsCreateBundle): Promise<{success: boolean, result?: BundleResult, error?: string}> => {
+  console.info(`Sending first bundle with ${bundle.transactions.length} transactions (critical)...`);
   
   let attempt = 0;
   let consecutiveErrors = 0;
@@ -533,7 +537,7 @@ const sendFirstBundle = async (bundle: BagsCreateBundle): Promise<{success: bool
       const result = await sendBundle(bundle.transactions);
       
       // Success!
-      console.log(`First bundle sent successfully on attempt ${attempt + 1}`);
+      console.info(`First bundle sent successfully on attempt ${attempt + 1}`);
       return { success: true, result };
     } catch (error) {
       consecutiveErrors++;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, ChevronRight, DollarSign, X, Info, Search } from 'lucide-react';
 import { getWallets, getWalletDisplayName } from '../Utils';
-import { useToast } from "../components/Notifications";
+import { useToast } from "../components/useToast";
 
 const STEPS_CUSTOMBUY = ['Select Wallets', 'Configure Buy', 'Review'];
 
@@ -12,25 +12,15 @@ interface BaseModalProps {
 }
 
 interface CustomBuyModalProps extends BaseModalProps { 
-  onCustomBuy: (data: any) => void;
   handleRefresh: () => void;
   tokenAddress: string;
   solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
 }
 
-// Interface for single transaction
-interface Transaction {
-  transaction: string; // Base58 encoded transaction data
-  walletAddress: string;
-  amount: number;
-}
-
 export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   isOpen,
   onClose,
-  onCustomBuy,
-  handleRefresh,
   tokenAddress,
   solBalances,
   tokenBalances
@@ -40,8 +30,6 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   const [walletAmounts, setWalletAmounts] = useState<Record<string, string>>({}); // Individual amounts per wallet
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const [tokenInfo, setTokenInfo] = useState<{ symbol: string } | null>(null);
-  const [isLoadingTokenInfo, setIsLoadingTokenInfo] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showInfoTip, setShowInfoTip] = useState(false);
   const [sortOption, setSortOption] = useState('address');
@@ -49,12 +37,22 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   const [balanceFilter, setBalanceFilter] = useState('all');
   const [bulkAmount, setBulkAmount] = useState('0.1');
   const [currentTransactionIndex, setCurrentTransactionIndex] = useState(0);
-  const [transactionResults, setTransactionResults] = useState<any[]>([]);
   const [selectedProtocol, setSelectedProtocol] = useState<string>('auto'); // Default to auto
   const [bundleMode, setBundleMode] = useState<string>('batch'); // Default to batch
+  const [transactionResults, setTransactionResults] = useState<Array<{
+    wallet: string;
+    amount: number;
+    success: boolean;
+    result?: string;
+    error?: string;
+  }>>([]);
 
   const wallets = getWallets();
   const { showToast } = useToast();
+  
+  // Suppress unused variable warning
+  void currentTransactionIndex;
+  void transactionResults;
 
   // DEX/Protocol options (removed auto option)
   const protocolOptions = [
@@ -84,12 +82,12 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   ];
 
   // Format SOL balance for display
-  const formatSolBalance = (balance: number) => {
+  const formatSolBalance = (balance: number): string => {
     return balance.toFixed(4);
   };
 
   // Format token balance for display
-  const formatTokenBalance = (balance: number | undefined) => {
+  const formatTokenBalance = (balance: number | undefined): string => {
     if (balance === undefined) return '0';
     // Use different formatting logic for very small or very large numbers
     if (balance < 0.001 && balance > 0) {
@@ -148,10 +146,9 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     });
   }, [wallets, searchTerm, balanceFilter, sortOption, sortDirection, solBalances, tokenBalances]);
 
-  useEffect(() => {
+  useEffect((): void => {
     if (isOpen) {
       resetForm();
-      handleRefresh();
     }
   }, [isOpen, tokenAddress]);
 
@@ -159,26 +156,28 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
 
   // Initialize wallet amounts when wallets are selected/deselected
   useEffect(() => {
-    const newWalletAmounts = { ...walletAmounts };
-    
-    // Add new wallets with default amount
-    selectedWallets.forEach(wallet => {
-      if (!newWalletAmounts[wallet]) {
-        newWalletAmounts[wallet] = '0.1';
-      }
+    setWalletAmounts(prevWalletAmounts => {
+      const newWalletAmounts = { ...prevWalletAmounts };
+      
+      // Add new wallets with default amount
+      selectedWallets.forEach(wallet => {
+        if (!newWalletAmounts[wallet]) {
+          newWalletAmounts[wallet] = '0.1';
+        }
+      });
+      
+      // Remove unselected wallets
+      Object.keys(newWalletAmounts).forEach(wallet => {
+        if (!selectedWallets.includes(wallet)) {
+          delete newWalletAmounts[wallet];
+        }
+      });
+      
+      return newWalletAmounts;
     });
-    
-    // Remove unselected wallets
-    Object.keys(newWalletAmounts).forEach(wallet => {
-      if (!selectedWallets.includes(wallet)) {
-        delete newWalletAmounts[wallet];
-      }
-    });
-    
-    setWalletAmounts(newWalletAmounts);
   }, [selectedWallets]);
 
-  const resetForm = () => {
+  const resetForm = (): void => {
     setSelectedWallets([]);
     setWalletAmounts({});
     setSelectedProtocol('auto');
@@ -191,7 +190,6 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     setSortDirection('asc');
     setBalanceFilter('all');
     setCurrentTransactionIndex(0);
-    setTransactionResults([]);
   };
 
   // Helper to get wallet address from private key
@@ -199,7 +197,11 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     const wallet = wallets.find(w => w.privateKey === privateKey);
     return wallet ? wallet.address : '';
   };
-  const handleNext = () => {
+  
+  // Token info placeholder
+  const tokenInfo = { symbol: tokenAddress.slice(0, 4) };
+  
+  const handleNext = (): void => {
     // Step validations
     if (currentStep === 0) {
       if (selectedWallets.length === 0) {
@@ -210,7 +212,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     if (currentStep === 1) {
       // Check if any wallet has an invalid amount
       const hasInvalidAmount = Object.values(walletAmounts).some(
-        amount => !amount || parseFloat(amount) <= 0
+        (amount: string) => !amount || parseFloat(amount) <= 0
       );
       
       if (hasInvalidAmount) {
@@ -222,12 +224,12 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     setCurrentStep((prev) => Math.min(prev + 1, STEPS_CUSTOMBUY.length - 1));
   };
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
 
   // Updated handleCustomBuy function for sequential processing
-  const handleCustomBuy = async (e: React.FormEvent) => {
+  const handleCustomBuy = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
     setIsSubmitting(true);
@@ -241,19 +243,18 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     try {
       // Prepare wallets data for trading utility
       const walletsData = selectedWallets.map(privateKey => {
-        const walletAddress = getWalletAddressFromKey(privateKey);
-        const amount = parseFloat(walletAmounts[privateKey]);
-        return {
-          address: walletAddress,
-          privateKey: privateKey
-        };
+        const wallet = wallets.find(w => w.privateKey === privateKey);
+        if (!wallet) {
+          throw new Error('Wallet not found');
+        }
+        return wallet;
       });
 
       // Prepare trading config
       const tradingConfig = {
         tokenAddress: tokenAddress,
         solAmount: parseFloat(walletAmounts[selectedWallets[0]]) || 0.01, // Use first wallet amount as default
-        bundleMode: bundleMode as any
+        bundleMode: bundleMode as 'single' | 'batch' | 'all-in-one'
       };
 
       // Import trading utility
@@ -262,7 +263,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
       // Execute trade with bundle mode support
       const result = await executeTrade(
         selectedProtocol,
-        walletsData.map(w => ({ ...w, isActive: true })) as any,
+        walletsData,
         tradingConfig,
         true, // isBuyMode
         new Map() // solBalances - empty for now
@@ -271,7 +272,6 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
       // Handle results
       if (result.success) {
         showToast(`CUSTOM BUY completed successfully!`, 'success');
-        handleRefresh(); // Refresh balances
         
         // Set success results for all wallets
         const successResults = selectedWallets.map(privateKey => {
@@ -319,7 +319,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   };
 
   // Helper to handle wallet selection
-  const toggleWalletSelection = (privateKey: string) => {
+  const toggleWalletSelection = (privateKey: string): void => {
     setSelectedWallets(prev => {
       if (prev.includes(privateKey)) {
         return prev.filter(key => key !== privateKey);
@@ -330,7 +330,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   };
 
   // Helper to handle select/deselect all wallets
-  const handleSelectAllWallets = () => {
+  const handleSelectAllWallets = (): void => {
     if (selectedWallets.length === filteredWallets.length) {
       // If all are selected, deselect all
       setSelectedWallets([]);
@@ -341,7 +341,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   };
 
   // Helper to update amount for a specific wallet
-  const handleWalletAmountChange = (wallet: string, value: string) => {
+  const handleWalletAmountChange = (wallet: string, value: string): void => {
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setWalletAmounts(prev => ({
         ...prev,
@@ -349,9 +349,12 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
       }));
     }
   };
+  
+  // Suppress unused variable warning
+  void handleWalletAmountChange;
 
   // Set the same amount for all wallets
-  const setAmountForAllWallets = () => {
+  const setAmountForAllWallets = (): void => {
     if (bulkAmount === '' || parseFloat(bulkAmount) <= 0) return;
     
     const newAmounts = { ...walletAmounts };
@@ -364,19 +367,16 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   };
 
   // Calculate total buy amount across all wallets
-  const calculateTotalBuyAmount = () => {
+  const calculateTotalBuyAmount = (): string => {
     return selectedWallets.reduce((total, wallet) => {
       return total + parseFloat(walletAmounts[wallet] || '0');
     }, 0).toFixed(4);
   };
 
-  // Format wallet address for display
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-6)}`;
-  };
+
   
   // Get wallet display from private key
-  const getWalletDisplayFromKey = (privateKey: string) => {
+  const getWalletDisplayFromKey = (privateKey: string): string => {
     const wallet = wallets.find(w => w.privateKey === privateKey);
     return wallet 
       ? getWalletDisplayName(wallet)
@@ -393,8 +393,8 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
     return tokenBalances.has(address) ? (tokenBalances.get(address) ?? 0) : 0;
   };
 
-  // Add cyberpunk style element to document head
-  useEffect(() => {
+  // Add  style element to document head
+  useEffect((): (() => void) | undefined => {
     if (isOpen) {
       const modalStyleElement = document.createElement('style');
       modalStyleElement.textContent = `
@@ -419,16 +419,16 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
           100% { transform: translateY(100%); opacity: 0; }
         }
         
-        .modal-cyberpunk-container {
+        .modal-container {
           animation: modal-fade-in 0.3s ease;
         }
         
-        .modal-cyberpunk-content {
+        .modal-content {
           animation: modal-slide-up 0.4s ease;
           position: relative;
         }
         
-        .modal-cyberpunk-content::before {
+        .modal-content::before {
           content: "";
           position: absolute;
           width: 100%;
@@ -446,18 +446,18 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
           animation: modal-pulse 4s infinite;
         }
         
-        .modal-input-cyberpunk:focus {
+        .modal-input-:focus {
           box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
           transition: all 0.3s ease;
         }
         
-        .modal-btn-cyberpunk {
+        .modal-btn- {
           position: relative;
           overflow: hidden;
           transition: all 0.3s ease;
         }
         
-        .modal-btn-cyberpunk::after {
+        .modal-btn-::after {
           content: "";
           position: absolute;
           top: -50%;
@@ -475,21 +475,21 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
           opacity: 0;
         }
         
-        .modal-btn-cyberpunk:hover::after {
+        .modal-btn-:hover::after {
           opacity: 1;
           transform: rotate(45deg) translate(50%, 50%);
         }
         
-        .modal-btn-cyberpunk:active {
+        .modal-btn-:active {
           transform: scale(0.95);
         }
         
-        .progress-bar-cyberpunk {
+        .progress-bar- {
           position: relative;
           overflow: hidden;
         }
         
-        .progress-bar-cyberpunk::after {
+        .progress-bar-::after {
           content: "";
           position: absolute;
           top: 0;
@@ -532,10 +532,11 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
         document.head.removeChild(modalStyleElement);
       };
     }
+    return undefined;
   }, [isOpen]);
 
-  // Render cyberpunk styled steps
-  const renderStepContent = () => {
+  // Render  styled steps
+  const renderStepContent = (): JSX.Element | null => {
     switch (currentStep) {
       case 0:
         // Select Wallets
@@ -562,7 +563,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
             
             <div>
               <div className="mb-4 p-4 bg-app-tertiary rounded-lg border-app-primary-40 border relative overflow-hidden">
-                <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid">
+                <div className="absolute inset-0 z-0 opacity-10 bg-grid">
                 </div>
                 <h4 className="text-sm font-medium color-primary mb-2 font-mono tracking-wider relative z-10">TOKEN INFORMATION</h4>
                 <div className="text-sm text-app-primary relative z-10 font-mono">
@@ -578,7 +579,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                   </label>
                   <button 
                     onClick={handleSelectAllWallets}
-                    className="text-xs px-3 py-1 bg-app-tertiary hover:bg-app-secondary text-app-secondary hover:color-primary rounded border-app-primary-30 border hover:border-app-primary transition-all font-mono tracking-wider modal-btn-cyberpunk"
+                    className="text-xs px-3 py-1 bg-app-tertiary hover:bg-app-secondary text-app-secondary hover:color-primary rounded border-app-primary-30 border hover:border-app-primary transition-all font-mono tracking-wider modal-btn-"
                   >
                     {selectedWallets.length === filteredWallets.length ? 'DESELECT ALL' : 'SELECT ALL'}
                   </button>
@@ -591,13 +592,13 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-app-tertiary border-app-primary-30 border rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-full pl-9 pr-4 py-2 bg-app-tertiary border-app-primary-30 border rounded-lg text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input- font-mono"
                       placeholder="SEARCH WALLETS..."
                     />
                   </div>
                   
                   <select 
-                    className="bg-app-tertiary border-app-primary-30 border rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input-cyberpunk font-mono"
+                    className="bg-app-tertiary border-app-primary-30 border rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                     value={sortOption}
                     onChange={(e) => setSortOption(e.target.value)}
                   >
@@ -607,14 +608,14 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                   </select>
                   
                   <button
-                    className="p-2 bg-app-tertiary border-app-primary-30 border rounded-lg text-app-secondary hover:color-primary hover:border-app-primary transition-all modal-btn-cyberpunk"
+                    className="p-2 bg-app-tertiary border-app-primary-30 border rounded-lg text-app-secondary hover:color-primary hover:border-app-primary transition-all modal-btn-"
                     onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
                   >
                     {sortDirection === 'asc' ? '↑' : '↓'}
                   </button>
                   
                   <select 
-                    className="bg-app-tertiary border-app-primary-30 border rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input-cyberpunk font-mono"
+                    className="bg-app-tertiary border-app-primary-30 border rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                     value={balanceFilter}
                     onChange={(e) => setBalanceFilter(e.target.value)}
                   >
@@ -702,7 +703,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
             
             {/* Bulk amount setter */}
             <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden">
-              <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+              <div className="absolute inset-0 z-0 opacity-5 bg-grid">
               </div>
               <div className="flex items-center justify-between mb-1 relative z-10">
                 <div className="flex items-center gap-1">
@@ -725,7 +726,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                       type="text"
                       value={bulkAmount}
                       placeholder="0.1"
-                      className="w-32 pl-8 pr-2 py-1.5 bg-app-primary border-app-primary-30 border rounded text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                      className="w-32 pl-8 pr-2 py-1.5 bg-app-primary border-app-primary-30 border rounded text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input- font-mono"
                       onChange={(e) => {
                         const value = e.target.value;
                         if (value === '' || /^\d*\.?\d*$/.test(value)) {
@@ -736,7 +737,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                   </div>
                   <button
                     type="button"
-                    className="ml-2 bg-app-primary-color text-xs rounded px-3 py-1.5 hover:bg-app-primary-dark text-app-primary transition-colors font-mono tracking-wider modal-btn-cyberpunk"
+                    className="ml-2 bg-app-primary-color text-xs rounded px-3 py-1.5 hover:bg-app-primary-dark text-app-primary transition-colors font-mono tracking-wider modal-btn-"
                     onClick={setAmountForAllWallets}
                   >
                     APPLY TO ALL
@@ -747,7 +748,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
             
             {/* Protocol and Delay settings on same row */}
             <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden">
-              <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+              <div className="absolute inset-0 z-0 opacity-5 bg-grid">
               </div>
               <div className="grid grid-cols-2 gap-4 relative z-10">
                 {/* Protocol selection */}
@@ -768,7 +769,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                     <select 
                       value={selectedProtocol}
                       onChange={(e) => setSelectedProtocol(e.target.value)}
-                      className="bg-app-primary border-app-primary-30 border rounded text-sm text-app-primary px-3 py-1.5 focus:outline-none focus:border-app-primary transition-all modal-input-cyberpunk font-mono min-w-[120px]"
+                      className="bg-app-primary border-app-primary-30 border rounded text-sm text-app-primary px-3 py-1.5 focus:outline-none focus:border-app-primary transition-all modal-input- font-mono min-w-[120px]"
                     >
                       {protocolOptions.map(option => (
                         <option key={option.value} value={option.value}>
@@ -796,7 +797,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
             
             {/* Bundle Mode Configuration */}
             <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden">
-              <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+              <div className="absolute inset-0 z-0 opacity-5 bg-grid">
               </div>
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-3">
@@ -860,7 +861,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
             
             {/* Individual wallet amounts */}
             <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden">
-              <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+              <div className="absolute inset-0 z-0 opacity-5 bg-grid">
               </div>
               <h4 className="text-sm font-medium text-app-secondary mb-3 font-mono tracking-wider relative z-10">INDIVIDUAL WALLET AMOUNTS</h4>
               <div className="max-h-64 overflow-y-auto pr-1 scrollbar-thin relative z-10">
@@ -887,7 +888,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                               type="text"
                               value={walletAmounts[privateKey] || '0.1'}
                               onChange={(e) => handleWalletAmountChange(privateKey, e.target.value)}
-                              className="w-24 pl-7 pr-2 py-1.5 bg-app-primary border-app-primary-30 border rounded text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input-cyberpunk font-mono"
+                              className="w-24 pl-7 pr-2 py-1.5 bg-app-primary border-app-primary-30 border rounded text-sm text-app-primary focus:outline-none focus:border-app-primary transition-all modal-input- font-mono"
                               placeholder="0.1"
                             />
                           </div>
@@ -936,7 +937,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
             {/* Transaction progress indicator (only show during processing) */}
             {isSubmitting && (
               <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden mb-4">
-                <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+                <div className="absolute inset-0 z-0 opacity-5 bg-grid">
                 </div>
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-2">
@@ -947,7 +948,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                       {currentTransactionIndex}/{selectedWallets.length}
                     </span>
                   </div>
-                  <div className="w-full bg-app-primary rounded-full h-2 progress-bar-cyberpunk">
+                  <div className="w-full bg-app-primary rounded-full h-2 progress-bar-">
                     <div 
                       className="bg-app-primary-color h-2 rounded-full transition-all duration-500"
                       style={{ width: `${(currentTransactionIndex / selectedWallets.length) * 100}%` }}
@@ -962,7 +963,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
               <div className="space-y-4">
                 {/* Token Details */}
                 <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden">
-                  <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+                  <div className="absolute inset-0 z-0 opacity-5 bg-grid">
                   </div>
                   <h4 className="text-sm font-medium color-primary mb-3 font-mono tracking-wider relative z-10">
                     TOKEN DETAILS
@@ -989,7 +990,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                 
                 {/* Operation Summary */}
                 <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden">
-                  <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+                  <div className="absolute inset-0 z-0 opacity-5 bg-grid">
                   </div>
                   <h4 className="text-sm font-medium color-primary mb-3 font-mono tracking-wider relative z-10">
                     OPERATION DETAILS
@@ -1022,7 +1023,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                 
                 {/* Confirmation */}
                 <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border relative overflow-hidden">
-                  <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+                  <div className="absolute inset-0 z-0 opacity-5 bg-grid">
                   </div>
                   <div 
                     className="flex items-start gap-3 relative z-10 cursor-pointer"
@@ -1047,7 +1048,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
               {/* Right column - Selected Wallets */}
               <div>
                 <div className="bg-app-tertiary rounded-lg p-4 border-app-primary-40 border h-full relative overflow-hidden">
-                  <div className="absolute inset-0 z-0 opacity-5 bg-cyberpunk-grid">
+                  <div className="absolute inset-0 z-0 opacity-5 bg-grid">
                   </div>
                   <h4 className="text-sm font-medium color-primary mb-3 font-mono tracking-wider relative z-10">
                     SELECTED WALLETS
@@ -1092,10 +1093,10 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-cyberpunk-container bg-app-primary-85">
-      <div className="relative bg-app-primary border-app-primary-40 border rounded-lg shadow-lg w-full max-w-5xl md:h-auto overflow-hidden transform modal-cyberpunk-content modal-glow">
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm modal-container bg-app-primary-85">
+      <div className="relative bg-app-primary border-app-primary-40 border rounded-lg shadow-lg w-full max-w-5xl md:h-auto overflow-hidden transform modal-content modal-glow">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-cyberpunk-grid">
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid">
         </div>
 
         {/* Header */}
@@ -1117,7 +1118,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="relative w-full h-1 bg-app-tertiary progress-bar-cyberpunk">
+        <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
           <div 
             className="h-full bg-app-primary-color transition-all duration-300"
             style={{ width: `${(currentStep + 1) / STEPS_CUSTOMBUY.length * 100}%` }}
@@ -1141,7 +1142,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                 type="button"
                 onClick={currentStep === 0 ? onClose : handleBack}
                 disabled={isSubmitting}
-                className="px-5 py-2.5 text-app-primary bg-app-tertiary border-app-primary-30 border hover:bg-app-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-cyberpunk"
+                className="px-5 py-2.5 text-app-primary bg-app-tertiary border-app-primary-30 border hover:bg-app-secondary hover:border-app-primary rounded-lg transition-all duration-200 shadow-md font-mono tracking-wider modal-btn-"
               >
                 {currentStep === 0 ? 'CANCEL' : 'BACK'}
               </button>
@@ -1155,7 +1156,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
                 className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider 
                           ${isSubmitting || (currentStep === STEPS_CUSTOMBUY.length - 1 && !isConfirmed)
                             ? 'bg-primary-50 text-app-primary-80 cursor-not-allowed opacity-50' 
-                            : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-cyberpunk'}`}
+                            : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
               >
                 {isSubmitting ? (
                   <>
@@ -1177,7 +1178,7 @@ export const CustomBuyModal: React.FC<CustomBuyModalProps> = ({
           </form>
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>

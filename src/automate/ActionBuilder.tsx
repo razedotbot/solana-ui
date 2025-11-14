@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
-import { TradingAction } from './types';
+import type { TradingAction } from './types';
 
 interface ActionBuilderProps {
   action: TradingAction;
@@ -54,7 +54,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
           <label className="block text-xs font-mono color-primary mb-1">Action</label>
           <select
             value={action.type}
-            onChange={(e) => onUpdate({ type: e.target.value as any })}
+            onChange={(e) => onUpdate({ type: e.target.value as TradingAction['type'] })}
             className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
           >
             {actionTypes.map(type => (
@@ -67,7 +67,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
           <label className="block text-xs font-mono color-primary mb-1">Amount Type</label>
           <select
             value={action.amountType}
-            onChange={(e) => onUpdate({ amountType: e.target.value as any })}
+            onChange={(e) => onUpdate({ amountType: e.target.value as TradingAction['amountType'] })}
             className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
           >
             {amountTypes.map(type => (
@@ -115,7 +115,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
             <label className="block text-xs font-mono color-primary mb-1">Volume Type</label>
             <select
               value={action.volumeType || 'buyVolume'}
-              onChange={(e) => onUpdate({ volumeType: e.target.value as any })}
+              onChange={(e) => onUpdate({ volumeType: e.target.value as TradingAction['volumeType'] })}
               className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
             >
               {volumeTypes.map(type => (
@@ -174,7 +174,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, index, onUpdate, 
           <label className="block text-xs font-mono color-primary mb-1">Priority</label>
           <select
             value={action.priority}
-            onChange={(e) => onUpdate({ priority: e.target.value as any })}
+            onChange={(e) => onUpdate({ priority: e.target.value as TradingAction['priority'] })}
             className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
           >
             <option value="low">Low</option>

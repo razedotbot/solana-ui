@@ -8,7 +8,7 @@ export const Tooltip = ({
   children: React.ReactNode;
   content: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
-}) => {
+}): React.ReactElement => {
   const [isVisible, setIsVisible] = useState(false);
 
   const positionClasses = {

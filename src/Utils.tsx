@@ -1,9 +1,12 @@
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import type { Connection } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import Cookies from 'js-cookie';
 import CryptoJS from 'crypto-js';
-import { TradingStrategy } from './automate/types';
+import type { TradingStrategy } from './automate/types';
 import { formatAddress as _formatAddress, formatTokenBalance as _formatTokenBalance } from './utils/formatting';
+
+export type WalletCategory = 'Soft' | 'Medium' | 'Hard';
 
 export interface WalletType {
   id: number;
@@ -12,7 +15,9 @@ export interface WalletType {
   isActive: boolean;
   tokenBalance?: number;
   label?: string;
+  category?: WalletCategory;
   isArchived?: boolean;
+  [key: string]: unknown;
 }
 
 export interface ConfigType {
@@ -53,11 +58,11 @@ request.onerror = () => {
   console.error('Error opening database:', request.error);
 };
 
-request.onsuccess = (event: Event) => {
+request.onsuccess = () => {
   db = request.result;
 };
 
-request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+request.onupgradeneeded = () => {
   db = request.result;
   if (!db.objectStoreNames.contains(WALLET_STORE)) {
     // Create object store for encrypted wallet data
@@ -65,45 +70,6 @@ request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
   }
 };
 
-// Function to load wallets from IndexedDB with encryption support
-const loadWalletsFromIndexedDB = (): Promise<WalletType[]> => {
-  return new Promise((resolve) => {
-    if (!db) {
-      resolve([]);
-      return;
-    }
-
-    try {
-      const transaction = db.transaction(WALLET_STORE, 'readonly');
-      const store = transaction.objectStore(WALLET_STORE);
-      const request = store.get('encrypted_wallets');
-
-      request.onsuccess = () => {
-        try {
-          if (request.result && request.result.data) {
-            const decryptedData = decryptData(request.result.data);
-            const wallets = JSON.parse(decryptedData);
-            resolve(wallets);
-          } else {
-            resolve([]);
-          }
-        } catch (error) {
-          console.error('Error decrypting IndexedDB data:', error);
-          resolve([]);
-        }
-      };
-
-      request.onerror = () => {
-        console.error('Error loading from IndexedDB:', request.error);
-        resolve([]);
-      };
-    } catch (error) {
-      console.error('Error accessing IndexedDB:', error);
-      resolve([]);
-    }
-  });
-};
-const WALLET_COOKIE_KEY = 'wallets';
 const CONFIG_COOKIE_KEY = 'config';
 const QUICK_BUY_COOKIE_KEY = 'quickBuyPreferences';
 const TRADING_STRATEGIES_COOKIE_KEY = 'tradingStrategies';
@@ -157,9 +123,9 @@ export const migrateToEncryptedStorage = (): boolean => {
   try {
     const unencryptedData = localStorage.getItem('wallets');
     if (unencryptedData) {
-      const wallets = JSON.parse(unencryptedData);
+      const wallets = JSON.parse(unencryptedData) as WalletType[];
       saveWalletsToCookies(wallets);
-      console.log('Successfully migrated wallet data to encrypted storage');
+      console.info('Successfully migrated wallet data to encrypted storage');
       return true;
     }
     return false;
@@ -169,7 +135,7 @@ export const migrateToEncryptedStorage = (): boolean => {
   }
 };
 
-export const createNewWallet = async (): Promise<WalletType> => {
+export const createNewWallet = (): WalletType => {
   const keypair = Keypair.generate();
   const address = keypair.publicKey.toString();
   const privateKey = bs58.encode(keypair.secretKey);
@@ -178,13 +144,14 @@ export const createNewWallet = async (): Promise<WalletType> => {
     id: Date.now(),
     address,
     privateKey,
-    isActive: false
+    isActive: false,
+    category: 'Medium'
   };
 };
 
-export const importWallet = async (
+export const importWallet = (
   privateKeyString: string
-): Promise<{ wallet: WalletType | null; error?: string }> => {
+): { wallet: WalletType | null; error?: string } => {
   try {
     // Basic validation
     if (!privateKeyString.trim()) {
@@ -200,7 +167,7 @@ export const importWallet = async (
       if (privateKeyBytes.length !== 64) {
         return { wallet: null, error: 'Invalid private key length' };
       }
-    } catch (e) {
+    } catch {
       return { wallet: null, error: 'Invalid private key format' };
     }
 
@@ -212,7 +179,8 @@ export const importWallet = async (
       id: Date.now(),
       address,
       privateKey: privateKeyString,
-      isActive: false
+      isActive: false,
+      category: 'Medium'
     };
     
     return { wallet };
@@ -262,10 +230,8 @@ export const getWallets = (): WalletType[] => {
 };
 export const getActiveWallets = (): WalletType[] => {
   try {
-    const savedWallets = Cookies.get(WALLET_COOKIE_KEY);
-    if (!savedWallets) return [];
-    const parsedWallets = JSON.parse(savedWallets);
-    return parsedWallets.filter((wallet: WalletType) => wallet.isActive);
+    const wallets = loadWalletsFromCookies();
+    return wallets.filter((wallet: WalletType) => wallet.isActive);
   } catch (error) {
     console.error('Error loading active wallets from cookies:', error);
     return [];
@@ -293,7 +259,8 @@ export const fetchTokenBalance = async (
     if (tokenAccounts.value.length === 0) return 0;
 
     // Get balance from the first token account
-    const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+    const parsedData = tokenAccounts.value[0].account.data.parsed as { info: { tokenAmount: { uiAmount: number | null } } };
+    const balance = parsedData.info.tokenAmount.uiAmount;
     return balance || 0;
   } catch (error) {
     console.error('Error fetching token balance:', error);
@@ -343,11 +310,11 @@ export const fetchWalletBalances = async (
   connection: Connection,
   wallets: WalletType[],
   tokenAddress: string,
-  setSolBalances: Function,
-  setTokenBalances: Function,
+  setSolBalances: (balances: Map<string, number>) => void,
+  setTokenBalances: (balances: Map<string, number>) => void,
   currentSolBalances?: Map<string, number>,
   currentTokenBalances?: Map<string, number>
-) => {
+): Promise<{ solBalances: Map<string, number>; tokenBalances: Map<string, number> }> => {
   // Start with existing balances to preserve them on errors
   const newSolBalances = new Map(currentSolBalances || new Map<string, number>());
   const newTokenBalances = new Map(currentTokenBalances || new Map<string, number>());
@@ -376,83 +343,16 @@ export const fetchWalletBalances = async (
       console.error(`Error fetching balances for ${wallet.address}:`, error);
     }
     
-    // Add 100ms delay between wallets (except for the last one)
+    // Add 5ms delay between wallets (except for the last one)
     if (i < wallets.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 5));
+      await new Promise<void>(resolve => setTimeout(resolve, 5));
     }
   }
   
   return { solBalances: newSolBalances, tokenBalances: newTokenBalances };
 };
 
-/**
- * Legacy function - kept for backwards compatibility
- * @deprecated Use fetchWalletBalances instead
- */
-export const fetchSolBalances = async (
-  connection: Connection,
-  wallets: WalletType[],
-  setSolBalances: Function,
-  onProgress?: (current: number, total: number) => void
-) => {
-  const newBalances = new Map<string, number>();
-  
-  // Process wallets sequentially with delay
-  for (let i = 0; i < wallets.length; i++) {
-    const wallet = wallets[i];
-    
-    try {
-      const balance = await fetchSolBalance(connection, wallet.address);
-      newBalances.set(wallet.address, balance);
-    } catch (error) {
-      console.error(`Error fetching SOL balance for ${wallet.address}:`, error);
-      // Don't set balance to 0 on error - preserve existing balance or skip if no existing balance
-    }
-    
-    // Report progress
-    if (onProgress) {
-      onProgress(i + 1, wallets.length);
-    }
-    
-    // Add 100ms delay between wallets (except for the last one)
-    if (i < wallets.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-  }
-  
-  // Update balances once at the end
-  setSolBalances(newBalances);
-  return newBalances;
-};
 
-/**
- * Legacy function - kept for backwards compatibility
- * @deprecated Use fetchWalletBalances instead
- */
-export const fetchTokenBalances = async (
-  connection: Connection,
-  wallets: WalletType[],
-  tokenAddress: string,
-  setTokenBalances: Function
-) => {
-  if (!tokenAddress) return new Map<string, number>();
-  
-  const newBalances = new Map<string, number>();
-  
-  const promises = wallets.map(async (wallet) => {
-    try {
-      const balance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
-      newBalances.set(wallet.address, balance);
-    } catch (error) {
-      console.error(`Error fetching token balance for ${wallet.address}:`, error);
-      // Don't set balance to 0 on error - preserve existing balance or skip if no existing balance
-    }
-  });
-  
-  await Promise.all(promises);
-  setTokenBalances(newBalances);
-  return newBalances;
-};
 
 /**
  * Handle wallet sorting by balance
@@ -460,10 +360,10 @@ export const fetchTokenBalances = async (
 export const handleSortWallets = (
   wallets: WalletType[],
   sortDirection: 'asc' | 'desc',
-  setSortDirection: Function,
+  setSortDirection: (direction: 'asc' | 'desc') => void,
   solBalances: Map<string, number>,
-  setWallets: Function
-) => {
+  setWallets: (wallets: WalletType[]) => void
+): void => {
   const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
   setSortDirection(newDirection);
   
@@ -488,9 +388,9 @@ export const handleCleanupWallets = (
   wallets: WalletType[],
   solBalances: Map<string, number>,
   tokenBalances: Map<string, number>,
-  setWallets: Function,
-  showToast: Function
-) => {
+  setWallets: (wallets: WalletType[]) => void,
+  showToast: (message: string, type: 'success' | 'error') => void
+): void => {
   // Keep track of seen addresses
   const seenAddresses = new Set<string>();
   // Keep track of removal counts
@@ -588,15 +488,15 @@ export const loadWalletsFromCookies = (): WalletType[] => {
     if (encryptedData) {
       try {
         const decryptedData = decryptData(encryptedData);
-        const parsedWallets = JSON.parse(decryptedData);
+        const parsedWallets = JSON.parse(decryptedData) as WalletType[];
         return parsedWallets;
-      } catch (decryptError) {
-        console.error('Error decrypting wallet data:', decryptError);
+      } catch {
+        console.error('Error decrypting wallet data');
         // If decryption fails, try to load old unencrypted data as fallback
         const oldWallets = localStorage.getItem('wallets');
         if (oldWallets) {
-          console.log('🔄 Loading from old unencrypted storage and migrating...');
-          const parsedWallets = JSON.parse(oldWallets);
+          console.info('🔄 Loading from old unencrypted storage and migrating...');
+          const parsedWallets = JSON.parse(oldWallets) as WalletType[];
           // Migrate to encrypted storage
           saveWalletsToCookies(parsedWallets);
           return parsedWallets;
@@ -607,8 +507,8 @@ export const loadWalletsFromCookies = (): WalletType[] => {
     // Fallback to old unencrypted data if no encrypted data exists
     const oldWallets = localStorage.getItem('wallets');
     if (oldWallets) {
-      console.log('🔄 Migrating from unencrypted to encrypted storage...');
-      const parsedWallets = JSON.parse(oldWallets);
+      console.info('🔄 Migrating from unencrypted to encrypted storage...');
+      const parsedWallets = JSON.parse(oldWallets) as WalletType[];
       // Migrate to encrypted storage
       saveWalletsToCookies(parsedWallets);
       return parsedWallets;
@@ -621,7 +521,7 @@ export const loadWalletsFromCookies = (): WalletType[] => {
   }
 };
 
-export const saveConfigToCookies = (config: ConfigType) => {
+export const saveConfigToCookies = (config: ConfigType): void => {
   Cookies.set(CONFIG_COOKIE_KEY, JSON.stringify(config), { expires: 30 });
 };
 
@@ -629,7 +529,7 @@ export const loadConfigFromCookies = (): ConfigType | null => {
   const savedConfig = Cookies.get(CONFIG_COOKIE_KEY);
   if (savedConfig) {
     try {
-      const config = JSON.parse(savedConfig);
+      const config = JSON.parse(savedConfig) as Partial<ConfigType>;
       // Handle backward compatibility for slippageBps
       if (config.slippageBps === undefined) {
         config.slippageBps = '9900'; // Default 99% slippage
@@ -652,7 +552,7 @@ export const loadConfigFromCookies = (): ConfigType | null => {
       if (config.tradingServerUrl === undefined) {
         config.tradingServerUrl = 'localhost:4444'; // Default URL
       }
-      return config;
+      return config as ConfigType;
     } catch (error) {
       console.error('Error parsing saved config:', error);
       return null;
@@ -664,7 +564,7 @@ export const loadConfigFromCookies = (): ConfigType | null => {
 // Re-export from shared formatting utilities for backward compatibility
 export const formatTokenBalance = _formatTokenBalance;
 
-export const downloadPrivateKey = (wallet: WalletType) => {
+export const downloadPrivateKey = (wallet: WalletType): void => {
   const blob = new Blob([wallet.privateKey], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -675,7 +575,7 @@ export const downloadPrivateKey = (wallet: WalletType) => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
-export const downloadAllWallets = (wallets: WalletType[]) => {
+export const downloadAllWallets = (wallets: WalletType[]): void => {
   const formattedText = wallets.map(wallet => (
     `${wallet.address}\n` +
     `${wallet.privateKey}\n\n`
@@ -704,7 +604,7 @@ export interface QuickBuyPreferences {
   useQuickSellRange: boolean;
 }
 
-export const saveQuickBuyPreferencesToCookies = (preferences: QuickBuyPreferences) => {
+export const saveQuickBuyPreferencesToCookies = (preferences: QuickBuyPreferences): void => {
   Cookies.set(QUICK_BUY_COOKIE_KEY, JSON.stringify(preferences), { expires: 30 });
 };
 
@@ -712,7 +612,7 @@ export const loadQuickBuyPreferencesFromCookies = (): QuickBuyPreferences | null
   const savedPreferences = Cookies.get(QUICK_BUY_COOKIE_KEY);
   if (savedPreferences) {
     try {
-      return JSON.parse(savedPreferences);
+      return JSON.parse(savedPreferences) as QuickBuyPreferences;
     } catch (error) {
       console.error('Error parsing saved quick buy preferences:', error);
       return null;
@@ -721,7 +621,7 @@ export const loadQuickBuyPreferencesFromCookies = (): QuickBuyPreferences | null
   return null;
 };
 
-export const saveTradingStrategiesToCookies = (strategies: TradingStrategy[]) => {
+export const saveTradingStrategiesToCookies = (strategies: TradingStrategy[]): void => {
   Cookies.set(TRADING_STRATEGIES_COOKIE_KEY, JSON.stringify(strategies), { expires: 30 });
 };
 

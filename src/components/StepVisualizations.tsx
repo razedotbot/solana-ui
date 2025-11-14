@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Rocket, BarChart3, DollarSign, ArrowRight } from 'lucide-react';
+import { Settings, Rocket, DollarSign, ArrowRight } from 'lucide-react';
 
 interface StepVisualizationProps {
   step: number;

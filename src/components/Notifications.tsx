@@ -1,5 +1,6 @@
-import React, { useEffect, useState, createContext, useContext, useRef } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import { AlertCircle, X, ZapIcon } from "lucide-react"
+import { ToastContext } from "./ToastContext"
 
 interface Toast {
   id: number
@@ -11,9 +12,9 @@ interface ToastProviderProps {
   children: React.ReactNode
 }
 
-// Custom cyberpunk styled toast animations
-const cyberpunkAnimations = `
-  @keyframes cyberpunk-slide-in {
+// Custom  styled toast animations
+const Animations = `
+  @keyframes slide-in {
     0% {
       transform: translateX(100%);
       opacity: 0;
@@ -39,7 +40,7 @@ const cyberpunkAnimations = `
     }
   }
 
-  @keyframes cyberpunk-glow {
+  @keyframes glow {
     0% {
       box-shadow: 0 0 5px var(--color-primary-70);
     }
@@ -51,7 +52,7 @@ const cyberpunkAnimations = `
     }
   }
 
-  @keyframes cyberpunk-error-glow {
+  @keyframes error-glow {
     0% {
       box-shadow: 0 0 5px var(--color-error-70);
     }
@@ -63,7 +64,7 @@ const cyberpunkAnimations = `
     }
   }
   
-  @keyframes cyberpunk-scanline {
+  @keyframes scanline {
     0% {
       background-position: 0 0;
     }
@@ -72,7 +73,7 @@ const cyberpunkAnimations = `
     }
   }
 
-  @keyframes cyberpunk-text-glitch {
+  @keyframes text-glitch {
     0% {
       text-shadow: 0 0 0 var(--color-text-secondary-90);
     }
@@ -94,36 +95,30 @@ const cyberpunkAnimations = `
   }
 `
 
-// CSS classes for cyberpunk styling
-const cyberpunkClasses = {
-  successToast: "relative bg-app-primary border border-app-primary text-app-primary animate-[cyberpunk-glow_2s_infinite]",
-  errorToast: "relative bg-app-primary border border-error text-app-primary animate-[cyberpunk-error-glow_2s_infinite]",
-  scanline: "absolute inset-0 pointer-events-none bg-gradient-scanline-primary bg-[size:100%_4px] animate-[cyberpunk-scanline_4s_linear_infinite] opacity-40",
-  errorScanline: "absolute inset-0 pointer-events-none bg-gradient-scanline-error bg-[size:100%_4px] animate-[cyberpunk-scanline_4s_linear_infinite] opacity-40",
+// CSS classes for  styling
+const Classes = {
+  successToast: "relative bg-app-primary border border-app-primary text-app-primary animate-[glow_2s_infinite]",
+  errorToast: "relative bg-app-primary border border-error text-app-primary animate-[error-glow_2s_infinite]",
+  scanline: "absolute inset-0 pointer-events-none bg-gradient-scanline-primary bg-[size:100%_4px] animate-[scanline_4s_linear_infinite] opacity-40",
+  errorScanline: "absolute inset-0 pointer-events-none bg-gradient-scanline-error bg-[size:100%_4px] animate-[scanline_4s_linear_infinite] opacity-40",
   icon: "h-5 w-5 color-primary",
   errorIcon: "h-5 w-5 text-error",
-  message: "font-mono tracking-wider animate-[cyberpunk-text-glitch_3s_infinite]",
+  message: "font-mono tracking-wider animate-[text-glitch_3s_infinite]",
   closeButton: "ml-2 rounded-full p-1 hover:bg-primary-40 text-app-secondary transition-colors duration-300",
   errorCloseButton: "ml-2 rounded-full p-1 hover:bg-error-40 text-error-light transition-colors duration-300"
 }
 
-export const ToastContext = createContext<{
-  showToast: (message: string, type: 'success' | 'error') => void
-}>({
-  showToast: () => {},
-})
-
-export const ToastProvider = ({ children }: ToastProviderProps) => {
+export const ToastProvider = ({ children }: ToastProviderProps): JSX.Element => {
   const [toasts, setToasts] = useState<Toast[]>([])
   const counterRef = useRef(0)
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = (message: string, type: 'success' | 'error'): void => {
     const id = Date.now() + counterRef.current
     counterRef.current += 1
     setToasts(prev => [...prev, { id, message, type }])
   }
 
-  const closeToast = (id: number) => {
+  const closeToast = (id: number): void => {
     setToasts(prev => prev.filter(toast => toast.id !== id))
   }
 
@@ -131,30 +126,30 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
     if (toasts.length > 0) {
       const timer = setTimeout(() => {
         setToasts(prev => prev.slice(1))
-      }, 2000) // Increased duration to 5 seconds to enjoy the cyberpunk effects
+      }, 2000) // Increased duration to 5 seconds to enjoy the  effects
       return () => clearTimeout(timer)
     }
+    return undefined
   }, [toasts])
-
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {/* Add the custom animations to the DOM */}
-      <style>{cyberpunkAnimations}</style>
+      <style>{Animations}</style>
       
       <div className="fixed bottom-4 right-4 z-[999999999999999999999999999999999] flex flex-col gap-2">
         {toasts.map(toast => (
           <div
             key={toast.id}
             style={{ animationDuration: '5s' }}
-            className={`animate-[cyberpunk-slide-in_5s_ease-in-out_forwards] flex items-center gap-2 rounded px-4 py-3 shadow-lg backdrop-blur-sm ${
-              toast.type === 'success' ? cyberpunkClasses.successToast : cyberpunkClasses.errorToast
+            className={`animate-[slide-in_5s_ease-in-out_forwards] flex items-center gap-2 rounded px-4 py-3 shadow-lg backdrop-blur-sm ${
+              toast.type === 'success' ? Classes.successToast : Classes.errorToast
             }`}
           >
             {/* Scanline effect */}
-            <div className={toast.type === 'success' ? cyberpunkClasses.scanline : cyberpunkClasses.errorScanline}></div>
+            <div className={toast.type === 'success' ? Classes.scanline : Classes.errorScanline}></div>
             
-            {/* Corner accents for cyberpunk border effect */}
+            {/* Corner accents for  border effect */}
             <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-app-primary"></div>
             <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-app-primary"></div>
             <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-app-primary"></div>
@@ -162,14 +157,14 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
             
             {/* Icon and content */}
             {toast.type === 'success' ? (
-              <ZapIcon className={cyberpunkClasses.icon} />
+              <ZapIcon className={Classes.icon} />
             ) : (
-              <AlertCircle className={cyberpunkClasses.errorIcon} />
+              <AlertCircle className={Classes.errorIcon} />
             )}
-            <p className={cyberpunkClasses.message}>{toast.message}</p>
+            <p className={Classes.message}>{toast.message}</p>
             <button
               onClick={() => closeToast(toast.id)}
-              className={toast.type === 'success' ? cyberpunkClasses.closeButton : cyberpunkClasses.errorCloseButton}
+              className={toast.type === 'success' ? Classes.closeButton : Classes.errorCloseButton}
             >
               <X className="h-4 w-4" />
             </button>
@@ -178,10 +173,6 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
       </div>
     </ToastContext.Provider>
   )
-}
-
-export const useToast = () => {
-  return useContext(ToastContext)
 }
 
 export default ToastProvider

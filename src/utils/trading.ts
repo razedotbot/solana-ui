@@ -1,6 +1,7 @@
-import { WalletType } from '../Utils';
-import { executeBuy, createBuyConfig, BuyConfig, BundleMode } from './buy';
-import { executeSell, createSellConfig, SellConfig } from './sell';
+import type { WalletType } from '../Utils';
+import { executeBuy, createBuyConfig } from './buy';
+import type { BundleMode } from './buy';
+import { executeSell, createSellConfig } from './sell';
 
 export interface TradingConfig {
   tokenAddress: string;
@@ -161,7 +162,7 @@ const executeUnifiedSell = async (
 
 // Main trading executor
 export const executeTrade = async (
-  dex: string,
+  _dex: string,
   wallets: WalletType[],
   config: TradingConfig,
   isBuyMode: boolean,

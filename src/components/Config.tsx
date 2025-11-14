@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Settings, Server, CreditCard } from 'lucide-react';
-import { ConfigType } from '../Utils';
+import type { ConfigType } from '../Utils';
 
 interface ConfigProps {
   isOpen: boolean;
@@ -18,7 +18,7 @@ const Config: React.FC<ConfigProps> = ({
   onConfigChange,
   onSave
 }) => {
-  // Add cyberpunk styles when the modal is opened
+  // Add  styles when the modal is opened
   useEffect(() => {
     if (isOpen) {
       const styleElement = document.createElement('style');
@@ -44,16 +44,16 @@ const Config: React.FC<ConfigProps> = ({
           100% { transform: translateY(100%); opacity: 0; }
         }
         
-        .config-cyberpunk-container {
+        .config-container {
           animation: config-fade-in 0.3s ease;
         }
         
-        .config-cyberpunk-content {
+        .config-content {
           animation: config-slide-up 0.4s ease;
           position: relative;
         }
         
-        .config-cyberpunk-content::before {
+        .config-content::before {
           content: "";
           position: absolute;
           width: 100%;
@@ -71,18 +71,18 @@ const Config: React.FC<ConfigProps> = ({
           animation: config-pulse 4s infinite;
         }
         
-        .config-input-cyberpunk:focus {
+        .config-input-:focus {
           box-shadow: 0 0 0 1px rgba(2, 179, 109, 0.7), 0 0 15px rgba(2, 179, 109, 0.5);
           transition: all 0.3s ease;
         }
         
-        .config-btn-cyberpunk {
+        .config-btn- {
           position: relative;
           overflow: hidden;
           transition: all 0.3s ease;
         }
         
-        .config-btn-cyberpunk::after {
+        .config-btn-::after {
           content: "";
           position: absolute;
           top: -50%;
@@ -100,12 +100,12 @@ const Config: React.FC<ConfigProps> = ({
           opacity: 0;
         }
         
-        .config-btn-cyberpunk:hover::after {
+        .config-btn-:hover::after {
           opacity: 1;
           transform: rotate(45deg) translate(50%, 50%);
         }
         
-        .config-btn-cyberpunk:active {
+        .config-btn-:active {
           transform: scale(0.95);
         }
         
@@ -132,20 +132,21 @@ const Config: React.FC<ConfigProps> = ({
         document.body.style.overflow = '';
       };
     }
+    return undefined;
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   return createPortal(
     <div 
-      className="fixed inset-0 flex items-center justify-center backdrop-blur-sm config-cyberpunk-container" 
+      className="fixed inset-0 flex items-center justify-center backdrop-blur-sm config-container" 
       style={{
         backgroundColor: 'rgba(5, 10, 14, 0.85)',
         zIndex: 9999, // Extremely high z-index to ensure it's on top
       }}
     >
       <div 
-        className="relative bg-[#050a0e] border border-[#02b36d40] rounded-lg shadow-lg w-full max-w-md overflow-hidden transform config-cyberpunk-content config-glow"
+        className="relative bg-[#050a0e] border border-[#02b36d40] rounded-lg shadow-lg w-full max-w-md overflow-hidden transform config-content config-glow"
         style={{ zIndex: 10000 }} // Even higher z-index for the modal content
       >
         {/* Ambient grid background */}
@@ -191,7 +192,7 @@ const Config: React.FC<ConfigProps> = ({
                 type="text"
                 value={config.rpcEndpoint}
                 onChange={(e) => onConfigChange('rpcEndpoint', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input-cyberpunk font-mono tracking-wider"
+                className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input- font-mono tracking-wider"
                 placeholder="ENTER RPC ENDPOINT URL"
               />
               <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-[#02b36d30] transition-all duration-300"></div>
@@ -210,7 +211,7 @@ const Config: React.FC<ConfigProps> = ({
                 type="number"
                 value={config.transactionFee}
                 onChange={(e) => onConfigChange('transactionFee', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input-cyberpunk font-mono tracking-wider"
+                className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input- font-mono tracking-wider"
                 step="0.000001"
                 min="0"
                 placeholder="ENTER TRANSACTION FEE"
@@ -222,14 +223,14 @@ const Config: React.FC<ConfigProps> = ({
           <div className="pt-4 animate-[fadeIn_0.5s_ease]">
             <button
               onClick={onSave}
-              className="w-full px-5 py-3 bg-[#02b36d] text-[#050a0e] rounded-lg shadow-lg transition-all duration-300 font-mono tracking-wider font-medium transform hover:-translate-y-0.5 hover:bg-[#01a35f] config-btn-cyberpunk"
+              className="w-full px-5 py-3 bg-[#02b36d] text-[#050a0e] rounded-lg shadow-lg transition-all duration-300 font-mono tracking-wider font-medium transform hover:-translate-y-0.5 hover:bg-[#01a35f] config-btn-"
             >
               SAVE CONFIGURATION
             </button>
           </div>
         </div>
         
-        {/* Cyberpunk decorative corner elements */}
+        {/*  decorative corner elements */}
         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#02b36d] opacity-70"></div>
         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#02b36d] opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#02b36d] opacity-70"></div>

@@ -162,9 +162,9 @@ interface BagsSharedCreateResponse {
     extractionMethod: string;
   };
   bundleOrder?: string[];
-  transactionDetails?: any[];
-  signers?: any;
-  summary?: any;
+  transactionDetails?: Array<Record<string, unknown>>;
+  signers?: Record<string, unknown>;
+  summary?: Record<string, unknown>;
   urls?: {
     token: string;
     explorer: string;
@@ -218,10 +218,11 @@ const checkRateLimit = async (): Promise<void> => {
  */
 const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
   try {
-    const baseUrl = (window as any).tradingServerUrl?.replace(/\/+$/, '') || '';
+    const baseUrl = (window as unknown as Record<string, unknown>)['tradingServerUrl'] as string | undefined;
+    const cleanBaseUrl = baseUrl?.replace(/\/+$/, '') || '';
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/solana/send`, {
+    const response = await fetch(`${cleanBaseUrl}/solana/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -233,13 +234,13 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as BundleResult & { error?: { message?: string } };
     
     if (data.error) {
       throw new Error(data.error.message || 'Unknown error from bundle server');
     }
     
-    return data.result;
+    return data.result as unknown as BundleResult;
   } catch (error) {
     console.error('Error sending bundle:', error);
     throw error;
@@ -263,8 +264,6 @@ export const createTokenAndConfig = async (
   config: BagsSharedTokenCreateConfig
 ): Promise<BagsSharedTokenCreateResponse> => {
   try {
-    
-    
     const response = await fetch(`https://utils.fury.bot/solana/bags/config/shared`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -275,7 +274,7 @@ export const createTokenAndConfig = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data: BagsSharedTokenCreateResponse = await response.json();
+    const data = await response.json() as BagsSharedTokenCreateResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to create token and config');
@@ -304,7 +303,7 @@ export const sendLaunchTransactions = async (
   bundleOrder?: string[]
 ): Promise<{ success: boolean; results?: BundleResult[]; error?: string }> => {
   try {
-    console.log(`Sending ${transactions.length} transactions with bundle order:`, bundleOrder);
+    console.info(`Sending ${transactions.length} transactions with bundle order:`, bundleOrder);
     
     // Create keypairs from private keys
     const walletKeypairs = wallets.map(wallet => 
@@ -326,7 +325,7 @@ export const sendLaunchTransactions = async (
         await checkRateLimit();
         
         const bundleType = bundleOrder?.[i] || 'unknown';
-        console.log(`Processing ${bundleType} transaction ${i + 1}/${transactions.length}`);
+        console.info(`Processing ${bundleType} transaction ${i + 1}/${transactions.length}`);
         
         // For config transactions, we need to add fee transactions
         if (bundleType === 'config') {
@@ -343,7 +342,7 @@ export const sendLaunchTransactions = async (
               success: true
             });
             successCount++;
-            console.log(`✅ Config transaction ${i + 1} sent successfully`);
+            console.info(`✅ Config transaction ${i + 1} sent successfully`);
           } else {
             throw new Error(result.error || 'Failed to send config transaction');
           }
@@ -369,7 +368,7 @@ export const sendLaunchTransactions = async (
           if (signers.length > 0) {
             // Sign the transaction
             transaction.sign(signers);
-            console.log(`✅ ${bundleType} transaction ${i + 1} signed with ${signers.length} signers`);
+            console.info(`✅ ${bundleType} transaction ${i + 1} signed with ${signers.length} signers`);
           }
           
           // Serialize and send the transaction
@@ -378,7 +377,7 @@ export const sendLaunchTransactions = async (
           
           results.push(result);
           successCount++;
-          console.log(`✅ ${bundleType} transaction ${i + 1} sent successfully`);
+          console.info(`✅ ${bundleType} transaction ${i + 1} sent successfully`);
         }
         
       } catch (error) {
@@ -410,8 +409,6 @@ export const checkSharedFeesConfig = async (
   sharedFeesConfig: BagsSharedFeesConfig
 ): Promise<BagsSharedConfigResponse> => {
   try {
-    
-    
     const response = await fetch(`https://utils.fury.bot/solana/bags/config/shared`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -422,7 +419,7 @@ export const checkSharedFeesConfig = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data: BagsSharedConfigResponse = await response.json();
+    const data = await response.json() as BagsSharedConfigResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to check shared fees config');
@@ -444,7 +441,7 @@ export const signAndSendSharedConfigTransaction = async (
   rpcEndpoint?: string
 ): Promise<{ success: boolean; signature?: string; error?: string }> => {
   try {
-    console.log('Signing and sending shared fees config transaction...');
+    console.info('Signing and sending shared fees config transaction...');
     
     // Deserialize the config transaction
     const txBuffer = bs58.decode(configTransaction);
@@ -508,12 +505,12 @@ export const signAndSendSharedConfigTransaction = async (
     // Send the bundle with both transactions
     const result = await sendBundle([signedTxBase58, feesSignedTxBase58]);
     
-    console.log('Shared fees config bundle has been sent', result);
+    console.info('Shared fees config bundle has been sent', result);
     
     // Handle different response structures
     if (result.success || result.result || result.jito) {
       const signature = result.jito || result.result || 'Bundle sent successfully';
-      console.log('Shared fees config and fee transactions sent successfully:', signature);
+      console.info('Shared fees config and fee transactions sent successfully:', signature);
       return {
         success: true,
         signature: signature
@@ -537,8 +534,6 @@ const getPartiallyPreparedSharedTransactions = async (
   sharedCreateConfig: BagsSharedCreateConfig
 ): Promise<{ mintAddress: string, bundles: BagsSharedCreateBundle[] }> => {
   try {
-    
-    
     const response = await fetch(`https://utils.fury.bot/solana/bags/create/shared`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -549,35 +544,39 @@ const getPartiallyPreparedSharedTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data: BagsSharedCreateResponse = await response.json();
+    const data = await response.json() as BagsSharedCreateResponse;
     
     if (!data.success) {
       throw new Error(data.error || 'Failed to get partially prepared shared transactions');
     }
     
+    // Handle different response formats
+    const responseData = (data as unknown as { data?: { transactions?: string[]; mintAddress?: string; usedData?: { tokenMintAddress?: string } } }).data;
+    const transactions = responseData?.transactions || (data as unknown as { transactions?: string[] }).transactions;
+    
     // Handle both old and new response formats for mint address
-    const mintAddress = data.mintAddress || data.usedData?.tokenMintAddress;
+    const mintAddress = responseData?.mintAddress || data.mintAddress || responseData?.usedData?.tokenMintAddress || data.usedData?.tokenMintAddress;
     if (!mintAddress) {
       throw new Error('No mint address returned from shared fees backend');
     }
     
-    if (!data.transactions || !Array.isArray(data.transactions) || data.transactions.length === 0) {
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
       throw new Error('No transactions returned from shared fees backend');
     }
     
-    console.log(`Received ${data.transactions.length} shared fees transactions for mint ${mintAddress}`);
+    console.info(`Received ${transactions.length} shared fees transactions for mint ${mintAddress}`);
     
     // Group transactions into bundles of max 5 transactions per bundle
     // IMPORTANT: Maintain original transaction order from backend
     const MAX_TX_PER_BUNDLE = 5;
     const bundles: BagsSharedCreateBundle[] = [];
     
-    for (let i = 0; i < data.transactions.length; i += MAX_TX_PER_BUNDLE) {
-      const bundleTransactions = data.transactions.slice(i, i + MAX_TX_PER_BUNDLE);
+    for (let i = 0; i < transactions.length; i += MAX_TX_PER_BUNDLE) {
+      const bundleTransactions = transactions.slice(i, i + MAX_TX_PER_BUNDLE);
       bundles.push({
         transactions: bundleTransactions
       });
-      console.log(`Created shared fees bundle ${bundles.length} with ${bundleTransactions.length} transactions (positions ${i}-${i + bundleTransactions.length - 1})`);
+      console.info(`Created shared fees bundle ${bundles.length} with ${bundleTransactions.length} transactions (positions ${i}-${i + bundleTransactions.length - 1})`);
     }
     
     return {
@@ -596,7 +595,7 @@ const getPartiallyPreparedSharedTransactions = async (
 const completeBundleSigning = (
   bundle: BagsSharedCreateBundle, 
   walletKeypairs: Keypair[],
-  isFirstBundle: boolean = false
+  _isFirstBundle: boolean = false
 ): BagsSharedCreateBundle => {
   // Check if the bundle has a valid transactions array
   if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
@@ -617,7 +616,7 @@ const completeBundleSigning = (
       );
       
       if (isFullySigned) {
-        console.log(`Shared fees transaction ${index + 1} in bundle is already fully signed, maintaining order.`);
+        console.info(`Shared fees transaction ${index + 1} in bundle is already fully signed, maintaining order.`);
         return txBase58;
       }
       
@@ -650,7 +649,7 @@ const completeBundleSigning = (
       if (!isNowSigned) {
         console.warn(`Shared fees transaction ${index + 1} in bundle could not be signed properly.`);
       } else {
-        console.log(`✅ Shared fees transaction ${index + 1} in bundle signed successfully`);
+        console.info(`✅ Shared fees transaction ${index + 1} in bundle signed successfully`);
       }
       
       // Serialize and encode the fully signed transaction
@@ -675,25 +674,25 @@ export const executeSharedFeesBagsCreate = async (
 ): Promise<{ 
   success: boolean; 
   mintAddress?: string; 
-  result?: any; 
+  result?: { totalBundles: number; successCount: number; failureCount: number; results: BundleResult[] }; 
   error?: string; 
   configNeeded?: boolean; 
   configTransaction?: string; 
   configInstructions?: string;
-  feeShare?: any;
+  feeShare?: { creatorWallet: string; feeShareWallet: string; feeSplit: { creator: number; feeClaimer: number }; twitterHandle: string };
 }> => {
   try {
-    console.log(`Preparing to create shared fees token using ${wallets.length} wallets`);
+    console.info(`Preparing to create shared fees token using ${wallets.length} wallets`);
     
     let updatedCreateConfig = sharedCreateConfig;
     
     if (!skipConfigCheck) {
       // Step 1: Check/create shared fees config
-      console.log('Checking shared fees config...');
+      console.info('Checking shared fees config...');
       const configResult = await checkSharedFeesConfig(sharedFeesConfig);
       
       if (configResult.needsConfig && configResult.transaction) {
-        console.log('Shared fees config needed. Config transaction must be signed and sent first.');
+        console.info('Shared fees config needed. Config transaction must be signed and sent first.');
         return {
           success: false,
           configNeeded: true,
@@ -708,8 +707,8 @@ export const executeSharedFeesBagsCreate = async (
         throw new Error('No config key received from shared fees config check');
       }
       
-      console.log('Shared fees config check passed. Proceeding with token creation...');
-      console.log('Fee sharing details:', configResult.feeShare);
+      console.info('Shared fees config check passed. Proceeding with token creation...');
+      console.info('Fee sharing details:', configResult.feeShare);
       
       // Update the create config with the config key
       updatedCreateConfig = {
@@ -717,12 +716,12 @@ export const executeSharedFeesBagsCreate = async (
         configKey: configResult.configKey
       };
     } else {
-      console.log('Skipping config check. Proceeding directly with token creation...');
+      console.info('Skipping config check. Proceeding directly with token creation...');
     }
     
     // Step 2: Get partially prepared bundles from backend
     const { mintAddress, bundles } = await getPartiallyPreparedSharedTransactions(updatedCreateConfig);
-    console.log(`Received ${bundles.length} shared fees bundles from backend for mint ${mintAddress}`);
+    console.info(`Received ${bundles.length} shared fees bundles from backend for mint ${mintAddress}`);
     
     // Step 3: Create keypairs from private keys
     const walletKeypairs = wallets.map(wallet => 
@@ -732,13 +731,13 @@ export const executeSharedFeesBagsCreate = async (
     // Step 4: Complete transaction signing for each bundle
     // IMPORTANT: Process bundles in received order to maintain transaction sequence
     const signedBundles = bundles.map((bundle, index) => {
-      console.log(`Signing shared fees bundle ${index + 1}/${bundles.length} with ${bundle.transactions.length} transactions`);
+      console.info(`Signing shared fees bundle ${index + 1}/${bundles.length} with ${bundle.transactions.length} transactions`);
       return completeBundleSigning(bundle, walletKeypairs, index === 0); // Mark first bundle
     });
-    console.log(`Completed signing for ${signedBundles.length} shared fees bundles in original order`);
+    console.info(`Completed signing for ${signedBundles.length} shared fees bundles in original order`);
     
     // Step 5: Send each bundle with improved retry logic and dynamic delays
-    let results: BundleResult[] = [];
+    const results: BundleResult[] = [];
     let successCount = 0;
     let failureCount = 0;
     
@@ -746,9 +745,9 @@ export const executeSharedFeesBagsCreate = async (
     if (signedBundles.length > 0) {
       const firstBundleResult = await sendFirstBundle(signedBundles[0]);
       if (firstBundleResult.success) {
-        results.push(firstBundleResult.result);
+        results.push(firstBundleResult.result as BundleResult);
         successCount++;
-        console.log("✅ First shared fees bundle landed successfully!");
+        console.info("✅ First shared fees bundle landed successfully!");
       } else {
         console.error("❌ Critical error: First shared fees bundle failed to land:", firstBundleResult.error);
         return {
@@ -766,13 +765,13 @@ export const executeSharedFeesBagsCreate = async (
         // Apply rate limiting
         await checkRateLimit();
         
-        console.log(`Sending shared fees bundle ${i + 1}/${signedBundles.length} in sequence...`);
+        console.info(`Sending shared fees bundle ${i + 1}/${signedBundles.length} in sequence...`);
         // Send the bundle
         const result = await sendBundle(signedBundles[i].transactions);
         
         results.push(result);
         successCount++;
-        console.log(`✅ Shared fees bundle ${i + 1}/${signedBundles.length} sent successfully in order`);
+        console.info(`✅ Shared fees bundle ${i + 1}/${signedBundles.length} sent successfully in order`);
       } catch (error) {
         failureCount++;
         console.error(`❌ Shared fees bundle ${i + 1}/${signedBundles.length} failed:`, error);
@@ -801,8 +800,8 @@ export const executeSharedFeesBagsCreate = async (
 /**
  * Send first bundle with extensive retry logic - this is critical for success
  */
-const sendFirstBundle = async (bundle: BagsSharedCreateBundle): Promise<{success: boolean, result?: any, error?: string}> => {
-  console.log(`Sending first shared fees bundle with ${bundle.transactions.length} transactions (critical)...`);
+const sendFirstBundle = async (bundle: BagsSharedCreateBundle): Promise<{success: boolean, result?: BundleResult, error?: string}> => {
+  console.info(`Sending first shared fees bundle with ${bundle.transactions.length} transactions (critical)...`);
   
   let attempt = 0;
   let consecutiveErrors = 0;
@@ -816,7 +815,7 @@ const sendFirstBundle = async (bundle: BagsSharedCreateBundle): Promise<{success
       const result = await sendBundle(bundle.transactions);
       
       // Success!
-      console.log(`First shared fees bundle sent successfully on attempt ${attempt + 1}`);
+      console.info(`First shared fees bundle sent successfully on attempt ${attempt + 1}`);
       return { success: true, result };
     } catch (error) {
       consecutiveErrors++;

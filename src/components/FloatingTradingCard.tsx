@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, X, Move, Edit3, Check } from 'lucide-react';
-import { WalletType } from '../Utils';
-import { ScriptType } from '../utils/wallets';
-import { formatNumber } from '../utils/formatting';
+import type { WalletType } from '../Utils';
+import type { ScriptType } from '../utils/wallets';
 
 // Hook to detect mobile viewport
-const useIsMobile = () => {
+const useIsMobile = (): boolean => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => {
+    const checkMobile = (): void => {
       setIsMobile(window.innerWidth < 768);
     };
     
@@ -23,12 +22,12 @@ const useIsMobile = () => {
 
 interface PresetButtonProps {
   value: string;
-  onExecute: (amount: string) => Promise<void>;
+  onExecute: (amount: string) => void;
   onChange: (newValue: string) => void;
   isLoading: boolean;
   variant?: 'buy' | 'sell';
   isEditMode: boolean;
-  index: number;
+  index?: number;
 }
 
 // Preset Button component
@@ -38,8 +37,7 @@ const PresetButton = React.memo<PresetButtonProps>(({
   onChange,
   isLoading, 
   variant = 'buy',
-  isEditMode,
-  index 
+  isEditMode
 }) => {
   const [editValue, setEditValue] = useState(value);
   const inputRef = useRef(null);
@@ -54,7 +52,7 @@ const PresetButton = React.memo<PresetButtonProps>(({
     }
   }, [isEditMode]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       const newValue = parseFloat(editValue);
       if (!isNaN(newValue) && newValue > 0) {
@@ -65,7 +63,7 @@ const PresetButton = React.memo<PresetButtonProps>(({
     }
   };
 
-  const handleBlur = () => {
+  const handleBlur = (): void => {
     const newValue = parseFloat(editValue);
     if (!isNaN(newValue) && newValue > 0) {
       onChange(newValue.toString());
@@ -127,30 +125,30 @@ interface TabButtonProps {
 const TabButton = React.memo<TabButtonProps>(({ label, isActive, onClick, onEdit, isEditMode }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(label);
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      (inputRef.current as HTMLInputElement).focus();
-      (inputRef.current as HTMLInputElement).select();
+      inputRef.current.focus();
+      inputRef.current.select();
     }
   }, [isEditing]);
 
-  const handleEdit = () => {
+  const handleEdit = (): void => {
     if (isEditMode) {
       setIsEditing(true);
       setEditValue(label);
     }
   };
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     if (editValue.trim()) {
       onEdit(editValue.trim());
     }
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       handleSave();
     } else if (e.key === 'Escape') {
@@ -201,7 +199,7 @@ interface FloatingTradingCardProps {
   isDragging: boolean;
   onDraggingChange: (dragging: boolean) => void;
   tokenAddress: string;
-  wallets: any[];
+  wallets: WalletType[];
   selectedDex: string;
   setSelectedDex: (dex: string) => void;
   isDropdownOpen: boolean;
@@ -210,7 +208,7 @@ interface FloatingTradingCardProps {
   setBuyAmount: (amount: string) => void;
   sellAmount: string;
   setSellAmount: (amount: string) => void;
-  handleTradeSubmit: (wallets: any[], isBuy: boolean, dex?: string, buyAmount?: string, sellAmount?: string) => void;
+  handleTradeSubmit: (wallets: WalletType[], isBuy: boolean, dex?: string, buyAmount?: string, sellAmount?: string) => void;
   isLoading: boolean;
   getScriptName: (dex: string, isBuy: boolean) => ScriptType;
   countActiveWallets: (wallets: WalletType[]) => number;
@@ -225,27 +223,17 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   onPositionChange,
   isDragging,
   onDraggingChange,
-  tokenAddress,
   wallets,
   selectedDex,
-  setSelectedDex,
-  isDropdownOpen,
-  setIsDropdownOpen,
-  buyAmount,
   setBuyAmount,
-  sellAmount,
   setSellAmount,
   handleTradeSubmit,
-  isLoading,
-  getScriptName,
-  countActiveWallets,
-  currentMarketCap,
-  tokenBalances
+  isLoading
 }) => {
 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
-  const [manualProtocol, setManualProtocol] = useState<string | null>(null);
+  const [manualProtocol] = useState<string | null>(null);
   const isMobile = useIsMobile();
   
   const cardRef = useRef<HTMLDivElement>(null);
@@ -281,7 +269,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   ];
 
   // Load presets from cookies
-  const loadPresetsFromCookies = () => {
+  const loadPresetsFromCookies = (): { tabs: PresetTab[]; activeTabId: string } => {
     try {
       const savedPresets = document.cookie
         .split('; ')
@@ -290,10 +278,10 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
       
       if (savedPresets) {
         const decoded = decodeURIComponent(savedPresets);
-        const parsed = JSON.parse(decoded);
+        const parsed = JSON.parse(decoded) as { tabs?: unknown; activeTabId?: string };
         return {
-          tabs: Array.isArray(parsed.tabs) ? parsed.tabs : defaultPresetTabs,
-          activeTabId: parsed.activeTabId || 'degen'
+          tabs: Array.isArray(parsed.tabs) ? parsed.tabs as PresetTab[] : defaultPresetTabs,
+          activeTabId: typeof parsed.activeTabId === 'string' ? parsed.activeTabId : 'degen'
         };
       }
     } catch (error) {
@@ -306,7 +294,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   };
 
   // Save presets to cookies
-  const savePresetsToCookies = (tabs: PresetTab[], activeTabId: string) => {
+  const savePresetsToCookies = useCallback((tabs: PresetTab[], activeTabId: string): void => {
     try {
       const presetsData = {
         tabs,
@@ -319,38 +307,28 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     } catch (error) {
       console.error('Error saving presets to cookies:', error);
     }
-  };
+  }, []);
 
   // Initialize presets from cookies
   const initialPresets = loadPresetsFromCookies();
-  const [presetTabs, setPresetTabs] = useState(initialPresets.tabs);
-  const [activeTabId, setActiveTabId] = useState(initialPresets.activeTabId);
+  const [presetTabs, setPresetTabs] = useState<PresetTab[]>(initialPresets.tabs);
+  const [activeTabId, setActiveTabId] = useState<string>(initialPresets.activeTabId);
   const activeTab = presetTabs.find((tab: PresetTab) => tab.id === activeTabId) || presetTabs[0];
   
   // Save presets to cookies whenever they change
   useEffect(() => {
     savePresetsToCookies(presetTabs, activeTabId);
-  }, [presetTabs, activeTabId]);
+  }, [presetTabs, activeTabId, savePresetsToCookies]);
   
-  const [initialProtocol, setInitialProtocol] = useState(null);
-  
-  // Fetch route when component opens
-  useEffect(() => {
-  
-  }, [isOpen, tokenAddress, selectedDex]);
-  
-  // Reset protocol when token address changes
-  useEffect(() => {
-    setInitialProtocol(null);
-  }, [tokenAddress]);
+
   
   // Handle tab switching with cookie save
-  const handleTabSwitch = (tabId: string) => {
+  const handleTabSwitch = (tabId: string): void => {
     setActiveTabId(tabId);
   };
   
   // Edit preset handlers
-  const handleEditBuyPreset = (index: number, newValue: string) => {
+  const handleEditBuyPreset = (index: number, newValue: string): void => {
     setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
@@ -361,7 +339,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     ));
   };
   
-  const handleEditSellPreset = (index: number, newValue: string) => {
+  const handleEditSellPreset = (index: number, newValue: string): void => {
     setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
@@ -373,14 +351,14 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   };
   
   // Edit tab label
-  const handleEditTabLabel = (tabId: string, newLabel: string) => {
+  const handleEditTabLabel = (tabId: string, newLabel: string): void => {
     setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === tabId ? { ...tab, label: newLabel } : tab
     ));
   };
   
   // Handle trade submission
-  const handleTrade = useCallback(async (amount: string, isBuy: boolean) => {
+  const handleTrade = useCallback((amount: string, isBuy: boolean): void => {
     const dexToUse = manualProtocol || selectedDex;
     
     // Set the amount in parent state and call handleTradeSubmit with the specific amount
@@ -396,7 +374,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   }, [manualProtocol, selectedDex, wallets, setBuyAmount, setSellAmount, handleTradeSubmit]);
   
   // Drag functionality
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent): void => {
     if (!dragHandleRef.current?.contains(e.target as Node)) return;
     
     onDraggingChange(true);
@@ -409,7 +387,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     }
   };
   
-  const handleMouseMove = React.useCallback((e: MouseEvent) => {
+  const handleMouseMove = React.useCallback((e: MouseEvent): void => {
     if (!isDragging) return;
     
     const newX = e.clientX - dragOffset.x;
@@ -425,7 +403,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     });
   }, [isDragging, dragOffset.x, dragOffset.y, onPositionChange]);
   
-  const handleMouseUp = React.useCallback(() => {
+  const handleMouseUp = React.useCallback((): void => {
     onDraggingChange(false);
   }, [onDraggingChange]);
   
@@ -438,6 +416,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
+    return undefined;
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   if (!isOpen) return null;

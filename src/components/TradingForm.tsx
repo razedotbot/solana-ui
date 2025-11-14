@@ -1,21 +1,18 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Loader2, Move, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Move, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { 
   createMultipleLimitOrders, 
   getActiveOrders, 
-  cancelOrder, 
   processLimitOrderBundle,
-  processCancelOrderTransaction,
   cancelOrderWithBundle,
   solToLamports,
-  lamportsToSol,
   validateLimitOrderConfig,
   calculatePrice,
   type LimitOrderConfig,
   type ActiveOrdersResponse
 } from '../utils/limitorders';
-import { useToast } from './Notifications';
-import { WalletType } from '../Utils';
+import { useToast } from './useToast';
+import type { WalletType } from '../Utils';
 
 interface PresetButtonProps {
   value: string;
@@ -34,11 +31,10 @@ const PresetButton = React.memo<PresetButtonProps>(({
   onChange,
   isLoading, 
   variant = 'buy',
-  isEditMode,
-  index 
+  isEditMode
 }) => {
   const [editValue, setEditValue] = useState(value);
-  const inputRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setEditValue(value);
@@ -46,11 +42,11 @@ const PresetButton = React.memo<PresetButtonProps>(({
 
   useEffect(() => {
     if (isEditMode && inputRef.current) {
-      (inputRef.current as HTMLInputElement)?.focus();
+      inputRef.current.focus();
     }
   }, [isEditMode]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       const newValue = parseFloat(editValue);
       if (!isNaN(newValue) && newValue > 0) {
@@ -61,7 +57,7 @@ const PresetButton = React.memo<PresetButtonProps>(({
     }
   };
 
-  const handleBlur = () => {
+  const handleBlur = (): void => {
     const newValue = parseFloat(editValue);
     if (!isNaN(newValue) && newValue > 0) {
       onChange(newValue.toString());
@@ -134,7 +130,7 @@ const TabButton = React.memo<TabButtonProps>(({ label, isActive, onClick, onEdit
     }
   }, [isEditing]);
 
-  const handleClick = () => {
+  const handleClick = (): void => {
     if (isEditMode) {
       setIsEditing(true);
       setEditValue(label);
@@ -143,14 +139,14 @@ const TabButton = React.memo<TabButtonProps>(({ label, isActive, onClick, onEdit
     }
   };
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     if (editValue.trim()) {
       onEdit(editValue.trim());
     }
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       handleSave();
     } else if (e.key === 'Escape') {
@@ -222,7 +218,7 @@ const CalendarWidget = React.memo<CalendarWidgetProps>(({
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
   
-  const handlePrevMonth = () => {
+  const handlePrevMonth = (): void => {
     if (currentMonth === 0) {
       setCurrentMonth(11);
       setCurrentYear(currentYear - 1);
@@ -231,7 +227,7 @@ const CalendarWidget = React.memo<CalendarWidgetProps>(({
     }
   };
   
-  const handleNextMonth = () => {
+  const handleNextMonth = (): void => {
     if (currentMonth === 11) {
       setCurrentMonth(0);
       setCurrentYear(currentYear + 1);
@@ -240,19 +236,19 @@ const CalendarWidget = React.memo<CalendarWidgetProps>(({
     }
   };
   
-  const handleDateClick = (day: number) => {
+  const handleDateClick = (day: number): void => {
     const newDate = new Date(currentYear, currentMonth, day);
     onDateSelect(newDate);
   };
   
-  const isToday = (day: number) => {
+  const isToday = (day: number): boolean => {
     const today = new Date();
     return today.getDate() === day && 
            today.getMonth() === currentMonth && 
            today.getFullYear() === currentYear;
   };
   
-  const isSelected = (day: number) => {
+  const isSelected = (day: number): boolean => {
     return selectedDate.getDate() === day && 
            selectedDate.getMonth() === currentMonth && 
            selectedDate.getFullYear() === currentYear;
@@ -388,16 +384,12 @@ const TradingCard: React.FC<TradingCardProps> = ({
   tokenAddress, 
   wallets,
   selectedDex,
-  setSelectedDex,
-  isDropdownOpen,
-  setIsDropdownOpen,
   buyAmount,
   setBuyAmount,
   sellAmount,
   setSellAmount,
   handleTradeSubmit,
   isLoading,
-  getScriptName,
   countActiveWallets,
   currentMarketCap,
   tokenBalances,
@@ -412,6 +404,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   const [isEditMode, setIsEditMode] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const [, setIsDropdownOpen] = useState(false);
   
   // Limit order state
   const [limitOrderSolAmount, setLimitOrderSolAmount] = useState('');
@@ -428,7 +421,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   const [selectedTime, setSelectedTime] = useState('12:00');
   const [activeOrders, setActiveOrders] = useState<ActiveOrdersResponse | null>(null);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
-  const [orderErrors, setOrderErrors] = useState<string[]>([]);
+  // const [orderErrors, setOrderErrors] = useState<string[]>([]);
   const [cancellingOrders, setCancellingOrders] = useState<Set<string>>(new Set());
   
   interface PresetTab {
@@ -461,7 +454,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   ];
 
   // Load presets from cookies
-  const loadPresetsFromCookies = () => {
+  const loadPresetsFromCookies = (): { tabs: PresetTab[]; activeTabId: string } => {
     try {
       const savedPresets = document.cookie
         .split('; ')
@@ -470,9 +463,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
       
       if (savedPresets) {
         const decoded = decodeURIComponent(savedPresets);
-        const parsed = JSON.parse(decoded);
+        const parsed = JSON.parse(decoded) as { tabs?: unknown; activeTabId?: string };
         return {
-          tabs: Array.isArray(parsed.tabs) ? parsed.tabs : defaultPresetTabs,
+          tabs: Array.isArray(parsed.tabs) ? parsed.tabs as PresetTab[] : defaultPresetTabs,
           activeTabId: parsed.activeTabId || 'degen'
         };
       }
@@ -486,7 +479,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   };
 
   // Save presets to cookies
-  const savePresetsToCookies = (tabs: PresetTab[], activeTabId: string) => {
+  const savePresetsToCookies = (tabs: PresetTab[], activeTabId: string): void => {
     try {
       const presetsData = {
         tabs,
@@ -514,15 +507,16 @@ const TradingCard: React.FC<TradingCardProps> = ({
     }, 500); // Debounce by 500ms
 
     return () => clearTimeout(timeoutId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetTabs, activeTabId]);
   
   // Handle tab switching with cookie save
-  const handleTabSwitch = (tabId: string) => {
+  const handleTabSwitch = (tabId: string): void => {
     setActiveTabId(tabId);
   };
   
   // Edit preset handlers
-  const handleEditBuyPreset = (index: number, newValue: string) => {
+  const handleEditBuyPreset = (index: number, newValue: string): void => {
     setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
@@ -533,7 +527,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
     ));
   };
   
-  const handleEditSellPreset = (index: number, newValue: string) => {
+  const handleEditSellPreset = (index: number, newValue: string): void => {
     setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === activeTabId 
         ? {
@@ -545,7 +539,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   };
   
   // Edit tab label
-  const handleEditTabLabel = (tabId: string, newLabel: string) => {
+  const handleEditTabLabel = (tabId: string, newLabel: string): void => {
     setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
       tab.id === tabId ? { ...tab, label: newLabel } : tab
     ));
@@ -554,7 +548,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   
   
   // Handle amount change
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const value = e.target.value.replace(/[^0-9.]/g, '');
     if (activeTradeType === 'buy') {
       setBuyAmount(value);
@@ -564,18 +558,18 @@ const TradingCard: React.FC<TradingCardProps> = ({
   };
 
   // Handle preset click
-  const handlePresetClick = (preset: string) => {
+  const handlePresetClick = (preset: string): void => {
     if (activeTradeType === 'buy') {
       setBuyAmount(preset);
-      handleTradeSubmit(wallets, true, selectedDex, preset, undefined);
+      void handleTradeSubmit(wallets, true, selectedDex, preset, undefined);
     } else {
       setSellAmount(preset);
-      handleTradeSubmit(wallets, false, selectedDex, undefined, preset);
+      void handleTradeSubmit(wallets, false, selectedDex, undefined, preset);
     }
   };
 
   // Limit Order Handlers
-  const loadActiveOrders = async () => {
+  const loadActiveOrders = async (): Promise<void> => {
     if (!wallets || wallets.length === 0) {
       showToast('No wallets available', 'error');
       return;
@@ -589,7 +583,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
     }
     
     // Check if trading server URL is configured
-    const tradingServerUrl = (window as any).tradingServerUrl;
+    const tradingServerUrl = (window as { tradingServerUrl?: string }).tradingServerUrl;
     if (!tradingServerUrl) {
       showToast('Trading server URL not configured', 'error');
       setActiveOrders(null);
@@ -659,7 +653,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       // Sell orders: inputMint is the token, outputMint is SOL
       const SOL_MINT = 'So11111111111111111111111111111111111111112';
       
-      const filteredOrders = allOrders.filter((order: any) => {
+      const filteredOrders = allOrders.filter((order: { inputMint?: string; outputMint?: string; account?: { inputMint?: string; outputMint?: string } }) => {
         const inputMint = order.inputMint || order.account?.inputMint;
         const outputMint = order.outputMint || order.account?.outputMint;
         
@@ -670,9 +664,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
         return isBuyOrder || isSellOrder;
       });
 
-      console.log('All orders fetched:', allOrders.length);
-      console.log('Filtered orders for token:', filteredOrders.length);
-      console.log('Sample filtered order:', filteredOrders[0]);
+      console.info('All orders fetched:', allOrders.length);
+      console.info('Filtered orders for token:', filteredOrders.length);
+      console.info('Sample filtered order:', filteredOrders[0]);
 
       // Create a combined response with filtered orders
       const combinedResponse = {
@@ -693,10 +687,10 @@ const TradingCard: React.FC<TradingCardProps> = ({
     }
   };
 
-  const handleCreateLimitOrder = async () => {
+  const handleCreateLimitOrder = async (): Promise<void> => {
     // Ensure calculated amounts exist
     if (!limitOrderSolAmount || !limitOrderTokenAmount) {
-      setOrderErrors(['Please ensure both SOL and token amounts are calculated']);
+      showToast('Please ensure both SOL and token amounts are calculated', 'error');
       return;
     }
 
@@ -704,18 +698,16 @@ const TradingCard: React.FC<TradingCardProps> = ({
     const solAmount = parseFloat(limitOrderSolAmount);
     if (solAmount < 0.1) {
       showToast('Minimum SOL amount for limit orders is 0.1 SOL', 'error');
-      setOrderErrors(['Minimum SOL amount for limit orders is 0.1 SOL']);
       return;
     }
 
     const activeWallets = wallets.filter((w: WalletType) => w.isActive);
     if (activeWallets.length === 0) {
-      setOrderErrors(['No active wallets selected']);
+      showToast('No active wallets selected', 'error');
       return;
     }
 
     setIsCreatingLimitOrder(true);
-    setOrderErrors([]);
 
     try {
       // Convert amounts to proper format based on trade type
@@ -758,7 +750,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       });
 
       if (!validation.valid) {
-        setOrderErrors(validation.errors);
+        showToast(validation.errors.join(', '), 'error');
         return;
       }
 
@@ -766,15 +758,15 @@ const TradingCard: React.FC<TradingCardProps> = ({
       const response = await createMultipleLimitOrders(activeWallets, orderConfig);
 
       if (response.success) {
-        console.log('Limit orders created successfully:', response.orders);
+        console.info('Limit orders created successfully:', response.orders);
         
         // Process and send the bundle with transactions
         if (response.transactions && response.transactions.length > 0) {
-          console.log('Processing bundle with transactions...');
+          console.info('Processing bundle with transactions...');
           const bundleResult = await processLimitOrderBundle(response, activeWallets);
           
           if (bundleResult.success) {
-            console.log('✅ Bundle sent successfully!', bundleResult.bundleId);
+            console.info('✅ Bundle sent successfully!', bundleResult.bundleId);
             
             // Clear form
             setLimitOrderSolAmount('');
@@ -788,11 +780,11 @@ const TradingCard: React.FC<TradingCardProps> = ({
             setCalendarDate(new Date());
             setSelectedTime('12:00');
           } else {
-            setOrderErrors([`Bundle failed to send: ${bundleResult.error}`]);
+            showToast(`Bundle failed to send: ${bundleResult.error}`, 'error');
             return;
           }
         } else {
-          console.log('No transactions to process in the response');
+          console.info('No transactions to process in the response');
           
           // Clear form even if no transactions (orders might still be created)
           setLimitOrderSolAmount('');
@@ -807,16 +799,16 @@ const TradingCard: React.FC<TradingCardProps> = ({
           setSelectedTime('12:00');
         }
       } else {
-        setOrderErrors([response.error || 'Failed to create limit orders']);
+        showToast(response.error || 'Failed to create limit orders', 'error');
       }
     } catch (error) {
-      setOrderErrors([error instanceof Error ? error.message : 'Unknown error occurred']);
+      showToast(error instanceof Error ? error.message : 'Unknown error occurred', 'error');
     } finally {
       setIsCreatingLimitOrder(false);
     }
   };
 
-  const handleCancelOrder = async (orderPublicKey: string, makerAddress: string) => {
+  const handleCancelOrder = async (orderPublicKey: string, makerAddress: string): Promise<void> => {
     // Find the wallet that matches the maker address
     const wallet = wallets.find((w: WalletType) => w.address === makerAddress);
     if (!wallet) {
@@ -828,7 +820,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
     setCancellingOrders(prev => new Set(prev).add(orderPublicKey));
 
     try {
-      console.log('� Starting cancel order process for:', orderPublicKey);
+      console.info('� Starting cancel order process for:', orderPublicKey);
       
       // Use the  cancel order function that handles bundle processing
       const result = await cancelOrderWithBundle({
@@ -837,15 +829,14 @@ const TradingCard: React.FC<TradingCardProps> = ({
       }, wallet);
 
       if (result.success) {
-        console.log('✅ Order canceled successfully:', result.bundleId);
+        console.info('✅ Order canceled successfully:', result.bundleId);
       } else {
         console.error('❌ Failed to cancel order:', result.error);
-        // You might want to show this error to the user
-        setOrderErrors(prev => [...prev, `Failed to cancel order: ${result.error}`]);
+        showToast(`Failed to cancel order: ${result.error}`, 'error');
       }
     } catch (error) {
       console.error('Error canceling order:', error);
-      setOrderErrors(prev => [...prev, `Error canceling order: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+      showToast(`Error canceling order: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     } finally {
       // Remove order from cancelling set
       setCancellingOrders(prev => {
@@ -857,17 +848,17 @@ const TradingCard: React.FC<TradingCardProps> = ({
   };
 
   // Calendar handlers
-  const handleCalendarDateSelect = (date: Date) => {
+  const handleCalendarDateSelect = (date: Date): void => {
     setCalendarDate(date);
     const isoString = date.toISOString().slice(0, 16); // Format for datetime-local
     setLimitOrderExpiry(isoString);
   };
 
-  const handleCalendarTimeChange = (time: string) => {
+  const handleCalendarTimeChange = (time: string): void => {
     setSelectedTime(time);
   };
 
-  const formatDisplayDate = (dateString: string) => {
+  const formatDisplayDate = (dateString: string): string => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
@@ -970,13 +961,14 @@ const TradingCard: React.FC<TradingCardProps> = ({
   // Load active orders when switching to orders tab
   useEffect(() => {
     if (activeMainTab === 'orders') {
-      loadActiveOrders();
+      void loadActiveOrders();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMainTab, tokenAddress]);
 
   // Close dropdown and calendar when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent): void => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
@@ -1037,7 +1029,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   };
 
   // Generate button text based on calculated amounts
-  const getButtonText = () => {
+  const getButtonText = (): React.ReactNode => {
     if (isLoading) {
       return (
         <span className="flex items-center justify-center gap-2">
@@ -1065,7 +1057,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       className="relative overflow-hidden rounded-xl shadow-xl"
 
     >
-      {/* Cyberpunk corner accents */}
+      {/*  corner accents */}
       <div className="absolute top-0 left-0 w-24 h-24 pointer-events-none">
         <div className="absolute top-0 left-0 w-px h-8 bg-gradient-to-b from-app-primary-color to-transparent"></div>
         <div className="absolute top-0 left-0 w-8 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
@@ -1235,15 +1227,33 @@ const TradingCard: React.FC<TradingCardProps> = ({
                 </div>
               ) : activeOrders && activeOrders.orders && activeOrders.orders.orders.length > 0 ? (
                  <div className="space-y-2">
-                   {activeOrders.orders.orders.map((order: any, index) => {
+                   {activeOrders.orders.orders.map((order: {
+                     publicKey?: string;
+                     orderKey?: string;
+                     userPubkey?: string;
+                     makingAmount?: string;
+                     takingAmount?: string;
+                     expiredAt?: number | null;
+                     inputMint?: string;
+                     outputMint?: string;
+                     account?: {
+                       orderKey?: string;
+                       userPubkey?: string;
+                       makingAmount?: string;
+                       takingAmount?: string;
+                       expiredAt?: number | null;
+                       inputMint?: string;
+                       outputMint?: string;
+                     };
+                   }, index: number) => {
                      // Properties might be directly on the order object or nested under account
-                     const orderKey = order.orderKey || order.account?.orderKey;
-                     const userPubkey = order.userPubkey || order.account?.userPubkey;
-                     const makingAmount = order.makingAmount || order.account?.makingAmount;
-                     const takingAmount = order.takingAmount || order.account?.takingAmount;
-                     const expiredAt = order.expiredAt || order.account?.expiredAt;
-                     const inputMint = order.inputMint || order.account?.inputMint;
-                     const outputMint = order.outputMint || order.account?.outputMint;
+                     const orderKey = order.orderKey || order.account?.orderKey || '';
+                     const userPubkey = order.userPubkey || order.account?.userPubkey || '';
+                     const makingAmount = order.makingAmount || order.account?.makingAmount || '0';
+                     const takingAmount = order.takingAmount || order.account?.takingAmount || '0';
+                     const expiredAt = order.expiredAt ?? order.account?.expiredAt ?? null;
+                     const inputMint = order.inputMint || order.account?.inputMint || '';
+                     const outputMint = order.outputMint || order.account?.outputMint || '';
                      
                      // Determine if this is a buy or sell order
                      // Buy order: inputMint is SOL (So11111111111111111111111111111111111111112)
@@ -1461,7 +1471,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
                     }
                   }}
                   isLoading={isLoading}
-                  variant={activeTradeType as 'buy' | 'sell'}
+                  variant={activeTradeType}
                   isEditMode={isEditMode}
                   index={index}
                 />
