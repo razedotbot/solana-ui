@@ -19,13 +19,16 @@
     "@solana/spl-token": "^0.4.14",
     "@solana/spl-token-registry": "^0.2.4574",
     "@solana/web3.js": "^1.95.8",
+    "@types/bip39": "^2.4.2",
     "@types/js-cookie": "^3.0.6",
+    "bip39": "^3.1.0",
     "bs58": "^6.0.0",
     "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "crypto-js": "^4.2.0",
     "d3": "^7.9.0",
+    "ed25519-hd-key": "^1.3.0",
     "framer-motion": "^11.11.17",
     "html2canvas": "^1.4.1",
     "js-cookie": "^3.0.5",
@@ -33,6 +36,7 @@
     "lucide-react": "^0.471.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.26.0",
     "react-split": "^2.0.14",
     "react-window": "^1.8.11",
     "serve": "^14.2.5",
@@ -44,6 +48,7 @@
     "@types/node": "^20.4.5",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
+    "@types/react-router-dom": "^5.3.3",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
     "@vitejs/plugin-react": "^4.0.3",
@@ -58,13 +63,7 @@
     "typescript": "^5.9.3",
     "vite": "^6.4.0",
     "vite-bundle-analyzer": "^0.7.0",
-    "vite-plugin-checker": "^0.11.0"
-  },
-  "overrides": {
-    "bigint-buffer": "npm:@solana/bigint-buffer@^1.1.5",
-    "node-fetch": "^2.7.0",
-    "@solana/buffer-layout-utils": {
-      "bigint-buffer": "npm:@solana/bigint-buffer@^1.1.5"
-    }
+    "vite-plugin-checker": "^0.11.0",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }
