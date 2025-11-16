@@ -43,7 +43,7 @@ Find the full documentation here:
 ## 🚀 Demo
 
 Try the live version here:  
-👉 [https://sol.app.raze.bot/](https://sol.app.raze.bot)
+👉 [https://sol.app.raze.bot/](https://sol.raze.bot)
 
 ---
 
