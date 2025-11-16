@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { BarChart } from 'lucide-react';
 import { type WalletType, getWalletDisplayName } from './Utils';
 import { brand } from './config/brandConfig';
 
-interface ChartPageProps {
+interface FrameProps {
   isLoadingChart: boolean;
   tokenAddress: string;
   wallets: WalletType[];
@@ -90,7 +91,10 @@ type IframeResponse =
   | WhitelistTradeResponse
   | TokenPriceUpdateResponse
   | TokenSelectedResponse
-  | NonWhitelistedTradeResponse;
+  | NonWhitelistedTradeResponse
+  | HoldingsOpenedResponse
+  | TokenClearedResponse
+  | NavigationCompleteResponse;
 
 interface NonWhitelistedTradeResponse {
   type: 'NON_WHITELIST_TRADE';
@@ -176,6 +180,20 @@ interface TokenPriceUpdateResponse {
   };
 }
 
+interface HoldingsOpenedResponse {
+  type: 'HOLDINGS_OPENED';
+}
+
+interface TokenClearedResponse {
+  type: 'TOKEN_CLEARED';
+}
+
+interface NavigationCompleteResponse {
+  type: 'NAVIGATION_COMPLETE';
+  view: string;
+  tokenMint: string | null;
+}
+
 // Button component with animation
 const IconButton: React.FC<{
   icon: React.ReactNode;
@@ -203,7 +221,7 @@ const IconButton: React.FC<{
 });
 IconButton.displayName = 'IconButton';
 
-export const ChartPage: React.FC<ChartPageProps> = ({
+export const Frame: React.FC<FrameProps> = ({
   isLoadingChart,
   tokenAddress,
   wallets,
@@ -211,6 +229,10 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   onTokenSelect,
   onNonWhitelistedTrade
 }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { tokenAddress: tokenAddressParam } = useParams<{ tokenAddress?: string }>();
+  
   const [frameLoading, setFrameLoading] = useState(true);
   const [iframeKey] = useState(Date.now());
   const [isIframeReady, setIsIframeReady] = useState(false);
@@ -294,19 +316,58 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   useEffect(() => {
     const handleMessage = (event: MessageEvent<IframeResponse>): void => {
       switch (event.data.type) {
-        case 'IFRAME_READY':
+        case 'IFRAME_READY': {
           setIsIframeReady(true);
-          // Enable non-whitelisted trades
+          
+          // Navigate based on current route
+          const pathname = location.pathname;
+          
+          if (pathname === '/holdings') {
+            // Navigate to holdings view with wallet addresses
+            iframeRef.current?.contentWindow?.postMessage({
+              type: 'NAVIGATE',
+              view: 'holdings',
+              wallets: wallets.map(w => w.address)
+            }, '*');
+          } else if (pathname.startsWith('/token/') && tokenAddressParam) {
+            // Navigate to token view with wallet addresses
+            iframeRef.current?.contentWindow?.postMessage({
+              type: 'NAVIGATE',
+              view: 'token',
+              tokenMint: tokenAddressParam,
+              wallets: wallets.map(w => w.address)
+            }, '*');
+          } else if (pathname === '/monitor' || tokenAddress) {
+            // Navigate to monitor or token view
+            if (tokenAddress) {
+              iframeRef.current?.contentWindow?.postMessage({
+                type: 'NAVIGATE',
+                view: 'token',
+                tokenMint: tokenAddress,
+                wallets: wallets.map(w => w.address)
+              }, '*');
+            } else {
+              iframeRef.current?.contentWindow?.postMessage({
+                type: 'NAVIGATE',
+                view: 'monitor'
+              }, '*');
+            }
+          }
+          
+          // Enable non-whitelisted trades for regular chart view
           sendMessageToIframe({
             type: 'TOGGLE_NON_WHITELISTED_TRADES',
             enabled: true
           });
+          
           // Process queued messages
           messageQueue.current.forEach(message => {
             sendMessageToIframe(message);
           });
           messageQueue.current = [];
+          
           break;
+        }
         
         case 'WALLETS_ADDED':
           break;
@@ -358,12 +419,35 @@ export const ChartPage: React.FC<ChartPageProps> = ({
            onNonWhitelistedTrade?.(response.data);
            break;
          }
+        
+        case 'HOLDINGS_OPENED': {
+          // When iframe requests holdings view, navigate parent to /holdings using React Router
+          navigate('/holdings');
+          break;
+        }
+        
+        case 'TOKEN_CLEARED': {
+          // When iframe goes back to home/monitor, navigate parent to /monitor using React Router
+          navigate('/monitor');
+          
+          // Also clear the token in the parent
+          if (onTokenSelect) {
+            onTokenSelect('');
+          }
+          break;
+        }
+        
+        case 'NAVIGATION_COMPLETE': {
+          // Confirmation from iframe that navigation is complete
+          // Can be used for loading states or analytics
+          break;
+        }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe]);
+  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, wallets, tokenAddress, location.pathname, tokenAddressParam, navigate]);
 
   // Memoize wallet addresses for stable dependency comparison
   const walletAddresses = useMemo(() => {
@@ -397,11 +481,30 @@ export const ChartPage: React.FC<ChartPageProps> = ({
     wallets
   ]);
   
-  // Reset loading state and live data when token changes
+  // Navigate to token view when route changes (SPA navigation without reload)
   useEffect(() => {
-    if (tokenAddress) {
-      setFrameLoading(true);
-      setIsIframeReady(false);
+    if (!isIframeReady || !iframeRef.current?.contentWindow) {
+      return;
+    }
+
+    const pathname = location.pathname;
+    
+    // Handle different routes
+    if (pathname === '/holdings') {
+      // Navigate to holdings view
+      iframeRef.current.contentWindow.postMessage({
+        type: 'NAVIGATE',
+        view: 'holdings',
+        wallets: wallets.map(w => w.address)
+      }, '*');
+    } else if (pathname.startsWith('/token/') && tokenAddressParam) {
+      // Navigate to token view
+      iframeRef.current.contentWindow.postMessage({
+        type: 'NAVIGATE',
+        view: 'token',
+        tokenMint: tokenAddressParam,
+        wallets: wallets.map(w => w.address)
+      }, '*');
       
       // Reset all live data when token changes
       setTradingStats(null);
@@ -409,8 +512,14 @@ export const ChartPage: React.FC<ChartPageProps> = ({
       setCurrentWallets([]);
       setRecentTrades([]);
       setTokenPrice(null);
+    } else if (pathname === '/monitor') {
+      // Navigate to monitor view
+      iframeRef.current.contentWindow.postMessage({
+        type: 'NAVIGATE',
+        view: 'monitor'
+      }, '*');
     }
-  }, [tokenAddress]);
+  }, [location.pathname, tokenAddressParam, isIframeReady, wallets]);
   
   // Handle iframe load completion
   const handleFrameLoad = (): void => {
@@ -467,15 +576,17 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   );
   
 
-
-  // Render iframe with single frame
-  const renderFrame = (hasToken: boolean = true): React.JSX.Element => {
-    const iframeSrc = hasToken 
-      ? `https://frame.fury.bot/sol/?tokenMint=${tokenAddress}&theme=${brand.theme.name}`
-      : `https://frame.fury.bot/sol/?theme=${brand.theme.name}`;
+  
+  // Render iframe with single frame (SPA - no URL changes after initial load)
+  const renderFrame = (): React.JSX.Element => {
+    // Use base URL with only theme - navigation handled via postMessage
+    const iframeSrc = `http://localhost:3000/sol/?theme=${brand.theme.name}`;
     
     return (
-      <div className="relative flex-1 overflow-hidden iframe-container">
+      <div 
+        className="relative flex-1 overflow-hidden iframe-container"
+        style={{ border: tokenAddress ? 'none' : undefined }}
+      >
         {renderLoader(frameLoading || isLoadingChart)}
         
         <div className="absolute inset-0 overflow-hidden">
@@ -486,7 +597,8 @@ export const ChartPage: React.FC<ChartPageProps> = ({
             className="absolute inset-0 w-full h-full border-0"
             style={{ 
               WebkitOverflowScrolling: 'touch',
-              minHeight: '100%'
+              minHeight: '100%',
+              border: tokenAddress ? 'none' : undefined
             }}
             loading="eager"
             onLoad={handleFrameLoad}
@@ -504,7 +616,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="relative w-full rounded-lg overflow-hidden h-full md:h-full min-h-[calc(100vh-8rem)] md:min-h-full bg-gradient-to-br from-app-primary to-app-secondary"
+      className="relative w-full rounded-lg overflow-hidden h	full md:h-full min-h-[calc(100vh-8rem)] md:min-h-full bg-gradient-to-br from-app-primary to-app-secondary"
       style={{
         touchAction: 'manipulation',
         WebkitOverflowScrolling: 'touch'
@@ -533,7 +645,7 @@ export const ChartPage: React.FC<ChartPageProps> = ({
             transition={{ duration: 0.3 }}
             className="flex flex-1 h-full"
           >
-            {renderFrame(!!tokenAddress)}
+            {renderFrame()}
           </motion.div>
         )}
       </AnimatePresence>
@@ -541,4 +653,6 @@ export const ChartPage: React.FC<ChartPageProps> = ({
   );
 };
 
-export default ChartPage;
+export default Frame;
+
+

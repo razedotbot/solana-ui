@@ -127,7 +127,10 @@ const Config: React.FC<ConfigProps> = ({
       document.body.style.overflow = 'hidden';
       
       return () => {
-        document.head.removeChild(styleElement);
+        // Safely remove style element if it's still a child
+        if (styleElement.parentNode === document.head) {
+          document.head.removeChild(styleElement);
+        }
         // Restore scrolling when modal is closed
         document.body.style.overflow = '';
       };

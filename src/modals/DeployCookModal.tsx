@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw } from 'lucide-react';
-import { getWallets, getWalletDisplayName } from '../Utils';
+import { getWalletDisplayName } from '../Utils';
 import type { WalletType } from '../Utils';
 import { useToast } from "../components/useToast";
 import type { TokenMetadata, CookCreateConfig } from '../utils/cookcreate';
@@ -19,12 +19,14 @@ interface BaseModalProps {
 
 interface DeployCookModalProps extends BaseModalProps {
   handleRefresh: () => void;
+  wallets: WalletType[];
   solBalances: Map<string, number>;
 }
 
 export const DeployCookModal: React.FC<DeployCookModalProps> = ({
   isOpen,
   onClose,
+  wallets: propWallets,
   solBalances,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -127,9 +129,8 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
     }
   };
 
-  // Get all wallets and filter those with SOL balance > 0
-  const allWallets = getWallets();
-  const wallets = allWallets.filter(wallet => (solBalances.get(wallet.address) || 0) > 0);
+  // Use wallets from props, filter those with SOL balance > 0
+  const wallets = propWallets.filter(wallet => (solBalances.get(wallet.address) || 0) > 0);
   const { showToast } = useToast();
 
   useEffect(() => {

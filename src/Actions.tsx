@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-   Blocks,
-   Trash2,
    ChartSpline,
-   Workflow,
    Activity,
-   Bot
+   ArrowUpRight,
+   ArrowDownRight,
+   Clock
  } from 'lucide-react';
 import { brand } from './config/brandConfig';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
@@ -14,6 +13,7 @@ import { useToast } from "./components/useToast";
 import { countActiveWallets } from './utils/wallets';
 import TradingCard from './components/TradingForm';
 import type { IframeData } from './types/api';
+import { getLatestTrades, type TradeHistoryEntry } from './utils/trading';
 
 import { executeTrade } from './utils/trading';
 
@@ -54,15 +54,9 @@ interface ActionsPageProps {
   solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
   currentMarketCap: number | null;
-  setBurnModalOpen: (open: boolean) => void;
   setCalculatePNLModalOpen: (open: boolean) => void;
-  setDeployModalOpen: (open: boolean) => void;
-  setCustomBuyModalOpen: (open: boolean) => void;
-  onOpenFloating: () => void;
-  isFloatingCardOpen: boolean;
   // Automate card state props
   isAutomateCardOpen: boolean;
-  setAutomateCardOpen: (open: boolean) => void;
   automateCardPosition: { x: number; y: number };
   setAutomateCardPosition: (position: { x: number; y: number }) => void;
   isAutomateCardDragging: boolean;
@@ -259,6 +253,141 @@ const DataBox: React.FC<{
 });
 DataBox.displayName = 'DataBox';
 
+// Latest Trade component - shows only the most recent trade for current token
+const LatestTrades: React.FC<{
+  tokenAddress?: string;
+}> = React.memo(({ tokenAddress }) => {
+  const [latestTrade, setLatestTrade] = useState<TradeHistoryEntry | null>(null);
+  const [tradeAppearedAt, setTradeAppearedAt] = useState<number | null>(null);
+  const [isFullyOpaque, setIsFullyOpaque] = useState(true);
+  const previousTradeIdRef = useRef<string | null>(null);
+  
+  const loadLatestTrade = useCallback(() => {
+    if (!tokenAddress) {
+      setLatestTrade(null);
+      setTradeAppearedAt(null);
+      previousTradeIdRef.current = null;
+      return;
+    }
+    
+    const trades = getLatestTrades(50);
+    // Get the most recent trade for the current token
+    const tokenTrades = trades.filter(trade => trade.tokenAddress === tokenAddress);
+    const newTrade = tokenTrades.length > 0 ? tokenTrades[0] : null;
+    
+    // Check if this is a new trade (different ID)
+    if (newTrade && newTrade.id !== previousTradeIdRef.current) {
+      setTradeAppearedAt(Date.now());
+      previousTradeIdRef.current = newTrade.id;
+    }
+    
+    setLatestTrade(newTrade);
+  }, [tokenAddress]);
+  
+  useEffect(() => {
+    loadLatestTrade();
+    
+    // Listen for trade history updates
+    const handleTradeUpdate = (): void => {
+      loadLatestTrade();
+    };
+    
+    window.addEventListener('tradeHistoryUpdated', handleTradeUpdate);
+    
+    return () => {
+      window.removeEventListener('tradeHistoryUpdated', handleTradeUpdate);
+    };
+  }, [loadLatestTrade]);
+  
+  // Update opacity state to track first 3 seconds
+  useEffect(() => {
+    if (tradeAppearedAt !== null) {
+      setIsFullyOpaque(true);
+      const timer = setTimeout(() => {
+        setIsFullyOpaque(false);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [tradeAppearedAt]);
+  
+  const formatTimeAgo = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
+  };
+  
+  const formatAmount = (trade: TradeHistoryEntry): string => {
+    if (trade.amountType === 'percentage') {
+      return `${trade.amount}%`;
+    }
+    return `${trade.amount.toFixed(3)} SOL`;
+  };
+  
+  // Only show when token is selected and there's a trade
+  if (!tokenAddress || !latestTrade) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-3">
+      <div className={`flex items-center justify-between py-1.5 px-2 rounded border text-xs ${
+        latestTrade.success
+          ? latestTrade.type === 'buy'
+            ? `bg-app-secondary-80 border-app-primary-40 ${isFullyOpaque ? 'opacity-100' : ''}`
+            : `bg-app-secondary-80 border-warning-40 ${isFullyOpaque ? 'opacity-100' : ''}`
+          : `bg-app-secondary-60 border-app-primary-20 ${isFullyOpaque ? 'opacity-100' : 'opacity-60'}`
+      }`}>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {/* Compact icon */}
+          {latestTrade.type === 'buy' ? (
+            <ArrowUpRight 
+              size={12} 
+              className={`flex-shrink-0 ${latestTrade.success ? 'color-primary' : 'text-app-secondary-60'}`} 
+            />
+          ) : (
+            <ArrowDownRight 
+              size={12} 
+              className={`flex-shrink-0 ${latestTrade.success ? 'text-warning' : 'text-app-secondary-60'}`} 
+            />
+          )}
+          
+          {/* Compact info */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className={`font-mono font-semibold ${
+              latestTrade.success
+                ? latestTrade.type === 'buy'
+                  ? 'color-primary'
+                  : 'text-warning'
+                : 'text-app-secondary-60'
+            }`}>
+              {latestTrade.type === 'buy' ? 'BUY' : 'SELL'}
+            </span>
+            <span className="text-app-secondary-60">•</span>
+            <span className="text-app-secondary-60 font-mono truncate">{formatAmount(latestTrade)}</span>
+            {latestTrade.walletsCount > 1 && (
+              <>
+                <span className="text-app-secondary-60">•</span>
+                <span className="text-app-secondary-60 font-mono">{latestTrade.walletsCount}w</span>
+              </>
+            )}
+          </div>
+        </div>
+        
+        {/* Compact timestamp */}
+        <div className="flex items-center gap-1 text-app-secondary-60 font-mono ml-2 flex-shrink-0">
+          <Clock size={10} />
+          <span>{formatTimeAgo(latestTrade.timestamp)}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+LatestTrades.displayName = 'LatestTrades';
+
 export const ActionsPage: React.FC<ActionsPageProps> = ({ 
   tokenAddress, 
   setTokenAddress,
@@ -266,14 +395,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   solBalances, 
   tokenBalances, 
   currentMarketCap,
-  setBurnModalOpen,
   setCalculatePNLModalOpen,
-  setDeployModalOpen,
-  setCustomBuyModalOpen,
-  onOpenFloating,
-  isFloatingCardOpen,
-  // Automate card state props
-  setAutomateCardOpen,
   iframeData
 }) => {
   // State management
@@ -491,8 +613,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             countActiveWallets={countActiveWallets}
             currentMarketCap={currentMarketCap}
             tokenBalances={tokenBalances}
-            onOpenFloating={onOpenFloating}
-            isFloatingCardOpen={isFloatingCardOpen}
             solPrice={iframeData?.solPrice ?? null}
           />
         ) : (
@@ -615,81 +735,8 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           </div>
         )}
         
-        {/* Token Operations */}
-        <div className="space-y-4">          
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
-              {/* AUTOMATE Button */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setAutomateCardOpen(true);
-                }}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Bot size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">AUTOMATE</span>
-              </button>
-              
-              {/* Deploy Button */}
-              <button
-                onClick={() => setDeployModalOpen(true)}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Blocks size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">Deploy</span>
-              </button>
-              
-              {/* Burn Button */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setBurnModalOpen(true);
-                }}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Trash2 size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">Burn</span>
-              </button>
-              
-              {/* Stagger Button */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setCustomBuyModalOpen(true);
-                }}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Workflow size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">Stagger</span>
-              </button>
-          </div>
-          
-          {/* Live Data Section */}
+        {/* Live Data Section */}
+        <div className="space-y-4">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -718,6 +765,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               </button>
             </div>
             <DataBox iframeData={iframeData} tokenAddress={tokenAddress} tokenBalances={tokenBalances} />
+            <LatestTrades tokenAddress={tokenAddress} />
           </div>
         </div>
       </div>

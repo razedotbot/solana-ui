@@ -8,3 +8,4 @@ export * from './utils';
 export { default as StrategyBuilder } from './StrategyBuilder';
 export { default as ConditionBuilder } from './ConditionBuilder';
 export { default as ActionBuilder } from './ActionBuilder';
+export { AutomatePage } from './AutomatePage';

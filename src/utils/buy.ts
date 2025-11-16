@@ -2,6 +2,7 @@ import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { loadConfigFromCookies } from '../Utils';
 import type { ApiResponse, BundleResult as SharedBundleResult } from '../types/api';
+import { addTradeHistory } from './trading';
 
 // Constants
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -581,24 +582,56 @@ export const executeBuy = async (
     console.info(`Preparing to buy ${config.tokenAddress} using ${wallets.length.toString()} wallets in ${bundleMode} mode`);
     
     // Execute based on bundle mode
+    let result: BuyResult;
     switch (bundleMode) {
       case 'single':
-        return await executeBuySingleMode(wallets, config);
+        result = await executeBuySingleMode(wallets, config);
+        break;
       
       case 'batch':
-        return await executeBuyBatchMode(wallets, config);
+        result = await executeBuyBatchMode(wallets, config);
+        break;
       
       case 'all-in-one':
-        return await executeBuyAllInOneMode(wallets, config);
+        result = await executeBuyAllInOneMode(wallets, config);
+        break;
       
       default:
         throw new Error(`Invalid bundle mode: ${bundleMode as string}. Must be 'single', 'batch', or 'all-in-one'`);
     }
+    
+    // Save trade history
+    addTradeHistory({
+      type: 'buy',
+      tokenAddress: config.tokenAddress,
+      walletsCount: wallets.length,
+      amount: config.solAmount,
+      amountType: 'sol',
+      success: result.success,
+      error: result.error,
+      bundleMode: bundleMode
+    });
+    
+    return result;
   } catch (error) {
     console.error('Buy error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error executing buy';
+    
+    // Save failed trade history
+    addTradeHistory({
+      type: 'buy',
+      tokenAddress: config.tokenAddress,
+      walletsCount: wallets.length,
+      amount: config.solAmount,
+      amountType: 'sol',
+      success: false,
+      error: errorMessage,
+      bundleMode: config.bundleMode || 'batch'
+    });
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error executing buy'
+      error: errorMessage
     };
   }
 };

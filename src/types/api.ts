@@ -62,6 +62,19 @@ export interface ServerConfig {
   rpcUrl?: string;
   serverRegion?: string;
 }
+
+/**
+ * Trading server instance information
+ * Used for regional trading server discovery and selection
+ */
+export interface ServerInfo {
+  id: string;
+  name: string;
+  url: string;
+  region: string;
+  flag: string;
+  ping?: number;
+}
 /**
  * Bundle response from transaction bundle operations
  * Used when processing bundle results from Jito or other bundlers

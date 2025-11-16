@@ -73,24 +73,19 @@ Visit: `http://localhost:5173`
 raze.bot/
 ├── src/                # Source code
 │   ├── modals/         # Modal components
-│   │   ├── BurnModal.tsx
 │   │   ├── CalculatePNLModal.tsx
 │   │   ├── CleanerModal.tsx
 │   │   ├── ConsolidateModal.tsx
-│   │   ├── CustomBuyModal.tsx
 │   │   ├── DeployBonkModal.tsx
 │   │   ├── DeployBoopModal.tsx
 │   │   ├── DeployCookModal.tsx
-│   │   ├── DeployModal.tsx
 │   │   ├── DeployMoonModal.tsx
 │   │   ├── DeployPumpModal.tsx
 │   │   ├── DepositModal.tsx
 │   │   ├── DistributeModal.tsx
-│   │   ├── IntroModal.tsx
 │   │   ├── MixerModal.tsx
 │   │   ├── SettingsModal.tsx
-│   │   ├── TransferModal.tsx
-│   │   └── WalletsModal.tsx
+│   │   └── TransferModal.tsx
 │   ├── styles/         # CSS and styling
 │   │   ├── Styles.tsx
 │   │   ├── betterskill.css

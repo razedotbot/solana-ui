@@ -80,7 +80,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
       conditions,
       conditionLogic: 'and',
       actions,
-      isActive,
+      isActive: false, // Always start as inactive - tokens will be set when activating
       cooldown,
       cooldownUnit,
       maxExecutions,
@@ -88,7 +88,8 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
       lastExecuted: strategy?.lastExecuted,
       createdAt: strategy?.createdAt || Date.now(),
       updatedAt: Date.now(),
-      whitelistedAddresses: whitelistedAddresses
+      whitelistedAddresses: whitelistedAddresses,
+      tokenAddresses: strategy?.tokenAddresses || [] // Preserve existing tokens if editing
     };
 
     onSave(newStrategy);
@@ -111,7 +112,8 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
       lastExecuted: strategy?.lastExecuted,
       createdAt: strategy?.createdAt || Date.now(),
       updatedAt: Date.now(),
-      whitelistedAddresses: whitelistedAddresses
+      whitelistedAddresses: whitelistedAddresses,
+      tokenAddresses: strategy?.tokenAddresses || []
     };
     
     // Convert to JSON and create a downloadable file
@@ -197,7 +199,7 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
       </div>
 
       {/* Strategy Settings */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-mono color-primary mb-2">Cooldown</label>
           <div className="flex gap-2">
@@ -230,17 +232,6 @@ const StrategyBuilder: React.FC<StrategyBuilderProps> = ({ strategy, onSave, onC
               className="w-full px-2 py-1.5 bg-app-primary border border-app-primary-40 rounded font-mono text-sm color-primary focus:outline-none focus:border-app-primary"
             placeholder="Unlimited"
           />
-        </div>
-        <div className="flex items-center">
-          <label className="flex items-center gap-2 font-mono text-sm color-primary">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="rounded"
-            />
-            Start Active
-          </label>
         </div>
       </div>
       

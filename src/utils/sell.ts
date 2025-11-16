@@ -1,6 +1,7 @@
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { loadConfigFromCookies } from '../Utils';
+import { addTradeHistory } from './trading';
 
 // Constants
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -595,24 +596,68 @@ export const executeSell = async (
     console.info(`Preparing to sell ${sellConfig.sellPercent}% of ${sellConfig.tokenAddress} using ${wallets.length} wallets with ${bundleMode} mode`);
     
     // Execute based on bundle mode
+    let result: SellResult;
     switch (bundleMode) {
       case 'single':
-        return await executeSellSingleMode(wallets, sellConfig);
+        result = await executeSellSingleMode(wallets, sellConfig);
+        break;
       
       case 'batch':
-        return await executeSellBatchMode(wallets, sellConfig);
+        result = await executeSellBatchMode(wallets, sellConfig);
+        break;
       
       case 'all-in-one':
-        return await executeSellAllInOneMode(wallets, sellConfig);
+        result = await executeSellAllInOneMode(wallets, sellConfig);
+        break;
       
       default:
         throw new Error(`Invalid bundle mode: ${String(bundleMode)}. Must be 'single', 'batch', or 'all-in-one'`);
     }
+    
+    // Determine amount for history
+    const amount = sellConfig.tokensAmount !== undefined 
+      ? sellConfig.tokensAmount 
+      : sellConfig.sellPercent;
+    const amountType: 'sol' | 'percentage' = sellConfig.tokensAmount !== undefined ? 'sol' : 'percentage';
+    
+    // Save trade history
+    addTradeHistory({
+      type: 'sell',
+      tokenAddress: sellConfig.tokenAddress,
+      walletsCount: wallets.length,
+      amount: amount,
+      amountType: amountType,
+      success: result.success,
+      error: result.error,
+      bundleMode: bundleMode
+    });
+    
+    return result;
   } catch (error) {
     console.error('Sell error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error executing sell';
+    
+    // Determine amount for history
+    const amount = sellConfig.tokensAmount !== undefined 
+      ? sellConfig.tokensAmount 
+      : sellConfig.sellPercent;
+    const amountType: 'sol' | 'percentage' = sellConfig.tokensAmount !== undefined ? 'sol' : 'percentage';
+    
+    // Save failed trade history
+    addTradeHistory({
+      type: 'sell',
+      tokenAddress: sellConfig.tokenAddress,
+      walletsCount: wallets.length,
+      amount: amount,
+      amountType: amountType,
+      success: false,
+      error: errorMessage,
+      bundleMode: sellConfig.bundleMode || 'batch'
+    });
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error executing sell'
+      error: errorMessage
     };
   }
 };

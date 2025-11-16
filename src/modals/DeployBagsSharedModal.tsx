@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Users, Percent, Copy } from 'lucide-react';
-import { getWallets, getWalletDisplayName, loadConfigFromCookies } from '../Utils';
+import { getWalletDisplayName, loadConfigFromCookies } from '../Utils';
 import type { WalletType } from '../Utils';
 import { useToast } from "../components/useToast";
 import type { 
@@ -35,6 +35,7 @@ interface BaseModalProps {
 
 interface DeployBagsSharedFeesModalProps extends BaseModalProps {
   handleRefresh: () => void;
+  wallets: WalletType[];
   solBalances: Map<string, number>;
 }
 
@@ -58,6 +59,7 @@ interface SharedFeesConfig {
 export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps> = ({
   isOpen,
   onClose,
+  wallets: propWallets,
   solBalances,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -254,9 +256,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
     }
   };
 
-  // Get all wallets and filter those with SOL balance > 0
-  const allWallets = getWallets();
-  const wallets = allWallets.filter(wallet => (solBalances.get(wallet.address) || 0) > 0);
+  // Use wallets from props, filter those with SOL balance > 0
+  const wallets = propWallets.filter(wallet => (solBalances.get(wallet.address) || 0) > 0);
   const { showToast } = useToast();
 
   useEffect(() => {

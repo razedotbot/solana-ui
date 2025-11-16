@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Loader2, Move, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { 
   createMultipleLimitOrders, 
   getActiveOrders, 
@@ -375,8 +375,6 @@ interface TradingCardProps {
   countActiveWallets: (wallets: WalletType[]) => number;
   currentMarketCap: number | null;
   tokenBalances: Map<string, number>;
-  onOpenFloating: () => void;
-  isFloatingCardOpen: boolean;
   solPrice: number | null;
 }
 
@@ -393,8 +391,6 @@ const TradingCard: React.FC<TradingCardProps> = ({
   countActiveWallets,
   currentMarketCap,
   tokenBalances,
-  onOpenFloating,
-  isFloatingCardOpen,
   solPrice
 }) => {
   const { showToast } = useToast();
@@ -1076,8 +1072,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       </div>
 
       {/* Main Tabs - Orders and Trading */}
-      {!isFloatingCardOpen && (
-        <div className="flex bg-app-primary-60 border-b border-app-primary-20">
+      <div className="flex bg-app-primary-60 border-b border-app-primary-20">
           {/* Orders Tab - Smaller */}
           <button
             onClick={() => setActiveMainTab('orders')}
@@ -1139,10 +1134,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
             </div>
           </div>
         </div>
-      )}
 
       {/* Order Type Tabs - Only show for trading tab */}
-      {!isFloatingCardOpen && activeMainTab === 'trading' && (
+      {activeMainTab === 'trading' && (
         <div className="flex items-center justify-between px-4 py-2 bg-app-primary-40 border-b border-app-primary-10">
           <div className="flex gap-4">
             <button
@@ -1170,21 +1164,13 @@ const TradingCard: React.FC<TradingCardProps> = ({
           {/* Action Icons - Hidden for limit orders */}
           {orderType !== 'limit' && (
             <div className="flex items-center gap-2">
-              <button
-                onClick={onOpenFloating}
-                className="p-1.5 rounded hover-bg-primary-20 text-app-secondary-60 hover:color-primary transition-all duration-200"
-                title="Detach"
-              >
-                <Move size={14} />
-              </button>
             </div>
           )}
         </div>
       )}
 
       {/* Main Content */}
-      {!isFloatingCardOpen ? (
-        <div className="p-3 space-y-2">
+      <div className="p-3 space-y-2">
           {activeMainTab === 'orders' ? (
             /* Orders Content */
             <div className="space-y-3">
@@ -1709,13 +1695,6 @@ const TradingCard: React.FC<TradingCardProps> = ({
             </>
           )}
         </div>
-      ) : (
-        <div className="p-8 text-center">
-          <p className="text-app-secondary-60 text-sm font-mono tracking-wider">
-            TRADING INTERFACE IS OPEN IN FLOATING MODE
-          </p>
-        </div>
-      )}
     </div>
   );
 };

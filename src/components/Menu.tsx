@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from '../logo.png';
@@ -115,34 +116,21 @@ const DropdownPortal = ({ isOpen, buttonRef, onClose, children }: DropdownPortal
   );
 };
 
+// Main component
 interface ServiceSelectorProps {
   onTokenAddressClear?: () => void;
 }
 
-// Main component
-const ServiceSelector = ({ onTokenAddressClear }: ServiceSelectorProps): JSX.Element => {
+const ServiceSelector = ({ onTokenAddressClear }: ServiceSelectorProps = {}): JSX.Element => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef(null);
 
   const handleButtonClick = (): void => {
-    // Check if there's a tokenAddress in the URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenAddress = urlParams.get('tokenAddress');
-    
-    if (tokenAddress) {
-      // Remove token address from URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete('tokenAddress');
-      window.history.replaceState({}, '', url.toString());
-      
-      // Call the callback to clear token address in state if provided
-      if (onTokenAddressClear) {
-        onTokenAddressClear();
-      }
-    } else {
-      // No token address, open the dropdown
-      setIsOpen(!isOpen);
-    }
+    // Call the clear callback if provided
+    onTokenAddressClear?.();
+    // Navigate to homepage
+    navigate('/');
   };
   
   const closeSelector = (): void => {

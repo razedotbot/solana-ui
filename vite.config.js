@@ -3,10 +3,21 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig({
   plugins: [
     react(),
+    nodePolyfills({
+      // Enable polyfills for specific globals and modules
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+      // Enable polyfills for specific modules (e.g., crypto, stream, etc.)
+      protocolImports: true,
+    }),
     checker({
       overlay: true,
       typescript: {
@@ -48,12 +59,7 @@ export default defineConfig({
           
           // Modal components
           'modals': [
-            './src/modals/BurnModal.tsx',
-            './src/modals/CalculatePNLModal.tsx', 
-            './src/modals/DeployModal.tsx',
-            './src/modals/CustomBuyModal.tsx',
-            './src/modals/SettingsModal.tsx',
-            './src/modals/WalletsModal.tsx'
+            './src/modals/CalculatePNLModal.tsx'
           ],
           
           // Page components

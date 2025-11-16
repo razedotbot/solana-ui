@@ -5,8 +5,20 @@ import Cookies from 'js-cookie';
 import CryptoJS from 'crypto-js';
 import type { TradingStrategy } from './automate/types';
 import { formatAddress as _formatAddress, formatTokenBalance as _formatTokenBalance } from './utils/formatting';
+import { deriveWalletFromMnemonic } from './utils/hdWallet';
 
 export type WalletCategory = 'Soft' | 'Medium' | 'Hard';
+
+export type WalletSource = 'hd-derived' | 'imported';
+
+export interface MasterWallet {
+  id: string;
+  name: string;
+  encryptedMnemonic: string;
+  accountCount: number;
+  createdAt: number;
+  color?: string; // Visual grouping
+}
 
 export interface WalletType {
   id: number;
@@ -17,6 +29,12 @@ export interface WalletType {
   label?: string;
   category?: WalletCategory;
   isArchived?: boolean;
+  
+  // HD Wallet fields
+  source?: WalletSource; // 'hd-derived' or 'imported'
+  masterWalletId?: string; // Links to MasterWallet.id if HD-derived
+  derivationIndex?: number; // Account index in derivation path
+  
   [key: string]: unknown;
 }
 
@@ -77,6 +95,7 @@ const TRADING_STRATEGIES_COOKIE_KEY = 'tradingStrategies';
 // Encryption setup
 const ENCRYPTION_KEY = 'raze-bot-wallet-encryption-key';
 const ENCRYPTED_STORAGE_KEY = 'encrypted_wallets';
+const ENCRYPTED_MASTER_WALLETS_KEY = 'encrypted_master_wallets';
 
 // Encryption helper functions
 const encryptData = (data: string): string => {
@@ -135,17 +154,137 @@ export const migrateToEncryptedStorage = (): boolean => {
   }
 };
 
+// ============= Master Wallet Storage Functions =============
+
+/**
+ * Save master wallets to encrypted storage
+ */
+export const saveMasterWallets = (masterWallets: MasterWallet[]): void => {
+  try {
+    const data = JSON.stringify(masterWallets);
+    const encrypted = encryptData(data);
+    localStorage.setItem(ENCRYPTED_MASTER_WALLETS_KEY, encrypted);
+  } catch (error) {
+    console.error('Error saving master wallets:', error);
+    throw new Error('Failed to save master wallets');
+  }
+};
+
+/**
+ * Load master wallets from encrypted storage
+ */
+export const loadMasterWallets = (): MasterWallet[] => {
+  try {
+    const encrypted = localStorage.getItem(ENCRYPTED_MASTER_WALLETS_KEY);
+    if (!encrypted) {
+      return [];
+    }
+    
+    const decrypted = decryptData(encrypted);
+    const masterWallets = JSON.parse(decrypted) as MasterWallet[];
+    return masterWallets;
+  } catch (error) {
+    console.error('Error loading master wallets:', error);
+    return [];
+  }
+};
+
+/**
+ * Create a new master wallet entry
+ */
+export const createMasterWallet = (
+  name: string,
+  mnemonic: string,
+  color?: string
+): MasterWallet => {
+  const encryptedMnemonic = encryptData(mnemonic);
+  
+  return {
+    id: `master_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name,
+    encryptedMnemonic,
+    accountCount: 0,
+    createdAt: Date.now(),
+    color,
+  };
+};
+
+/**
+ * Get mnemonic from master wallet (decrypted)
+ */
+export const getMasterWalletMnemonic = (masterWallet: MasterWallet): string => {
+  try {
+    return decryptData(masterWallet.encryptedMnemonic);
+  } catch (error) {
+    console.error('Error decrypting master wallet mnemonic:', error);
+    throw new Error('Failed to decrypt mnemonic');
+  }
+};
+
+/**
+ * Update master wallet account count
+ */
+export const updateMasterWalletAccountCount = (
+  masterWallets: MasterWallet[],
+  masterWalletId: string,
+  accountCount: number
+): MasterWallet[] => {
+  return masterWallets.map(mw => 
+    mw.id === masterWalletId ? { ...mw, accountCount } : mw
+  );
+};
+
+/**
+ * Delete a master wallet
+ */
+export const deleteMasterWallet = (
+  masterWallets: MasterWallet[],
+  masterWalletId: string
+): MasterWallet[] => {
+  return masterWallets.filter(mw => mw.id !== masterWalletId);
+};
+
+/**
+ * Create HD-derived wallet from master wallet
+ */
+// Generate unique wallet ID with timestamp and random component
+const generateWalletId = (): number => {
+  // Use timestamp + random number to ensure uniqueness even when created rapidly
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+};
+
+export const createHDWalletFromMaster = (
+  masterWallet: MasterWallet,
+  accountIndex: number,
+  category: WalletCategory = 'Medium'
+): WalletType => {
+  const mnemonic = getMasterWalletMnemonic(masterWallet);
+  const derived = deriveWalletFromMnemonic(mnemonic, accountIndex);
+  
+  return {
+    id: generateWalletId() + accountIndex, // Ensure unique ID
+    address: derived.address,
+    privateKey: derived.privateKey,
+    isActive: false,
+    category,
+    source: 'hd-derived',
+    masterWalletId: masterWallet.id,
+    derivationIndex: accountIndex,
+  };
+};
+
 export const createNewWallet = (): WalletType => {
   const keypair = Keypair.generate();
   const address = keypair.publicKey.toString();
   const privateKey = bs58.encode(keypair.secretKey);
   
   return {
-    id: Date.now(),
+    id: generateWalletId(),
     address,
     privateKey,
     isActive: false,
-    category: 'Medium'
+    category: 'Medium',
+    source: 'imported' // Mark as imported (not HD-derived)
   };
 };
 
@@ -176,11 +315,12 @@ export const importWallet = (
     const address = keypair.publicKey.toString();
     
     const wallet: WalletType = {
-      id: Date.now(),
+      id: generateWalletId(),
       address,
       privateKey: privateKeyString,
       isActive: false,
-      category: 'Medium'
+      category: 'Medium',
+      source: 'imported' // Mark as imported (not HD-derived)
     };
     
     return { wallet };

@@ -38,4 +38,5 @@ export interface TradingStrategy {
   createdAt: number;
   updatedAt: number;
   whitelistedAddresses?: string[]; // addresses to monitor for whitelist-based strategies
+  tokenAddresses?: string[]; // token addresses to monitor (if empty, uses current token)
 }

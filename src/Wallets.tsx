@@ -436,9 +436,43 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
 
 
   return (
-    <div className="flex-1 bg-app-primary relative bg">
-      {/*  scanline effect - pointer-events-none ensures it doesn't block clicks */}
-      <div className="absolute top-0 left-0 w-full h-full scanline pointer-events-none z-1 opacity-30"></div>
+    <div className="flex-1 bg-app-primary relative overflow-y-auto overflow-x-hidden h-full min-h-full">
+      {/* Background effects - same as Actions.tsx */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden min-h-full">
+        {/* Grid background */}
+        <div className="absolute inset-0 bg-app-primary opacity-90">
+          <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
+          <div 
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `
+                linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
+              `,
+              backgroundSize: '20px 20px',
+              backgroundPosition: 'center center',
+            }}
+          ></div>
+        </div>
+        
+        {/* Glowing corner accents */}
+        <div className="absolute top-0 left-0 w-32 h-32 opacity-20">
+          <div className="absolute top-0 left-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+          <div className="absolute top-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+        </div>
+        <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
+          <div className="absolute top-0 right-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+          <div className="absolute top-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+        </div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 opacity-20">
+          <div className="absolute bottom-0 left-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+          <div className="absolute bottom-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+        </div>
+        <div className="absolute bottom-0 right-0 w-32 h-32 opacity-20">
+          <div className="absolute bottom-0 right-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+          <div className="absolute bottom-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+        </div>
+      </div>
       
       {/*  header */}
       <div className="top-0 sticky bg-app-primary-99 backdrop-blur-sm border-b border-app-primary-40 z-10 shadow-sm">
@@ -498,8 +532,8 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
       </div>
       
       {/* Wallets table with  visual selection */}
-      <div className="pt-2 relative">
-        <div className="min-w-full overflow-auto relative">
+      <div className="pt-2 relative z-10">
+        <div className="min-w-full relative">
           <table className="w-full border-separate border-spacing-0">
             <tbody className="text-sm">
               {wallets.filter(wallet => !wallet.isArchived).map((wallet) => (
@@ -591,34 +625,36 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                   {/*  Address Display */}
                   <td className="py-3 px-2 font-mono">
                     <div className="flex items-center justify-between">
-                      <Tooltip 
-                        content={`Click to copy`}
-                        position="bottom"
-                      >
-                        <span 
-                          className={`text-sm font-mono cursor-pointer transition-all duration-300 tracking-wide font-medium
-                            ${wallet.isActive 
-                              ? 'text-success drop-shadow-sm' 
-                              : 'text-app-primary hover:color-primary'
-                            }
-                          `}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const success = await copyToClipboard(wallet.address, showToast);
-                            if (success) {
-                              setCopiedAddress(wallet.address);
-                              setTimeout(() => setCopiedAddress(null), 2000);
-                            }
-                          }}
+                      <div className="flex items-center gap-2">
+                        <Tooltip 
+                          content={`Click to copy`}
+                          position="bottom"
                         >
-                          {getWalletDisplayName(wallet)}
-                          {copiedAddress === wallet.address && (
-                            <span className="ml-2 text-xs color-primary animate-pulse bg-primary-20 px-1 py-0.5 rounded">
-                              ✓
-                            </span>
-                          )}
-                        </span>
-                      </Tooltip>
+                          <span 
+                            className={`text-sm font-mono cursor-pointer transition-all duration-300 tracking-wide font-medium
+                              ${wallet.isActive 
+                                ? 'text-success drop-shadow-sm' 
+                                : 'text-app-primary hover:color-primary'
+                              }
+                            `}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const success = await copyToClipboard(wallet.address, showToast);
+                              if (success) {
+                                setCopiedAddress(wallet.address);
+                                setTimeout(() => setCopiedAddress(null), 2000);
+                              }
+                            }}
+                          >
+                            {getWalletDisplayName(wallet)}
+                            {copiedAddress === wallet.address && (
+                              <span className="ml-2 text-xs color-primary animate-pulse bg-primary-20 px-1 py-0.5 rounded">
+                                ✓
+                              </span>
+                            )}
+                          </span>
+                        </Tooltip>
+                      </div>
 
                     </div>
                   </td>

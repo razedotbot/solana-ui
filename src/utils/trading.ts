@@ -195,3 +195,97 @@ export const executeTrade = async (
   }
 
 };
+
+/**
+ * Trade history management utilities
+ * Stores and retrieves trade history from localStorage
+ */
+
+export interface TradeHistoryEntry {
+  id: string;
+  type: 'buy' | 'sell';
+  tokenAddress: string;
+  timestamp: number;
+  walletsCount: number;
+  amount: number;
+  amountType: 'sol' | 'percentage';
+  success: boolean;
+  error?: string;
+  bundleMode?: 'single' | 'batch' | 'all-in-one';
+}
+
+const STORAGE_KEY = 'raze_trade_history';
+const MAX_HISTORY_ENTRIES = 50; // Keep last 50 trades
+
+/**
+ * Get all trade history entries from localStorage
+ */
+export const getTradeHistory = (): TradeHistoryEntry[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return [];
+    
+    const history = JSON.parse(stored) as TradeHistoryEntry[];
+    // Sort by timestamp descending (newest first)
+    return history.sort((a, b) => b.timestamp - a.timestamp);
+  } catch (error) {
+    console.error('Error reading trade history:', error);
+    return [];
+  }
+};
+
+/**
+ * Add a new trade entry to history
+ */
+export const addTradeHistory = (entry: Omit<TradeHistoryEntry, 'id' | 'timestamp'>): void => {
+  try {
+    const history = getTradeHistory();
+    
+    const newEntry: TradeHistoryEntry = {
+      ...entry,
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+      timestamp: Date.now()
+    };
+    
+    // Add to beginning of array (newest first)
+    history.unshift(newEntry);
+    
+    // Keep only the last MAX_HISTORY_ENTRIES entries
+    const trimmedHistory = history.slice(0, MAX_HISTORY_ENTRIES);
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedHistory));
+    
+    // Dispatch custom event for real-time updates
+    window.dispatchEvent(new CustomEvent('tradeHistoryUpdated', { detail: newEntry }));
+  } catch (error) {
+    console.error('Error saving trade history:', error);
+  }
+};
+
+/**
+ * Clear all trade history
+ */
+export const clearTradeHistory = (): void => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent('tradeHistoryUpdated'));
+  } catch (error) {
+    console.error('Error clearing trade history:', error);
+  }
+};
+
+/**
+ * Get latest trades (up to limit)
+ */
+export const getLatestTrades = (limit: number = 10): TradeHistoryEntry[] => {
+  const history = getTradeHistory();
+  return history.slice(0, limit);
+};
+
+/**
+ * Get trades for a specific token
+ */
+export const getTradesForToken = (tokenAddress: string): TradeHistoryEntry[] => {
+  const history = getTradeHistory();
+  return history.filter(trade => trade.tokenAddress === tokenAddress);
+};

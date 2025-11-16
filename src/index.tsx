@@ -1,12 +1,15 @@
+// Apply passive touch event patch before any other imports
+import './utils/passiveTouchPatch';
+
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
-// Separate import for createPortal
-import { createPortal } from 'react-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Buffer } from 'buffer';
 import Cookies from 'js-cookie';
 window.Buffer = Buffer;
 import { brand } from './config/brandConfig';
-import type { WindowWithToast } from './types/api';
+import type { WindowWithToast, ServerInfo } from './types/api';
+import { AppContextProvider } from './contexts/AppContext';
 
 // Dynamic CSS loading based on brand configuration using Vite's import
 const loadBrandCSS = async (): Promise<void> => {
@@ -25,18 +28,16 @@ void loadBrandCSS();
 import ToastProvider from "./components/Notifications";
 import { useToast } from "./components/useToast";
 import BeRightBack from './components/BeRightBack';
-import IntroModal from './modals/IntroModal';
-import { Connection } from '@solana/web3.js';
-import { 
-  loadWalletsFromCookies, 
-  loadConfigFromCookies, 
-  saveConfigToCookies,
-  saveWalletsToCookies
-} from './Utils';
-import type { WalletType, ConfigType } from './Utils';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Lazy load page components
 const App = lazy(() => import('./App'));
-const SettingsModal = lazy(() => import('./modals/SettingsModal'));
-const WalletOverview = lazy(() => import('./modals/WalletsModal'));
+const Homepage = lazy(() => import('./homepage'));
+const AutomatePage = lazy(() => import('./automate/AutomatePage'));
+const DeployPage = lazy(() => import('./pages/DeployPage'));
+const BurnPage = lazy(() => import('./pages/BurnPage'));
+const WalletsPage = lazy(() => import('./pages/WalletsPage').then(module => ({ default: module.WalletsPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 
 declare global {
   interface Window {
@@ -50,16 +51,6 @@ declare global {
 
 const SERVER_URL_COOKIE = 'trading_server_url';
 const SERVER_REGION_COOKIE = 'trading_server_region';
-const INTRO_COMPLETED_COOKIE = 'intro_completed';
-
-interface ServerInfo {
-  id: string;
-  name: string;
-  url: string;
-  region: string;
-  flag: string;
-  ping?: number;
-}
 
 const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
   { id: 'us', name: 'United States', url: 'https://us.fury.bot/', region: 'US', flag: '🇺🇸' },
@@ -74,93 +65,10 @@ export const ServerCheckLoading = (): JSX.Element => {
   );
 };
 
-/**
- * Custom Modal Container Component
- * This directly creates a backdrop for the IntroModal
- */
-interface ModalPortalProps {
-  isOpen: boolean;
-  onComplete: () => void;
-  onSkip: () => void;
-}
-
-export const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onComplete }): JSX.Element | null => {
-  const [modalRoot, setModalRoot] = useState<HTMLElement | null>(null);
-  
-  useEffect((): (() => void) => {
-    // Create or get the modal root element when component mounts
-    let rootElement = document.getElementById('modal-root');
-    
-    if (!rootElement && isOpen) {
-      rootElement = document.createElement('div');
-      rootElement.id = 'modal-root';
-      document.body.appendChild(rootElement);
-    }
-    
-    setModalRoot(rootElement);
-    
-    // Clean up function
-    return (): void => {
-      // Only remove if we created it
-      if (rootElement && rootElement.parentNode && !isOpen) {
-        document.body.removeChild(rootElement);
-      }
-    };
-  }, [isOpen]);
-  
-  // Apply styles only when modal is open
-  useEffect((): void => {
-    if (!modalRoot) return;
-    
-    if (isOpen) {
-      modalRoot.style.position = 'fixed';
-      modalRoot.style.top = '0';
-      modalRoot.style.left = '0';
-      modalRoot.style.width = '100vw';
-      modalRoot.style.height = '100vh';
-      modalRoot.style.zIndex = '99999';
-      modalRoot.style.pointerEvents = 'auto';
-    } else {
-      // When closed, disable pointer events
-      if (modalRoot) {
-        modalRoot.style.pointerEvents = 'none';
-      }
-    }
-  }, [isOpen, modalRoot]);
-
-  if (!isOpen || !modalRoot) return null;
-  
-  // Create our portal
-  return createPortal(
-    <div className="fixed inset-0 bg-app-overlay backdrop-blur-sm flex items-center justify-center"
-         style={{ zIndex: 99999, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-      <div className="relative z-[99999]">
-        <IntroModal 
-          isOpen={true} 
-          onClose={onComplete}  
-        />
-      </div>
-    </div>,
-    modalRoot
-  );
-};
-
 export const Root = (): JSX.Element => {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
   const [isChecking, setIsChecking] = useState(true);
-  const [showIntroModal, setShowIntroModal] = useState(false);
-  
-  // Modal states for offline access
-  const [isWalletsModalOpen, setIsWalletsModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  
-  // Load wallets and config for offline modal access
-  const [wallets, setWallets] = useState<WalletType[]>([]);
-  const [config, setConfig] = useState<ConfigType | null>(null);
-  const [solBalances, setSolBalances] = useState<Map<string, number>>(new Map());
-  const [tokenBalances, setTokenBalances] = useState<Map<string, number>>(new Map());
-  const [connection, setConnection] = useState<Connection | null>(null);
 
   // Disable right-click and text selection globally
   useEffect((): (() => void) => {
@@ -216,7 +124,10 @@ export const Root = (): JSX.Element => {
 
     // Cleanup function
     return (): void => {
-      document.head.removeChild(style);
+      // Safely remove style element if it's still a child
+      if (style.parentNode === document.head) {
+        document.head.removeChild(style);
+      }
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('selectstart', handleSelectStart);
       document.removeEventListener('dragstart', handleDragStart);
@@ -313,51 +224,6 @@ export const Root = (): JSX.Element => {
   }, [availableServers]);
 
 
-  // Handler for completing the intro
-  const handleIntroComplete = (): void => {
-    console.info("Intro completed");
-    Cookies.set(INTRO_COMPLETED_COOKIE, 'true', { expires: 365 });
-    setShowIntroModal(false);
-    
-    // Ensure any modal-related elements are properly cleaned up
-    cleanupModalElements();
-  };
-
-  // Handler for skipping the intro
-  const handleIntroSkip = (): void => {
-    console.info("Intro skipped");
-    Cookies.set(INTRO_COMPLETED_COOKIE, 'true', { expires: 365 });
-    setShowIntroModal(false);
-    
-    // Ensure any modal-related elements are properly cleaned up
-    cleanupModalElements();
-  };
-  
-  // Function to clean up any modal-related elements
-  const cleanupModalElements = (): void => {
-    // Force pointer-events to be enabled on the body and html
-    document.body.style.pointerEvents = 'auto';
-    document.documentElement.style.pointerEvents = 'auto';
-    
-    // Remove any lingering modal-related elements or styles
-    const modalRoot = document.getElementById('modal-root');
-    if (modalRoot) {
-      modalRoot.style.pointerEvents = 'none';
-    }
-  };
-
-  // Forcefully show the modal after a short delay
-  const forceShowIntroModal = (): void => {
-    // Make sure intro hasn't been completed
-    const introCompleted = Cookies.get(INTRO_COMPLETED_COOKIE);
-    if (!introCompleted) {
-      console.info('Forcing intro modal to show...');
-      setTimeout((): void => {
-        setShowIntroModal(true);
-      }, 800); // Longer delay to ensure everything has loaded
-    }
-  };
-
   // Initialize server connection
   useEffect((): void => {
     const initializeServer = async (): Promise<void> => {
@@ -410,7 +276,6 @@ export const Root = (): JSX.Element => {
           });
           window.dispatchEvent(event);
           
-          forceShowIntroModal();
           return;
         } else {
           console.info('Saved server is not reachable or not in our list, finding best server...');
@@ -434,7 +299,6 @@ export const Root = (): JSX.Element => {
         });
         window.dispatchEvent(event);
         
-        forceShowIntroModal();
         console.info('Server initialization completed with:', bestServer.name);
         return;
       }
@@ -454,37 +318,6 @@ export const Root = (): JSX.Element => {
     }
   }, [availableServers, switchToServer]);
 
-  // Load wallets and config for offline access
-  useEffect((): void => {
-    const loadData = (): void => {
-      try {
-        const savedWallets = loadWalletsFromCookies();
-        if (savedWallets && savedWallets.length > 0) {
-          setWallets(savedWallets);
-        }
-        
-        const savedConfig = loadConfigFromCookies();
-        if (savedConfig) {
-          setConfig(savedConfig);
-          
-          // Try to create connection if RPC endpoint is available
-          if (savedConfig.rpcEndpoint) {
-            try {
-              const conn = new Connection(savedConfig.rpcEndpoint, 'confirmed');
-              setConnection(conn);
-            } catch (err) {
-              console.info('Could not create connection:', err);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading wallets/config:', error);
-      }
-    };
-    
-    loadData();
-  }, []);
-
   // Toast wrapper
   const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({ children }): JSX.Element => {
     const { showToast } = useToast();
@@ -500,109 +333,53 @@ export const Root = (): JSX.Element => {
     return <>{children}</>;
   };
 
-  // Config change handler
-  const handleConfigChange = (key: keyof ConfigType, value: string): void => {
-    if (!config) return;
-    const updatedConfig = { ...config, [key]: value };
-    setConfig(updatedConfig);
-    saveConfigToCookies(updatedConfig);
-  };
 
-  // Save settings handler
-  const handleSaveSettings = (): void => {
-    if (config) {
-      saveConfigToCookies(config);
-    }
-  };
-
-  // Wallet update handler
-  const handleWalletsUpdate = (updatedWallets: WalletType[]): void => {
-    setWallets(updatedWallets);
-    saveWalletsToCookies(updatedWallets);
-  };
-
-  // Force modal to appear with keyboard shortcut for debugging
-  useEffect((): (() => void) => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      // Ctrl + Shift + M to toggle modal for debugging
-      if (e.ctrlKey && e.shiftKey && e.key === 'M') {
-        setShowIntroModal((prev): boolean => !prev);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return (): void => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   if (isChecking) {
     return <ServerCheckLoading />;
   }
 
   return (
-    <ToastProvider>
-      <ToastWrapper>
-        {serverUrl ? (
-          <>
-            {/* The App component without blur effect */}
-            <div className={showIntroModal ? 'filter blur-sm' : ''} 
-                 style={{ pointerEvents: showIntroModal ? 'none' : 'auto' }}>
-              <Suspense fallback={<ServerCheckLoading />}>
-                <App />
-              </Suspense>
-            </div>
-            
-            {/* Our custom modal portal implementation */}
-            <ModalPortal
-              isOpen={showIntroModal}
-              onComplete={handleIntroComplete}
-              onSkip={handleIntroSkip}
-            />
-          </>
-        ) : (
-          <BeRightBack 
-            onOpenWallets={() => setIsWalletsModalOpen(true)}
-            onOpenSettings={() => {
-              setIsSettingsModalOpen(true);
-            }}
-          />
-        )}
-        
-        {/* Modals accessible even when server is unreachable */}
-        <Suspense fallback={null}>
-          <WalletOverview
-            isOpen={isWalletsModalOpen}
-            onClose={() => setIsWalletsModalOpen(false)}
-            wallets={wallets}
-            setWallets={handleWalletsUpdate}
-            solBalances={solBalances}
-            setSolBalances={setSolBalances}
-            tokenBalances={tokenBalances}
-            setTokenBalances={setTokenBalances}
-            tokenAddress=""
-            connection={connection}
-            handleRefresh={() => {}}
-            isRefreshing={false}
-            showToast={(window as WindowWithToast).showToast || (() => {})}
-            onOpenSettings={() => {
-              setIsWalletsModalOpen(false);
-              setIsSettingsModalOpen(true);
-            }}
-          />
-          
-          {config && (
-            <SettingsModal
-              isOpen={isSettingsModalOpen}
-              onClose={() => setIsSettingsModalOpen(false)}
-              config={config}
-              onConfigChange={handleConfigChange}
-              onSave={handleSaveSettings}
-              connection={connection}
-              showToast={(window as WindowWithToast).showToast || (() => {})}
-            />
-          )}
-        </Suspense>
-      </ToastWrapper>
-    </ToastProvider>
+    <ErrorBoundary>
+      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <ToastProvider>
+          <ToastWrapper>
+            <AppContextProvider showToast={(window as WindowWithToast).showToast || (() => {})}>
+              {serverUrl ? (
+                <Suspense fallback={<ServerCheckLoading />}>
+                  <Routes>
+                    {/* Homepage */}
+                    <Route path="/" element={<Homepage />} />
+                    
+                    {/* Main app routes */}
+                    <Route path="/holdings" element={<App />} />
+                    <Route path="/monitor" element={<App />} />
+                    <Route path="/token/:tokenAddress" element={<App />} />
+                    
+                    {/* Feature pages */}
+                    <Route path="/automate" element={<AutomatePage />} />
+                    <Route path="/deploy" element={<DeployPage />} />
+                    <Route path="/burn" element={<BurnPage />} />
+                    <Route path="/wallets" element={<WalletsPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    
+                    {/* Fallback - redirect to homepage */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Suspense>
+              ) : (
+                <BeRightBack 
+                  onOpenWallets={() => window.location.href = '/wallets'}
+                  onOpenSettings={() => {
+                    window.location.href = '/settings';
+                  }}
+                />
+              )}
+            </AppContextProvider>
+          </ToastWrapper>
+        </ToastProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 };
 
