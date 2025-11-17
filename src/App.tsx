@@ -1,6 +1,6 @@
 import React, { useEffect, lazy, useCallback, useReducer, useMemo, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronDown, Settings, Wrench, Bot, Blocks, Trash2 } from 'lucide-react';
+import { ChevronDown, Settings, Wrench, Bot, Blocks } from 'lucide-react';
 import type { Connection } from '@solana/web3.js';
 import ServiceSelector from './components/Menu';
 import { initStyles } from './styles/Styles';
@@ -50,15 +50,9 @@ const ToolsDropdown: React.FC<{
   onSettingsClick: () => void;
 }> = ({ onAutomateClick, onDeployClick, onSettingsClick }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const navigate = useNavigate();
 
   const handleAutomateClick = (): void => {
     onAutomateClick();
-    setIsOpen(false);
-  };
-
-  const handleBurnClick = (): void => {
-    navigate('/burn');
     setIsOpen(false);
   };
 
@@ -133,17 +127,6 @@ const ToolsDropdown: React.FC<{
                   <span className="text-xs font-mono font-medium">Deploy</span>
                 </button>
 
-                {/* Burn */}
-                <button
-                  onClick={handleBurnClick}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
-                >
-                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
-                    <Trash2 size={14} className="color-primary" />
-                  </div>
-                  <span className="text-xs font-mono font-medium">Burn</span>
-                </button>
-
                 {/* Settings */}
                 <button
                   onClick={handleSettingsClick}
@@ -178,6 +161,20 @@ const WalletManager: React.FC = () => {
     setTokenBalances: setContextTokenBalances,
     isRefreshing: contextIsRefreshing
   } = useAppContext();
+  
+  // Detect if we're on mobile or desktop to conditionally render layouts
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = (): void => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint is 768px
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
   // Apply styles
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -783,8 +780,9 @@ const WalletManager: React.FC = () => {
 
       {/* Main Content - Full Height */}
       <div className="flex flex-col md:flex-row h-screen">
-        {/* Desktop Layout */}
-        <div className="hidden md:block w-full h-full relative">
+        {/* Desktop Layout - Only render when not mobile */}
+        {!isMobile && (
+          <div className="w-full h-full relative">
             <Split
               className="flex w-full h-full split-custom"
               sizes={state.leftColumnCollapsed ? [0, 80, 20] : [20, 60, 20]}
@@ -823,8 +821,28 @@ const WalletManager: React.FC = () => {
             >
               {/* Left Column */}
             <div 
-              className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full"
+              className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col"
             >
+              {/* Top Navigation - Left Column */}
+              <nav className="sticky top-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
+                <div className="flex items-center gap-2 md:gap-3">
+                  {/* Service Selector */}
+                  <ServiceSelector />
+                  
+                  {/* Spacer to push items to the right */}
+                  <div className="flex-1"></div>
+                  
+                  {/* Tools Dropdown */}
+                  <ToolsDropdown
+                    onAutomateClick={(): void => memoizedCallbacks.setAutomateCardOpen(true)}
+                    onDeployClick={(): void => navigate('/deploy')}
+                    onSettingsClick={(): void => navigate('/settings')}
+                  />
+                </div>
+              </nav>
+              
+              {/* Wallets Page Content */}
+              <div className="flex-1 overflow-y-auto">
                 {state.connection && (
                   <WalletsPage
                   wallets={state.wallets}
@@ -859,6 +877,7 @@ const WalletManager: React.FC = () => {
                   setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
                 />
               )}
+              </div>
             </div>
 
             {/* Middle Column */}
@@ -912,10 +931,12 @@ const WalletManager: React.FC = () => {
             />
             </div>
           </Split>
-        </div>
+          </div>
+        )}
 
-        {/* Mobile Layout */}
-        <MobileLayout
+        {/* Mobile Layout - Only render when mobile */}
+        {isMobile && (
+          <MobileLayout
           currentPage={state.currentPage}
           setCurrentPage={memoizedCallbacks.setCurrentPage}
           children={{
@@ -1013,7 +1034,8 @@ const WalletManager: React.FC = () => {
               </div>
             )
           }}
-        />
+          />
+        )}
       </div>
   
 

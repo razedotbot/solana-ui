@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, Share, X } from 'lucide-react';
-import type { WalletCategory } from '../Utils';
+import { DollarSign, Share, X, RotateCcw } from 'lucide-react';
+import type { WalletType, CustomQuickTradeSettings, WalletCategory } from '../Utils';
+import type { CategoryQuickTradeSettings } from './QuickTradeModal';
 
-export interface CategoryQuickTradeSettings {
-  enabled: boolean;
-  buyAmount: number;
-  buyMinAmount: number;
-  buyMaxAmount: number;
-  useBuyRange: boolean;
-  sellPercentage: number;
-  sellMinPercentage: number;
-  sellMaxPercentage: number;
-  useSellRange: boolean;
-}
-
-interface QuickTradeModalProps {
+interface WalletQuickTradeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  wallet: WalletType;
   categorySettings: Record<WalletCategory, CategoryQuickTradeSettings>;
-  setCategorySettings: (settings: Record<WalletCategory, CategoryQuickTradeSettings>) => void;
+  onSaveCustomSettings: (walletId: number, settings: CustomQuickTradeSettings | null) => void;
 }
 
 const buttonVariants = {
@@ -29,52 +19,94 @@ const buttonVariants = {
   tap: { scale: 0.95 }
 };
 
-const categories: WalletCategory[] = ['Soft', 'Medium', 'Hard'];
-const categoryColors = {
-  Soft: 'bg-green-500/20 text-green-400 border-green-500/30',
-  Medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  Hard: 'bg-red-500/20 text-red-400 border-red-500/30'
-};
-
-export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
+export const WalletQuickTradeModal: React.FC<WalletQuickTradeModalProps> = ({
   isOpen,
   onClose,
+  wallet,
   categorySettings,
-  setCategorySettings
+  onSaveCustomSettings
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<WalletCategory>('Medium');
-  const [tempSettings, setTempSettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings>>(categorySettings);
+  const [useCustomSettings, setUseCustomSettings] = useState(!!wallet.customQuickTradeSettings);
+  const [tempSettings, setTempSettings] = useState<CustomQuickTradeSettings>(() => {
+    if (wallet.customQuickTradeSettings) {
+      return wallet.customQuickTradeSettings;
+    }
+    // Initialize with category defaults
+    const category = wallet.category || 'Medium';
+    const categoryDefaults = categorySettings[category];
+    return {
+      buyAmount: categoryDefaults.buyAmount,
+      buyMinAmount: categoryDefaults.buyMinAmount,
+      buyMaxAmount: categoryDefaults.buyMaxAmount,
+      useBuyRange: categoryDefaults.useBuyRange,
+      sellPercentage: categoryDefaults.sellPercentage,
+      sellMinPercentage: categoryDefaults.sellMinPercentage,
+      sellMaxPercentage: categoryDefaults.sellMaxPercentage,
+      useSellRange: categoryDefaults.useSellRange
+    };
+  });
 
-  // Reset temp values and selected category when modal opens
+  // Reset temp values when modal opens
   useEffect(() => {
     if (isOpen) {
-      setTempSettings(categorySettings);
-      setSelectedCategory('Medium');
+      setUseCustomSettings(!!wallet.customQuickTradeSettings);
+      if (wallet.customQuickTradeSettings) {
+        setTempSettings(wallet.customQuickTradeSettings);
+      } else {
+        const category = wallet.category || 'Medium';
+        const categoryDefaults = categorySettings[category];
+        setTempSettings({
+          buyAmount: categoryDefaults.buyAmount,
+          buyMinAmount: categoryDefaults.buyMinAmount,
+          buyMaxAmount: categoryDefaults.buyMaxAmount,
+          useBuyRange: categoryDefaults.useBuyRange,
+          sellPercentage: categoryDefaults.sellPercentage,
+          sellMinPercentage: categoryDefaults.sellMinPercentage,
+          sellMaxPercentage: categoryDefaults.sellMaxPercentage,
+          useSellRange: categoryDefaults.useSellRange
+        });
+      }
     }
-  }, [isOpen, categorySettings]);
+  }, [isOpen, wallet, categorySettings]);
 
-  const currentSettings = tempSettings[selectedCategory];
-
-  const updateCategorySetting = <K extends keyof CategoryQuickTradeSettings>(
-    category: WalletCategory,
+  const updateSetting = <K extends keyof CustomQuickTradeSettings>(
     key: K,
-    value: CategoryQuickTradeSettings[K]
+    value: CustomQuickTradeSettings[K]
   ): void => {
     setTempSettings(prev => ({
       ...prev,
-      [category]: {
-        ...prev[category],
-        [key]: value
-      }
+      [key]: value
     }));
   };
 
   const saveSettings = (): void => {
-    setCategorySettings(tempSettings);
+    if (useCustomSettings) {
+      onSaveCustomSettings(wallet.id, tempSettings);
+    } else {
+      onSaveCustomSettings(wallet.id, null);
+    }
     onClose();
   };
 
+  const resetToCategory = (): void => {
+    const category = wallet.category || 'Medium';
+    const categoryDefaults = categorySettings[category];
+    setTempSettings({
+      buyAmount: categoryDefaults.buyAmount,
+      buyMinAmount: categoryDefaults.buyMinAmount,
+      buyMaxAmount: categoryDefaults.buyMaxAmount,
+      useBuyRange: categoryDefaults.useBuyRange,
+      sellPercentage: categoryDefaults.sellPercentage,
+      sellMinPercentage: categoryDefaults.sellMinPercentage,
+      sellMaxPercentage: categoryDefaults.sellMaxPercentage,
+      useSellRange: categoryDefaults.useSellRange
+    });
+  };
+
   if (!isOpen) return null;
+
+  const category = wallet.category || 'Medium';
+  const categoryDefaults = categorySettings[category];
 
   return createPortal(
     <AnimatePresence>
@@ -92,7 +124,14 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
         >
           {/* Header */}
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-app-primary-20">
-            <h2 className="text-lg font-mono color-primary font-bold tracking-wider">QUICK TRADE SETTINGS</h2>
+            <div>
+              <h2 className="text-lg font-mono color-primary font-bold tracking-wider">
+                WALLET QUICK TRADE SETTINGS
+              </h2>
+              <p className="text-xs text-app-secondary-80 mt-1 font-mono">
+                {wallet.label || wallet.address.substring(0, 8)}... • Category: {category}
+              </p>
+            </div>
             <button
               onClick={onClose}
               className="color-primary hover-color-primary-light transition-colors p-1"
@@ -101,28 +140,54 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
             </button>
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex gap-2 mb-6">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`flex-1 py-2 px-4 rounded-lg font-mono text-sm transition-all duration-200 border ${
-                  selectedCategory === category
-                    ? `${categoryColors[category]} border-current shadow-md`
-                    : 'bg-app-quaternary border-app-primary-30 color-primary hover-color-primary-light'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
+          {/* Use Custom Settings Toggle */}
+          <div className="mb-6 p-4 bg-app-quaternary border border-app-primary-20 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="font-mono color-primary text-sm mb-1">Custom Settings</div>
+                <p className="text-xs text-app-secondary-80">
+                  {useCustomSettings 
+                    ? 'Using wallet-specific custom settings' 
+                    : `Using ${category} category defaults`
+                  }
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={resetToCategory}
+                  disabled={!useCustomSettings}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 
+                           bg-app-primary border border-app-primary-30 color-primary hover-color-primary-light
+                           disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <RotateCcw size={12} />
+                  Reset
+                </button>
+                
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCustomSettings}
+                    onChange={(e) => setUseCustomSettings(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-app-tertiary peer-focus:outline-none rounded-full peer 
+                                peer-checked:after:translate-x-full peer-checked:after:border-white 
+                                after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                                after:bg-white after:border-gray-300 after:border after:rounded-full 
+                                after:h-5 after:w-5 after:transition-all peer-checked:bg-app-primary-color">
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
           
           <div className="space-y-6">
             {/* Buy Amount Configuration */}
             <motion.div 
-              className={`transition-all duration-300 ${currentSettings.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}
-              animate={{ opacity: currentSettings.enabled ? 1 : 0.4 }}
+              className={`transition-all duration-300 ${useCustomSettings ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}
+              animate={{ opacity: useCustomSettings ? 1 : 0.4 }}
             >
               <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
@@ -130,6 +195,11 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                     <DollarSign size={16} />
                     Quick Buy Configuration
                   </h3>
+                  {!useCustomSettings && (
+                    <span className="text-xs text-app-secondary-80 font-mono">
+                      (Category: {categoryDefaults.buyAmount} SOL)
+                    </span>
+                  )}
                 </div>
                 
                 {/* Amount Type Toggle */}
@@ -137,16 +207,16 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                   <div className="flex-1">
                     <div className="font-mono color-primary text-sm mb-1">Amount Type</div>
                     <p className="text-xs text-app-secondary-80">
-                      {currentSettings.useBuyRange ? 'Random amounts for natural variation' : 'Fixed amount for consistency'}
+                      {tempSettings.useBuyRange ? 'Random amounts for natural variation' : 'Fixed amount for consistency'}
                     </p>
                   </div>
                   
                   <div className="flex bg-app-secondary rounded-lg p-1 border border-app-primary-30">
                     <button
-                      onClick={() => updateCategorySetting(selectedCategory, 'useBuyRange', false)}
-                      disabled={!currentSettings.enabled}
+                      onClick={() => updateSetting('useBuyRange', false)}
+                      disabled={!useCustomSettings}
                       className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
-                        !currentSettings.useBuyRange && currentSettings.enabled
+                        !tempSettings.useBuyRange && useCustomSettings
                           ? 'bg-app-primary-color text-app-quaternary shadow-md'
                           : 'color-primary hover-color-primary-light'
                       }`}
@@ -154,10 +224,10 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                       Fixed
                     </button>
                     <button
-                      onClick={() => updateCategorySetting(selectedCategory, 'useBuyRange', true)}
-                      disabled={!currentSettings.enabled}
+                      onClick={() => updateSetting('useBuyRange', true)}
+                      disabled={!useCustomSettings}
                       className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
-                        currentSettings.useBuyRange && currentSettings.enabled
+                        tempSettings.useBuyRange && useCustomSettings
                           ? 'bg-app-primary-color text-app-quaternary shadow-md'
                           : 'color-primary hover-color-primary-light'
                       }`}
@@ -168,7 +238,7 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                 </div>
 
                 {/* Amount Inputs */}
-                {currentSettings.useBuyRange ? (
+                {tempSettings.useBuyRange ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -181,17 +251,17 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                           step="0.001"
                           min="0.001"
                           max="10"
-                          value={currentSettings.buyMinAmount}
+                          value={tempSettings.buyMinAmount}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value);
                             if (!isNaN(value) && value >= 0.001 && value <= 10) {
-                              updateCategorySetting(selectedCategory, 'buyMinAmount', value);
-                              if (value >= currentSettings.buyMaxAmount) {
-                                updateCategorySetting(selectedCategory, 'buyMaxAmount', Math.min(value + 0.01, 10));
+                              updateSetting('buyMinAmount', value);
+                              if (value >= (tempSettings.buyMaxAmount || 0)) {
+                                updateSetting('buyMaxAmount', Math.min(value + 0.01, 10));
                               }
                             }
                           }}
-                          disabled={!currentSettings.enabled}
+                          disabled={!useCustomSettings}
                           className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
                                    text-app-primary font-mono text-sm focus-border-primary focus:outline-none
                                    transition-colors duration-200 disabled:opacity-50"
@@ -207,32 +277,22 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                         <input
                           type="number"
                           step="0.001"
-                          min={currentSettings.buyMinAmount + 0.001}
+                          min={(tempSettings.buyMinAmount || 0) + 0.001}
                           max="10"
-                          value={currentSettings.buyMaxAmount}
+                          value={tempSettings.buyMaxAmount}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value);
-                            if (!isNaN(value) && value > currentSettings.buyMinAmount && value <= 10) {
-                              updateCategorySetting(selectedCategory, 'buyMaxAmount', value);
+                            if (!isNaN(value) && value > (tempSettings.buyMinAmount || 0) && value <= 10) {
+                              updateSetting('buyMaxAmount', value);
                             }
                           }}
-                          disabled={!currentSettings.enabled}
+                          disabled={!useCustomSettings}
                           className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
                                    text-app-primary font-mono text-sm focus-border-primary focus:outline-none
                                    transition-colors duration-200 disabled:opacity-50"
                           placeholder="0.05"
                         />
                       </div>
-                    </div>
-                    
-                    <div className="bg-app-primary border border-app-primary-20 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-2 h-2 bg-app-primary-color rounded-full animate-pulse"></div>
-                        <span className="text-xs font-mono color-primary">Preview</span>
-                      </div>
-                      <p className="text-xs text-app-secondary-80">
-                        Each quick buy will randomly spend between <span className="color-primary font-mono">{currentSettings.buyMinAmount.toFixed(3)}</span> and <span className="color-primary font-mono">{currentSettings.buyMaxAmount.toFixed(3)}</span> SOL
-                      </p>
                     </div>
                   </div>
                 ) : (
@@ -247,22 +307,19 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                         step="0.001"
                         min="0.001"
                         max="10"
-                        value={currentSettings.buyAmount}
+                        value={tempSettings.buyAmount}
                         onChange={(e) => {
                           const value = parseFloat(e.target.value);
                           if (!isNaN(value) && value >= 0.001 && value <= 10) {
-                            updateCategorySetting(selectedCategory, 'buyAmount', value);
+                            updateSetting('buyAmount', value);
                           }
                         }}
-                        disabled={!currentSettings.enabled}
+                        disabled={!useCustomSettings}
                         className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
                                  text-app-primary font-mono text-sm focus-border-primary focus:outline-none
                                  transition-colors duration-200 disabled:opacity-50"
                         placeholder="0.01"
                       />
-                      <p className="text-xs text-app-secondary-80 mt-2">
-                        Fixed amount of SOL to spend on each quick buy
-                      </p>
                     </div>
                   </div>
                 )}
@@ -270,26 +327,38 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
             </motion.div>
 
             {/* Quick Sell Configuration */}
-            <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
-              <h3 className="font-mono color-primary font-medium mb-4 flex items-center gap-2">
-                <Share size={16} />
-                Quick Sell Configuration
-              </h3>
+            <motion.div 
+              className={`transition-all duration-300 ${useCustomSettings ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}
+              animate={{ opacity: useCustomSettings ? 1 : 0.4 }}
+            >
+              <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-mono color-primary font-medium flex items-center gap-2">
+                    <Share size={16} />
+                    Quick Sell Configuration
+                  </h3>
+                  {!useCustomSettings && (
+                    <span className="text-xs text-app-secondary-80 font-mono">
+                      (Category: {categoryDefaults.sellPercentage}%)
+                    </span>
+                  )}
+                </div>
               
               {/* Percentage Type Toggle */}
               <div className="flex items-center gap-3 mb-4 p-3 bg-app-primary border border-app-primary-30 rounded-lg">
                 <div className="flex-1">
                   <div className="font-mono color-primary text-sm mb-1">Percentage Type</div>
                   <p className="text-xs text-app-secondary-80">
-                    {currentSettings.useSellRange ? 'Random percentages for natural variation' : 'Fixed percentage for consistency'}
+                    {tempSettings.useSellRange ? 'Random percentages for natural variation' : 'Fixed percentage for consistency'}
                   </p>
                 </div>
                 
                 <div className="flex bg-app-secondary rounded-lg p-1 border border-app-primary-30">
                   <button
-                    onClick={() => updateCategorySetting(selectedCategory, 'useSellRange', false)}
+                    onClick={() => updateSetting('useSellRange', false)}
+                    disabled={!useCustomSettings}
                     className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
-                      !currentSettings.useSellRange
+                      !tempSettings.useSellRange && useCustomSettings
                         ? 'bg-app-primary-color text-app-quaternary shadow-md'
                         : 'color-primary hover-color-primary-light'
                     }`}
@@ -297,9 +366,10 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                     Fixed
                   </button>
                   <button
-                    onClick={() => updateCategorySetting(selectedCategory, 'useSellRange', true)}
+                    onClick={() => updateSetting('useSellRange', true)}
+                    disabled={!useCustomSettings}
                     className={`px-3 py-1.5 text-xs font-mono rounded transition-all duration-200 ${
-                      currentSettings.useSellRange
+                      tempSettings.useSellRange && useCustomSettings
                         ? 'bg-app-primary-color text-app-quaternary shadow-md'
                         : 'color-primary hover-color-primary-light'
                     }`}
@@ -310,7 +380,7 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
               </div>
 
               {/* Percentage Inputs */}
-              {currentSettings.useSellRange ? (
+              {tempSettings.useSellRange ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -323,19 +393,20 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                         step="5"
                         min="1"
                         max="100"
-                        value={currentSettings.sellMinPercentage}
+                        value={tempSettings.sellMinPercentage}
                         onChange={(e) => {
                           const value = parseInt(e.target.value);
                           if (!isNaN(value) && value >= 1 && value <= 100) {
-                            updateCategorySetting(selectedCategory, 'sellMinPercentage', value);
-                            if (value >= currentSettings.sellMaxPercentage) {
-                              updateCategorySetting(selectedCategory, 'sellMaxPercentage', Math.min(value + 5, 100));
+                            updateSetting('sellMinPercentage', value);
+                            if (value >= (tempSettings.sellMaxPercentage || 0)) {
+                              updateSetting('sellMaxPercentage', Math.min(value + 5, 100));
                             }
                           }
                         }}
+                        disabled={!useCustomSettings}
                         className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
                                  text-app-primary font-mono text-sm focus-border-primary focus:outline-none
-                                 transition-colors duration-200"
+                                 transition-colors duration-200 disabled:opacity-50"
                         placeholder="25"
                       />
                     </div>
@@ -348,27 +419,22 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                       <input
                         type="number"
                         step="5"
-                        min={currentSettings.sellMinPercentage + 5}
+                        min={(tempSettings.sellMinPercentage || 0) + 5}
                         max="100"
-                        value={currentSettings.sellMaxPercentage}
+                        value={tempSettings.sellMaxPercentage}
                         onChange={(e) => {
                           const value = parseInt(e.target.value);
-                          if (!isNaN(value) && value > currentSettings.sellMinPercentage && value <= 100) {
-                            updateCategorySetting(selectedCategory, 'sellMaxPercentage', value);
+                          if (!isNaN(value) && value > (tempSettings.sellMinPercentage || 0) && value <= 100) {
+                            updateSetting('sellMaxPercentage', value);
                           }
                         }}
+                        disabled={!useCustomSettings}
                         className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
                                  text-app-primary font-mono text-sm focus-border-primary focus:outline-none
-                                 transition-colors duration-200"
+                                 transition-colors duration-200 disabled:opacity-50"
                         placeholder="100"
                       />
                     </div>
-                  </div>
-                  
-                  <div className="bg-app-primary border border-app-primary-30 rounded-lg p-3">
-                    <p className="text-xs text-app-secondary-80">
-                      Each quick sell will randomly sell between <span className="color-primary font-mono">{currentSettings.sellMinPercentage}%</span> and <span className="color-primary font-mono">{currentSettings.sellMaxPercentage}%</span> of token balance
-                    </p>
                   </div>
                 </div>
               ) : (
@@ -383,25 +449,24 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
                       step="5"
                       min="1"
                       max="100"
-                      value={currentSettings.sellPercentage}
+                      value={tempSettings.sellPercentage}
                       onChange={(e) => {
                         const value = parseInt(e.target.value);
                         if (!isNaN(value) && value >= 1 && value <= 100) {
-                          updateCategorySetting(selectedCategory, 'sellPercentage', value);
+                          updateSetting('sellPercentage', value);
                         }
                       }}
+                      disabled={!useCustomSettings}
                       className="w-full px-3 py-2 bg-app-primary border border-app-primary-30 rounded-md
                                text-app-primary font-mono text-sm focus-border-primary focus:outline-none
-                               transition-colors duration-200"
+                               transition-colors duration-200 disabled:opacity-50"
                       placeholder="100"
                     />
-                    <p className="text-xs text-app-secondary-80 mt-2">
-                      Fixed percentage of token balance to sell on each quick sell
-                    </p>
                   </div>
                 </div>
               )}
             </div>
+            </motion.div>
             
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4 border-t border-app-primary-20">
@@ -437,3 +502,4 @@ export const QuickTradeModal: React.FC<QuickTradeModalProps> = ({
     document.body
   );
 };
+

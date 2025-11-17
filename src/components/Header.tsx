@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Settings, Bot, Blocks, Trash2, Wallet } from 'lucide-react';
+import { Settings, Bot, Blocks, Wallet, TrendingUp } from 'lucide-react';
 import ServiceSelector from './Menu';
 
 interface HeaderProps {
@@ -17,12 +17,12 @@ const VerticalSidebar: React.FC = () => {
     navigate('/wallets');
   };
 
-  const handleAutomateClick = (): void => {
-    navigate('/automate');
+  const handleMonitorClick = (): void => {
+    navigate('/monitor');
   };
 
-  const handleBurnClick = (): void => {
-    navigate('/burn');
+  const handleAutomateClick = (): void => {
+    navigate('/automate');
   };
 
   const handleDeployClick = (): void => {
@@ -39,11 +39,16 @@ const VerticalSidebar: React.FC = () => {
 
   const getButtonClassName = (path: string): string => {
     const active = isActive(path);
-    return `group flex items-center gap-3 px-4 py-3 rounded transition-all duration-300 w-full ${
-      active
-        ? 'bg-primary-10 border border-app-primary hover-border-primary-60'
-        : 'bg-transparent border border-app-primary-20 hover-border-primary-60'
-    }`;
+    return `group flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-lg transition-all duration-200 w-full
+            ${active
+              ? 'bg-primary-20 border border-app-primary-80 color-primary shadow-inner-black-80' 
+              : 'bg-app-primary-60 border border-app-primary-40 text-app-secondary-60 hover-border-primary-40 hover-text-app-secondary hover-bg-app-primary-80-alpha'
+            }`;
+  };
+
+  const getIconClassName = (path: string): string => {
+    const active = isActive(path);
+    return `transition-all duration-200 ${active ? 'color-primary' : 'text-app-secondary-60 group-hover:color-primary'}`;
   };
 
   return (
@@ -53,9 +58,20 @@ const VerticalSidebar: React.FC = () => {
         onClick={handleWalletsClick}
         className={getButtonClassName('/wallets')}
       >
-        <Wallet size={16} className="color-primary" />
-        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+        <Wallet size={24} className={getIconClassName('/wallets')} />
+        <span className="text-xs font-mono font-medium tracking-wider uppercase">
           WALLETS
+        </span>
+      </button>
+
+      {/* Trade */}
+      <button
+        onClick={handleMonitorClick}
+        className={getButtonClassName('/monitor')}
+      >
+        <TrendingUp size={24} className={getIconClassName('/monitor')} />
+        <span className="text-xs font-mono font-medium tracking-wider uppercase">
+          TRADE
         </span>
       </button>
 
@@ -64,8 +80,8 @@ const VerticalSidebar: React.FC = () => {
         onClick={handleAutomateClick}
         className={getButtonClassName('/automate')}
       >
-        <Bot size={16} className="color-primary" />
-        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+        <Bot size={24} className={getIconClassName('/automate')} />
+        <span className="text-xs font-mono font-medium tracking-wider uppercase">
           AUTOMATE
         </span>
       </button>
@@ -75,20 +91,9 @@ const VerticalSidebar: React.FC = () => {
         onClick={handleDeployClick}
         className={getButtonClassName('/deploy')}
       >
-        <Blocks size={16} className="color-primary" />
-        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+        <Blocks size={24} className={getIconClassName('/deploy')} />
+        <span className="text-xs font-mono font-medium tracking-wider uppercase">
           DEPLOY
-        </span>
-      </button>
-
-      {/* Burn */}
-      <button
-        onClick={handleBurnClick}
-        className={getButtonClassName('/burn')}
-      >
-        <Trash2 size={16} className="color-primary" />
-        <span className="text-xs font-mono color-primary font-medium tracking-wider">
-          BURN
         </span>
       </button>
 
@@ -97,8 +102,8 @@ const VerticalSidebar: React.FC = () => {
         onClick={handleSettingsClick}
         className={getButtonClassName('/settings')}
       >
-        <Settings size={16} className="color-primary" />
-        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+        <Settings size={24} className={getIconClassName('/settings')} />
+        <span className="text-xs font-mono font-medium tracking-wider uppercase">
           SETTINGS
         </span>
       </button>
@@ -110,7 +115,7 @@ export const HomepageHeader: React.FC<HeaderProps> = ({
   onNavigateHome,
 }) => {
   return (
-    <aside className="fixed left-0 top-0 h-full w-48 border-r border-app-primary-70 backdrop-blur-sm bg-app-primary-99 z-30 flex flex-col p-4 gap-6">
+    <aside className="hidden md:flex fixed left-0 top-0 h-screen w-48 border-r border-app-primary-40 backdrop-blur-sm bg-app-primary-80-alpha z-30 flex-col p-4 gap-6 overflow-y-auto shadow-inner-black-80">
       {/* Service Selector at top */}
       <div className="flex justify-center">
         <ServiceSelector onTokenAddressClear={onNavigateHome} />
@@ -131,7 +136,7 @@ export const UnifiedHeader: React.FC<HeaderProps> = () => {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-48 border-r border-app-primary-70 backdrop-blur-sm bg-app-primary-99 z-30 flex flex-col p-4 gap-6">
+    <aside className="hidden md:flex fixed left-0 top-0 h-screen w-48 border-r border-app-primary-40 backdrop-blur-sm bg-app-primary-80-alpha z-30 flex-col p-4 gap-6 overflow-y-auto shadow-inner-black-80">
       {/* Service Selector at top */}
       <div className="flex justify-center">
         <ServiceSelector onTokenAddressClear={handleNavigateHome} />
@@ -144,4 +149,3 @@ export const UnifiedHeader: React.FC<HeaderProps> = () => {
 };
 
 export default HomepageHeader;
-

@@ -75,10 +75,7 @@ const ExportSeedPhraseModal: React.FC<ExportSeedPhraseModalProps> = ({
 
   return createPortal(
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      <div
         className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
         onClick={onClose}
       >
@@ -252,7 +249,7 @@ const ExportSeedPhraseModal: React.FC<ExportSeedPhraseModalProps> = ({
             </button>
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     </AnimatePresence>,
     document.body
   );

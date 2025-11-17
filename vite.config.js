@@ -65,14 +65,13 @@ export default defineConfig({
           // Page components
           'pages': [
             './src/Wallets.tsx',
-            './src/Chart.tsx',
+            './src/Frame.tsx',
             './src/Actions.tsx',
             './src/Mobile.tsx'
           ],
           
           // Core components
           'components': [
-            './src/components/FloatingTradingCard.tsx',
             './src/components/TradingForm.tsx',
             './src/components/PnlCard.tsx'
           ]

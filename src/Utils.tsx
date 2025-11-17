@@ -20,6 +20,17 @@ export interface MasterWallet {
   color?: string; // Visual grouping
 }
 
+export interface CustomQuickTradeSettings {
+  buyAmount?: number;
+  buyMinAmount?: number;
+  buyMaxAmount?: number;
+  useBuyRange?: boolean;
+  sellPercentage?: number;
+  sellMinPercentage?: number;
+  sellMaxPercentage?: number;
+  useSellRange?: boolean;
+}
+
 export interface WalletType {
   id: number;
   address: string;
@@ -34,6 +45,9 @@ export interface WalletType {
   source?: WalletSource; // 'hd-derived' or 'imported'
   masterWalletId?: string; // Links to MasterWallet.id if HD-derived
   derivationIndex?: number; // Account index in derivation path
+  
+  // Custom quick trade settings (overrides category settings)
+  customQuickTradeSettings?: CustomQuickTradeSettings;
   
   [key: string]: unknown;
 }

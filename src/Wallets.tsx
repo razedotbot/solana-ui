@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, DollarSign, Activity, Zap, TrendingDown } from 'lucide-react';
+import { RefreshCw, Zap, TrendingDown, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { saveWalletsToCookies, copyToClipboard, toggleWallet, getWalletDisplayName } from './Utils';
 import type { WalletType, WalletCategory } from './Utils';
 import { formatTokenBalance } from './utils/formatting';
 import { useToast } from "./components/useToast";
 import type { Connection } from '@solana/web3.js';
-import { WalletOperationsButtons } from './components/OperationsWallets';
 import { executeBuy, createBuyConfig, validateBuyInputs } from './utils/buy';
 import { executeSell, createSellConfig, validateSellInputs } from './utils/sell';
-import { 
-  toggleWalletsByBalance, 
-} from './utils/wallets';
 import { Tooltip } from './components/Tooltip';
 import type { CategoryQuickTradeSettings } from './modals/QuickTradeModal';
 
@@ -62,17 +58,17 @@ interface WalletsPageProps {
 export const WalletsPage: React.FC<WalletsPageProps> = ({
   wallets,
   setWallets,
-  handleRefresh,
-  isRefreshing,
-  setIsModalOpen,
+  handleRefresh: _handleRefresh,
+  isRefreshing: _isRefreshing,
+  setIsModalOpen: _setIsModalOpen,
   tokenAddress,
-  sortDirection,
-  handleSortWallets,
-  connection,
+  sortDirection: _sortDirection,
+  handleSortWallets: _handleSortWallets,
+  connection: _connection,
   
   // Balance props with defaults
   solBalances: externalSolBalances,
-  setSolBalances: setExternalSolBalances,
+  setSolBalances: _setExternalSolBalances,
   tokenBalances: externalTokenBalances,
   totalSol: externalTotalSol,
   setTotalSol: setExternalTotalSol,
@@ -103,18 +99,14 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   categorySettings
 }) => {
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-  const [showingTokenWallets, setShowingTokenWallets] = useState(true);
   const [hoverRow, setHoverRow] = useState<number | null>(null);
   const [buyingWalletId, setBuyingWalletId] = useState<number | null>(null);
   const [sellingWalletId, setSellingWalletId] = useState<number | null>(null);
   const [recentlyUpdatedWallets, setRecentlyUpdatedWallets] = useState<Set<string>>(new Set());
   const [clickedWalletId, setClickedWalletId] = useState<number | null>(null);
-  const [localCategorySettings, setLocalCategorySettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings> | undefined>(categorySettings);
-  
-  // Handler to update category settings
-  const handleCategorySettingsChange = (settings: Record<WalletCategory, CategoryQuickTradeSettings>): void => {
-    setLocalCategorySettings(settings);
-  };
+  const [localCategorySettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings> | undefined>(categorySettings);
+  const [sortType, setSortType] = useState<'sol' | 'token' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
   // Use prop categorySettings if provided, otherwise use local state
   const effectiveCategorySettings = categorySettings || localCategorySettings;
@@ -266,20 +258,6 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   const activeSol = externalActiveSol !== undefined ? externalActiveSol : calculatedActiveSol;
   const activeTokens = externalActiveTokens !== undefined ? externalActiveTokens : calculatedActiveTokens;
 
-  const handleBalanceToggle = (): void => {
-    setShowingTokenWallets(!showingTokenWallets);
-    const newWallets = toggleWalletsByBalance(wallets, !showingTokenWallets, solBalances, tokenBalances);
-    saveWalletsToCookies(newWallets);
-    setWallets(newWallets);
-  };
-
-  const handleRefreshAll = (): void => {
-    if (isRefreshing) return;
-    
-    // Call the parent's refresh handler which manages all balance fetching
-    handleRefresh();
-  };
-
   const handleQuickBuy = async (wallet: WalletType, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
     
@@ -293,19 +271,33 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
     setBuyingWalletId(wallet.id);
     
     try {
-      // Get category-specific settings or fall back to global settings
-      const walletCategory = wallet.category;
-      let settings: CategoryQuickTradeSettings | null = null;
+      // Priority: 1. Custom wallet settings, 2. Category settings, 3. Global settings
+      let buyAmount: number;
+      let buyMinAmount: number;
+      let buyMaxAmount: number;
+      let useBuyRange: boolean;
       
-      if (effectiveCategorySettings && walletCategory) {
-        settings = effectiveCategorySettings[walletCategory];
+      if (wallet.customQuickTradeSettings) {
+        // Use custom wallet settings
+        buyAmount = wallet.customQuickTradeSettings.buyAmount ?? 0.01;
+        buyMinAmount = wallet.customQuickTradeSettings.buyMinAmount ?? 0.01;
+        buyMaxAmount = wallet.customQuickTradeSettings.buyMaxAmount ?? 0.05;
+        useBuyRange = wallet.customQuickTradeSettings.useBuyRange ?? false;
+      } else {
+        // Fall back to category or global settings
+        const walletCategory = wallet.category;
+        let settings: CategoryQuickTradeSettings | null = null;
+        
+        if (effectiveCategorySettings && walletCategory) {
+          settings = effectiveCategorySettings[walletCategory];
+        }
+        
+        // Use category settings if available, otherwise use global settings
+        buyAmount = settings?.buyAmount ?? quickBuyAmount ?? 0.01;
+        buyMinAmount = settings?.buyMinAmount ?? quickBuyMinAmount ?? 0.01;
+        buyMaxAmount = settings?.buyMaxAmount ?? quickBuyMaxAmount ?? 0.05;
+        useBuyRange = settings?.useBuyRange ?? useQuickBuyRange ?? false;
       }
-      
-      // Use category settings if available, otherwise use global settings
-      const buyAmount = settings?.buyAmount ?? quickBuyAmount ?? 0.01;
-      const buyMinAmount = settings?.buyMinAmount ?? quickBuyMinAmount ?? 0.01;
-      const buyMaxAmount = settings?.buyMaxAmount ?? quickBuyMaxAmount ?? 0.05;
-      const useBuyRange = settings?.useBuyRange ?? useQuickBuyRange ?? false;
             
       // Calculate the SOL amount to use
       let solAmountToUse = buyAmount;
@@ -363,6 +355,130 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
     }
   };
 
+  // Handler for sorting wallets by SOL balance
+  const handleSortBySol = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    const newDirection = sortType === 'sol' && sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortType('sol');
+    setSortDirection(newDirection);
+    
+    const sortedWallets = [...wallets].sort((a, b) => {
+      const balanceA = solBalances.get(a.address) || 0;
+      const balanceB = solBalances.get(b.address) || 0;
+      return newDirection === 'asc' ? balanceA - balanceB : balanceB - balanceA;
+    });
+    
+    setWallets(sortedWallets);
+    saveWalletsToCookies(sortedWallets);
+  };
+
+  // Handler for sorting wallets by token balance
+  const handleSortByToken = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    if (!tokenAddress) {
+      showToast('No token selected', 'error');
+      return;
+    }
+    
+    const newDirection = sortType === 'token' && sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortType('token');
+    setSortDirection(newDirection);
+    
+    const sortedWallets = [...wallets].sort((a, b) => {
+      const balanceA = tokenBalances.get(a.address) || 0;
+      const balanceB = tokenBalances.get(b.address) || 0;
+      return newDirection === 'asc' ? balanceA - balanceB : balanceB - balanceA;
+    });
+    
+    setWallets(sortedWallets);
+    saveWalletsToCookies(sortedWallets);
+  };
+
+  // Handler for selecting/deselecting all wallets with SOL balance
+  const handleSelectAllWithSol = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    const walletsWithSol = wallets.filter(wallet => {
+      const balance = solBalances.get(wallet.address) || 0;
+      return balance > 0;
+    });
+    
+    if (walletsWithSol.length === 0) {
+      showToast('No wallets with SOL balance found', 'error');
+      return;
+    }
+    
+    // Check if all wallets with SOL are already active
+    const allActive = walletsWithSol.every(wallet => wallet.isActive);
+    
+    // Toggle: if all wallets with SOL are active, deselect ALL wallets; otherwise, select all wallets with SOL
+    const updatedWallets = wallets.map(wallet => {
+      const hasSol = (solBalances.get(wallet.address) || 0) > 0;
+      if (allActive) {
+        // Deselect all wallets
+        return { ...wallet, isActive: false };
+      } else {
+        // Select only wallets with SOL balance
+        if (hasSol) {
+          return { ...wallet, isActive: true };
+        }
+        return wallet;
+      }
+    });
+    
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+    if (allActive) {
+      showToast(`Deselected all wallets`, 'success');
+    } else {
+      showToast(`Selected ${walletsWithSol.length} wallet${walletsWithSol.length === 1 ? '' : 's'} with SOL balance`, 'success');
+    }
+  };
+
+  // Handler for selecting/deselecting all wallets with token balance
+  const handleSelectAllWithTokens = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    if (!tokenAddress) {
+      showToast('No token selected', 'error');
+      return;
+    }
+    
+    const walletsWithTokens = wallets.filter(wallet => {
+      const balance = tokenBalances.get(wallet.address) || 0;
+      return balance > 0;
+    });
+    
+    if (walletsWithTokens.length === 0) {
+      showToast('No wallets with token balance found', 'error');
+      return;
+    }
+    
+    // Check if all wallets with tokens are already active
+    const allActive = walletsWithTokens.every(wallet => wallet.isActive);
+    
+    // Toggle: if all wallets with tokens are active, deselect ALL wallets; otherwise, select all wallets with tokens
+    const updatedWallets = wallets.map(wallet => {
+      const hasTokens = (tokenBalances.get(wallet.address) || 0) > 0;
+      if (allActive) {
+        // Deselect all wallets
+        return { ...wallet, isActive: false };
+      } else {
+        // Select only wallets with token balance
+        if (hasTokens) {
+          return { ...wallet, isActive: true };
+        }
+        return wallet;
+      }
+    });
+    
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+    if (allActive) {
+      showToast(`Deselected all wallets`, 'success');
+    } else {
+      showToast(`Selected ${walletsWithTokens.length} wallet${walletsWithTokens.length === 1 ? '' : 's'} with token balance`, 'success');
+    }
+  };
+
   const handleQuickSell = async (wallet: WalletType, e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
     
@@ -376,19 +492,33 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
     setSellingWalletId(wallet.id);
     
     try {
-      // Get category-specific settings or fall back to global settings
-      const walletCategory = wallet.category;
-      let settings: CategoryQuickTradeSettings | null = null;
+      // Priority: 1. Custom wallet settings, 2. Category settings, 3. Global settings
+      let sellPercentage: number;
+      let sellMinPercentage: number;
+      let sellMaxPercentage: number;
+      let useSellRange: boolean;
       
-      if (effectiveCategorySettings && walletCategory) {
-        settings = effectiveCategorySettings[walletCategory];
+      if (wallet.customQuickTradeSettings) {
+        // Use custom wallet settings
+        sellPercentage = wallet.customQuickTradeSettings.sellPercentage ?? 100;
+        sellMinPercentage = wallet.customQuickTradeSettings.sellMinPercentage ?? 25;
+        sellMaxPercentage = wallet.customQuickTradeSettings.sellMaxPercentage ?? 100;
+        useSellRange = wallet.customQuickTradeSettings.useSellRange ?? false;
+      } else {
+        // Fall back to category or global settings
+        const walletCategory = wallet.category;
+        let settings: CategoryQuickTradeSettings | null = null;
+        
+        if (effectiveCategorySettings && walletCategory) {
+          settings = effectiveCategorySettings[walletCategory];
+        }
+        
+        // Use category settings if available, otherwise use global settings
+        sellPercentage = settings?.sellPercentage ?? quickSellPercentage ?? 100;
+        sellMinPercentage = settings?.sellMinPercentage ?? quickSellMinPercentage ?? 25;
+        sellMaxPercentage = settings?.sellMaxPercentage ?? quickSellMaxPercentage ?? 100;
+        useSellRange = settings?.useSellRange ?? useQuickSellRange ?? false;
       }
-      
-      // Use category settings if available, otherwise use global settings
-      const sellPercentage = settings?.sellPercentage ?? quickSellPercentage ?? 100;
-      const sellMinPercentage = settings?.sellMinPercentage ?? quickSellMinPercentage ?? 25;
-      const sellMaxPercentage = settings?.sellMaxPercentage ?? quickSellMaxPercentage ?? 100;
-      const useSellRange = settings?.useSellRange ?? useQuickSellRange ?? false;
       
       // Create wallet for sell
       const walletForSell = {
@@ -436,7 +566,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
 
 
   return (
-    <div className="flex-1 bg-app-primary relative overflow-y-auto overflow-x-hidden h-full min-h-full">
+    <div className="relative flex-1 overflow-y-auto overflow-x-hidden bg-app-primary h-full min-h-full">
       {/* Background effects - same as Actions.tsx */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden min-h-full">
         {/* Grid background */}
@@ -475,53 +605,63 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
       </div>
       
       {/*  header */}
-      <div className="top-0 sticky bg-app-primary-99 backdrop-blur-sm border-b border-app-primary-40 z-10 shadow-sm">
-        {/* Compact buttons row */}
-        <div className="px-2 py-1 border-b border-app-primary-20">
-          <WalletOperationsButtons
-            wallets={wallets}
-            solBalances={solBalances}
-            setSolBalances={setExternalSolBalances}
-            connection={connection}
-            tokenBalances={tokenBalances}
-            tokenAddress={tokenAddress}
-            handleRefresh={handleRefreshAll}
-            isRefreshing={isRefreshing}
-            showingTokenWallets={showingTokenWallets}
-            handleBalanceToggle={handleBalanceToggle}
-            setWallets={setWallets}
-            sortDirection={sortDirection}
-            handleSortWallets={handleSortWallets}
-            setIsModalOpen={setIsModalOpen}
-            quickBuyAmount={quickBuyAmount}
-            quickBuyEnabled={quickBuyEnabled}
-            quickBuyMinAmount={quickBuyMinAmount}
-            quickBuyMaxAmount={quickBuyMaxAmount}
-            useQuickBuyRange={useQuickBuyRange}
-            onCategorySettingsChange={handleCategorySettingsChange}
-          />
-        </div>
-        
+      <div className="sticky top-0 bg-app-primary-99 backdrop-blur-sm border-b border-app-primary-40 z-10 shadow-sm">
         {/* Improved balance info */}
         <div className="py-2 px-3 bg-app-secondary-80-solid relative">
           <div className="flex justify-between text-sm">
             <div>
               <div className="text-app-secondary font-mono flex items-center gap-2">
-                <DollarSign size={14} className="color-primary" />
-                <span>
+                <span
+                  onClick={handleSelectAllWithSol}
+                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                  title="Click to select/deselect all wallets with SOL balance"
+                >
                   <span className="text-app-primary">{totalSol.toFixed(2)}</span> (
                   <span className="color-primary">{activeSol.toFixed(2)}</span>) SOL
                 </span>
+                <button
+                  onClick={handleSortBySol}
+                  className="ml-1 p-0.5 hover:bg-app-primary-20 rounded transition-colors cursor-pointer"
+                  title="Sort wallets by SOL balance"
+                >
+                  {sortType === 'sol' ? (
+                    sortDirection === 'asc' ? (
+                      <ArrowUp size={12} className="color-primary" />
+                    ) : (
+                      <ArrowDown size={12} className="color-primary" />
+                    )
+                  ) : (
+                    <ArrowUpDown size={12} className="text-app-secondary-60" />
+                  )}
+                </button>
               </div>
             </div>
             {tokenAddress && (
               <div className="text-right">
                 <div className="text-app-secondary font-mono flex items-center justify-end gap-2">
-                  <span>
+                  <span
+                    onClick={handleSelectAllWithTokens}
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                    title="Click to select/deselect all wallets with token balance"
+                  >
                     <span className="text-app-primary">{formatTokenBalance(totalTokens)}</span> (
                     <span className="color-primary">{formatTokenBalance(activeTokens)}</span>) Tokens
                   </span>
-                  <Activity size={14} className="color-primary" />
+                  <button
+                    onClick={handleSortByToken}
+                    className="ml-1 p-0.5 hover:bg-app-primary-20 rounded transition-colors cursor-pointer"
+                    title="Sort wallets by token balance"
+                  >
+                    {sortType === 'token' ? (
+                      sortDirection === 'asc' ? (
+                        <ArrowUp size={12} className="color-primary" />
+                      ) : (
+                        <ArrowDown size={12} className="color-primary" />
+                      )
+                    ) : (
+                      <ArrowUpDown size={12} className="text-app-secondary-60" />
+                    )}
+                  </button>
                 </div>
               </div>
             )}
@@ -566,19 +706,36 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                       
                       {/* Quick Buy Button */}
                       {(() => {
-                        // Get category-specific settings or fall back to global settings
-                        const walletCategory = wallet.category;
-                        let settings: CategoryQuickTradeSettings | null = null;
+                        // Priority: 1. Custom wallet settings, 2. Category settings, 3. Global settings
+                        let buyEnabled: boolean;
+                        let buyAmount: number;
+                        let buyMinAmount: number;
+                        let buyMaxAmount: number;
+                        let useBuyRange: boolean;
                         
-                        if (effectiveCategorySettings && walletCategory) {
-                          settings = effectiveCategorySettings[walletCategory];
+                        if (wallet.customQuickTradeSettings) {
+                          // Use custom wallet settings (always enabled if custom settings exist)
+                          buyEnabled = true;
+                          buyAmount = wallet.customQuickTradeSettings.buyAmount ?? 0.01;
+                          buyMinAmount = wallet.customQuickTradeSettings.buyMinAmount ?? 0.01;
+                          buyMaxAmount = wallet.customQuickTradeSettings.buyMaxAmount ?? 0.05;
+                          useBuyRange = wallet.customQuickTradeSettings.useBuyRange ?? false;
+                        } else {
+                          // Fall back to category or global settings
+                          const walletCategory = wallet.category;
+                          let settings: CategoryQuickTradeSettings | null = null;
+                          
+                          if (effectiveCategorySettings && walletCategory) {
+                            settings = effectiveCategorySettings[walletCategory];
+                          }
+                          
+                          buyEnabled = settings?.enabled ?? quickBuyEnabled ?? true;
+                          buyAmount = settings?.buyAmount ?? quickBuyAmount ?? 0.01;
+                          buyMinAmount = settings?.buyMinAmount ?? quickBuyMinAmount ?? 0.01;
+                          buyMaxAmount = settings?.buyMaxAmount ?? quickBuyMaxAmount ?? 0.05;
+                          useBuyRange = settings?.useBuyRange ?? useQuickBuyRange ?? false;
                         }
                         
-                        const buyEnabled = settings?.enabled ?? quickBuyEnabled ?? true;
-                        const buyAmount = settings?.buyAmount ?? quickBuyAmount ?? 0.01;
-                        const buyMinAmount = settings?.buyMinAmount ?? quickBuyMinAmount ?? 0.01;
-                        const buyMaxAmount = settings?.buyMaxAmount ?? quickBuyMaxAmount ?? 0.05;
-                        const useBuyRange = settings?.useBuyRange ?? useQuickBuyRange ?? false;
                         const minRequired = useBuyRange ? buyMinAmount : buyAmount;
                         
                         if (!buyEnabled) return null;
@@ -586,10 +743,10 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                         return (
                         <Tooltip content={
                           tokenAddress 
-                              ? (useBuyRange 
-                                  ? `Quick buy random ${buyMinAmount.toFixed(3)}-${buyMaxAmount.toFixed(3)} ${walletCategory ? ` (${walletCategory})` : ''} (capped)` 
-                                  : `Quick buy ${buyAmount} SOL${walletCategory ? ` (${walletCategory})` : ''} (capped)`
-                              )
+                            ? (useBuyRange 
+                                ? `Quick buy random ${buyMinAmount.toFixed(3)}-${buyMaxAmount.toFixed(3)} SOL${wallet.customQuickTradeSettings ? ' (Custom)' : wallet.category ? ` (${wallet.category})` : ''} (capped)` 
+                                : `Quick buy ${buyAmount} SOL${wallet.customQuickTradeSettings ? ' (Custom)' : wallet.category ? ` (${wallet.category})` : ''} (capped)`
+                            )
                             : "No token selected"
                         } position="right">
                           <button
@@ -690,27 +847,42 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                   {/* Quick Sell Button */}
                   <td className="py-3 pl-2 pr-3 text-right">
                     {(() => {
-                      // Get category-specific settings or fall back to global settings
-                      const walletCategory = wallet.category;
-                      let settings: CategoryQuickTradeSettings | null = null;
+                      // Priority: 1. Custom wallet settings, 2. Category settings, 3. Global settings
+                      let sellPercentage: number;
+                      let sellMinPercentage: number;
+                      let sellMaxPercentage: number;
+                      let useSellRange: boolean;
                       
-                      if (effectiveCategorySettings && walletCategory) {
-                        settings = effectiveCategorySettings[walletCategory];
+                      if (wallet.customQuickTradeSettings) {
+                        // Use custom wallet settings
+                        sellPercentage = wallet.customQuickTradeSettings.sellPercentage ?? 100;
+                        sellMinPercentage = wallet.customQuickTradeSettings.sellMinPercentage ?? 25;
+                        sellMaxPercentage = wallet.customQuickTradeSettings.sellMaxPercentage ?? 100;
+                        useSellRange = wallet.customQuickTradeSettings.useSellRange ?? false;
+                      } else {
+                        // Fall back to category or global settings
+                        const walletCategory = wallet.category;
+                        let settings: CategoryQuickTradeSettings | null = null;
+                        
+                        if (effectiveCategorySettings && walletCategory) {
+                          settings = effectiveCategorySettings[walletCategory];
+                        }
+                        
+                        sellPercentage = settings?.sellPercentage ?? quickSellPercentage ?? 100;
+                        sellMinPercentage = settings?.sellMinPercentage ?? quickSellMinPercentage ?? 25;
+                        sellMaxPercentage = settings?.sellMaxPercentage ?? quickSellMaxPercentage ?? 100;
+                        useSellRange = settings?.useSellRange ?? useQuickSellRange ?? false;
                       }
                       
-                      const sellPercentage = settings?.sellPercentage ?? quickSellPercentage ?? 100;
-                      const sellMinPercentage = settings?.sellMinPercentage ?? quickSellMinPercentage ?? 25;
-                      const sellMaxPercentage = settings?.sellMaxPercentage ?? quickSellMaxPercentage ?? 100;
-                      const useSellRange = settings?.useSellRange ?? useQuickSellRange ?? false;
                       const tokenBalance = tokenBalances.get(wallet.address) || 0;
                       
                       return (
                     <Tooltip content={
                       tokenAddress 
-                            ? tokenBalance > 0
-                              ? useSellRange
-                                ? `Quick sell random ${sellMinPercentage}-${sellMaxPercentage}%${walletCategory ? ` (${walletCategory})` : ''} of tokens`
-                                : `Quick sell ${sellPercentage}%${walletCategory ? ` (${walletCategory})` : ''} of tokens`
+                        ? tokenBalance > 0
+                          ? useSellRange
+                            ? `Quick sell random ${sellMinPercentage}-${sellMaxPercentage}%${wallet.customQuickTradeSettings ? ' (Custom)' : wallet.category ? ` (${wallet.category})` : ''} of tokens`
+                            : `Quick sell ${sellPercentage}%${wallet.customQuickTradeSettings ? ' (Custom)' : wallet.category ? ` (${wallet.category})` : ''} of tokens`
                           : "No tokens to sell"
                         : "No token selected"
                     } position="left">

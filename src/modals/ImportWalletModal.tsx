@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, AlertCircle, Download } from 'lucide-react';
+import { X, Check, AlertCircle, Download, FileUp } from 'lucide-react';
 import { validateMnemonic, getMnemonicWordCount } from '../utils/hdWallet';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -11,15 +11,17 @@ interface ImportWalletModalProps {
   onClose: () => void;
   onImportMasterWallet: (name: string, mnemonic: string, initialWalletCount: number) => void;
   onImportPrivateKey?: (privateKey: string) => void;
+  onImportFromFile?: (file: File) => Promise<void>;
 }
 
-type ImportType = 'seed' | 'privateKey';
+type ImportType = 'seed' | 'privateKey' | 'file';
 
 const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
   isOpen,
   onClose,
   onImportMasterWallet,
   onImportPrivateKey,
+  onImportFromFile,
 }) => {
   const [importType, setImportType] = useState<ImportType>('seed');
   const [walletName, setWalletName] = useState('');
@@ -28,6 +30,9 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
   const [initialWalletCount, setInitialWalletCount] = useState('1');
   const [error, setError] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -39,6 +44,11 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
       setInitialWalletCount('1');
       setError(null);
       setValidationStatus('idle');
+      setIsProcessingFile(false);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   }, [isOpen]);
 
@@ -155,7 +165,7 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
       const text = await navigator.clipboard.readText();
       if (importType === 'seed') {
         setMnemonic(text);
-      } else {
+      } else if (importType === 'privateKey') {
         setPrivateKey(text);
       }
     } catch (error) {
@@ -164,19 +174,52 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
     }
   };
 
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (!['txt', 'key', 'json'].includes(fileExtension || '')) {
+      setError('Invalid file type. Please select a .txt, .key, or .json file.');
+      return;
+    }
+
+    setSelectedFile(file);
+    setError(null);
+  };
+
+  const handleFileImport = async (): Promise<void> => {
+    if (!selectedFile || !onImportFromFile) {
+      setError('Please select a file');
+      return;
+    }
+
+    setIsProcessingFile(true);
+    setError(null);
+
+    try {
+      await onImportFromFile(selectedFile);
+      onClose();
+    } catch (error) {
+      console.error('Error importing from file:', error);
+      setError(error instanceof Error ? error.message : 'Failed to import from file');
+    } finally {
+      setIsProcessingFile(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const wordCount = importType === 'seed' ? getMnemonicWordCount(mnemonic.trim()) : null;
   const isValid = importType === 'seed' 
     ? validationStatus === 'valid' && walletName.trim()
-    : validationStatus === 'valid';
+    : importType === 'privateKey'
+    ? validationStatus === 'valid'
+    : selectedFile !== null;
 
   return createPortal(
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      <div
         className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
         onClick={onClose}
       >
@@ -224,6 +267,16 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
                 }`}
               >
                 Private Key
+              </button>
+              <button
+                onClick={() => setImportType('file')}
+                className={`flex-1 px-4 py-2 rounded font-mono text-sm transition-all ${
+                  importType === 'file'
+                    ? 'bg-app-primary-color text-black'
+                    : 'text-app-secondary-80 hover:text-app-primary'
+                }`}
+              >
+                File
               </button>
             </div>
 
@@ -403,6 +456,85 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
                 </div>
               </>
             )}
+
+            {importType === 'file' && (
+              <>
+                <div>
+                  <label className="block text-sm font-mono text-app-secondary-80 mb-2">
+                    Import from File (.txt, .key, .json)
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt,.key,.json"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isProcessingFile}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-mono text-sm transition-all ${
+                        isProcessingFile
+                          ? 'bg-app-tertiary text-app-secondary-60 cursor-not-allowed'
+                          : 'bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-40 text-app-primary'
+                      }`}
+                    >
+                      <FileUp size={16} />
+                      {selectedFile ? 'Change File' : 'Select File'}
+                    </button>
+                    {selectedFile && (
+                      <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="text-sm font-mono text-app-primary font-bold">
+                              {selectedFile.name}
+                            </div>
+                            <div className="text-xs font-mono text-app-secondary-80 mt-1">
+                              {(selectedFile.size / 1024).toFixed(2)} KB
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedFile(null);
+                              if (fileInputRef.current) {
+                                fileInputRef.current.value = '';
+                              }
+                            }}
+                            className="p-1 hover:bg-app-tertiary rounded transition-colors"
+                          >
+                            <X size={16} className="text-app-secondary-80 hover:text-app-primary" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {error && (
+                    <div className="mt-2 text-sm font-mono text-error-alt flex items-center gap-2">
+                      <AlertCircle size={16} />
+                      {error}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle size={20} className="color-primary flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-app-secondary font-mono">
+                      <p className="font-bold mb-2 text-app-primary">Supported Formats:</p>
+                      <ul className="space-y-1">
+                        <li>• <strong>.txt</strong> - One private key or seed phrase per line</li>
+                        <li>• <strong>.key</strong> - Single private key file</li>
+                        <li>• <strong>.json</strong> - JSON array of private keys or Solana keypair format</li>
+                        <li>• Files can contain multiple private keys or seed phrases</li>
+                        <li>• Each valid entry will be imported as a separate wallet</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Footer */}
@@ -415,19 +547,25 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
               Cancel
             </button>
             <button
-              onClick={handleImport}
-              disabled={!isValid}
+              onClick={importType === 'file' ? handleFileImport : handleImport}
+              disabled={!isValid || isProcessingFile}
               className={`px-6 py-2 font-mono rounded-lg transition-all duration-200 ${
-                isValid
+                isValid && !isProcessingFile
                   ? 'bg-app-primary-color hover:bg-app-primary-dark text-black'
                   : 'bg-app-tertiary text-app-secondary-60 cursor-not-allowed'
               }`}
             >
-              {importType === 'seed' ? 'Import Master Wallet' : 'Import Wallet'}
+              {isProcessingFile 
+                ? 'Processing...' 
+                : importType === 'seed' 
+                ? 'Import Master Wallet' 
+                : importType === 'file'
+                ? 'Import from File'
+                : 'Import Wallet'}
             </button>
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     </AnimatePresence>,
     document.body
   );

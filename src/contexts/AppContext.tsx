@@ -14,7 +14,7 @@ import { AppContext } from './AppContextInstance';
 export interface AppContextType {
   // Wallet state
   wallets: WalletType[];
-  setWallets: (wallets: WalletType[]) => void;
+  setWallets: (wallets: WalletType[] | ((prev: WalletType[]) => WalletType[])) => void;
   
   // Config state
   config: ConfigType;
@@ -27,7 +27,7 @@ export interface AppContextType {
   
   // Balance state
   solBalances: Map<string, number>;
-  setSolBalances: (balances: Map<string, number>) => void;
+  setSolBalances: (balances: Map<string, number> | ((prev: Map<string, number>) => Map<string, number>)) => void;
   tokenBalances: Map<string, number>;
   setTokenBalances: (balances: Map<string, number>) => void;
   
@@ -108,9 +108,19 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
   }, [config.rpcEndpoint]);
 
   // Wallet setters with cookie persistence
-  const setWallets = useCallback((newWallets: WalletType[]) => {
-    setWalletsState(newWallets);
-    saveWalletsToCookies(newWallets);
+  const setWallets = useCallback((newWallets: WalletType[] | ((prev: WalletType[]) => WalletType[])) => {
+    setWalletsState(prev => {
+      const updated = typeof newWallets === 'function' ? newWallets(prev) : newWallets;
+      saveWalletsToCookies(updated);
+      return updated;
+    });
+  }, []);
+
+  // Balance setters with functional update support
+  const setSolBalancesWrapper = useCallback((newBalances: Map<string, number> | ((prev: Map<string, number>) => Map<string, number>)) => {
+    setSolBalances(prev => {
+      return typeof newBalances === 'function' ? newBalances(prev) : newBalances;
+    });
   }, []);
 
   // Config setters with cookie persistence
@@ -137,7 +147,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
         connection,
         wallets,
         tokenAddress || '',
-        setSolBalances,
+        setSolBalancesWrapper,
         setTokenBalances,
         solBalances,
         tokenBalances
@@ -148,7 +158,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
     } finally {
       setIsRefreshing(false);
     }
-  }, [connection, wallets, solBalances, tokenBalances, showToast]);
+  }, [connection, wallets, solBalances, tokenBalances, showToast, setSolBalancesWrapper]);
 
   // Memoize context value
   const value = useMemo<AppContextType>(() => ({
@@ -160,7 +170,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
     connection,
     setConnection,
     solBalances,
-    setSolBalances,
+    setSolBalances: setSolBalancesWrapper,
     tokenBalances,
     setTokenBalances,
     isRefreshing,
@@ -177,7 +187,8 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
     tokenBalances,
     isRefreshing,
     refreshBalances,
-    showToast
+    showToast,
+    setSolBalancesWrapper
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

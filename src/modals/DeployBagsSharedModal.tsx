@@ -1706,27 +1706,8 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       100% { transform: translateY(100%); opacity: 0; }
     }
     
-    .modal-container {
-      animation: modal-fade-in 0.3s ease;
-    }
-    
     .modal-content {
-      animation: modal-slide-up 0.4s ease;
       position: relative;
-    }
-    
-    .modal-content::before {
-      content: "";
-      position: absolute;
-      width: 100%;
-      height: 5px;
-      background: linear-gradient(to bottom, 
-        transparent 0%,
-        var(--color-primary-20) 50%,
-        transparent 100%);
-      z-index: 10;
-      animation: modal-scan-line 8s linear infinite;
-      pointer-events: none;
     }
     
     .modal-glow {
@@ -1817,10 +1798,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
 
   return createPortal(
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      <div
         className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
         onClick={onClose}
       >
@@ -2013,7 +1991,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
             </form>
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     </AnimatePresence>,
     document.body
   );

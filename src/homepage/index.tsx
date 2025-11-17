@@ -5,7 +5,6 @@ import type { WalletType } from '../Utils';
 import { getRecentTokens, clearRecentTokens } from '../utils/recentTokens';
 import type { RecentToken } from '../types/recentTokens';
 import { HomepageHeader } from '../components/Header';
-import { Hero } from './Hero';
 import { QuickActions } from './QuickActions';
 import { RecentlyViewed } from './RecentlyViewed';
 
@@ -31,9 +30,6 @@ export const Homepage: React.FC<HomepageProps> = ({
   onNavigateToToken,
   onNavigateToMonitor,
   onNavigateToHoldings,
-  wallets,
-  solBalances,
-  connection,
   currentTokenAddress,
   showToast
 }) => {
@@ -94,7 +90,7 @@ export const Homepage: React.FC<HomepageProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="relative flex-1 overflow-y-auto ml-48"
+        className="relative flex-1 overflow-y-auto overflow-x-hidden w-full md:w-auto md:ml-48 bg-app-primary"
       >
         {/* Background effects layer */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -143,14 +139,6 @@ export const Homepage: React.FC<HomepageProps> = ({
         <div className="relative z-10 p-4 md:p-6 lg:p-8">
           <div className="max-w-3xl w-full mx-auto space-y-6 md:space-y-8">
             
-            {/* Hero section with stats */}
-            <Hero 
-              wallets={wallets}
-              solBalances={solBalances}
-              connection={connection}
-              recentTokensCount={recentTokens.length}
-            />
-
             {/* Quick Actions section */}
             <QuickActions
               onNavigateToMonitor={onNavigateToMonitor}

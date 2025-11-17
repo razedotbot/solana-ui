@@ -111,7 +111,7 @@ export const AutomatePage: React.FC = () => {
   }, [contextWallets.length, tokenAddress, localTokenAddress]);
 
   // Use token address from URL or local state
-  const activeTokenAddress = tokenAddress || localTokenAddress; // eslint-disable-line react-hooks/exhaustive-deps
+  const activeTokenAddress = tokenAddress || localTokenAddress;
 
   // Calculate market data from trades
   const marketData = useMemo((): MarketData => {
@@ -523,12 +523,13 @@ export const AutomatePage: React.FC = () => {
   }, [activeWallets, walletSearchTerm, walletBalanceFilter, walletSortOption, walletSortDirection, solBalances, tokenBalances]);
 
   return (
-    <div className="min-h-screen bg-app-primary text-app-tertiary">
+    <div className="min-h-screen bg-app-primary text-app-tertiary flex">
       {/* Unified Header */}
       <UnifiedHeader tokenAddress={tokenAddressFromUrl} />
 
       {/* Main Content - with left margin for sidebar */}
-      <div className="container mx-auto px-4 py-8 ml-48">
+      <div className="flex-1 min-h-screen w-full md:w-auto md:ml-48 overflow-y-auto overflow-x-hidden">
+        <div className="container mx-auto px-4 py-8">
         {/* Page Title and Actions */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -930,6 +931,7 @@ export const AutomatePage: React.FC = () => {
               </div>
             )}
           </motion.div>
+        </div>
         </div>
       </div>
     </div>

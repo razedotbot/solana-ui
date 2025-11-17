@@ -103,12 +103,57 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-app-primary text-app-tertiary">
+    <div className="min-h-screen bg-app-primary text-app-tertiary flex">
       {/* Unified Header */}
       <UnifiedHeader />
 
       {/* Main Content - with left margin for sidebar */}
-      <div className="max-w-4xl mx-auto px-4 py-8 ml-48">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full md:w-auto md:ml-48 bg-app-primary">
+        {/* Background effects layer */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          {/* Grid pattern background */}
+          <div className="absolute inset-0 bg-app-primary opacity-90">
+            <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `
+                  linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
+                `,
+                backgroundSize: '20px 20px',
+                backgroundPosition: 'center center',
+              }}
+            ></div>
+          </div>
+          
+          {/* Corner accent lines - 4 corners with gradient lines */}
+          <div className="absolute top-0 left-0 w-32 h-32 opacity-20">
+            <div className="absolute top-0 left-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+            <div className="absolute top-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+          </div>
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
+            <div className="absolute top-0 right-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+            <div className="absolute top-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+          </div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 opacity-20">
+            <div className="absolute bottom-0 left-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+          </div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 opacity-20">
+            <div className="absolute bottom-0 right-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+            <div className="absolute bottom-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+          </div>
+
+          {/* Scanline overlay effect */}
+          <div className="absolute inset-0 scanline pointer-events-none opacity-30"></div>
+
+          {/* Gradient overlays for depth */}
+          <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent pointer-events-none"></div>
+        </div>
+
+        {/* Content container */}
+        <div className="relative z-10 max-w-4xl mx-auto px-4 py-8">
         <div className="space-y-4 sm:space-y-6">
           {/* Network Configuration Section */}
           <div className="bg-app-secondary border border-app-primary-30 rounded-lg p-4 sm:p-6">
@@ -418,6 +463,7 @@ export const SettingsPage: React.FC = () => {
             <Save size={14} />
             SAVE SETTINGS
           </motion.button>
+        </div>
         </div>
       </div>
     </div>

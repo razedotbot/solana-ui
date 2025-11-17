@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { 
   ArrowUpDown, 
   ArrowUp, 
@@ -15,15 +15,22 @@ import {
   XCircle,
   Plus,
   Key,
-  FileUp,
-  ArrowRight,
   Archive,
-  ChevronDown
+  ChevronDown,
+  Share2,
+  Network,
+  Send,
+  HandCoins,
+  Share,
+  X,
+  Settings,
+  Flame,
+  GripVertical
 } from 'lucide-react';
 import { UnifiedHeader } from '../components/Header';
 import bs58 from 'bs58';
 import { WalletTooltip } from '../styles/Styles';
-import type { WalletType, WalletCategory, MasterWallet } from '../Utils';
+import type { WalletType, WalletCategory, MasterWallet, CustomQuickTradeSettings } from '../Utils';
 import { 
   formatAddress, 
   copyToClipboard, 
@@ -31,10 +38,8 @@ import {
   deleteWallet,
   saveWalletsToCookies,
   loadWalletsFromCookies,
-  createNewWallet,
   importWallet,
   fetchSolBalance,
-  fetchTokenBalance,
   downloadAllWallets,
   handleCleanupWallets,
   loadMasterWallets,
@@ -46,18 +51,25 @@ import {
   updateMasterWalletAccountCount
 } from '../Utils';
 import CreateMasterWalletModal from '../modals/CreateMasterWalletModal';
+import CreateWalletModal from '../modals/CreateWalletModal';
 import ImportWalletModal from '../modals/ImportWalletModal';
 import ExportSeedPhraseModal from '../modals/ExportSeedPhraseModal';
-import { deriveMultipleWallets } from '../utils/hdWallet';
+import { DistributeModal } from '../modals/DistributeModal';
+import { ConsolidateModal } from '../modals/ConsolidateModal';
+import { TransferModal } from '../modals/TransferModal';
+import { DepositModal } from '../modals/DepositModal';
+import { MixerModal } from '../modals/MixerModal';
+import { QuickTradeModal, type CategoryQuickTradeSettings } from '../modals/QuickTradeModal';
+import { WalletQuickTradeModal } from '../modals/WalletQuickTradeModal';
+import { BurnModal } from '../modals/BurnModal';
+import { deriveMultipleWallets, validateMnemonic, getMnemonicWordCount } from '../utils/hdWallet';
 import { useAppContext } from '../contexts/useAppContext';
 import { useToast } from '../components/useToast';
 
-type SortField = 'solBalance' | 'tokenBalance';
+type SortField = 'solBalance';
 type SortDirection = 'asc' | 'desc';
 
 export const WalletsPage: React.FC = () => {
-  const { tokenAddress: tokenAddressParam } = useParams<{ tokenAddress?: string }>();
-  const tokenAddress = tokenAddressParam || '';
   const { showToast } = useToast();
   
   const {
@@ -65,13 +77,11 @@ export const WalletsPage: React.FC = () => {
     setWallets,
     solBalances,
     setSolBalances,
-    tokenBalances,
-    setTokenBalances,
     connection,
     refreshBalances
   } = useAppContext();
 
-  const [sortField, setSortField] = useState<SortField>('solBalance');
+  const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddressSearch, setShowAddressSearch] = useState(false);
@@ -81,17 +91,9 @@ export const WalletsPage: React.FC = () => {
   const [editingLabel, setEditingLabel] = useState<number | null>(null);
   const [editLabelValue, setEditLabelValue] = useState<string>('');
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
-  const [isCreatingWallets, setIsCreatingWallets] = useState(false);
-  const [walletQuantity, setWalletQuantity] = useState('1');
-  const [importKey, setImportKey] = useState('');
-  const [importError, setImportError] = useState<string | null>(null);
-  const [isProcessingFile, setIsProcessingFile] = useState(false);
-  const [showImportInput, setShowImportInput] = useState(false);
-  const [showCreateInput, setShowCreateInput] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
-  const createInputRef = useRef<HTMLInputElement>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isCreateWalletModalOpen, setIsCreateWalletModalOpen] = useState(false);
   
   // Master Wallet State
   const [masterWallets, setMasterWallets] = useState<MasterWallet[]>([]);
@@ -102,6 +104,66 @@ export const WalletsPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'all' | 'hd' | 'imported'>('all');
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
   const viewModeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Modal states
+  const [activeModal, setActiveModal] = useState<'distribute' | 'consolidate' | 'transfer' | 'deposit' | 'mixer' | 'burn' | null>(null);
+  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
+  const [isQuickTradeModalOpen, setIsQuickTradeModalOpen] = useState(false);
+  const [editingWalletQuickTrade, setEditingWalletQuickTrade] = useState<WalletType | null>(null);
+  const [burnTokenAddress, setBurnTokenAddress] = useState<string>('');
+  const [burnTokenBalances, setBurnTokenBalances] = useState<Map<string, number>>(new Map());
+  
+  // Drag and drop state
+  const [draggedWalletId, setDraggedWalletId] = useState<number | null>(null);
+  const [dragOverWalletId, setDragOverWalletId] = useState<number | null>(null);
+  
+  // Category settings for quick trade (loaded from localStorage)
+  const [categorySettings, setCategorySettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings>>(() => {
+    const saved = localStorage.getItem('categoryQuickTradeSettings');
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Record<WalletCategory, CategoryQuickTradeSettings>;
+      } catch (error) {
+        console.error('Error loading category settings:', error);
+      }
+    }
+    // Default settings
+    return {
+      Soft: {
+        enabled: true,
+        buyAmount: 0.01,
+        buyMinAmount: 0.01,
+        buyMaxAmount: 0.03,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      },
+      Medium: {
+        enabled: true,
+        buyAmount: 0.05,
+        buyMinAmount: 0.03,
+        buyMaxAmount: 0.07,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      },
+      Hard: {
+        enabled: true,
+        buyAmount: 0.1,
+        buyMinAmount: 0.07,
+        buyMaxAmount: 0.15,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      }
+    };
+  });
 
   // Load wallets from storage when component mounts (fallback in case AppContext hasn't loaded them yet)
   // This ensures wallets are always loaded when navigating directly to the wallets page
@@ -170,103 +232,44 @@ export const WalletsPage: React.FC = () => {
 
   // Track the last wallet addresses we refreshed for to prevent unnecessary refreshes
   const lastRefreshedAddressesRef = useRef<string>('');
-  const lastTokenAddressRef = useRef<string>('');
   const lastConnectionRef = useRef<typeof connection>(null);
 
-  // Refresh balances when component mounts or when wallets/connection/tokenAddress changes
+  // Refresh balances when component mounts or when wallets/connection changes
   useEffect(() => {
     // Reset tracking refs if connection changed (new connection means we need fresh balances)
     if (connection !== lastConnectionRef.current) {
       lastConnectionRef.current = connection;
       lastRefreshedAddressesRef.current = '';
-      lastTokenAddressRef.current = '';
     }
 
     if (connection && wallets.length > 0) {
       const currentAddresses = walletAddresses;
-      const currentTokenAddress = tokenAddress || '';
       
-      // Only refresh if addresses or token address actually changed
-      if (
-        currentAddresses !== lastRefreshedAddressesRef.current ||
-        currentTokenAddress !== lastTokenAddressRef.current
-      ) {
+      // Only refresh if addresses actually changed
+      if (currentAddresses !== lastRefreshedAddressesRef.current) {
         lastRefreshedAddressesRef.current = currentAddresses;
-        lastTokenAddressRef.current = currentTokenAddress;
-        void refreshBalances(currentTokenAddress || undefined);
+        void refreshBalances();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection, walletAddresses, tokenAddress]); // Removed refreshBalances and wallets.length from deps
+  }, [connection, walletAddresses]); // Removed refreshBalances and wallets.length from deps
 
   // Wallet creation and import handlers
-  const handleCreateMultipleWallets = async (): Promise<void> => {
+  const handleImportPrivateKey = async (privateKey: string): Promise<void> => {
     if (!connection) return;
     
-    const quantity = parseInt(walletQuantity);
-    if (isNaN(quantity) || quantity < 1 || quantity > 100) {
-      showToast('Please enter a valid number between 1 and 100', 'error');
-      return;
-    }
-
-    setIsCreatingWallets(true);
-    
     try {
-      const newWallets: WalletType[] = [];
-      const newSolBalances = new Map(solBalances);
-      const newTokenBalances = new Map(tokenBalances);
-      
-      for (let i = 0; i < quantity; i++) {
-        const newWallet = createNewWallet();
-        newWallets.push(newWallet);
-        
-        const solBalance = await fetchSolBalance(connection, newWallet.address);
-        newSolBalances.set(newWallet.address, solBalance);
-        
-        if (tokenAddress) {
-          const tokenBalance = await fetchTokenBalance(connection, newWallet.address, tokenAddress);
-          newTokenBalances.set(newWallet.address, tokenBalance);
-        } else {
-          newTokenBalances.set(newWallet.address, 0);
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-      
-      const updatedWallets = [...wallets, ...newWallets];
-      setWallets(updatedWallets);
-      setSolBalances(newSolBalances);
-      setTokenBalances(newTokenBalances);
-      
-      showToast(`Successfully created ${quantity} wallet${quantity > 1 ? 's' : ''}`, 'success');
-      setWalletQuantity('1');
-      setShowCreateInput(false);
-    } catch (error) {
-      console.error('Error creating wallets:', error);
-      showToast('Failed to create wallets', 'error');
-    } finally {
-      setIsCreatingWallets(false);
-    }
-  };
-
-  const handleImportWallet = async (): Promise<void> => {
-    if (!connection || !importKey.trim()) {
-      setImportError('Please enter a private key');
-      return;
-    }
-    
-    try {
-      const { wallet, error } = importWallet(importKey.trim());
+      const { wallet, error } = importWallet(privateKey.trim());
       
       if (error) {
-        setImportError(error);
+        showToast(error, 'error');
         return;
       }
       
       if (wallet) {
         const exists = wallets.some(w => w.address === wallet.address);
         if (exists) {
-          setImportError('Wallet already exists');
+          showToast('Wallet already exists', 'error');
           return;
         }
         
@@ -278,43 +281,197 @@ export const WalletsPage: React.FC = () => {
         newSolBalances.set(wallet.address, solBalance);
         setSolBalances(newSolBalances);
         
-        if (tokenAddress) {
-          const tokenBalance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
-          const newTokenBalances = new Map(tokenBalances);
-          newTokenBalances.set(wallet.address, tokenBalance);
-          setTokenBalances(newTokenBalances);
-        } else {
-          const newTokenBalances = new Map(tokenBalances);
-          newTokenBalances.set(wallet.address, 0);
-          setTokenBalances(newTokenBalances);
-        }
-        
-        setImportKey('');
-        setImportError(null);
-        setShowImportInput(false);
         showToast('Wallet imported successfully', 'success');
       } else {
-        setImportError('Failed to import wallet');
+        showToast('Failed to import wallet', 'error');
       }
     } catch (error) {
-      console.error('Error in handleImportWallet:', error);
-      setImportError('Failed to import wallet');
+      console.error('Error importing wallet:', error);
+      showToast('Failed to import wallet', 'error');
     }
   };
 
-  // Focus import input when it becomes visible
-  useEffect(() => {
-    if (showImportInput && importInputRef.current) {
-      importInputRef.current.focus();
+  const handleCreateWallet = async (wallet: WalletType): Promise<void> => {
+    if (!connection) {
+      throw new Error('Connection not available');
     }
-  }, [showImportInput]);
 
-  // Focus create input when it becomes visible
-  useEffect(() => {
-    if (showCreateInput && createInputRef.current) {
-      createInputRef.current.focus();
+    try {
+      // Fetch balance first
+      const solBalance = await fetchSolBalance(connection, wallet.address);
+      
+      // Use functional updates to ensure we're working with the latest state
+      // This is critical when creating multiple wallets in sequence
+      setSolBalances(prevBalances => {
+        const newSolBalances = new Map(prevBalances);
+        newSolBalances.set(wallet.address, solBalance);
+        return newSolBalances;
+      });
+
+      // Add wallet to list using functional update to handle concurrent additions
+      // This ensures each wallet is added to the latest state, not a stale closure
+      setWallets(prevWallets => {
+        // Check if wallet already exists in the current state (race condition protection)
+        const alreadyExists = prevWallets.some(w => w.address === wallet.address);
+        if (alreadyExists) {
+          // Wallet already exists, don't add it again
+          return prevWallets;
+        }
+        // Add the new wallet
+        const newWallets = [...prevWallets, wallet];
+        saveWalletsToCookies(newWallets);
+        return newWallets;
+      });
+
+      // If it's an HD wallet, update master wallet account count
+      if (wallet.source === 'hd-derived' && wallet.masterWalletId && wallet.derivationIndex !== undefined) {
+        setMasterWallets(prevMasterWallets => {
+          const updatedMasterWallets = updateMasterWalletAccountCount(
+            prevMasterWallets,
+            wallet.masterWalletId!,
+            wallet.derivationIndex! + 1
+          );
+          saveMasterWallets(updatedMasterWallets);
+          return updatedMasterWallets;
+        });
+      }
+
+      showToast('Wallet created successfully', 'success');
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      throw error;
     }
-  }, [showCreateInput]);
+  };
+
+  const handleImportFromFile = async (file: File): Promise<void> => {
+    if (!connection) {
+      throw new Error('Connection not available');
+    }
+
+    const text = await file.text();
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const base58Pattern = /^[1-9A-HJ-NP-Za-km-z]{64,88}$/;
+    let foundKeys: string[] = [];
+    let foundMnemonics: string[] = [];
+    
+    if (fileExtension === 'key') {
+      const trimmedText = text.trim();
+      if (base58Pattern.test(trimmedText)) {
+        foundKeys = [trimmedText];
+      } else {
+        // Check if it's a seed phrase
+        const wordCount = getMnemonicWordCount(trimmedText);
+        if (wordCount && validateMnemonic(trimmedText)) {
+          foundMnemonics = [trimmedText];
+        }
+      }
+    } else if (fileExtension === 'json') {
+      try {
+        const jsonData: unknown = JSON.parse(text);
+        
+        if (Array.isArray(jsonData) && jsonData.length === 64) {
+          const secretKey = new Uint8Array(jsonData as number[]);
+          const privateKey = bs58.encode(secretKey);
+          foundKeys = [privateKey];
+        } else if (Array.isArray(jsonData)) {
+          for (const item of jsonData) {
+            if (Array.isArray(item) && item.length === 64) {
+              const secretKey = new Uint8Array(item as number[]);
+              const privateKey = bs58.encode(secretKey);
+              foundKeys.push(privateKey);
+            } else if (typeof item === 'string') {
+              // Could be a private key or seed phrase
+              if (base58Pattern.test(item.trim())) {
+                foundKeys.push(item.trim());
+              } else {
+                const wordCount = getMnemonicWordCount(item.trim());
+                if (wordCount && validateMnemonic(item.trim())) {
+                  foundMnemonics.push(item.trim());
+                }
+              }
+            }
+          }
+        } else if (typeof jsonData === 'object' && jsonData !== null && 'secretKey' in jsonData && Array.isArray((jsonData as { secretKey: unknown }).secretKey)) {
+          const secretKey = new Uint8Array((jsonData as { secretKey: number[] }).secretKey);
+          const privateKey = bs58.encode(secretKey);
+          foundKeys = [privateKey];
+        }
+      } catch {
+        throw new Error('Invalid JSON format');
+      }
+    } else {
+      // .txt file - parse line by line
+      const lines = text.split(/\r?\n/);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        
+        // Check if it's a private key
+        if (base58Pattern.test(trimmed)) {
+          foundKeys.push(trimmed);
+        } else {
+          // Check if it's a seed phrase
+          const wordCount = getMnemonicWordCount(trimmed);
+          if (wordCount && validateMnemonic(trimmed)) {
+            foundMnemonics.push(trimmed);
+          }
+        }
+      }
+    }
+
+    if (foundKeys.length === 0 && foundMnemonics.length === 0) {
+      throw new Error('No valid private keys or seed phrases found in file');
+    }
+
+    const importedWallets: WalletType[] = [];
+    const newSolBalances = new Map(solBalances);
+    
+    // Import private keys
+    for (const key of foundKeys) {
+      try {
+        const { wallet, error } = importWallet(key);
+        
+        if (error || !wallet) continue;
+        
+        const exists = wallets.some(w => w.address === wallet.address);
+        if (exists) continue;
+        
+        importedWallets.push(wallet);
+        
+        const solBalance = await fetchSolBalance(connection, wallet.address);
+        newSolBalances.set(wallet.address, solBalance);
+        
+        await new Promise(resolve => setTimeout(resolve, 10));
+      } catch (error) {
+        console.error('Error importing wallet:', error);
+      }
+    }
+    
+    // Import seed phrases as master wallets
+    for (const mnemonic of foundMnemonics) {
+      try {
+        const masterWalletName = `Imported Master ${Date.now()}`;
+        await handleImportMasterWallet(masterWalletName, mnemonic, 0);
+        await new Promise(resolve => setTimeout(resolve, 10));
+      } catch (error) {
+        console.error('Error importing master wallet:', error);
+      }
+    }
+    
+    setSolBalances(newSolBalances);
+    
+    if (importedWallets.length === 0 && foundMnemonics.length === 0) {
+      throw new Error('No new wallets could be imported');
+    }
+    
+    if (importedWallets.length > 0) {
+      const newWallets = [...wallets, ...importedWallets];
+      setWallets(newWallets);
+    }
+    
+    const totalImported = importedWallets.length + foundMnemonics.length;
+    showToast(`Successfully imported ${totalImported} wallet${totalImported > 1 ? 's' : ''}`, 'success');
+  };
 
   // Master Wallet Handlers
   const handleCreateMasterWallet = async (name: string, mnemonic: string): Promise<void> => {
@@ -326,17 +483,9 @@ export const WalletsPage: React.FC = () => {
       const masterWallet = createHDWalletFromMaster(newMasterWallet, 0);
       const newWallets: WalletType[] = [masterWallet];
       const newSolBalances = new Map(solBalances);
-      const newTokenBalances = new Map(tokenBalances);
 
       const solBalance = await fetchSolBalance(connection, masterWallet.address);
       newSolBalances.set(masterWallet.address, solBalance);
-
-      if (tokenAddress) {
-        const tokenBalance = await fetchTokenBalance(connection, masterWallet.address, tokenAddress);
-        newTokenBalances.set(masterWallet.address, tokenBalance);
-      } else {
-        newTokenBalances.set(masterWallet.address, 0);
-      }
 
       newMasterWallet.accountCount = 1;
 
@@ -347,7 +496,6 @@ export const WalletsPage: React.FC = () => {
       const allWallets = [...wallets, ...newWallets];
       setWallets(allWallets);
       setSolBalances(newSolBalances);
-      setTokenBalances(newTokenBalances);
 
       showToast('Master wallet created with primary wallet', 'success');
     } catch (error) {
@@ -365,17 +513,9 @@ export const WalletsPage: React.FC = () => {
       const masterWallet = createHDWalletFromMaster(newMasterWallet, 0);
       const newWallets: WalletType[] = [masterWallet];
       const newSolBalances = new Map(solBalances);
-      const newTokenBalances = new Map(tokenBalances);
 
       const solBalance = await fetchSolBalance(connection, masterWallet.address);
       newSolBalances.set(masterWallet.address, solBalance);
-
-      if (tokenAddress) {
-        const tokenBalance = await fetchTokenBalance(connection, masterWallet.address, tokenAddress);
-        newTokenBalances.set(masterWallet.address, tokenBalance);
-      } else {
-        newTokenBalances.set(masterWallet.address, 0);
-      }
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -400,13 +540,6 @@ export const WalletsPage: React.FC = () => {
           const solBalance = await fetchSolBalance(connection, wallet.address);
           newSolBalances.set(wallet.address, solBalance);
 
-          if (tokenAddress) {
-            const tokenBalance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
-            newTokenBalances.set(wallet.address, tokenBalance);
-          } else {
-            newTokenBalances.set(wallet.address, 0);
-          }
-
           await new Promise(resolve => setTimeout(resolve, 10));
         }
 
@@ -422,7 +555,6 @@ export const WalletsPage: React.FC = () => {
       const allWallets = [...wallets, ...newWallets];
       setWallets(allWallets);
       setSolBalances(newSolBalances);
-      setTokenBalances(newTokenBalances);
 
       const totalWallets = initialWalletCount + 1;
       showToast(`Master wallet imported with ${totalWallets} wallet${totalWallets > 1 ? 's' : ''}`, 'success');
@@ -432,42 +564,6 @@ export const WalletsPage: React.FC = () => {
     }
   };
 
-  const handleGenerateWalletFromMaster = async (masterWallet: MasterWallet): Promise<void> => {
-    if (!connection) return;
-
-    try {
-      const newAccountIndex = masterWallet.accountCount === 0 ? 0 : masterWallet.accountCount;
-      const newWallet = createHDWalletFromMaster(masterWallet, newAccountIndex);
-
-      const solBalance = await fetchSolBalance(connection, newWallet.address);
-      const newSolBalances = new Map(solBalances);
-      newSolBalances.set(newWallet.address, solBalance);
-      setSolBalances(newSolBalances);
-
-      if (tokenAddress) {
-        const tokenBalance = await fetchTokenBalance(connection, newWallet.address, tokenAddress);
-        const newTokenBalances = new Map(tokenBalances);
-        newTokenBalances.set(newWallet.address, tokenBalance);
-        setTokenBalances(newTokenBalances);
-      }
-
-      const updatedWallets = [...wallets, newWallet];
-      setWallets(updatedWallets);
-
-      const updatedMasterWallets = updateMasterWalletAccountCount(
-        masterWallets,
-        masterWallet.id,
-        newAccountIndex + 1
-      );
-      setMasterWallets(updatedMasterWallets);
-      saveMasterWallets(updatedMasterWallets);
-
-      showToast('Wallet generated from master', 'success');
-    } catch (error) {
-      console.error('Error generating wallet from master:', error);
-      showToast('Failed to generate wallet', 'error');
-    }
-  };
 
   const handleDeleteMasterWallet = (masterWalletId: string): void => {
     const derivedWallets = wallets.filter(w => w.masterWalletId === masterWalletId);
@@ -495,114 +591,25 @@ export const WalletsPage: React.FC = () => {
     setExpandedMasterWallets(newExpanded);
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const file = event.target.files?.[0];
-    if (!file || !connection) return;
-
-    setIsProcessingFile(true);
-    setImportError(null);
-
-    try {
-      const text = await file.text();
-      const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      const base58Pattern = /^[1-9A-HJ-NP-Za-km-z]{64,88}$/;
-      let foundKeys: string[] = [];
-      
-      if (fileExtension === 'key') {
-        const trimmedText = text.trim();
-        if (base58Pattern.test(trimmedText)) {
-          foundKeys = [trimmedText];
-        }
-      } else if (fileExtension === 'json') {
-        try {
-          const jsonData: unknown = JSON.parse(text);
-          
-          if (Array.isArray(jsonData) && jsonData.length === 64) {
-            const secretKey = new Uint8Array(jsonData as number[]);
-            const privateKey = bs58.encode(secretKey);
-            foundKeys = [privateKey];
-          } else if (Array.isArray(jsonData)) {
-            for (const item of jsonData) {
-              if (Array.isArray(item) && item.length === 64) {
-                const secretKey = new Uint8Array(item as number[]);
-                const privateKey = bs58.encode(secretKey);
-                foundKeys.push(privateKey);
-              }
-            }
-          } else if (typeof jsonData === 'object' && jsonData !== null && 'secretKey' in jsonData && Array.isArray((jsonData as { secretKey: unknown }).secretKey)) {
-            const secretKey = new Uint8Array((jsonData as { secretKey: number[] }).secretKey);
-            const privateKey = bs58.encode(secretKey);
-            foundKeys = [privateKey];
-          }
-        } catch {
-          setImportError('Invalid JSON format');
-          setIsProcessingFile(false);
-          return;
-        }
-      } else {
-        const lines = text.split(/\r?\n/);
-        foundKeys = lines
-          .map(line => line.trim())
-          .filter(line => base58Pattern.test(line));
-      }
-
-      if (foundKeys.length === 0) {
-        setImportError('No valid private keys found in file');
-        setIsProcessingFile(false);
-        return;
-      }
-
-      const importedWallets: WalletType[] = [];
-      const newSolBalances = new Map(solBalances);
-      const newTokenBalances = new Map(tokenBalances);
-      
-      for (const key of foundKeys) {
-        try {
-          const { wallet, error } = importWallet(key);
-          
-          if (error || !wallet) continue;
-          
-          const exists = wallets.some(w => w.address === wallet.address);
-          if (exists) continue;
-          
-          importedWallets.push(wallet);
-          
-          const solBalance = await fetchSolBalance(connection, wallet.address);
-          newSolBalances.set(wallet.address, solBalance);
-          
-          if (tokenAddress) {
-            const tokenBalance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
-            newTokenBalances.set(wallet.address, tokenBalance);
-          } else {
-            newTokenBalances.set(wallet.address, 0);
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 10));
-        } catch (error) {
-          console.error('Error importing wallet:', error);
-        }
-      }
-      
-      setSolBalances(newSolBalances);
-      setTokenBalances(newTokenBalances);
-      
-      if (importedWallets.length === 0) {
-        setImportError('No new wallets could be imported');
-      } else {
-        const newWallets = [...wallets, ...importedWallets];
-        setWallets(newWallets);
-        showToast(`Successfully imported ${importedWallets.length} wallets`, 'success');
-      }
-    } catch (error) {
-      console.error('Error processing file:', error);
-      setImportError('Error processing file');
-    } finally {
-      setIsProcessingFile(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
+  // Handle category settings save
+  const handleSaveCategorySettings = (settings: Record<WalletCategory, CategoryQuickTradeSettings>): void => {
+    setCategorySettings(settings);
+    localStorage.setItem('categoryQuickTradeSettings', JSON.stringify(settings));
+    showToast('Quick trade settings saved', 'success');
   };
+
+  // Handle custom wallet quick trade settings
+  const handleSaveWalletCustomSettings = (walletId: number, settings: CustomQuickTradeSettings | null): void => {
+    const updatedWallets = wallets.map(w => 
+      w.id === walletId 
+        ? { ...w, customQuickTradeSettings: settings || undefined }
+        : w
+    );
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+    showToast(settings ? 'Custom quick trade settings saved' : 'Custom settings removed', 'success');
+  };
+
 
   // Filter and sort wallets
   const filteredAndSortedWallets = useMemo(() => {
@@ -620,6 +627,11 @@ export const WalletsPage: React.FC = () => {
       return matchesArchivedFilter && matchesAddressSearch && matchesLabelSearch && matchesViewMode;
     });
 
+    // If no sort field is set, preserve manual order
+    if (!sortField) {
+      return filtered;
+    }
+
     return filtered.sort((a, b) => {
       let aValue: number;
       let bValue: number;
@@ -628,10 +640,6 @@ export const WalletsPage: React.FC = () => {
         case 'solBalance':
           aValue = solBalances.get(a.address) || 0;
           bValue = solBalances.get(b.address) || 0;
-          break;
-        case 'tokenBalance':
-          aValue = tokenBalances.get(a.address) || 0;
-          bValue = tokenBalances.get(b.address) || 0;
           break;
         default:
           aValue = solBalances.get(a.address) || 0;
@@ -642,7 +650,7 @@ export const WalletsPage: React.FC = () => {
         ? aValue - bValue
         : bValue - aValue;
     });
-  }, [wallets, sortField, sortDirection, searchTerm, labelSearchTerm, solBalances, tokenBalances, showArchived, viewMode]);
+  }, [wallets, sortField, sortDirection, searchTerm, labelSearchTerm, solBalances, showArchived, viewMode]);
 
   // Keep search inputs visible when there's a search term
   useEffect(() => {
@@ -674,11 +682,35 @@ export const WalletsPage: React.FC = () => {
     return undefined;
   }, [showViewModeDropdown]);
 
-  // Sorting function
+  // Sorting function - now persists to storage
   const handleSort = (field: SortField): void => {
     const newDirection = sortField === field && sortDirection === 'asc' ? 'desc' : 'asc';
     setSortField(field);
     setSortDirection(newDirection);
+    
+    // Sort the actual wallets array and save to storage
+    const sortedWallets = [...wallets].sort((a, b) => {
+      let aValue: number;
+      let bValue: number;
+
+      switch (field) {
+        case 'solBalance':
+          aValue = solBalances.get(a.address) || 0;
+          bValue = solBalances.get(b.address) || 0;
+          break;
+        default:
+          aValue = solBalances.get(a.address) || 0;
+          bValue = solBalances.get(b.address) || 0;
+      }
+
+      return newDirection === 'asc' 
+        ? aValue - bValue
+        : bValue - aValue;
+    });
+    
+    setWallets(sortedWallets);
+    saveWalletsToCookies(sortedWallets);
+    showToast(`Sorted by ${field} (${newDirection === 'asc' ? 'ascending' : 'descending'})`, 'success');
   };
 
   // Selection functions
@@ -744,6 +776,78 @@ export const WalletsPage: React.FC = () => {
     setWallets(updatedWallets);
     setEditingCategory(null);
     showToast('Category updated', 'success');
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, walletId: number): void => {
+    e.stopPropagation();
+    setDraggedWalletId(walletId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', walletId.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, walletId: number): void => {
+    if (!draggedWalletId) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (draggedWalletId !== walletId) {
+      setDragOverWalletId(walletId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent): void => {
+    e.preventDefault();
+    setDragOverWalletId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetWalletId: number): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverWalletId(null);
+    
+    if (!draggedWalletId || draggedWalletId === targetWalletId) {
+      setDraggedWalletId(null);
+      return;
+    }
+
+    // Find indices in the full wallets array
+    const draggedIndex = wallets.findIndex(w => w.id === draggedWalletId);
+    const targetIndex = wallets.findIndex(w => w.id === targetWalletId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedWalletId(null);
+      return;
+    }
+
+    // Create a new array with the reordered wallets
+    const reorderedWallets = [...wallets];
+    
+    // Remove the dragged wallet
+    const [draggedWallet] = reorderedWallets.splice(draggedIndex, 1);
+    
+    // Insert the dragged wallet at the target position
+    reorderedWallets.splice(targetIndex, 0, draggedWallet);
+
+    // Update state and save to storage
+    setWallets(reorderedWallets);
+    saveWalletsToCookies(reorderedWallets);
+    setDraggedWalletId(null);
+    
+    // Clear sorting so manual order is visible
+    if (sortField !== null) {
+      setSortField(null);
+      showToast('Wallet order updated', 'success');
+    } else {
+      showToast('Wallet order updated', 'success');
+    }
+  };
+
+  const handleDragEnd = (): void => {
+    setDraggedWalletId(null);
+    setDragOverWalletId(null);
   };
 
   // Bulk operations
@@ -833,895 +937,1060 @@ export const WalletsPage: React.FC = () => {
   // Calculate totals excluding archived wallets
   const nonArchivedWallets = wallets.filter(w => !w.isArchived);
   const totalSOL = nonArchivedWallets.reduce((sum, wallet) => sum + (solBalances.get(wallet.address) || 0), 0);
-  const totalTokens = nonArchivedWallets.reduce((sum, wallet) => sum + (tokenBalances.get(wallet.address) || 0), 0);
   const activeWallets = nonArchivedWallets.filter(w => (solBalances.get(w.address) || 0) > 0).length;
   const archivedCount = wallets.filter(w => w.isArchived).length;
 
   return (
-    <div className="min-h-screen bg-app-primary text-app-tertiary">
+    <div className="min-h-screen bg-app-primary text-app-tertiary flex">
       {/* Unified Header */}
-      <UnifiedHeader tokenAddress={tokenAddress} />
+      <UnifiedHeader />
 
       {/* Main Content - with left margin for sidebar */}
-      <div className="max-w-7xl mx-auto px-4 py-6 ml-48">
-        {/* Quick Stats */}
-        <div className="mb-6 pb-4 border-b border-app-primary-20">
-          <div className="grid grid-cols-4 gap-2 sm:flex sm:gap-6 text-xs sm:text-sm font-mono">
-            <div className="text-center">
-              <div className="color-primary font-bold">{filteredAndSortedWallets.length} of {wallets.length}</div>
-              <div className="text-app-secondary-80 text-[10px] sm:text-xs">SHOWN</div>
-            </div>
-            <div className="text-center">
-              <div className="color-primary font-bold text-xs sm:text-sm">{totalSOL.toFixed(4)}</div>
-              <div className="text-app-secondary-80 text-[10px] sm:text-xs">TOTAL SOL</div>
-            </div>
-            <div className="text-center">
-              <div className="color-primary font-bold text-xs sm:text-sm">{totalTokens.toLocaleString()}</div>
-              <div className="text-app-secondary-80 text-[10px] sm:text-xs">TOTAL TOKENS</div>
-            </div>
-            <div className="text-center">
-              <div className="color-primary font-bold">{showArchived ? archivedCount : activeWallets}</div>
-              <div className="text-app-secondary-80 text-[10px] sm:text-xs">{showArchived ? 'ARCHIVED' : 'ACTIVE'}</div>
-            </div>
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full md:w-auto md:ml-48 bg-app-primary">
+        {/* Background effects layer */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          {/* Grid pattern background */}
+          <div className="absolute inset-0 bg-app-primary opacity-90">
+            <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `
+                  linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
+                `,
+                backgroundSize: '20px 20px',
+                backgroundPosition: 'center center',
+              }}
+            ></div>
           </div>
+          
+          {/* Corner accent lines - 4 corners with gradient lines */}
+          <div className="absolute top-0 left-0 w-32 h-32 opacity-20">
+            <div className="absolute top-0 left-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+            <div className="absolute top-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+          </div>
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
+            <div className="absolute top-0 right-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+            <div className="absolute top-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+          </div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 opacity-20">
+            <div className="absolute bottom-0 left-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+          </div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 opacity-20">
+            <div className="absolute bottom-0 right-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+            <div className="absolute bottom-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+          </div>
+
+          {/* Scanline overlay effect */}
+          <div className="absolute inset-0 scanline pointer-events-none opacity-30"></div>
+
+          {/* Gradient overlays for depth */}
+          <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent pointer-events-none"></div>
         </div>
 
-        {/* Master Wallets Section */}
-        {masterWallets.length > 0 && (
-          <div className="mb-4 bg-app-quaternary border border-app-primary-40 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-mono color-primary font-bold tracking-wider">
-                MASTER WALLETS ({masterWallets.length})
-              </h3>
-              <div className="flex gap-2">
+        {/* Content container */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-6">
+          {/* Quick Stats & Master Wallets Row */}
+          <div className="mb-6 pb-4 border-b border-app-primary-20">
+            <div className="flex flex-wrap items-start gap-3 justify-between">
+              {/* Quick Stats - Left Side */}
+              <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-6 text-xs sm:text-sm font-mono">
+                <div className="text-center">
+                  <div className="color-primary font-bold">
+                    {filteredAndSortedWallets.length} of {wallets.length}
+                  </div>
+                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">
+                    SHOWN
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="color-primary font-bold text-xs sm:text-sm">
+                    {totalSOL.toFixed(4)}
+                  </div>
+                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">
+                    TOTAL SOL
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="color-primary font-bold">
+                    {showArchived ? archivedCount : activeWallets}
+                  </div>
+                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">
+                    {showArchived ? "ARCHIVED" : "ACTIVE"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Master Wallets & Actions - Right Side */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Master Wallet Cards */}
+                {masterWallets.map((masterWallet) => {
+                  const derivedWallets = wallets.filter(
+                    (w) => w.masterWalletId === masterWallet.id
+                  );
+                  const isExpanded = expandedMasterWallets.has(masterWallet.id);
+
+                  return (
+                    <button
+                      key={masterWallet.id}
+                      onClick={() => toggleMasterWalletExpansion(masterWallet.id)}
+                      className={`text-center px-3 py-1 border rounded text-xs font-mono transition-colors
+                              ${
+                                isExpanded
+                                  ? "border-app-primary-color bg-app-primary-color/10 color-primary"
+                                  : "border-app-primary-30 hover:border-app-primary-40 color-primary hover-color-primary-light"
+                              }`}
+                    >
+                      <div className="font-bold">{masterWallet.name}</div>
+                      <div className="text-app-secondary-80 text-[10px]">
+                        {derivedWallets.length} wallet
+                        {derivedWallets.length !== 1 ? "s" : ""}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Action Buttons */}
                 <button
                   onClick={() => setIsCreateMasterWalletModalOpen(true)}
-                  className="text-xs font-mono color-primary hover-color-primary-light px-3 py-1 
-                           bg-app-primary border border-app-primary-40 rounded"
+                  className="px-2 sm:px-3 py-1 sm:py-1.5 color-primary hover-color-primary-light 
+                          border border-app-primary-30 rounded text-xs sm:text-sm font-mono"
                 >
                   + NEW
                 </button>
                 <button
                   onClick={() => setIsImportMasterWalletModalOpen(true)}
-                  className="text-xs font-mono color-primary hover-color-primary-light px-3 py-1 
-                           bg-app-primary border border-app-primary-40 rounded"
+                  className="px-2 sm:px-3 py-1 sm:py-1.5 color-primary hover-color-primary-light 
+                          border border-app-primary-30 rounded text-xs sm:text-sm font-mono"
                 >
                   IMPORT
                 </button>
               </div>
             </div>
-            
-            <div className="space-y-2">
-              {masterWallets.map((masterWallet) => {
-                const derivedWallets = wallets.filter(w => w.masterWalletId === masterWallet.id);
-                const isExpanded = expandedMasterWallets.has(masterWallet.id);
-                
-                return (
-                  <div key={masterWallet.id} className="bg-app-primary border border-app-primary-30 rounded-lg">
-                    <div className="p-3 flex justify-between items-center">
-                      <div className="flex items-center gap-3 flex-1">
-                        <button
-                          onClick={() => toggleMasterWalletExpansion(masterWallet.id)}
-                          className="color-primary hover-color-primary-light"
-                        >
-                          {isExpanded ? '▼' : '▶'}
-                        </button>
-                        <div className="flex-1">
-                          <div className="font-mono text-sm text-app-primary font-bold">
-                            {masterWallet.name}
-                          </div>
-                          <div className="font-mono text-xs text-app-secondary-80">
-                            {derivedWallets.length} wallet{derivedWallets.length !== 1 ? 's' : ''} derived
-                          </div>
-                          {(() => {
-                            const masterWalletAccount = derivedWallets.find(w => w.derivationIndex === 0);
-                            return masterWalletAccount ? (
-                              <div className="font-mono text-xs text-app-primary mt-1 flex items-center gap-2">
-                                <span className="text-app-secondary-80">Master:</span>
-                                <WalletTooltip content="Click to copy master wallet address" position="top">
-                                  <button
-                                    onClick={() => copyToClipboard(masterWalletAccount.address, showToast)}
-                                    className="hover:color-primary transition-colors"
-                                  >
-                                    {formatAddress(masterWalletAccount.address)}
-                                  </button>
-                                </WalletTooltip>
-                                <span className="text-app-secondary-80">
-                                  ({(solBalances.get(masterWalletAccount.address) || 0).toFixed(4)} SOL)
-                                </span>
-                              </div>
-                            ) : null;
-                          })()}
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <WalletTooltip content="Generate Next Wallet" position="top">
-                          <button
-                            onClick={() => handleGenerateWalletFromMaster(masterWallet)}
-                            disabled={!connection}
-                            className={`px-3 py-1 text-xs font-mono rounded ${
-                              connection
-                                ? 'bg-app-primary-color hover:bg-app-primary-dark text-black'
-                                : 'bg-app-tertiary text-app-secondary-60 cursor-not-allowed'
-                            }`}
-                          >
-                            + GENERATE
-                          </button>
-                        </WalletTooltip>
-                        
-                        <WalletTooltip content="Export Seed Phrase" position="top">
-                          <button
-                            onClick={() => setExportSeedPhraseMasterWallet(masterWallet)}
-                            className="px-3 py-1 text-xs font-mono bg-app-quaternary hover:bg-app-tertiary 
-                                     text-app-primary border border-app-primary-20 rounded"
-                          >
-                            EXPORT
-                          </button>
-                        </WalletTooltip>
-                        
-                        <WalletTooltip content="Delete Master Wallet" position="top">
-                          <button
-                            onClick={() => handleDeleteMasterWallet(masterWallet.id)}
-                            className="px-3 py-1 text-xs font-mono bg-app-quaternary hover:bg-red-500/20 
-                                     text-red-500 border border-red-500/30 rounded"
-                          >
-                            DELETE
-                          </button>
-                        </WalletTooltip>
-                      </div>
-                    </div>
-                    
-                    {isExpanded && derivedWallets.length > 0 && (
-                      <div className="border-t border-app-primary-20 p-2 bg-app-primary-80">
-                        <div className="text-xs font-mono text-app-secondary-80 mb-2 px-2">
-                          Derived Wallets:
-                        </div>
-                        <div className="space-y-1 max-h-40 overflow-y-auto">
-                          {derivedWallets
-                            .sort((a, b) => (a.derivationIndex || 0) - (b.derivationIndex || 0))
-                            .map(wallet => {
-                              const isMasterWallet = wallet.derivationIndex === 0;
-                              return (
-                                <div
-                                  key={wallet.id}
-                                  className={`flex justify-between items-center px-2 py-1 rounded text-xs font-mono ${
-                                    isMasterWallet
-                                      ? 'bg-app-primary-color/20 border border-app-primary-color/40'
-                                      : 'bg-app-quaternary'
-                                  }`}
-                                >
-                                  <span className={isMasterWallet ? 'text-app-primary-color font-bold' : 'text-app-secondary-80'}>
-                                    {isMasterWallet ? '★ #0 (Master)' : `#${wallet.derivationIndex}`}
-                                  </span>
-                                  <span className={isMasterWallet ? 'text-app-primary-color font-bold' : 'text-app-primary'}>
-                                    {formatAddress(wallet.address)}
-                                  </span>
-                                  <span className={isMasterWallet ? 'text-app-primary-color font-bold' : 'text-app-secondary-80'}>
-                                    {(solBalances.get(wallet.address) || 0).toFixed(3)} SOL
-                                  </span>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </div>
-        )}
 
-        {/* Quick Create Master Wallet Buttons (if no master wallets exist) */}
-        {masterWallets.length === 0 && (
-          <div className="mb-4 bg-app-quaternary border border-app-primary-40 rounded-lg p-4">
-            <div className="text-center">
-              <h3 className="text-sm font-mono color-primary font-bold tracking-wider mb-3">
-                HIERARCHICAL DETERMINISTIC WALLETS
-              </h3>
-              <p className="text-xs font-mono text-app-secondary-80 mb-4">
-                Generate multiple wallets from a single seed phrase
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => setIsCreateMasterWalletModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm 
-                           bg-app-primary-color hover:bg-app-primary-dark text-black"
-                >
-                  <Plus size={16} />
-                  Create Master Wallet
-                </button>
-                <button
-                  onClick={() => setIsImportMasterWalletModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm 
-                           bg-app-quaternary hover:bg-app-tertiary text-app-primary border border-app-primary-40"
-                >
-                  <Key size={16} />
-                  Import Master Wallet
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          {/* Expanded Master Wallet Details */}
+          {masterWallets.map((masterWallet) => {
+            const derivedWallets = wallets.filter(
+              (w) => w.masterWalletId === masterWallet.id
+            );
+            const isExpanded = expandedMasterWallets.has(masterWallet.id);
 
-        {/* Controls */}
-        <div className="mb-4">
-          <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-start sm:items-center">
-            {/* View Mode Dropdown */}
-            <div className="relative" ref={viewModeDropdownRef}>
-              <button
-                onClick={() => setShowViewModeDropdown(!showViewModeDropdown)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 
-                         bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 
-                         text-app-primary whitespace-nowrap"
+            if (!isExpanded) return null;
+
+            return (
+              <div
+                key={masterWallet.id}
+                className="mb-4 pb-4 border-b border-app-primary-20"
               >
-                <span className="text-xs text-app-secondary-80">VIEW:</span>
-                <span className="font-bold">
-                  {viewMode === 'all' ? 'ALL' : viewMode === 'hd' ? 'HD WALLETS' : 'IMPORTED'}
-                </span>
-                <ChevronDown size={14} className={`transition-transform duration-200 ${showViewModeDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {showViewModeDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-app-primary border border-app-primary-30 rounded-lg shadow-lg z-20 min-w-full">
-                  {(['all', 'hd', 'imported'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => {
-                        setViewMode(mode);
-                        setShowViewModeDropdown(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 text-xs font-mono transition-colors ${
-                        viewMode === mode
-                          ? 'bg-app-primary-color text-black font-bold'
-                          : 'text-app-primary hover:bg-app-quaternary'
-                      } ${mode === 'all' ? 'rounded-t-lg' : mode === 'imported' ? 'rounded-b-lg' : ''}`}
-                    >
-                      {mode === 'all' ? 'ALL' : mode === 'hd' ? 'HD WALLETS' : 'IMPORTED'}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                {/* Master Wallet Header */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="font-mono">
+                    <div className="text-sm text-app-primary font-bold">
+                      {masterWallet.name}
+                    </div>
+                    {(() => {
+                      const masterWalletAccount = derivedWallets.find(
+                        (w) => w.derivationIndex === 0
+                      );
+                      return masterWalletAccount ? (
+                        <div className="text-xs text-app-secondary-80 mt-1 flex items-center gap-2">
+                          <span>Master:</span>
+                          <WalletTooltip
+                            content="Click to copy master wallet address"
+                            position="top"
+                          >
+                            <button
+                              onClick={() =>
+                                copyToClipboard(
+                                  masterWalletAccount.address,
+                                  showToast
+                                )
+                              }
+                              className="color-primary hover-color-primary-light transition-colors"
+                            >
+                              {formatAddress(masterWalletAccount.address)}
+                            </button>
+                          </WalletTooltip>
+                          <span>
+                            (
+                            {(
+                              solBalances.get(masterWalletAccount.address) || 0
+                            ).toFixed(4)}{" "}
+                            SOL)
+                          </span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
 
-            {/* Create Wallet */}
-            {showCreateInput ? (
-              <div className="relative flex items-center">
-                <input
-                  ref={createInputRef}
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={walletQuantity}
-                  onChange={(e) => setWalletQuantity(e.target.value)}
-                  onKeyDown={(e): void => {
-                    if (e.key === 'Enter' && walletQuantity.trim()) {
-                      void handleCreateMultipleWallets();
-                    } else if (e.key === 'Escape') {
-                      setShowCreateInput(false);
-                      setWalletQuantity('1');
-                    }
-                  }}
-                  className="bg-app-primary-color border border-app-primary-20 rounded-lg px-4 py-2 pr-10 text-sm text-black focus:border-app-primary-60 focus:outline-none font-mono font-bold text-center min-w-[120px]"
-                  placeholder="1"
-                  style={{ width: '120px' }}
-                />
-                <button
-                  onClick={handleCreateMultipleWallets}
-                  disabled={isCreatingWallets || !connection || !walletQuantity.trim()}
-                  className={`absolute right-2 p-1.5 rounded transition-all duration-300 touch-manipulation ${
-                    isCreatingWallets || !connection || !walletQuantity.trim()
-                      ? 'cursor-not-allowed text-app-secondary-80'
-                      : 'text-black hover:bg-app-primary-dark'
-                  }`}
-                >
-                  <ArrowRight size={16} />
-                </button>
+                  <div className="flex gap-2">
+                    <WalletTooltip content="Export Seed Phrase" position="top">
+                      <button
+                        onClick={() => setExportSeedPhraseMasterWallet(masterWallet)}
+                        className="px-2 py-1 text-[10px] font-mono color-primary 
+                                hover-color-primary-light border border-app-primary-20 rounded"
+                      >
+                        EXPORT
+                      </button>
+                    </WalletTooltip>
+
+                    <WalletTooltip content="Delete Master Wallet" position="top">
+                      <button
+                        onClick={() => handleDeleteMasterWallet(masterWallet.id)}
+                        className="px-2 py-1 text-[10px] font-mono text-red-500 
+                                hover:text-red-400 border border-red-500/30 rounded"
+                      >
+                        DELETE
+                      </button>
+                    </WalletTooltip>
+                  </div>
+                </div>
+
+                {/* Derived Wallets List */}
+                {derivedWallets.length > 0 && (
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {derivedWallets
+                      .sort(
+                        (a, b) =>
+                          (a.derivationIndex || 0) - (b.derivationIndex || 0)
+                      )
+                      .map((wallet) => {
+                        const isMasterWallet = wallet.derivationIndex === 0;
+                        return (
+                          <div
+                            key={wallet.id}
+                            className="flex justify-between items-center py-1 text-xs font-mono"
+                          >
+                            <span
+                              className={
+                                isMasterWallet
+                                  ? "text-app-primary-color font-bold"
+                                  : "text-app-secondary-80"
+                              }
+                            >
+                              {isMasterWallet
+                                ? "★ #0 (Master)"
+                                : `#${wallet.derivationIndex}`}
+                            </span>
+                            <span className="text-app-primary">
+                              {formatAddress(wallet.address)}
+                            </span>
+                            <span className="text-app-secondary-80">
+                              {(solBalances.get(wallet.address) || 0).toFixed(3)} SOL
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
-            ) : (
+            );
+          })}
+
+
+          {/* Controls */}
+          <div className="mb-4">
+            <div className="flex flex-row flex-wrap items-center gap-0.5 sm:gap-1">
+              {/* View Mode Dropdown */}
+              <div className="relative" ref={viewModeDropdownRef}>
+                <button
+                  onClick={() => setShowViewModeDropdown(!showViewModeDropdown)}
+                  className="flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 
+                          bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 
+                          text-app-primary whitespace-nowrap"
+                >
+                  <span className="hidden sm:inline text-xs sm:text-sm text-app-secondary-80">VIEW:</span>
+                  <span className="font-bold">
+                    {viewMode === 'all' ? 'ALL' : viewMode === 'hd' ? 'HD' : 'IMP'}
+                  </span>
+                  <ChevronDown size={12} className={`sm:hidden transition-transform duration-200 ${showViewModeDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={14} className={`hidden sm:block transition-transform duration-200 ${showViewModeDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showViewModeDropdown && (
+                  <div className="absolute top-full left-0 mt-1 bg-app-primary border border-app-primary-30 rounded-lg shadow-lg z-20 min-w-full">
+                    {(['all', 'hd', 'imported'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          setViewMode(mode);
+                          setShowViewModeDropdown(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-xs font-mono transition-colors ${
+                          viewMode === mode
+                            ? 'bg-app-primary-color text-black font-bold'
+                            : 'text-app-primary hover:bg-app-quaternary'
+                        } ${mode === 'all' ? 'rounded-t-lg' : mode === 'imported' ? 'rounded-b-lg' : ''}`}
+                      >
+                        {mode === 'all' ? 'ALL' : mode === 'hd' ? 'HD WALLETS' : 'IMPORTED'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Create Single Wallet */}
               <button
-                onClick={() => setShowCreateInput(true)}
+                onClick={() => setIsCreateWalletModalOpen(true)}
                 disabled={!connection}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
+                className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
                   !connection
                     ? 'bg-primary-20 cursor-not-allowed text-app-secondary-80'
                     : 'bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn'
                 }`}
               >
-                <Plus size={16} />
-                <span className="hidden sm:inline">CREATE</span>
-                <span className="sm:hidden">+</span>
+                <Plus size={12} className="sm:hidden" />
+                <Plus size={14} className="hidden sm:block" />
+                <span className="hidden sm:inline ml-0.5">CREATE</span>
               </button>
-            )}
 
-            {/* Import Wallet */}
-            {showImportInput ? (
-              <div className="relative">
-                <div className="relative flex items-center">
-                  <input
-                    ref={importInputRef}
-                    type="text"
-                    placeholder="Private Key"
-                    value={importKey}
-                    onChange={(e) => {
-                      setImportKey(e.target.value);
-                      setImportError(null);
-                    }}
-                    onKeyDown={(e): void => {
-                      if (e.key === 'Enter' && importKey.trim()) {
-                        void handleImportWallet();
-                      } else if (e.key === 'Escape') {
-                        setShowImportInput(false);
-                        setImportKey('');
-                        setImportError(null);
-                      }
-                    }}
-                    className={`bg-app-quaternary border ${
-                      importError ? 'border-error-alt' : 'border-app-primary-20'
-                    } rounded-lg px-4 py-2 pr-10 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono`}
-                    style={{ width: '160px' }}
-                  />
-                  <button
-                    onClick={handleImportWallet}
-                    disabled={!importKey.trim()}
-                    className={`absolute right-2 p-1.5 rounded transition-all duration-300 touch-manipulation ${
-                      !importKey.trim()
-                        ? 'cursor-not-allowed text-app-secondary-80'
-                        : 'text-app-primary hover:color-primary hover:bg-app-tertiary'
-                    }`}
-                  >
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-                {importError && (
-                  <div className="text-error-alt text-xs font-mono absolute top-full left-0 mt-1 whitespace-nowrap z-10 bg-app-primary border border-error-alt rounded px-2 py-1">
-                    {importError}
-                  </div>
-                )}
-              </div>
-            ) : (
+              {/* Import Wallet */}
               <button
-                onClick={() => setShowImportInput(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 touch-manipulation whitespace-nowrap bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary"
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary"
               >
-                <Key size={16} />
-                <span className="hidden sm:inline">IMPORT WALLET</span>
-                <span className="sm:hidden">IMPORT</span>
+                <Key size={12} className="sm:hidden" />
+                <Key size={14} className="hidden sm:block" />
+                <span className="hidden sm:inline ml-0.5">IMPORT</span>
               </button>
-            )}
-            
-            {/* File Upload */}
-            <div className="flex gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.key,.json"
-                onChange={handleFileUpload}
-                className="hidden"
-                disabled={isProcessingFile}
-              />
-              <WalletTooltip content="Import from file (.txt/.key/.json)" position="bottom">
+
+              {/* Quick Actions */}
+              <WalletTooltip content="Export all wallets" position="bottom">
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isProcessingFile}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 touch-manipulation ${
-                    isProcessingFile 
-                      ? 'bg-primary-20 cursor-not-allowed text-app-secondary-80' 
-                      : 'bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary'
-                  }`}
+                  onClick={() => downloadAllWallets(wallets)}
+                  className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary whitespace-nowrap"
                 >
-                  <FileUp size={16} />
-                  <span className="hidden sm:inline">{isProcessingFile ? 'PROCESSING...' : 'FILE'}</span>
+                  <Download size={12} className="sm:hidden" />
+                  <Download size={14} className="hidden sm:block" />
+                  <span className="hidden sm:inline ml-0.5">DOWNLOAD</span>
                 </button>
               </WalletTooltip>
-            </div>
 
-            {/* Quick Actions */}
-            <WalletTooltip content="Export all wallets" position="bottom">
-              <button
-                onClick={() => downloadAllWallets(wallets)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 touch-manipulation bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary"
-              >
-                <Download size={16} />
-                <span className="hidden sm:inline">EXPORT ALL</span>
-              </button>
-            </WalletTooltip>
+              <WalletTooltip content="Remove empty wallets" position="bottom">
+                <button
+                  onClick={() => handleCleanupWallets(wallets, solBalances, new Map<string, number>(), setWallets, showToast)}
+                  className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary border border-error-alt-40 hover:border-error-alt text-error-alt hover:bg-app-tertiary whitespace-nowrap"
+                >
+                  <Trash2 size={12} className="sm:hidden" />
+                  <Trash2 size={14} className="hidden sm:block" />
+                  <span className="hidden sm:inline ml-0.5">CLEANUP</span>
+                </button>
+              </WalletTooltip>
 
-            <WalletTooltip content="Remove empty wallets" position="bottom">
-              <button
-                onClick={() => handleCleanupWallets(wallets, solBalances, tokenBalances, setWallets, showToast)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 touch-manipulation bg-app-quaternary border border-error-alt-40 hover:border-error-alt text-error-alt hover:bg-app-tertiary"
-              >
-                <Trash2 size={16} />
-                <span className="hidden sm:inline">CLEANUP EMPTY</span>
-              </button>
-            </WalletTooltip>
+              {/* Archive View Toggle */}
+              <WalletTooltip content={showArchived ? "Show active wallets" : "Show archived wallets"} position="bottom">
+                <button
+                  onClick={() => {
+                    setShowArchived(!showArchived);
+                    setSelectedWallets(new Set());
+                  }}
+                  className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
+                    showArchived
+                      ? 'bg-app-primary-color text-black border border-app-primary-60 font-bold'
+                      : 'bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary'
+                  }`}
+                >
+                  <Archive size={12} className="sm:hidden" />
+                  <Archive size={14} className="hidden sm:block" />
+                  <span className="hidden sm:inline ml-0.5">{showArchived ? 'ARCHIVED' : 'ARCHIVE'}</span>
+                </button>
+              </WalletTooltip>
 
-            {/* Archive View Toggle */}
-            <WalletTooltip content={showArchived ? "Show active wallets" : "Show archived wallets"} position="bottom">
-              <button
-                onClick={() => {
-                  setShowArchived(!showArchived);
-                  setSelectedWallets(new Set());
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm transition-all duration-300 touch-manipulation ${
-                  showArchived
-                    ? 'bg-app-primary-color text-black border border-app-primary-60 font-bold'
-                    : 'bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary'
-                }`}
-              >
-                <Archive size={16} />
-                <span className="hidden sm:inline">{showArchived ? 'ARCHIVED' : 'ARCHIVE'}</span>
-              </button>
-            </WalletTooltip>
-
-            {/* Bulk Actions */}
-            {selectedWallets.size > 0 && (
-              <div className="ml-auto flex items-center gap-2">
-                <WalletTooltip content="Download Selected" position="bottom">
+              {/* End Row Buttons */}
+              <div className="flex items-center gap-0.5 sm:gap-1 ml-auto">
+                <WalletTooltip content="Fund Wallets" position="bottom">
                   <button
-                    onClick={downloadSelectedWallets}
-                    className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    onClick={() => setIsFundModalOpen(true)}
+                    className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
-                    <Download size={16} className="color-primary" />
+                    <HandCoins size={12} className="sm:hidden" />
+                    <HandCoins size={14} className="hidden sm:block" />
+                    <span className="hidden sm:inline ml-0.5">FUND</span>
                   </button>
                 </WalletTooltip>
                 
-                {!showArchived && (
-                  <WalletTooltip content="Archive Selected" position="bottom">
-                    <button
-                      onClick={archiveSelectedWallets}
-                      className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    >
-                      <Archive size={16} className="color-primary" />
-                    </button>
-                  </WalletTooltip>
-                )}
-                
-                {showArchived && (
-                  <WalletTooltip content="Unarchive Selected" position="bottom">
-                    <button
-                      onClick={unarchiveSelectedWallets}
-                      className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    >
-                      <Archive size={16} className="text-app-primary-color" />
-                    </button>
-                  </WalletTooltip>
-                )}
-                
-                <WalletTooltip content="Delete Selected" position="bottom">
+                <WalletTooltip content="Consolidate SOL" position="bottom">
                   <button
-                    onClick={deleteSelectedWallets}
-                    className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-red-500 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    onClick={() => setActiveModal('consolidate')}
+                    className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
-                    <Trash2 size={16} className="text-red-500" />
+                    <Share size={12} className="sm:hidden" />
+                    <Share size={14} className="hidden sm:block" />
+                    <span className="hidden sm:inline ml-0.5">CONSOLIDATE</span>
                   </button>
                 </WalletTooltip>
                 
-                <span className="px-3 py-2 bg-app-quaternary border border-app-primary-20 rounded-lg text-xs sm:text-sm font-mono color-primary whitespace-nowrap flex items-center">
-                  {selectedWallets.size} selected
-                </span>
+                <WalletTooltip content="Transfer Assets" position="bottom">
+                  <button
+                    onClick={() => setActiveModal('transfer')}
+                    className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
+                  >
+                    <Network size={12} className="sm:hidden" />
+                    <Network size={14} className="hidden sm:block" />
+                    <span className="hidden sm:inline ml-0.5">TRANSFER</span>
+                  </button>
+                </WalletTooltip>
+                
+                <WalletTooltip content="Burn Tokens" position="bottom">
+                  <button
+                    onClick={() => {
+                      setBurnTokenAddress('');
+                      setActiveModal('burn');
+                    }}
+                    className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
+                  >
+                    <Flame size={12} className="sm:hidden" />
+                    <Flame size={14} className="hidden sm:block" />
+                    <span className="hidden sm:inline ml-0.5">BURN</span>
+                  </button>
+                </WalletTooltip>
+                
+                <WalletTooltip content="Deposit SOL" position="bottom">
+                  <button
+                    onClick={() => setActiveModal('deposit')}
+                    className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
+                  >
+                    <Send size={12} className="sm:hidden" />
+                    <Send size={14} className="hidden sm:block" />
+                    <span className="hidden sm:inline ml-0.5">DEPOSIT</span>
+                  </button>
+                </WalletTooltip>
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* Table Container */}
-        <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-          <div className="flex-1 overflow-y-auto overflow-x-auto border border-app-primary-20 rounded-lg min-h-0">
-            <table className="w-full text-xs sm:text-sm font-mono min-w-[600px]">
-              {/* Header */}
-              <thead className="sticky top-0 bg-app-primary border-b border-app-primary-20 z-10">
-              <tr>
-                <th className="p-2 sm:p-3 text-left bg-app-primary">
-                  <button
-                    onClick={selectedWallets.size === filteredAndSortedWallets.length ? clearSelection : selectAllVisible}
-                    className="color-primary hover-text-app-primary transition-colors touch-manipulation"
-                  >
-                    {selectedWallets.size === filteredAndSortedWallets.length && filteredAndSortedWallets.length > 0 ? 
-                      <CheckSquare size={14} className="sm:w-4 sm:h-4" /> : <Square size={14} className="sm:w-4 sm:h-4" />
-                    }
-                  </button>
-                </th>
-                <th className="p-2 sm:p-3 text-left bg-app-primary">
-                  {showLabelSearch ? (
-                    <div className="flex items-center gap-1 text-[10px] sm:text-xs">
-                      <input
-                        type="text"
-                        placeholder="Search label..."
-                        value={labelSearchTerm}
-                        onChange={(e) => setLabelSearchTerm(e.target.value)}
-                        onBlur={() => {
-                          if (!labelSearchTerm.trim()) {
-                            setShowLabelSearch(false);
-                          }
-                        }}
-                        autoFocus
-                        className="bg-app-quaternary border border-app-primary-20 rounded px-2 py-1 text-xs text-app-primary focus:border-app-primary-60 focus:outline-none font-mono w-32"
-                      />
-                      <button
-                        onClick={() => {
-                          setLabelSearchTerm('');
-                          setShowLabelSearch(false);
-                        }}
-                        className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                      >
-                        <XCircle size={12} className="text-app-secondary-80 hover:text-app-primary" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                      <span className="text-app-secondary-80">LABEL</span>
-                      <button
-                        onClick={() => setShowLabelSearch(true)}
-                        className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                      >
-                        <Search size={14} className="text-app-secondary-80 hover:color-primary" />
-                      </button>
-                    </div>
-                  )}
-                </th>
-                <th className="p-2 sm:p-3 text-left bg-app-primary">
-                  <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                    <span className="text-app-secondary-80">QUICKMODE</span>
-                  </div>
-                </th>
-                <th className="p-2 sm:p-3 text-left bg-app-primary">
-                  <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                    <span className="text-app-secondary-80">TYPE</span>
-                  </div>
-                </th>
-                <th className="p-2 sm:p-3 text-left bg-app-primary">
-                  {showAddressSearch ? (
-                    <div className="flex items-center gap-1 text-[10px] sm:text-xs">
-                      <input
-                        type="text"
-                        placeholder="Search address..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onBlur={() => {
-                          if (!searchTerm.trim()) {
-                            setShowAddressSearch(false);
-                          }
-                        }}
-                        autoFocus
-                        className="bg-app-quaternary border border-app-primary-20 rounded px-2 py-1 text-xs text-app-primary focus:border-app-primary-60 focus:outline-none font-mono w-32"
-                      />
-                      <button
-                        onClick={() => {
-                          setSearchTerm('');
-                          setShowAddressSearch(false);
-                        }}
-                        className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                      >
-                        <XCircle size={12} className="text-app-secondary-80 hover:text-app-primary" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                      <span className="text-app-secondary-80">ADDRESS</span>
-                      <button
-                        onClick={() => setShowAddressSearch(true)}
-                        className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                      >
-                        <Search size={14} className="text-app-secondary-80 hover:color-primary" />
-                      </button>
-                    </div>
-                  )}
-                </th>
-                <th className="p-2 sm:p-3 text-left bg-app-primary">
-                  <button
-                    onClick={() => handleSort('solBalance')}
-                    className="flex items-center gap-1 sm:gap-2 text-app-secondary-80 hover:color-primary transition-colors touch-manipulation text-[10px] sm:text-xs"
-                  >
-                    SOL BALANCE
-                    <SortIcon field="solBalance" />
-                  </button>
-                </th>
-                {tokenAddress && (
+          {/* Table Container */}
+          <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+            <div className="flex-1 overflow-y-auto overflow-x-auto border border-app-primary-20 rounded-lg min-h-0">
+              <table className="w-full text-xs sm:text-sm font-mono min-w-[600px]">
+                {/* Header */}
+                <thead className="sticky top-0 bg-app-primary border-b border-app-primary-20 z-10">
+                <tr>
                   <th className="p-2 sm:p-3 text-left bg-app-primary">
-                    <button
-                      onClick={() => handleSort('tokenBalance')}
-                      className="flex items-center gap-1 sm:gap-2 text-app-secondary-80 hover:color-primary transition-colors touch-manipulation text-[10px] sm:text-xs"
-                    >
-                      TOKEN BALANCE
-                      <SortIcon field="tokenBalance" />
-                    </button>
-                  </th>
-                )}
-                <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">PRIVATE KEY</th>
-                <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">ACTIONS</th>
-              </tr>
-            </thead>
-
-            {/* Body */}
-            <tbody>
-              {filteredAndSortedWallets.map((wallet) => {
-                const isSelected = selectedWallets.has(wallet.id);
-                const solBalance = solBalances.get(wallet.address) || 0;
-                const tokenBalance = tokenBalances.get(wallet.address) || 0;
-                
-                return (
-                  <tr 
-                    key={wallet.id}
-                    className={`border-b border-app-primary-20 hover:bg-app-quaternary transition-colors ${
-                      isSelected ? 'bg-app-quaternary' : ''
-                    }`}
-                  >
-                    <td className="p-2 sm:p-3">
+                    <div className="flex items-center gap-2">
+                      <GripVertical 
+                        size={12} 
+                        className="text-app-secondary-60 opacity-40" 
+                      />
                       <button
-                        onClick={() => toggleWalletSelection(wallet.id)}
+                        onClick={selectedWallets.size === filteredAndSortedWallets.length ? clearSelection : selectAllVisible}
                         className="color-primary hover-text-app-primary transition-colors touch-manipulation"
                       >
-                        {isSelected ? <CheckSquare size={14} className="sm:w-4 sm:h-4" /> : <Square size={14} className="sm:w-4 sm:h-4" />}
+                        {selectedWallets.size === filteredAndSortedWallets.length && filteredAndSortedWallets.length > 0 ? 
+                          <CheckSquare size={14} className="sm:w-4 sm:h-4" /> : <Square size={14} className="sm:w-4 sm:h-4" />
+                        }
                       </button>
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      {editingLabel === wallet.id ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={editLabelValue}
-                            onChange={(e) => setEditLabelValue(e.target.value)}
-                            onKeyDown={(e) => handleLabelKeyPress(e, wallet.id)}
-                            className="bg-app-quaternary border border-app-primary-20 rounded-lg px-2 py-1.5 sm:py-1 text-xs sm:text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono flex-1"
-                            placeholder="Enter label..."
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => saveLabel(wallet.id)}
-                            className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
-                          >
-                            <Check size={14} className="color-primary" />
-                          </button>
-                          <button
-                            onClick={cancelEditingLabel}
-                            className="p-1.5 sm:p-1 hover:bg-app-quaternary border border-app-primary-20 rounded-lg transition-all duration-300 touch-manipulation"
-                          >
-                            <XCircle size={14} className="text-red-500" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-app-primary font-mono text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
-                            {wallet.label || 'No label'}
-                          </span>
-                          <button
-                            onClick={() => startEditingLabel(wallet)}
-                            className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 opacity-60 hover:opacity-100 touch-manipulation"
-                          >
-                            <Edit3 size={12} className="color-primary" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      {editingCategory === wallet.id ? (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={wallet.category || 'Medium'}
-                            onChange={(e) => {
-                              const value = e.target.value as WalletCategory;
-                              saveCategory(wallet.id, value);
-                            }}
-                            onBlur={() => setEditingCategory(null)}
-                            autoFocus
-                            className="bg-app-quaternary border border-app-primary-20 rounded-lg px-2 py-1.5 sm:py-1 text-xs sm:text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
-                          >
-                            <option value="Soft">Soft</option>
-                            <option value="Medium">Medium</option>
-                            <option value="Hard">Hard</option>
-                          </select>
-                          <button
-                            onClick={() => setEditingCategory(null)}
-                            className="p-1.5 sm:p-1 hover:bg-app-quaternary border border-app-primary-20 rounded-lg transition-all duration-300 touch-manipulation"
-                          >
-                            <XCircle size={14} className="text-red-500" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded ${
-                            wallet.category === 'Soft' ? 'bg-green-500/20 text-green-400' :
-                            wallet.category === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                            wallet.category === 'Hard' ? 'bg-red-500/20 text-red-400' :
-                            'bg-yellow-500/20 text-yellow-400'
-                          }`}>
-                            {wallet.category || 'Medium'}
-                          </span>
-                          <button
-                            onClick={() => setEditingCategory(wallet.id)}
-                            className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 opacity-60 hover:opacity-100 touch-manipulation"
-                          >
-                            <Edit3 size={12} className="color-primary" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      <span className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded ${
-                        wallet.source === 'hd-derived' 
-                          ? 'bg-blue-500/20 text-blue-400' 
-                          : 'bg-purple-500/20 text-purple-400'
-                      }`}>
-                        {wallet.source === 'hd-derived' ? 'HD' : 'IM'}
-                      </span>
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      <WalletTooltip content="Click to copy address" position="top">
+                    </div>
+                  </th>
+                  <th className="p-2 sm:p-3 text-left bg-app-primary">
+                    {showLabelSearch ? (
+                      <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                        <input
+                          type="text"
+                          placeholder="Search label..."
+                          value={labelSearchTerm}
+                          onChange={(e) => setLabelSearchTerm(e.target.value)}
+                          onBlur={() => {
+                            if (!labelSearchTerm.trim()) {
+                              setShowLabelSearch(false);
+                            }
+                          }}
+                          autoFocus
+                          className="bg-app-quaternary border border-app-primary-20 rounded px-2 py-1 text-xs text-app-primary focus:border-app-primary-60 focus:outline-none font-mono w-32"
+                        />
                         <button
-                          onClick={() => copyToClipboard(wallet.address, showToast)}
-                          className="text-app-primary hover:color-primary transition-colors font-mono text-[10px] sm:text-xs touch-manipulation"
+                          onClick={() => {
+                            setLabelSearchTerm('');
+                            setShowLabelSearch(false);
+                          }}
+                          className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
                         >
-                          {formatAddress(wallet.address)}
+                          <XCircle size={12} className="text-app-secondary-80 hover:text-app-primary" />
                         </button>
-                      </WalletTooltip>
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      <span className={`${solBalance > 0 ? 'color-primary' : 'text-app-secondary-80'} font-bold text-xs sm:text-sm`}>
-                        {solBalance.toFixed(4)}
-                      </span>
-                    </td>
-                    {tokenAddress && (
-                      <td className="p-2 sm:p-3">
-                        <span className={`${tokenBalance > 0 ? 'color-primary' : 'text-app-secondary-80'} font-bold text-xs sm:text-sm`}>
-                          {tokenBalance.toLocaleString()}
-                        </span>
-                      </td>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
+                        <span className="text-app-secondary-80">LABEL</span>
+                        <button
+                          onClick={() => setShowLabelSearch(true)}
+                          className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
+                        >
+                          <Search size={14} className="text-app-secondary-80 hover:color-primary" />
+                        </button>
+                      </div>
                     )}
-                    <td className="p-2 sm:p-3">
-                      <WalletTooltip content="Click to copy private key" position="top">
-                        <button
-                          onClick={() => copyToClipboard(wallet.privateKey, showToast)}
-                          className="text-app-secondary-80 hover:color-primary transition-colors font-mono text-[10px] sm:text-xs touch-manipulation"
-                        >
-                          {wallet.privateKey.substring(0, 12)}...
-                        </button>
-                      </WalletTooltip>
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      <div className="flex gap-1">
-                        {wallet.isArchived ? (
-                          <WalletTooltip content="Unarchive Wallet" position="top">
-                            <button
-                              onClick={() => unarchiveWallet(wallet.id)}
-                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
-                            >
-                              <Archive size={14} className="text-app-primary-color" />
-                            </button>
-                          </WalletTooltip>
-                        ) : (
-                          <WalletTooltip content="Archive Wallet" position="top">
-                            <button
-                              onClick={() => archiveWallet(wallet.id)}
-                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
-                            >
-                              <Archive size={14} className="color-primary" />
-                            </button>
-                          </WalletTooltip>
-                        )}
-
-                        <WalletTooltip content="Download Private Key" position="top">
-                          <button
-                            onClick={() => downloadPrivateKey(wallet)}
-                            className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
-                          >
-                            <Download size={14} className="color-primary" />
-                          </button>
-                        </WalletTooltip>
-                        
-                        <WalletTooltip content="Delete Wallet" position="top">
+                  </th>
+                  <th className="p-2 sm:p-3 text-left bg-app-primary">
+                      <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
+                        <span className="text-app-secondary-80">QUICKMODE</span>
+                        <WalletTooltip content="Configure Quick Trade Category Settings" position="bottom">
                           <button
                             onClick={() => {
-                              const newWallets = deleteWallet(wallets, wallet.id);
-                              saveWalletsToCookies(newWallets);
-                              setWallets(newWallets);
-                              showToast('Wallet deleted', 'success');
+                              setEditingWalletQuickTrade(null);
+                              setIsQuickTradeModalOpen(true);
                             }}
-                            className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
+                            className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
                           >
-                            <Trash2 size={14} className="text-red-500" />
+                            <Settings size={12} className="text-app-secondary-80 hover:text-app-primary" />
                           </button>
                         </WalletTooltip>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  </th>
+                  <th className="p-2 sm:p-3 text-left bg-app-primary">
+                    <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
+                      <span className="text-app-secondary-80">TYPE</span>
+                    </div>
+                  </th>
+                  <th className="p-2 sm:p-3 text-left bg-app-primary">
+                    {showAddressSearch ? (
+                      <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                        <input
+                          type="text"
+                          placeholder="Search address..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          onBlur={() => {
+                            if (!searchTerm.trim()) {
+                              setShowAddressSearch(false);
+                            }
+                          }}
+                          autoFocus
+                          className="bg-app-quaternary border border-app-primary-20 rounded px-2 py-1 text-xs text-app-primary focus:border-app-primary-60 focus:outline-none font-mono w-32"
+                        />
+                        <button
+                          onClick={() => {
+                            setSearchTerm('');
+                            setShowAddressSearch(false);
+                          }}
+                          className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
+                        >
+                          <XCircle size={12} className="text-app-secondary-80 hover:text-app-primary" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
+                        <span className="text-app-secondary-80">ADDRESS</span>
+                        <button
+                          onClick={() => setShowAddressSearch(true)}
+                          className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
+                        >
+                          <Search size={14} className="text-app-secondary-80 hover:color-primary" />
+                        </button>
+                      </div>
+                    )}
+                  </th>
+                  <th className="p-2 sm:p-3 text-left bg-app-primary">
+                    <button
+                      onClick={() => handleSort('solBalance')}
+                      className="flex items-center gap-1 sm:gap-2 text-app-secondary-80 hover:color-primary transition-colors touch-manipulation text-[10px] sm:text-xs"
+                    >
+                      SOL BALANCE
+                      <SortIcon field="solBalance" />
+                    </button>
+                  </th>
+                  <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">PRIVATE KEY</th>
+                  <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">ACTIONS</th>
+                </tr>
+              </thead>
 
-            {/* Empty State */}
-            {filteredAndSortedWallets.length === 0 && (
-              <div className="p-6 sm:p-8 text-center text-app-secondary-80">
-                <Wallet size={40} className="sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
-                <div className="font-mono text-xs sm:text-sm">
-                  {searchTerm || labelSearchTerm
-                    ? 'No wallets match your search' 
-                    : 'No wallets found'
-                  }
+              {/* Body */}
+              <tbody>
+                {filteredAndSortedWallets.map((wallet) => {
+                  const isSelected = selectedWallets.has(wallet.id);
+                  const solBalance = solBalances.get(wallet.address) || 0;
+                  const isDragging = draggedWalletId === wallet.id;
+                  const isDragOver = dragOverWalletId === wallet.id;
+                  
+                  return (
+                    <tr 
+                      key={wallet.id}
+                      onDragOver={(e) => handleDragOver(e, wallet.id)}
+                      onDragLeave={(e) => handleDragLeave(e)}
+                      onDrop={(e) => handleDrop(e, wallet.id)}
+                      className={`border-b border-app-primary-20 hover:bg-app-quaternary transition-all ${
+                        isSelected ? 'bg-app-quaternary' : ''
+                      } ${
+                        isDragging ? 'opacity-40 bg-app-primary-color/5' : ''
+                      } ${
+                        isDragOver ? 'border-t-2 border-t-app-primary-color bg-app-primary-color/10' : ''
+                      }`}
+                    >
+                      <td className="p-2 sm:p-3">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            data-grip-handle
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, wallet.id)}
+                            onDragEnd={handleDragEnd}
+                            className="cursor-grab active:cursor-grabbing flex items-center"
+                          >
+                            <GripVertical 
+                              size={14} 
+                              className="text-app-secondary-60 opacity-60 hover:opacity-100 transition-opacity" 
+                            />
+                          </div>
+                          <button
+                            onClick={() => toggleWalletSelection(wallet.id)}
+                            className="color-primary hover-text-app-primary transition-colors touch-manipulation"
+                          >
+                            {isSelected ? <CheckSquare size={14} className="sm:w-4 sm:h-4" /> : <Square size={14} className="sm:w-4 sm:h-4" />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        {editingLabel === wallet.id ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editLabelValue}
+                              onChange={(e) => setEditLabelValue(e.target.value)}
+                              onKeyDown={(e) => handleLabelKeyPress(e, wallet.id)}
+                              className="bg-app-quaternary border border-app-primary-20 rounded-lg px-2 py-1.5 sm:py-1 text-xs sm:text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono flex-1"
+                              placeholder="Enter label..."
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => saveLabel(wallet.id)}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
+                            >
+                              <Check size={14} className="color-primary" />
+                            </button>
+                            <button
+                              onClick={cancelEditingLabel}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary border border-app-primary-20 rounded-lg transition-all duration-300 touch-manipulation"
+                            >
+                              <XCircle size={14} className="text-red-500" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-app-primary font-mono text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
+                              {wallet.label || 'No label'}
+                            </span>
+                            <button
+                              onClick={() => startEditingLabel(wallet)}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 opacity-60 hover:opacity-100 touch-manipulation"
+                            >
+                              <Edit3 size={12} className="color-primary" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        {editingCategory === wallet.id ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={wallet.category || 'Medium'}
+                              onChange={(e) => {
+                                const value = e.target.value as WalletCategory;
+                                saveCategory(wallet.id, value);
+                              }}
+                              onBlur={() => setEditingCategory(null)}
+                              autoFocus
+                              className="bg-app-quaternary border border-app-primary-20 rounded-lg px-2 py-1.5 sm:py-1 text-xs sm:text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
+                            >
+                              <option value="Soft">Soft</option>
+                              <option value="Medium">Medium</option>
+                              <option value="Hard">Hard</option>
+                            </select>
+                            <button
+                              onClick={() => setEditingCategory(null)}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary border border-app-primary-20 rounded-lg transition-all duration-300 touch-manipulation"
+                            >
+                              <XCircle size={14} className="text-red-500" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <WalletTooltip 
+                              content={wallet.customQuickTradeSettings 
+                                ? "Using custom quick trade settings (click to configure)" 
+                                : `Using ${wallet.category || 'Medium'} category settings (click to configure)`
+                              } 
+                              position="top"
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingWalletQuickTrade(wallet);
+                                  setIsQuickTradeModalOpen(true);
+                                }}
+                                className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded transition-all hover:opacity-80 ${
+                                  wallet.customQuickTradeSettings
+                                    ? 'bg-blue-500/30 text-blue-300 border border-blue-500/50'
+                                    : wallet.category === 'Soft' 
+                                      ? 'bg-green-500/20 text-green-400' 
+                                      : wallet.category === 'Medium' 
+                                        ? 'bg-yellow-500/20 text-yellow-400' 
+                                        : wallet.category === 'Hard' 
+                                          ? 'bg-red-500/20 text-red-400' 
+                                          : 'bg-yellow-500/20 text-yellow-400'
+                                }`}
+                              >
+                                {wallet.customQuickTradeSettings 
+                                  ? 'Custom' 
+                                  : (wallet.category || 'Medium')
+                                }
+                              </button>
+                            </WalletTooltip>
+                            <button
+                              onClick={() => setEditingCategory(wallet.id)}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 opacity-60 hover:opacity-100 touch-manipulation"
+                            >
+                              <Edit3 size={12} className="color-primary" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        <span className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded ${
+                          wallet.source === 'hd-derived' 
+                            ? 'bg-blue-500/20 text-blue-400' 
+                            : 'bg-purple-500/20 text-purple-400'
+                        }`}>
+                          {wallet.source === 'hd-derived' ? 'HD' : 'IM'}
+                        </span>
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        <WalletTooltip content="Click to copy address" position="top">
+                          <button
+                            onClick={() => copyToClipboard(wallet.address, showToast)}
+                            className="text-app-primary hover:color-primary transition-colors font-mono text-[10px] sm:text-xs touch-manipulation"
+                          >
+                            {formatAddress(wallet.address)}
+                          </button>
+                        </WalletTooltip>
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        <span className={`${solBalance > 0 ? 'color-primary' : 'text-app-secondary-80'} font-bold text-xs sm:text-sm`}>
+                          {solBalance.toFixed(4)}
+                        </span>
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        <WalletTooltip content="Click to copy private key" position="top">
+                          <button
+                            onClick={() => copyToClipboard(wallet.privateKey, showToast)}
+                            className="text-app-secondary-80 hover:color-primary transition-colors font-mono text-[10px] sm:text-xs touch-manipulation"
+                          >
+                            {wallet.privateKey.substring(0, 12)}...
+                          </button>
+                        </WalletTooltip>
+                      </td>
+                      <td className="p-2 sm:p-3">
+                        <div className="flex gap-1">
+                          {wallet.isArchived ? (
+                            <WalletTooltip content="Unarchive Wallet" position="top">
+                              <button
+                                onClick={() => unarchiveWallet(wallet.id)}
+                                className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
+                              >
+                                <Archive size={14} className="text-app-primary-color" />
+                              </button>
+                            </WalletTooltip>
+                          ) : (
+                            <WalletTooltip content="Archive Wallet" position="top">
+                              <button
+                                onClick={() => archiveWallet(wallet.id)}
+                                className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
+                              >
+                                <Archive size={14} className="color-primary" />
+                              </button>
+                            </WalletTooltip>
+                          )}
+
+                          <WalletTooltip content="Download Private Key" position="top">
+                            <button
+                              onClick={() => downloadPrivateKey(wallet)}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
+                            >
+                              <Download size={14} className="color-primary" />
+                            </button>
+                          </WalletTooltip>
+                          
+                          <WalletTooltip content="Delete Wallet" position="top">
+                            <button
+                              onClick={() => {
+                                const newWallets = deleteWallet(wallets, wallet.id);
+                                saveWalletsToCookies(newWallets);
+                                setWallets(newWallets);
+                                showToast('Wallet deleted', 'success');
+                              }}
+                              className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
+                            >
+                              <Trash2 size={14} className="text-red-500" />
+                            </button>
+                          </WalletTooltip>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+              {/* Empty State */}
+              {filteredAndSortedWallets.length === 0 && (
+                <div className="p-6 sm:p-8 text-center text-app-secondary-80">
+                  <Wallet size={40} className="sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
+                  <div className="font-mono text-xs sm:text-sm">
+                    {searchTerm || labelSearchTerm
+                      ? 'No wallets match your search' 
+                      : 'No wallets found'
+                    }
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Master Wallet Modals */}
-      {isCreateMasterWalletModalOpen && (
-        <CreateMasterWalletModal
-          key="create-master-wallet-modal"
-          isOpen={isCreateMasterWalletModalOpen}
-          onClose={() => setIsCreateMasterWalletModalOpen(false)}
-          onCreateMasterWallet={handleCreateMasterWallet}
-        />
-      )}
-      
-      {isImportMasterWalletModalOpen && (
-        <ImportWalletModal
-          key="import-master-wallet-modal"
-          isOpen={isImportMasterWalletModalOpen}
-          onClose={() => setIsImportMasterWalletModalOpen(false)}
-          onImportMasterWallet={handleImportMasterWallet}
-          onImportPrivateKey={async (privateKey: string) => {
-            if (!connection) return;
+        {/* Master Wallet Modals */}
+        {isCreateMasterWalletModalOpen && (
+          <CreateMasterWalletModal
+            key="create-master-wallet-modal"
+            isOpen={isCreateMasterWalletModalOpen}
+            onClose={() => setIsCreateMasterWalletModalOpen(false)}
+            onCreateMasterWallet={handleCreateMasterWallet}
+          />
+        )}
+        
+        {isImportMasterWalletModalOpen && (
+          <ImportWalletModal
+            key="import-master-wallet-modal"
+            isOpen={isImportMasterWalletModalOpen}
+            onClose={() => setIsImportMasterWalletModalOpen(false)}
+            onImportMasterWallet={handleImportMasterWallet}
+            onImportPrivateKey={handleImportPrivateKey}
+            onImportFromFile={handleImportFromFile}
+          />
+        )}
+
+        {/* Create Wallet Modal */}
+        {isCreateWalletModalOpen && (
+          <CreateWalletModal
+            key="create-wallet-modal"
+            isOpen={isCreateWalletModalOpen}
+            onClose={() => setIsCreateWalletModalOpen(false)}
+            masterWallets={masterWallets}
+            onCreateWallet={handleCreateWallet}
+          />
+        )}
+
+        {/* Regular Import Modal */}
+        {isImportModalOpen && (
+          <ImportWalletModal
+            key="import-wallet-modal"
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onImportMasterWallet={handleImportMasterWallet}
+            onImportPrivateKey={handleImportPrivateKey}
+            onImportFromFile={handleImportFromFile}
+          />
+        )}
+        
+        {exportSeedPhraseMasterWallet && (
+          <ExportSeedPhraseModal
+            key="export-seed-phrase-modal"
+            isOpen={true}
+            onClose={() => setExportSeedPhraseMasterWallet(null)}
+            mnemonic={getMasterWalletMnemonic(exportSeedPhraseMasterWallet)}
+            masterWalletName={exportSeedPhraseMasterWallet.name}
+          />
+        )}
+
+        {/* Wallet Operations Modals */}
+        {connection && (
+          <>
+            <DistributeModal
+              isOpen={activeModal === 'distribute'}
+              onClose={() => setActiveModal(null)}
+              wallets={wallets}
+              solBalances={solBalances}
+              connection={connection}
+            />
             
-            try {
-              const { wallet, error } = importWallet(privateKey);
+            <MixerModal
+              isOpen={activeModal === 'mixer'}
+              onClose={() => setActiveModal(null)}
+              wallets={wallets}
+              solBalances={solBalances}
+              connection={connection}
+            />
+            
+            <ConsolidateModal
+              isOpen={activeModal === 'consolidate'}
+              onClose={() => setActiveModal(null)}
+              wallets={wallets}
+              solBalances={solBalances}
+              connection={connection}
+            />
+            
+            <TransferModal
+              isOpen={activeModal === 'transfer'}
+              onClose={() => setActiveModal(null)}
+              wallets={wallets}
+              solBalances={solBalances}
+              connection={connection}
+            />
+            
+            <DepositModal
+              isOpen={activeModal === 'deposit'}
+              onClose={() => setActiveModal(null)}
+              wallets={wallets}
+              solBalances={solBalances}
+              setSolBalances={setSolBalances}
+              connection={connection}
+            />
+            
+            <BurnModal
+              isOpen={activeModal === 'burn'}
+              onClose={() => {
+                setActiveModal(null);
+                setBurnTokenBalances(new Map());
+              }}
+              handleRefresh={() => void refreshBalances()}
+              tokenAddress={burnTokenAddress}
+              solBalances={solBalances}
+              tokenBalances={burnTokenBalances}
+            />
+          </>
+        )}
+
+        {/* Fund Wallets Modal */}
+        {isFundModalOpen && createPortal(
+          <div
+            className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 animate-fadeIn"
+            onClick={() => setIsFundModalOpen(false)}
+          >
+            <div
+              className="bg-app-primary border border-app-primary-30 rounded-lg p-6 max-w-md w-full mx-4 animate-scaleIn"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-mono color-primary tracking-wider">Fund Wallets</h2>
+                <button
+                  onClick={() => setIsFundModalOpen(false)}
+                  className="color-primary hover-color-primary-light transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
               
-              if (error) {
-                showToast(error, 'error');
-                return;
-              }
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setIsFundModalOpen(false);
+                    setActiveModal('distribute');
+                  }}
+                  className="w-full flex items-center gap-3 p-4 rounded-md
+                           bg-app-quaternary border border-app-primary-30 hover-border-primary-60
+                           color-primary hover-color-primary-light transition-all duration-200
+                           hover:shadow-md hover:shadow-app-primary-15 active:scale-95"
+                >
+                  <Share2 size={20} />
+                  <div className="text-left">
+                    <div className="font-mono text-sm tracking-wider">Distribute SOL</div>
+                    <div className="text-xs text-app-secondary-80 mt-1">Send SOL from main wallet to multiple wallets</div>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setIsFundModalOpen(false);
+                    setActiveModal('mixer');
+                  }}
+                  className="w-full flex items-center gap-3 p-4 rounded-md
+                           bg-app-quaternary border border-app-primary-30 hover-border-primary-60
+                           color-primary hover-color-primary-light transition-all duration-200
+                           hover:shadow-md hover:shadow-app-primary-15 active:scale-95"
+                >
+                  <Share size={20} />
+                  <div className="text-left">
+                    <div className="font-mono text-sm tracking-wider">Mixer SOL</div>
+                    <div className="text-xs text-app-secondary-80 mt-1">Mix SOL between wallets for privacy</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {/* Bulk Actions - Fixed Floating on Right */}
+        {selectedWallets.size > 0 && (
+          <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-2 bg-app-primary border border-app-primary-30 rounded-lg p-3 shadow-lg">
+              <WalletTooltip content="Download Selected" position="left">
+                <button
+                  onClick={downloadSelectedWallets}
+                  className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                >
+                  <Download size={16} className="color-primary" />
+                </button>
+              </WalletTooltip>
               
-              if (wallet) {
-                const exists = wallets.some(w => w.address === wallet.address);
-                if (exists) {
-                  showToast('Wallet already exists', 'error');
-                  return;
-                }
-                
-                const newWallets = [...wallets, wallet];
-                setWallets(newWallets);
-                
-                const solBalance = await fetchSolBalance(connection, wallet.address);
-                const newSolBalances = new Map(solBalances);
-                newSolBalances.set(wallet.address, solBalance);
-                setSolBalances(newSolBalances);
-                
-                if (tokenAddress) {
-                  const tokenBalance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
-                  const newTokenBalances = new Map(tokenBalances);
-                  newTokenBalances.set(wallet.address, tokenBalance);
-                  setTokenBalances(newTokenBalances);
-                } else {
-                  const newTokenBalances = new Map(tokenBalances);
-                  newTokenBalances.set(wallet.address, 0);
-                  setTokenBalances(newTokenBalances);
-                }
-                
-                showToast('Wallet imported successfully', 'success');
-              } else {
-                showToast('Failed to import wallet', 'error');
-              }
-            } catch (error) {
-              console.error('Error importing wallet:', error);
-              showToast('Failed to import wallet', 'error');
-            }
-          }}
-        />
-      )}
-      
-      {exportSeedPhraseMasterWallet && (
-        <ExportSeedPhraseModal
-          key="export-seed-phrase-modal"
-          isOpen={true}
-          onClose={() => setExportSeedPhraseMasterWallet(null)}
-          mnemonic={getMasterWalletMnemonic(exportSeedPhraseMasterWallet)}
-          masterWalletName={exportSeedPhraseMasterWallet.name}
-        />
-      )}
+              {!showArchived && (
+                <WalletTooltip content="Archive Selected" position="left">
+                  <button
+                    onClick={archiveSelectedWallets}
+                    className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  >
+                    <Archive size={16} className="color-primary" />
+                  </button>
+                </WalletTooltip>
+              )}
+              
+              {showArchived && (
+                <WalletTooltip content="Unarchive Selected" position="left">
+                  <button
+                    onClick={unarchiveSelectedWallets}
+                    className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  >
+                    <Archive size={16} className="text-app-primary-color" />
+                  </button>
+                </WalletTooltip>
+              )}
+              
+              <WalletTooltip content="Delete Selected" position="left">
+                <button
+                  onClick={deleteSelectedWallets}
+                  className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-red-500 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+                >
+                  <Trash2 size={16} className="text-red-500" />
+                </button>
+              </WalletTooltip>
+            </div>
+            
+            <span className="px-3 py-2 bg-app-primary border border-app-primary-30 rounded-lg text-xs sm:text-sm font-mono color-primary whitespace-nowrap shadow-lg">
+              {selectedWallets.size} selected
+            </span>
+          </div>
+        )}
+
+        {/* Quick Trade Modals */}
+        {editingWalletQuickTrade ? (
+          <WalletQuickTradeModal
+            isOpen={isQuickTradeModalOpen}
+            onClose={() => {
+              setIsQuickTradeModalOpen(false);
+              setEditingWalletQuickTrade(null);
+            }}
+            wallet={editingWalletQuickTrade}
+            categorySettings={categorySettings}
+            onSaveCustomSettings={handleSaveWalletCustomSettings}
+          />
+        ) : (
+          <QuickTradeModal
+            isOpen={isQuickTradeModalOpen}
+            onClose={() => setIsQuickTradeModalOpen(false)}
+            categorySettings={categorySettings}
+            setCategorySettings={handleSaveCategorySettings}
+          />
+        )}
+      </div>
     </div>
   );
 };

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { BarChart } from 'lucide-react';
-import { type WalletType, getWalletDisplayName } from './Utils';
+import { type WalletType } from './Utils';
 import { brand } from './config/brandConfig';
+import { useIframeState, type ViewType } from './contexts/IframeStateContext';
 
 interface FrameProps {
   isLoadingChart: boolean;
@@ -237,7 +238,9 @@ export const Frame: React.FC<FrameProps> = ({
   const [iframeKey] = useState(Date.now());
   const [isIframeReady, setIsIframeReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const messageQueue = useRef<IframeMessage[]>([]);
+  const { getViewState, setViewState } = useIframeState();
+  const previousViewRef = useRef<{ view: ViewType; tokenMint?: string } | null>(null);
+  const lastNavigationSentRef = useRef<{ view: string; tokenMint?: string } | null>(null);
   
   // State for iframe data
   const [tradingStats, setTradingStats] = useState<{
@@ -292,196 +295,95 @@ export const Frame: React.FC<FrameProps> = ({
       tokenPrice,
       marketCap
     };
-  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, calculateMarketCap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice]);
 
   // Notify parent component of data updates (excluding currentWallets to prevent balance updates on selection)
   useEffect(() => {
     if (onDataUpdate) {
       onDataUpdate(iframeDataObject);
     }
-  }, [iframeDataObject, onDataUpdate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iframeDataObject]);
 
-  // Send message to iframe
+  // Helper to send messages to iframe directly
   const sendMessageToIframe = useCallback((message: IframeMessage): void => {
-    if (!isIframeReady || !iframeRef.current) {
-      messageQueue.current.push(message);
-      return;
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(message, '*');
     }
-
-    iframeRef.current.contentWindow?.postMessage(message, '*');
-  }, [isIframeReady]);
+  }, []);
 
   
-  // Setup iframe message listener
+  // Determine current view and token mint - using stable primitives
+  const currentViewType: ViewType = useMemo(() => {
+    const pathname = location.pathname;
+    if (pathname === '/holdings') {
+      return 'holdings';
+    } else if (pathname.startsWith('/token/') || tokenAddress) {
+      return 'token';
+    }
+    return 'monitor';
+  }, [location.pathname, tokenAddress]);
+
+  const currentTokenMint = useMemo(() => {
+    if (tokenAddressParam) return tokenAddressParam;
+    if (tokenAddress) return tokenAddress;
+    return undefined;
+  }, [tokenAddressParam, tokenAddress]);
+
+  // Restore cached state when view changes (using primitive dependencies)
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<IframeResponse>): void => {
-      switch (event.data.type) {
-        case 'IFRAME_READY': {
-          setIsIframeReady(true);
-          
-          // Navigate based on current route
-          const pathname = location.pathname;
-          
-          if (pathname === '/holdings') {
-            // Navigate to holdings view with wallet addresses
-            iframeRef.current?.contentWindow?.postMessage({
-              type: 'NAVIGATE',
-              view: 'holdings',
-              wallets: wallets.map(w => w.address)
-            }, '*');
-          } else if (pathname.startsWith('/token/') && tokenAddressParam) {
-            // Navigate to token view with wallet addresses
-            iframeRef.current?.contentWindow?.postMessage({
-              type: 'NAVIGATE',
-              view: 'token',
-              tokenMint: tokenAddressParam,
-              wallets: wallets.map(w => w.address)
-            }, '*');
-          } else if (pathname === '/monitor' || tokenAddress) {
-            // Navigate to monitor or token view
-            if (tokenAddress) {
-              iframeRef.current?.contentWindow?.postMessage({
-                type: 'NAVIGATE',
-                view: 'token',
-                tokenMint: tokenAddress,
-                wallets: wallets.map(w => w.address)
-              }, '*');
-            } else {
-              iframeRef.current?.contentWindow?.postMessage({
-                type: 'NAVIGATE',
-                view: 'monitor'
-              }, '*');
-            }
-          }
-          
-          // Enable non-whitelisted trades for regular chart view
-          sendMessageToIframe({
-            type: 'TOGGLE_NON_WHITELISTED_TRADES',
-            enabled: true
-          });
-          
-          // Process queued messages
-          messageQueue.current.forEach(message => {
-            sendMessageToIframe(message);
-          });
-          messageQueue.current = [];
-          
-          break;
-        }
-        
-        case 'WALLETS_ADDED':
-          break;
-        
-        case 'WALLETS_CLEARED':
-          break;
-        
-        case 'CURRENT_WALLETS':
-          setCurrentWallets(event.data.wallets);
-          break;
-        
-        case 'WHITELIST_TRADING_STATS': {
-          const response = event.data;
-          setTradingStats(response.data);
-          break;
-        }
-        
-        case 'SOL_PRICE_UPDATE': {
-          const response = event.data;
-          setSolPrice(response.data.solPrice);
-          break;
-        }
-        
-        case 'WHITELIST_TRADE': {
-          const response = event.data;
-          setRecentTrades(prev => {
-            const newTrades = [response.data, ...prev].slice(0, 10); // Keep only last 10 trades
-            return newTrades;
-          });
-          break;
-        }
-        
-        case 'TOKEN_PRICE_UPDATE': {
-          const response = event.data;
-          setTokenPrice(response.data);
-          break;
-        }
-        
-        case 'TOKEN_SELECTED': {
-          const response = event.data;
-          if (onTokenSelect) {
-            onTokenSelect(response.tokenAddress);
-          }
-          break;
-        }
-        
-        case 'NON_WHITELIST_TRADE': {
-           const response = event.data;
-           onNonWhitelistedTrade?.(response.data);
-           break;
-         }
-        
-        case 'HOLDINGS_OPENED': {
-          // When iframe requests holdings view, navigate parent to /holdings using React Router
-          navigate('/holdings');
-          break;
-        }
-        
-        case 'TOKEN_CLEARED': {
-          // When iframe goes back to home/monitor, navigate parent to /monitor using React Router
-          navigate('/monitor');
-          
-          // Also clear the token in the parent
-          if (onTokenSelect) {
-            onTokenSelect('');
-          }
-          break;
-        }
-        
-        case 'NAVIGATION_COMPLETE': {
-          // Confirmation from iframe that navigation is complete
-          // Can be used for loading states or analytics
-          break;
+    const cachedState = getViewState(currentViewType, currentTokenMint);
+    if (cachedState) {
+      setTradingStats(cachedState.tradingStats);
+      setSolPrice(cachedState.solPrice);
+      setCurrentWallets(cachedState.currentWallets);
+      setRecentTrades(cachedState.recentTrades);
+      setTokenPrice(cachedState.tokenPrice);
+    } else {
+      // Only clear state if switching to a different view (not just re-mounting)
+      const prevView = previousViewRef.current;
+      if (prevView && (prevView.view !== currentViewType || prevView.tokenMint !== currentTokenMint)) {
+        // Clear state when switching views (but cache will preserve it)
+        if (currentViewType === 'token' && currentTokenMint) {
+          // Only clear token-specific data when switching tokens
+          setTradingStats(null);
+          setSolPrice(null);
+          setCurrentWallets([]);
+          setRecentTrades([]);
+          setTokenPrice(null);
         }
       }
-    };
+    }
+    previousViewRef.current = { view: currentViewType, tokenMint: currentTokenMint };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentViewType, currentTokenMint]);
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, wallets, tokenAddress, location.pathname, tokenAddressParam, navigate]);
+  // Save state to cache whenever it changes (using primitive dependencies)
+  useEffect(() => {
+    const marketCap = calculateMarketCap(tokenPrice, solPrice);
+    setViewState(currentViewType, {
+      tradingStats,
+      solPrice,
+      currentWallets,
+      recentTrades,
+      tokenPrice,
+      marketCap,
+    }, currentTokenMint);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, currentViewType, currentTokenMint]);
 
-  // Memoize wallet addresses for stable dependency comparison
-  const walletAddresses = useMemo(() => {
-    return wallets.map(w => w.address);
+  // Memoize wallet data with labels for iframe communication
+  const walletData = useMemo(() => {
+    return wallets.map(w => ({
+      address: w.address,
+      label: w.label || `${w.address.substring(0, 3)}...${w.address.substring(w.address.length - 3)}`
+    }));
   }, [wallets]);
 
-  // Send wallets to iframe only when addresses change (not selection changes)
-  useEffect(() => {
-    if (wallets && wallets.length > 0) {
-      const iframeWallets: Wallet[] = wallets.map((wallet) => ({
-        address: wallet.address,
-        label: getWalletDisplayName(wallet)
-      }));
-      
-      sendMessageToIframe({
-        type: 'ADD_WALLETS',
-        wallets: iframeWallets
-      });
-    } else {
-      // Clear wallets if no addresses provided
-      sendMessageToIframe({
-        type: 'CLEAR_WALLETS'
-      });
-    }
-  }, [
-    // Only trigger when wallet addresses change, not when isActive changes
-    walletAddresses, 
-    wallets.length, 
-    isIframeReady,
-    sendMessageToIframe,
-    wallets
-  ]);
-  
-  // Navigate to token view when route changes (SPA navigation without reload)
+  // Consolidated navigation effect - handles all route changes
+  // Note: walletData is NOT in dependencies to avoid infinite loops
+  // We capture the current wallets value when the route changes
   useEffect(() => {
     if (!isIframeReady || !iframeRef.current?.contentWindow) {
       return;
@@ -489,37 +391,192 @@ export const Frame: React.FC<FrameProps> = ({
 
     const pathname = location.pathname;
     
-    // Handle different routes
+    // Determine which view and token to use
+    // Priority: route params > monitor/holdings routes
+    // Note: We rely ONLY on route params to avoid race conditions with state updates
+    let targetView: 'holdings' | 'token' | 'monitor';
+    let targetTokenMint: string | undefined;
+    
     if (pathname === '/holdings') {
-      // Navigate to holdings view
-      iframeRef.current.contentWindow.postMessage({
-        type: 'NAVIGATE',
-        view: 'holdings',
-        wallets: wallets.map(w => w.address)
-      }, '*');
+      targetView = 'holdings';
+      targetTokenMint = undefined;
     } else if (pathname.startsWith('/token/') && tokenAddressParam) {
-      // Navigate to token view
-      iframeRef.current.contentWindow.postMessage({
-        type: 'NAVIGATE',
-        view: 'token',
-        tokenMint: tokenAddressParam,
-        wallets: wallets.map(w => w.address)
-      }, '*');
-      
-      // Reset all live data when token changes
-      setTradingStats(null);
-      setSolPrice(null);
-      setCurrentWallets([]);
-      setRecentTrades([]);
-      setTokenPrice(null);
-    } else if (pathname === '/monitor') {
-      // Navigate to monitor view
-      iframeRef.current.contentWindow.postMessage({
-        type: 'NAVIGATE',
-        view: 'monitor'
-      }, '*');
+      // Route-based token view - use route param directly
+      targetView = 'token';
+      targetTokenMint = tokenAddressParam;
+    } else if (pathname === '/monitor' || pathname === '/') {
+      targetView = 'monitor';
+      targetTokenMint = undefined;
+    } else {
+      // Default to monitor for unknown routes
+      targetView = 'monitor';
+      targetTokenMint = undefined;
     }
-  }, [location.pathname, tokenAddressParam, isIframeReady, wallets]);
+    
+    // Check if we're sending the same navigation message as last time
+    const lastSent = lastNavigationSentRef.current;
+    if (lastSent && 
+        lastSent.view === targetView && 
+        lastSent.tokenMint === targetTokenMint) {
+      return;
+    }
+    
+    // Set the ref IMMEDIATELY to prevent duplicate sends from concurrent effect runs
+    lastNavigationSentRef.current = { view: targetView, tokenMint: targetTokenMint };
+    
+    // Add a small delay to ensure iframe components are ready
+    // This prevents race conditions and duplicate initializations
+    const timeoutId = setTimeout(() => {
+      if (!iframeRef.current?.contentWindow) return;
+      
+      // Send navigation message
+      if (targetView === 'holdings') {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'NAVIGATE',
+          view: 'holdings',
+          wallets: walletData
+        }, '*');
+      } else if (targetView === 'token' && targetTokenMint) {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'NAVIGATE',
+          view: 'token',
+          tokenMint: targetTokenMint,
+          wallets: walletData
+        }, '*');
+      } else {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'NAVIGATE',
+          view: 'monitor'
+        }, '*');
+      }
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, tokenAddressParam, isIframeReady]);
+
+  // Setup iframe message listener
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent<IframeMessage | IframeResponse>): void => {
+      switch (event.data.type) {
+        case 'IFRAME_READY': {
+          setIsIframeReady(true);
+          // Navigation will be triggered by the navigation effect when isIframeReady becomes true
+          break;
+        }
+        
+        case 'CURRENT_WALLETS':
+          setCurrentWallets(event.data.wallets);
+          break;
+        
+        case 'WHITELIST_TRADING_STATS': {
+          setTradingStats(event.data.data);
+          break;
+        }
+        
+        case 'SOL_PRICE_UPDATE': {
+          setSolPrice(event.data.data.solPrice);
+          break;
+        }
+        
+        case 'WHITELIST_TRADE': {
+          const tradeData = event.data.data;
+          setRecentTrades((prev) => {
+            const newTrades: Array<{
+              type: 'buy' | 'sell';
+              address: string;
+              tokensAmount: number;
+              avgPrice: number;
+              solAmount: number;
+              timestamp: number;
+              signature: string;
+            }> = [tradeData, ...prev].slice(0, 10);
+            return newTrades;
+          });
+          break;
+        }
+        
+        case 'TOKEN_PRICE_UPDATE': {
+          setTokenPrice(event.data.data);
+          break;
+        }
+        
+        case 'TOKEN_SELECTED': {
+          if (onTokenSelect) {
+            // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
+            // This fixes the issue where selecting a token from iframe doesn't update iframe view
+            lastNavigationSentRef.current = null;
+            onTokenSelect(event.data.tokenAddress);
+          }
+          break;
+        }
+        
+        case 'NON_WHITELIST_TRADE': {
+          onNonWhitelistedTrade?.(event.data.data);
+          break;
+        }
+        
+        case 'HOLDINGS_OPENED': {
+          // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
+          lastNavigationSentRef.current = null;
+          navigate('/holdings');
+          break;
+        }
+        
+        case 'TOKEN_CLEARED': {
+          // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
+          lastNavigationSentRef.current = null;
+          navigate('/monitor');
+          if (onTokenSelect) {
+            onTokenSelect('');
+          }
+          break;
+        }
+        
+        case 'GET_WALLETS': {
+          // Iframe is requesting wallet data - send it back
+          if (iframeRef.current?.contentWindow) {
+            const currentPath = location.pathname;
+            
+            // Send wallet data in the format the iframe expects
+            if (currentPath === '/holdings') {
+              // Holdings needs wallet addresses
+              iframeRef.current.contentWindow.postMessage({
+                type: 'HOLDINGS',
+                payload: { wallets: walletData.map(w => w.address) }
+              }, '*');
+            } else if (currentPath.startsWith('/token/')) {
+              // Token view needs wallet objects for tracking
+              iframeRef.current.contentWindow.postMessage({
+                type: 'ADD_WALLETS',
+                wallets: walletData
+              }, '*');
+            }
+          }
+          break;
+        }
+        
+        case 'WALLETS_ADDED':
+        case 'WALLETS_CLEARED':
+        case 'NAVIGATION_COMPLETE':
+          // These are acknowledgment messages, no action needed
+          break;
+        
+        case 'ADD_WALLETS':
+        case 'CLEAR_WALLETS':
+        case 'TOGGLE_NON_WHITELISTED_TRADES':
+          // These are messages from iframe that may need handling in the future
+          // For now, no action needed
+          break;
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname]);
+
+  // Note: Wallet syncing is now handled in the navigation message
+  // No separate wallet sync effect needed since NAVIGATE includes wallets
   
   // Handle iframe load completion
   const handleFrameLoad = (): void => {
@@ -584,8 +641,7 @@ export const Frame: React.FC<FrameProps> = ({
     
     return (
       <div 
-        className="relative flex-1 overflow-hidden iframe-container"
-        style={{ border: tokenAddress ? 'none' : undefined }}
+        className={`relative flex-1 overflow-hidden iframe-container ${tokenAddress ? 'border-0' : ''}`}
       >
         {renderLoader(frameLoading || isLoadingChart)}
         
@@ -598,7 +654,7 @@ export const Frame: React.FC<FrameProps> = ({
             style={{ 
               WebkitOverflowScrolling: 'touch',
               minHeight: '100%',
-              border: tokenAddress ? 'none' : undefined
+              border: 'none'
             }}
             loading="eager"
             onLoad={handleFrameLoad}
