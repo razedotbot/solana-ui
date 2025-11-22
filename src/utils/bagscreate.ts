@@ -1,6 +1,7 @@
-import { Keypair, VersionedTransaction, PublicKey, SystemProgram, TransactionMessage, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Keypair, VersionedTransaction, PublicKey, SystemProgram, TransactionMessage, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { loadConfigFromCookies } from '../Utils';
+import { createConnectionFromConfig } from './rpcManager';
 
 // Constants for rate limiting
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -184,8 +185,7 @@ export const checkDeveloperConfig = async (
  */
 export const signAndSendConfigTransaction = async (
   configTransaction: string,
-  ownerWallet: WalletForBagsCreate,
-  rpcEndpoint?: string
+  ownerWallet: WalletForBagsCreate
 ): Promise<{ success: boolean; signature?: string; error?: string }> => {
   try {
     console.info('Signing and sending config transaction...');
@@ -205,8 +205,7 @@ export const signAndSendConfigTransaction = async (
     
     const savedConfig = loadConfigFromCookies();
     // Create fee transaction with SOL transfer
-    const defaultRpcEndpoint = savedConfig?.rpcEndpoint || "https://api.mainnet-beta.solana.com";
-    const connection = new Connection(rpcEndpoint || defaultRpcEndpoint);
+    const connection = await createConnectionFromConfig(savedConfig?.rpcEndpoints);
     const { blockhash } = await connection.getLatestBlockhash();
     
     // Define fee recipients

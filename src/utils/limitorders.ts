@@ -4,7 +4,7 @@ import bs58 from 'bs58';
 
 // Type definition for config to avoid circular dependency
 interface AppConfig {
-  rpcEndpoint?: string;
+  rpcEndpoints?: string;
   transactionFee?: string;
   slippageBps?: string;
 }
@@ -25,6 +25,19 @@ const getDefaultConfig = (): AppConfig | null => {
   } catch (error) {
     console.error('Error loading config:', error);
     return null;
+  }
+};
+
+// Helper function to get first active RPC endpoint URL from rpcEndpoints
+const getFirstActiveRpcUrl = (rpcEndpoints?: string): string | undefined => {
+  if (!rpcEndpoints) return undefined;
+  try {
+    const endpoints = JSON.parse(rpcEndpoints) as Array<{ url: string; isActive: boolean }>;
+    const activeEndpoint = endpoints.find(e => e.isActive);
+    return activeEndpoint?.url;
+  } catch (error) {
+    console.error('Error parsing rpcEndpoints:', error);
+    return undefined;
   }
 };
 export interface LimitOrderConfig {
@@ -167,7 +180,7 @@ export const createMultipleLimitOrders = async (
 
     const requestConfig: CreateMultipleLimitOrdersRequest = {
       orders,
-      rpcUrl: options?.rpcUrl || appConfig?.rpcEndpoint,
+      rpcUrl: options?.rpcUrl || getFirstActiveRpcUrl(appConfig?.rpcEndpoints),
       includeTip: options?.includeTip ?? true,
       jitoTipLamports: options?.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000),
       affiliateAddress: options?.affiliateAddress,
@@ -258,7 +271,7 @@ export const cancelOrder = async (
     const requestConfig: CancelOrderRequest = {
       ...config,
       computeUnitPrice: config.computeUnitPrice || 'auto',
-      rpcUrl: config.rpcUrl || appConfig?.rpcEndpoint,
+      rpcUrl: config.rpcUrl || getFirstActiveRpcUrl(appConfig?.rpcEndpoints),
       includeTip: config.includeTip ?? true,
       jitoTipLamports: config.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000)
     };

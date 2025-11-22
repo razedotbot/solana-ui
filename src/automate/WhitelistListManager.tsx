@@ -179,7 +179,7 @@ const WhitelistListManager: React.FC<WhitelistListManagerProps> = ({ onSelectLis
           No saved lists. Create one by saving your current whitelist.
         </div>
       ) : (
-        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+        <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
           {savedLists.map(list => (
             <div key={list.id} className="flex items-center justify-between bg-app-primary-20 p-2 rounded border border-app-primary-40">
               {isEditingList === list.id ? (

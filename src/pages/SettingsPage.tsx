@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Globe, Zap, Save, Wifi } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { useAppContext } from '../contexts/useAppContext';
 import { useToast } from '../components/useToast';
 import { saveConfigToCookies } from '../Utils';
 import { UnifiedHeader } from '../components/Header';
 import type { ServerInfo } from '../types/api';
+import { RPCEndpointManager } from '../components/RPCEndpointManager';
+import { createDefaultEndpoints, type RPCEndpoint } from '../utils/rpcManager';
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -96,11 +97,6 @@ export const SettingsPage: React.FC = () => {
     return 'bg-ping-poor-10';
   };
 
-  const buttonVariants = {
-    rest: { scale: 1 },
-    hover: { scale: 1.05 },
-    tap: { scale: 0.95 }
-  };
 
   return (
     <div className="min-h-screen bg-app-primary text-app-tertiary flex">
@@ -163,18 +159,16 @@ export const SettingsPage: React.FC = () => {
             </h3>
             
             <div className="space-y-3 sm:space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm text-app-secondary font-mono mb-2 uppercase tracking-wider">
-                  RPC Endpoint
-                </label>
-                <input
-                  type="text"
-                  value={config.rpcEndpoint}
-                  onChange={(e) => handleConfigChange('rpcEndpoint', e.target.value)}
-                  className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
-                  placeholder="Enter RPC endpoint URL"
-                />
-              </div>
+              <RPCEndpointManager
+                endpoints={
+                  config.rpcEndpoints
+                    ? JSON.parse(config.rpcEndpoints) as RPCEndpoint[]
+                    : createDefaultEndpoints()
+                }
+                onChange={(endpoints) => {
+                  handleConfigChange('rpcEndpoints', JSON.stringify(endpoints));
+                }}
+              />
               
               <div>
                 <label className="block text-xs sm:text-sm text-app-secondary font-mono mb-2 uppercase tracking-wider">
@@ -440,29 +434,21 @@ export const SettingsPage: React.FC = () => {
 
         {/* Footer */}
         <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-4 border-t border-app-primary-20">
-          <motion.button
-            variants={buttonVariants}
-            initial="rest"
-            whileHover="hover"
-            whileTap="tap"
+          <button
             onClick={() => navigate(-1)}
-            className="px-6 py-3 border border-app-primary-30 rounded-lg font-mono text-sm transition-all duration-200 color-primary hover-color-primary-light hover:bg-app-quaternary order-2 sm:order-1"
+            className="px-6 py-3 border border-app-primary-30 rounded-lg font-mono text-sm transition-all duration-200 color-primary hover-color-primary-light hover:bg-app-quaternary order-2 sm:order-1 hover:scale-105 active:scale-95"
           >
             CANCEL
-          </motion.button>
-          <motion.button
-            variants={buttonVariants}
-            initial="rest"
-            whileHover="hover"
-            whileTap="tap"
+          </button>
+          <button
             onClick={handleSaveAndClose}
             className="px-6 py-3 bg-gradient-to-r from-app-primary-color to-app-primary-light
                      text-app-quaternary hover:from-app-primary-light hover:to-app-primary-color 
-                     transition-all duration-200 font-mono tracking-wider rounded-lg shadow-lg flex items-center justify-center gap-2 text-sm order-1 sm:order-2"
+                     transition-all duration-200 font-mono tracking-wider rounded-lg shadow-lg flex items-center justify-center gap-2 text-sm order-1 sm:order-2 hover:scale-105 active:scale-95"
           >
             <Save size={14} />
             SAVE SETTINGS
-          </motion.button>
+          </button>
         </div>
         </div>
       </div>

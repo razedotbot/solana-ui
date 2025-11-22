@@ -238,37 +238,8 @@ All theme variables are automatically applied to CSS custom properties (CSS vari
 }
 ```
 
-### TypeScript Types
-
-All theme properties are fully typed. See `src/types/theme.ts` for complete TypeScript definitions.
-
-### Programmatic Access
-
-Access the theme store programmatically:
-
-```typescript
-import { useThemeStore } from './stores/themeStore';
-
-// Get current theme
-const currentTheme = useThemeStore.getState().currentTheme;
-
-// Update theme
-useThemeStore.getState().updateTheme({
-  colors: {
-    primary: {
-      primary: '#ff0000'
-    }
-  }
-});
-```
-
 ## File Structure
 
-- **Types**: `src/types/theme.ts` - TypeScript interfaces
-- **Config**: `src/config/levaConfig.ts` - Leva control definitions
-- **Store**: `src/stores/themeStore.ts` - Zustand state management
-- **Component**: `src/components/ThemeCustomizer.tsx` - UI component
-- **CSS Manager**: `src/utils/cssVariableManager.ts` - CSS variable application
 - **Styles**: `src/styles/green.css` - Default theme values
 
 ## Complete Variable Reference

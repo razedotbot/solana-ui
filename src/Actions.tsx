@@ -10,8 +10,9 @@ import { brand } from './config/brandConfig';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import type { WalletType } from "./Utils";
 import { useToast } from "./components/useToast";
-import { countActiveWallets } from './utils/wallets';
+import { countActiveWallets, getScriptName } from './utils/wallets';
 import TradingCard from './components/TradingForm';
+import FloatingTradingCard from './components/FloatingTradingCard';
 import type { IframeData } from './types/api';
 import { getLatestTrades, type TradeHistoryEntry } from './utils/trading';
 
@@ -409,7 +410,37 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   // Auto-buy settings
   const [autoBuyAmount, setAutoBuyAmount] = useState('0.01'); // Default SOL amount for auto-buy
   const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true); // Auto redirect to token after buy
-
+  
+  // Floating card state
+  const [isFloatingCardOpen, setIsFloatingCardOpen] = useState(false);
+  // Calculate center position on mount - will be updated when card opens
+  const [floatingCardPosition, setFloatingCardPosition] = useState(() => {
+    // Start at center of viewport
+    const cardWidth = 320; // w-80 = 20rem = 320px
+    const cardHeight = 400; // approximate height
+    return {
+      x: Math.max(0, (window.innerWidth - cardWidth) / 2),
+      y: Math.max(0, (window.innerHeight - cardHeight) / 2)
+    };
+  });
+  const [isFloatingCardDragging, setIsFloatingCardDragging] = useState(false);
+  
+  // Handler to open floating card
+  const handleOpenFloating = useCallback(() => {
+    // Recalculate center position when opening
+    const cardWidth = 320;
+    const cardHeight = 400;
+    setFloatingCardPosition({
+      x: Math.max(0, (window.innerWidth - cardWidth) / 2),
+      y: Math.max(0, (window.innerHeight - cardHeight) / 2)
+    });
+    setIsFloatingCardOpen(true);
+  }, []);
+  
+  // Handler to close floating card
+  const handleCloseFloating = useCallback(() => {
+    setIsFloatingCardOpen(false);
+  }, []);
 
   // Wrapper function to match TradingForm's expected signature
   const getScriptNameWrapper = useCallback((script: string): string => {
@@ -460,6 +491,18 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       setIsLoading(false);
     }
   }, [tokenAddress, selectedDex, solBalances, showToast, setIsLoading]);
+
+  // Wrapper for FloatingTradingCard's handleTradeSubmit signature
+  const handleFloatingTradeSubmit = useCallback((
+    wallets: WalletType[], 
+    isBuy: boolean, 
+    dex?: string, 
+    buyAmount?: string, 
+    sellAmount?: string
+  ): void => {
+    // Fire and forget - FloatingTradingCard doesn't await the result
+    void handleTradeSubmit(wallets, isBuy, dex, buyAmount, sellAmount);
+  }, [handleTradeSubmit]);
 
   // Track last processed message to prevent duplicates
   const lastProcessedMessageRef = useRef<{tokenMint: string, timestamp: number} | null>(null);
@@ -614,6 +657,8 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             currentMarketCap={currentMarketCap}
             tokenBalances={tokenBalances}
             solPrice={iframeData?.solPrice ?? null}
+            onOpenFloating={handleOpenFloating}
+            isFloatingCardOpen={isFloatingCardOpen}
           />
         ) : (
           <div className="relative overflow-hidden rounded-xl shadow-xl bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm p-6 border border-app-primary-20">
@@ -736,38 +781,40 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         )}
         
         {/* Live Data Section */}
-        <div className="space-y-4">
+        {tokenAddress && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Activity size={16} className="color-primary" />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
+                    <Activity size={16} className="color-primary" />
+                  </div>
+                  <span className="font-mono text-sm tracking-wider text-app-secondary uppercase">Live Data</span>
                 </div>
-                <span className="font-mono text-sm tracking-wider text-app-secondary uppercase">Live Data</span>
+                
+                {/* Share PNL Button moved next to Live Data */}
+                <button
+                  onClick={() => {
+                    if (!tokenAddress) {
+                      showToast("Please select a token first", "error");
+                      return;
+                    }
+                    setCalculatePNLModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg
+                            bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-color
+                            shadow-md shadow-app-primary-40 hover-shadow-app-primary-60
+                            transition-all duration-300 relative overflow-hidden"
+                >
+                  <ChartSpline size={16} className="text-black relative z-10" />
+                  <span className="text-sm font-mono tracking-wider text-black font-medium relative z-10">Share PNL</span>
+                </button>
               </div>
-              
-              {/* Share PNL Button moved next to Live Data */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setCalculatePNLModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg
-                          bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-color
-                          shadow-md shadow-app-primary-40 hover-shadow-app-primary-60
-                          transition-all duration-300 relative overflow-hidden"
-              >
-                <ChartSpline size={16} className="text-black relative z-10" />
-                <span className="text-sm font-mono tracking-wider text-black font-medium relative z-10">Share PNL</span>
-              </button>
+              <DataBox iframeData={iframeData} tokenAddress={tokenAddress} tokenBalances={tokenBalances} />
+              <LatestTrades tokenAddress={tokenAddress} />
             </div>
-            <DataBox iframeData={iframeData} tokenAddress={tokenAddress} tokenBalances={tokenBalances} />
-            <LatestTrades tokenAddress={tokenAddress} />
           </div>
-        </div>
+        )}
       </div>
 
       <br></br>
@@ -851,6 +898,34 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Floating Trading Card */}
+      {tokenAddress && (
+        <FloatingTradingCard
+          isOpen={isFloatingCardOpen}
+          onClose={handleCloseFloating}
+          position={floatingCardPosition}
+          onPositionChange={setFloatingCardPosition}
+          isDragging={isFloatingCardDragging}
+          onDraggingChange={setIsFloatingCardDragging}
+          tokenAddress={tokenAddress}
+          wallets={wallets}
+          selectedDex={selectedDex}
+          setSelectedDex={setSelectedDex}
+          isDropdownOpen={isDropdownOpen}
+          setIsDropdownOpen={setIsDropdownOpen}
+          buyAmount={buyAmount}
+          setBuyAmount={setBuyAmount}
+          sellAmount={sellAmount}
+          setSellAmount={setSellAmount}
+          handleTradeSubmit={handleFloatingTradeSubmit}
+          isLoading={isLoading}
+          getScriptName={getScriptName}
+          countActiveWallets={countActiveWallets}
+          currentMarketCap={currentMarketCap}
+          tokenBalances={tokenBalances}
+        />
+      )}
       
     </div>
   );

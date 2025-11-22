@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import { Connection } from '@solana/web3.js';
+import type { Connection } from '@solana/web3.js';
 import { 
   loadWalletsFromCookies, 
   loadConfigFromCookies, 
@@ -10,6 +10,7 @@ import {
   type ConfigType 
 } from '../Utils';
 import { AppContext } from './AppContextInstance';
+import { RPCManager, createDefaultEndpoints, type RPCEndpoint } from '../utils/rpcManager';
 
 export interface AppContextType {
   // Wallet state
@@ -24,6 +25,7 @@ export interface AppContextType {
   // Connection state
   connection: Connection | null;
   setConnection: (connection: Connection | null) => void;
+  rpcManager: RPCManager | null;
   
   // Balance state
   solBalances: Map<string, number>;
@@ -40,7 +42,7 @@ export interface AppContextType {
 }
 
 const defaultConfig: ConfigType = {
-  rpcEndpoint: 'https://solana-rpc.publicnode.com',
+  rpcEndpoints: JSON.stringify(createDefaultEndpoints()),
   transactionFee: '0.001',
   selectedDex: 'auto',
   isDropdownOpen: false,
@@ -67,6 +69,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
   const [solBalances, setSolBalances] = useState<Map<string, number>>(new Map());
   const [tokenBalances, setTokenBalances] = useState<Map<string, number>>(new Map());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [rpcManager, setRpcManager] = useState<RPCManager | null>(null);
 
   // Load initial data from cookies
   useEffect(() => {
@@ -80,32 +83,51 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
       if (savedConfig) {
         setConfigState(savedConfig);
         
-        // Create connection from saved config
-        if (savedConfig.rpcEndpoint) {
-          try {
-            const conn = new Connection(savedConfig.rpcEndpoint, 'confirmed');
+        // Create RPC manager and connection from saved config
+        try {
+          const endpoints = savedConfig.rpcEndpoints 
+            ? JSON.parse(savedConfig.rpcEndpoints) as RPCEndpoint[]
+            : createDefaultEndpoints();
+          
+          const manager = new RPCManager(endpoints);
+          setRpcManager(manager);
+          
+          // Create initial connection
+          manager.createConnection().then(conn => {
             setConnection(conn);
-          } catch (error) {
-            console.error('Error creating connection:', error);
-          }
+          }).catch(error => {
+            console.error('Error creating initial connection:', error);
+            showToast('Failed to connect to RPC endpoints', 'error');
+          });
+        } catch (error) {
+          console.error('Error creating RPC manager:', error);
         }
       }
     } catch (error) {
       console.error('Error loading initial data:', error);
     }
-  }, []);
+  }, [showToast]);
 
-  // Update connection when RPC endpoint changes
+  // Update RPC manager and connection when endpoints change
   useEffect(() => {
-    if (config.rpcEndpoint) {
+    if (config.rpcEndpoints) {
       try {
-        const conn = new Connection(config.rpcEndpoint, 'confirmed');
-        setConnection(conn);
+        const endpoints = JSON.parse(config.rpcEndpoints) as RPCEndpoint[];
+        const manager = new RPCManager(endpoints);
+        setRpcManager(manager);
+        
+        // Create new connection with updated endpoints
+        manager.createConnection().then(conn => {
+          setConnection(conn);
+        }).catch(error => {
+          console.error('Error creating connection:', error);
+          showToast('Failed to connect to RPC endpoints', 'error');
+        });
       } catch (error) {
-        console.error('Error creating connection:', error);
+        console.error('Error updating RPC manager:', error);
       }
     }
-  }, [config.rpcEndpoint]);
+  }, [config.rpcEndpoints, showToast]);
 
   // Wallet setters with cookie persistence
   const setWallets = useCallback((newWallets: WalletType[] | ((prev: WalletType[]) => WalletType[])) => {
@@ -139,12 +161,13 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
 
   // Refresh balances
   const refreshBalances = useCallback(async (tokenAddress?: string) => {
-    if (!connection || wallets.length === 0) return;
+    if (!rpcManager || wallets.length === 0) return;
 
     setIsRefreshing(true);
     try {
+      // Pass rpcManager directly to fetchWalletBalances so it can rotate endpoints for each wallet
       await fetchWalletBalances(
-        connection,
+        rpcManager,
         wallets,
         tokenAddress || '',
         setSolBalancesWrapper,
@@ -158,7 +181,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
     } finally {
       setIsRefreshing(false);
     }
-  }, [connection, wallets, solBalances, tokenBalances, showToast, setSolBalancesWrapper]);
+  }, [rpcManager, wallets, solBalances, tokenBalances, showToast, setSolBalancesWrapper]);
 
   // Memoize context value
   const value = useMemo<AppContextType>(() => ({
@@ -169,6 +192,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
     updateConfig,
     connection,
     setConnection,
+    rpcManager,
     solBalances,
     setSolBalances: setSolBalancesWrapper,
     tokenBalances,
@@ -183,6 +207,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
     setConfig,
     updateConfig,
     connection,
+    rpcManager,
     solBalances,
     tokenBalances,
     isRefreshing,

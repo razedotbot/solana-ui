@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+
 import type { Connection } from '@solana/web3.js';
 import type { WalletType } from '../Utils';
 import { getRecentTokens, clearRecentTokens } from '../utils/recentTokens';
@@ -86,10 +86,7 @@ export const Homepage: React.FC<HomepageProps> = ({
       />
 
       {/* Main Content with Background Effects - with left margin for sidebar */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
+      <div
         className="relative flex-1 overflow-y-auto overflow-x-hidden w-full md:w-auto md:ml-48 bg-app-primary"
       >
         {/* Background effects layer */}
@@ -156,9 +153,10 @@ export const Homepage: React.FC<HomepageProps> = ({
 
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };
 
 export default Homepage;
+

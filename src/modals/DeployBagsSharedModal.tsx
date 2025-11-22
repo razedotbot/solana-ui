@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { PlusCircle, X, CheckCircle, Info, Search, ChevronRight, Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Users, Percent, Copy } from 'lucide-react';
 import { getWalletDisplayName, loadConfigFromCookies } from '../Utils';
 import type { WalletType } from '../Utils';
@@ -22,11 +21,6 @@ const STEPS_DEPLOY = ["Token & Fees Details", "Select Wallets", "Review"];
 const MAX_WALLETS = 5; // Maximum number of wallets that can be selected
 const MIN_WALLETS = 2; // Minimum number of wallets required (developer + 1 buyer)
 
-const buttonVariants = {
-  rest: { scale: 1 },
-  hover: { scale: 1.05 },
-  tap: { scale: 0.95 }
-};
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -407,7 +401,18 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       
       // Load config to get RPC endpoint
       const savedConfig = loadConfigFromCookies();
-      const rpcEndpoint = savedConfig?.rpcEndpoint;
+      let rpcUrl: string | undefined = undefined;
+      if (savedConfig?.rpcEndpoints) {
+        try {
+          const endpoints = JSON.parse(savedConfig.rpcEndpoints) as Array<{ url: string; isActive: boolean }>;
+          const activeEndpoint = endpoints.find(e => e.isActive);
+          if (activeEndpoint) {
+            rpcUrl = activeEndpoint.url;
+          }
+        } catch (error) {
+          console.error('Error parsing rpcEndpoints:', error);
+        }
+      }
       
       if (deploymentStep === 'step1') {
         // Step 1: Create token and fee share configuration
@@ -427,7 +432,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
           imageSource: tokenData.imageUrl,
           creatorFeeBps: sharedFeesConfig.creatorFeeBps,
           feeClaimerFeeBps: sharedFeesConfig.feeClaimerFeeBps,
-          rpcUrl: rpcEndpoint
+          rpcUrl: rpcUrl
         };
         
         console.info('Step 1: Creating token and fee share configuration');
@@ -513,7 +518,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                   ownerPublicKey: ownerWallet.address,
                   initialBuyAmount,
                   buyerWallets,
-                  rpcUrl: rpcEndpoint
+                  rpcUrl: rpcUrl
                 });
                 
                 // Execute step 2: get transactions from create endpoint and send them
@@ -525,7 +530,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                     feeClaimerTwitterHandle: sharedFeesConfig.feeClaimerTwitterHandle,
                     creatorFeeBps: sharedFeesConfig.creatorFeeBps,
                     feeClaimerFeeBps: sharedFeesConfig.feeClaimerFeeBps,
-                    rpcUrl: rpcEndpoint
+                    rpcUrl: rpcUrl
                   }), 
                   sharedCreateConfig, 
                   true // Skip config check since we already completed step 1
@@ -652,7 +657,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                   ownerPublicKey: ownerWallet.address,
                   initialBuyAmount,
                   buyerWallets,
-                  rpcUrl: rpcEndpoint
+                  rpcUrl: rpcUrl
                 });
                 
                 // Create shared fees config
@@ -661,7 +666,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                   feeClaimerTwitterHandle: sharedFeesConfig.feeClaimerTwitterHandle,
                   creatorFeeBps: sharedFeesConfig.creatorFeeBps,
                   feeClaimerFeeBps: sharedFeesConfig.feeClaimerFeeBps,
-                  rpcUrl: rpcEndpoint
+                  rpcUrl: rpcUrl
                 });
                 
                 // Execute the shared fees bags create with correct parameter order, skipping config check since we already have the data
@@ -774,9 +779,20 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
 
       // Load config to get RPC endpoint
       const savedConfig = loadConfigFromCookies();
-      const rpcEndpoint = savedConfig?.rpcEndpoint;
+      let rpcUrl: string | undefined = undefined;
+      if (savedConfig?.rpcEndpoints) {
+        try {
+          const endpoints = JSON.parse(savedConfig.rpcEndpoints) as Array<{ url: string; isActive: boolean }>;
+          const activeEndpoint = endpoints.find(e => e.isActive);
+          if (activeEndpoint) {
+            rpcUrl = activeEndpoint.url;
+          }
+        } catch (error) {
+          console.error('Error parsing rpcEndpoints:', error);
+        }
+      }
       
-      const result = await signAndSendSharedConfigTransaction(configTransaction, walletObj, rpcEndpoint);
+      const result = await signAndSendSharedConfigTransaction(configTransaction, walletObj);
       
       if (result.success) {
         setConfigNeeded(false);
@@ -822,7 +838,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
             ownerPublicKey: ownerWallet.address,
             initialBuyAmount,
             buyerWallets,
-            rpcUrl: rpcEndpoint
+            rpcUrl: rpcUrl
           });
           
           // Create shared fees config
@@ -831,7 +847,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
             feeClaimerTwitterHandle: sharedFeesConfig.feeClaimerTwitterHandle,
             creatorFeeBps: sharedFeesConfig.creatorFeeBps,
             feeClaimerFeeBps: sharedFeesConfig.feeClaimerFeeBps,
-            rpcUrl: rpcEndpoint
+            rpcUrl: rpcUrl
           });
           
           // Execute the shared fees bags create with correct parameter order, skipping config check since it was already sent
@@ -1320,7 +1336,7 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                         return (
                           <div
                             key={wallet?.id}
-                            className="p-3 rounded-lg border-app-primary bg-primary-10 mb-2 shadow-lg modal-glow"
+                            className="p-3 rounded-lg border-app-primary bg-primary-10 mb-2 shadow-lg"
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-4">
@@ -1710,9 +1726,6 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
       position: relative;
     }
     
-    .modal-glow {
-      animation: modal-pulse 4s infinite;
-    }
     
     .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
@@ -1797,18 +1810,14 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
   document.head.appendChild(modalStyleElement);
 
   return createPortal(
-    <AnimatePresence>
+    <div
+      className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4 animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
-        onClick={onClose}
+        className="bg-app-primary border border-app-primary-30 rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
       >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className="bg-app-primary border border-app-primary-30 rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
           {/* Header */}
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-app-primary-20">
             <h2 className="text-lg font-mono color-primary font-bold tracking-wider">DEPLOY BAGS TOKEN WITH SHARED FEES</h2>
@@ -1884,15 +1893,11 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                         </div>
                         
                         <div className="flex gap-3 pt-4">
-                          <motion.button
+                          <button
                             type="button"
-                            variants={buttonVariants}
-                            initial="rest"
-                            whileHover="hover"
-                            whileTap="tap"
                             onClick={handleSendSharedConfigTransaction}
                             disabled={isSendingConfig}
-                            className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-mono text-sm ${
+                            className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-mono text-sm hover:scale-105 active:scale-95 ${
                               isSendingConfig
                                 ? 'bg-app-primary-color/50 text-app-quaternary cursor-not-allowed opacity-50'
                                 : 'bg-gradient-to-r from-app-primary-color to-app-primary-light text-app-quaternary hover:from-app-primary-light hover:to-app-primary-color disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg disabled:shadow-none'
@@ -1909,14 +1914,10 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                                 INITIALIZE SHARED FEES CONFIG
                               </>
                             )}
-                          </motion.button>
+                          </button>
                           
-                          <motion.button
+                          <button
                             type="button"
-                            variants={buttonVariants}
-                            initial="rest"
-                            whileHover="hover"
-                            whileTap="tap"
                             onClick={() => {
                               setConfigNeeded(false);
                               setConfigTransaction('');
@@ -1924,10 +1925,10 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                               setFeeShareInfo(null);
                             }}
                             disabled={isSendingConfig}
-                            className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30 color-primary hover-color-primary-light transition-colors duration-200 font-mono text-sm hover:bg-app-quaternary"
+                            className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30 color-primary hover-color-primary-light transition-colors duration-200 font-mono text-sm hover:bg-app-quaternary hover:scale-105 active:scale-95"
                           >
                             CANCEL
-                          </motion.button>
+                          </button>
                         </div>
                     </div>
                   </div>
@@ -1938,28 +1939,20 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
             </div>
 
               <div className="flex gap-3 pt-4 border-t border-app-primary-20">
-                <motion.button
+                <button
                   type="button"
-                  variants={buttonVariants}
-                  initial="rest"
-                  whileHover="hover"
-                  whileTap="tap"
                   onClick={currentStep === 0 ? onClose : handleBack}
                   disabled={isSubmitting}
-                  className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30 color-primary hover-color-primary-light transition-colors duration-200 font-mono text-sm hover:bg-app-quaternary"
+                  className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30 color-primary hover-color-primary-light transition-colors duration-200 font-mono text-sm hover:bg-app-quaternary hover:scale-105 active:scale-95"
                 >
                   {currentStep === 0 ? 'CANCEL' : 'BACK'}
-                </motion.button>
+                </button>
 
-                <motion.button
+                <button
                   type={currentStep === 2 ? 'submit' : 'button'}
-                  variants={buttonVariants}
-                  initial="rest"
-                  whileHover="hover"
-                  whileTap="tap"
                   onClick={currentStep === 2 ? undefined : handleNext}
                   disabled={currentStep === 2 ? (isSubmitting || !isConfirmed) : isSubmitting}
-                  className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center font-mono text-sm ${
+                  className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center font-mono text-sm hover:scale-105 active:scale-95 ${
                     currentStep === 2 && (isSubmitting || !isConfirmed)
                       ? 'bg-app-primary-color/50 text-app-quaternary cursor-not-allowed opacity-50'
                       : 'bg-gradient-to-r from-app-primary-color to-app-primary-light text-app-quaternary hover:from-app-primary-light hover:to-app-primary-color disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg disabled:shadow-none'
@@ -1986,13 +1979,12 @@ export const DeployBagsSharedFeesModal: React.FC<DeployBagsSharedFeesModalProps>
                       <ChevronRight size={16} className="ml-1" />
                     </span>
                   )}
-                </motion.button>
+                </button>
               </div>
             </form>
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>,
+        </div>
+      </div>,
     document.body
   );
 };

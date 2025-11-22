@@ -1,6 +1,7 @@
-import { Keypair, VersionedTransaction, PublicKey, SystemProgram, TransactionMessage, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Keypair, VersionedTransaction, PublicKey, SystemProgram, TransactionMessage, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { loadConfigFromCookies } from '../Utils';
+import { createConnectionFromConfig } from './rpcManager';
 
 // Constants for rate limiting
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -437,8 +438,7 @@ export const checkSharedFeesConfig = async (
  */
 export const signAndSendSharedConfigTransaction = async (
   configTransaction: string,
-  ownerWallet: WalletForBagsSharedCreate,
-  rpcEndpoint?: string
+  ownerWallet: WalletForBagsSharedCreate
 ): Promise<{ success: boolean; signature?: string; error?: string }> => {
   try {
     console.info('Signing and sending shared fees config transaction...');
@@ -458,8 +458,7 @@ export const signAndSendSharedConfigTransaction = async (
     
     const savedConfig = loadConfigFromCookies();
     // Create fee transaction with SOL transfer
-    const defaultRpcEndpoint = savedConfig?.rpcEndpoint || "https://api.mainnet-beta.solana.com";
-    const connection = new Connection(rpcEndpoint || defaultRpcEndpoint);
+    const connection = await createConnectionFromConfig(savedConfig?.rpcEndpoints);
     const { blockhash } = await connection.getLatestBlockhash();
     
     // Define fee recipients

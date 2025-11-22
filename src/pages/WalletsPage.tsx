@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { 
   ArrowUpDown, 
   ArrowUp, 
@@ -17,15 +16,14 @@ import {
   Key,
   Archive,
   ChevronDown,
-  Share2,
   Network,
   Send,
   HandCoins,
   Share,
-  X,
   Settings,
   Flame,
-  GripVertical
+  GripVertical,
+  RefreshCw
 } from 'lucide-react';
 import { UnifiedHeader } from '../components/Header';
 import bs58 from 'bs58';
@@ -54,11 +52,10 @@ import CreateMasterWalletModal from '../modals/CreateMasterWalletModal';
 import CreateWalletModal from '../modals/CreateWalletModal';
 import ImportWalletModal from '../modals/ImportWalletModal';
 import ExportSeedPhraseModal from '../modals/ExportSeedPhraseModal';
-import { DistributeModal } from '../modals/DistributeModal';
+import { FundModal } from '../modals/FundModal';
 import { ConsolidateModal } from '../modals/ConsolidateModal';
 import { TransferModal } from '../modals/TransferModal';
 import { DepositModal } from '../modals/DepositModal';
-import { MixerModal } from '../modals/MixerModal';
 import { QuickTradeModal, type CategoryQuickTradeSettings } from '../modals/QuickTradeModal';
 import { WalletQuickTradeModal } from '../modals/WalletQuickTradeModal';
 import { BurnModal } from '../modals/BurnModal';
@@ -78,7 +75,8 @@ export const WalletsPage: React.FC = () => {
     solBalances,
     setSolBalances,
     connection,
-    refreshBalances
+    refreshBalances,
+    isRefreshing
   } = useAppContext();
 
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -107,7 +105,6 @@ export const WalletsPage: React.FC = () => {
 
   // Modal states
   const [activeModal, setActiveModal] = useState<'distribute' | 'consolidate' | 'transfer' | 'deposit' | 'mixer' | 'burn' | null>(null);
-  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
   const [isQuickTradeModalOpen, setIsQuickTradeModalOpen] = useState(false);
   const [editingWalletQuickTrade, setEditingWalletQuickTrade] = useState<WalletType | null>(null);
   const [burnTokenAddress, setBurnTokenAddress] = useState<string>('');
@@ -941,12 +938,12 @@ export const WalletsPage: React.FC = () => {
   const archivedCount = wallets.filter(w => w.isArchived).length;
 
   return (
-    <div className="min-h-screen bg-app-primary text-app-tertiary flex">
+    <div className="h-screen bg-app-primary text-app-tertiary flex overflow-hidden">
       {/* Unified Header */}
       <UnifiedHeader />
 
       {/* Main Content - with left margin for sidebar */}
-      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full md:w-auto md:ml-48 bg-app-primary">
+      <div className="relative flex-1 overflow-hidden w-full md:w-auto md:ml-48 bg-app-primary flex flex-col">
         {/* Background effects layer */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           {/* Grid pattern background */}
@@ -991,9 +988,9 @@ export const WalletsPage: React.FC = () => {
         </div>
 
         {/* Content container */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 py-6">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Quick Stats & Master Wallets Row */}
-          <div className="mb-6 pb-4 border-b border-app-primary-20">
+          <div className="mb-6 pb-4 border-b border-app-primary-20 flex-shrink-0">
             <div className="flex flex-wrap items-start gap-3 justify-between">
               {/* Quick Stats - Left Side */}
               <div className="grid grid-cols-3 gap-2 sm:flex sm:gap-6 text-xs sm:text-sm font-mono">
@@ -1067,6 +1064,30 @@ export const WalletsPage: React.FC = () => {
                 >
                   IMPORT
                 </button>
+                <button
+                  onClick={async () => {
+                    if (!connection || isRefreshing) return;
+                    try {
+                      await refreshBalances();
+                      // Force a re-render by creating a new Map reference
+                      setSolBalances(prev => new Map(prev));
+                      showToast('Balances refreshed', 'success');
+                    } catch (error) {
+                      console.error('Error refreshing balances:', error);
+                      showToast('Failed to refresh balances', 'error');
+                    }
+                  }}
+                  disabled={!connection || isRefreshing}
+                  className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
+                    !connection || isRefreshing
+                      ? 'bg-primary-20 cursor-not-allowed text-app-secondary-80'
+                      : 'bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn'
+                  }`}
+                >
+                  <RefreshCw size={12} className={`sm:hidden ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw size={14} className={`hidden sm:block ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline ml-0.5">REFRESH</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1083,7 +1104,7 @@ export const WalletsPage: React.FC = () => {
             return (
               <div
                 key={masterWallet.id}
-                className="mb-4 pb-4 border-b border-app-primary-20"
+                className="mb-4 pb-4 border-b border-app-primary-20 flex-shrink-0"
               >
                 {/* Master Wallet Header */}
                 <div className="flex justify-between items-start mb-3">
@@ -1192,7 +1213,7 @@ export const WalletsPage: React.FC = () => {
 
 
           {/* Controls */}
-          <div className="mb-4">
+          <div className="mb-4 flex-shrink-0">
             <div className="flex flex-row flex-wrap items-center gap-0.5 sm:gap-1">
               {/* View Mode Dropdown */}
               <div className="relative" ref={viewModeDropdownRef}>
@@ -1303,7 +1324,7 @@ export const WalletsPage: React.FC = () => {
               <div className="flex items-center gap-0.5 sm:gap-1 ml-auto">
                 <WalletTooltip content="Fund Wallets" position="bottom">
                   <button
-                    onClick={() => setIsFundModalOpen(true)}
+                    onClick={() => setActiveModal('distribute')}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
                     <HandCoins size={12} className="sm:hidden" />
@@ -1804,20 +1825,13 @@ export const WalletsPage: React.FC = () => {
         {/* Wallet Operations Modals */}
         {connection && (
           <>
-            <DistributeModal
-              isOpen={activeModal === 'distribute'}
+            <FundModal
+              isOpen={activeModal === 'distribute' || activeModal === 'mixer'}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
               solBalances={solBalances}
               connection={connection}
-            />
-            
-            <MixerModal
-              isOpen={activeModal === 'mixer'}
-              onClose={() => setActiveModal(null)}
-              wallets={wallets}
-              solBalances={solBalances}
-              connection={connection}
+              initialMode={activeModal === 'mixer' ? 'mixer' : 'distribute'}
             />
             
             <ConsolidateModal
@@ -1857,66 +1871,6 @@ export const WalletsPage: React.FC = () => {
               tokenBalances={burnTokenBalances}
             />
           </>
-        )}
-
-        {/* Fund Wallets Modal */}
-        {isFundModalOpen && createPortal(
-          <div
-            className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 animate-fadeIn"
-            onClick={() => setIsFundModalOpen(false)}
-          >
-            <div
-              className="bg-app-primary border border-app-primary-30 rounded-lg p-6 max-w-md w-full mx-4 animate-scaleIn"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-mono color-primary tracking-wider">Fund Wallets</h2>
-                <button
-                  onClick={() => setIsFundModalOpen(false)}
-                  className="color-primary hover-color-primary-light transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    setIsFundModalOpen(false);
-                    setActiveModal('distribute');
-                  }}
-                  className="w-full flex items-center gap-3 p-4 rounded-md
-                           bg-app-quaternary border border-app-primary-30 hover-border-primary-60
-                           color-primary hover-color-primary-light transition-all duration-200
-                           hover:shadow-md hover:shadow-app-primary-15 active:scale-95"
-                >
-                  <Share2 size={20} />
-                  <div className="text-left">
-                    <div className="font-mono text-sm tracking-wider">Distribute SOL</div>
-                    <div className="text-xs text-app-secondary-80 mt-1">Send SOL from main wallet to multiple wallets</div>
-                  </div>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setIsFundModalOpen(false);
-                    setActiveModal('mixer');
-                  }}
-                  className="w-full flex items-center gap-3 p-4 rounded-md
-                           bg-app-quaternary border border-app-primary-30 hover-border-primary-60
-                           color-primary hover-color-primary-light transition-all duration-200
-                           hover:shadow-md hover:shadow-app-primary-15 active:scale-95"
-                >
-                  <Share size={20} />
-                  <div className="text-left">
-                    <div className="font-mono text-sm tracking-wider">Mixer SOL</div>
-                    <div className="text-xs text-app-secondary-80 mt-1">Mix SOL between wallets for privacy</div>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
         )}
 
         {/* Bulk Actions - Fixed Floating on Right */}

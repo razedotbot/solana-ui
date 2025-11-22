@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, RefreshCw, Check, AlertTriangle } from 'lucide-react';
 import { generateMnemonic } from '../utils/hdWallet';
 
@@ -67,19 +66,15 @@ const CreateMasterWalletModal: React.FC<CreateMasterWalletModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <AnimatePresence>
+    <div
+      className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4 animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
-        onClick={onClose}
+        className="bg-app-primary border border-app-primary-30 rounded-xl p-6 
+                   w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
       >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className="bg-app-primary border border-app-primary-30 rounded-xl p-6 
-                     w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
           {/* Header */}
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-app-primary-20">
             <h2 className="text-xl font-mono color-primary tracking-wider">
@@ -280,9 +275,8 @@ const CreateMasterWalletModal: React.FC<CreateMasterWalletModalProps> = ({
               </>
             )}
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>,
+        </div>
+      </div>,
     document.body
   );
 };

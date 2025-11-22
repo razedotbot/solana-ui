@@ -1,6 +1,5 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { BarChart, FolderOpen, Rocket, Zap, Settings, TrendingUp } from 'lucide-react';
 
 interface QuickActionsProps {
@@ -52,11 +51,9 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
     }
   };
   return (
-    <motion.div
-      initial={{ y: 20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ delay: 0.3, duration: 0.5 }}
-      className="space-y-3 md:space-y-4"
+    <div
+      className="space-y-3 md:space-y-4 animate-slide-up"
+      style={{ animationDelay: '0.3s' }}
     >
       <h2 className="text-lg md:text-xl lg:text-2xl font-mono tracking-wider uppercase color-primary font-bold text-center mb-4">
         Quick Actions
@@ -65,11 +62,9 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
       {/* Action cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Monitor */}
-        <motion.div
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
+        <div
           onClick={handleMonitorClick}
-          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden"
+          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
@@ -83,14 +78,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
             </p>
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </motion.div>
+        </div>
 
         {/* Holdings */}
-        <motion.div
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
+        <div
           onClick={handleHoldingsClick}
-          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden"
+          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
@@ -104,14 +97,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
             </p>
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </motion.div>
+        </div>
 
         {/* Deploy Token */}
-        <motion.div
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
+        <div
           onClick={handleDeployClick}
-          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
@@ -125,14 +116,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
             </p>
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </motion.div>
+        </div>
 
         {/* Automation */}
-        <motion.div
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
+        <div
           onClick={handleAutomationClick}
-          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden"
+          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
@@ -146,14 +135,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
             </p>
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </motion.div>
+        </div>
 
         {/* Settings */}
-        <motion.div
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
+        <div
           onClick={handleSettingsClick}
-          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden"
+          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
@@ -167,14 +154,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
             </p>
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </motion.div>
+        </div>
 
         {/* Explore Chart */}
-        <motion.div
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
+        <div
           onClick={handleExploreChartClick}
-          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden"
+          className="group cursor-pointer bg-app-secondary-80 border border-app-primary-20 hover:border-app-primary-40 rounded-xl p-5 md:p-6 transition-all duration-300 relative overflow-hidden hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]"
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
@@ -188,9 +173,9 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
             </p>
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </motion.div>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

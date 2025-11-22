@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, Share, X, RotateCcw } from 'lucide-react';
 import type { WalletType, CustomQuickTradeSettings, WalletCategory } from '../Utils';
 import type { CategoryQuickTradeSettings } from './QuickTradeModal';
@@ -13,11 +12,6 @@ interface WalletQuickTradeModalProps {
   onSaveCustomSettings: (walletId: number, settings: CustomQuickTradeSettings | null) => void;
 }
 
-const buttonVariants = {
-  rest: { scale: 1 },
-  hover: { scale: 1.05 },
-  tap: { scale: 0.95 }
-};
 
 export const WalletQuickTradeModal: React.FC<WalletQuickTradeModalProps> = ({
   isOpen,
@@ -109,19 +103,15 @@ export const WalletQuickTradeModal: React.FC<WalletQuickTradeModalProps> = ({
   const categoryDefaults = categorySettings[category];
 
   return createPortal(
-    <AnimatePresence>
+    <div
+      className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4 animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="fixed inset-0 bg-app-overlay flex items-center justify-center z-50 p-4"
-        onClick={onClose}
+        className="bg-app-primary border border-app-primary-30 rounded-xl p-6 
+                   w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
       >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className="bg-app-primary border border-app-primary-30 rounded-xl p-6 
-                     w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
           {/* Header */}
           <div className="flex justify-between items-center mb-6 pb-4 border-b border-app-primary-20">
             <div>
@@ -185,9 +175,8 @@ export const WalletQuickTradeModal: React.FC<WalletQuickTradeModalProps> = ({
           
           <div className="space-y-6">
             {/* Buy Amount Configuration */}
-            <motion.div 
+            <div 
               className={`transition-all duration-300 ${useCustomSettings ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}
-              animate={{ opacity: useCustomSettings ? 1 : 0.4 }}
             >
               <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
@@ -324,12 +313,11 @@ export const WalletQuickTradeModal: React.FC<WalletQuickTradeModalProps> = ({
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
 
             {/* Quick Sell Configuration */}
-            <motion.div 
+            <div 
               className={`transition-all duration-300 ${useCustomSettings ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}
-              animate={{ opacity: useCustomSettings ? 1 : 0.4 }}
             >
               <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
@@ -466,39 +454,30 @@ export const WalletQuickTradeModal: React.FC<WalletQuickTradeModalProps> = ({
                 </div>
               )}
             </div>
-            </motion.div>
+            </div>
             
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4 border-t border-app-primary-20">
-              <motion.button
-                variants={buttonVariants}
-                initial="rest"
-                whileHover="hover"
-                whileTap="tap"
+              <button
                 onClick={onClose}
                 className="flex-1 py-3 px-4 rounded-lg border border-app-primary-30
                          color-primary hover-color-primary-light transition-colors duration-200
-                         font-mono text-sm hover:bg-app-quaternary"
+                         font-mono text-sm hover:bg-app-quaternary hover:scale-105 active:scale-95"
               >
                 Cancel
-              </motion.button>
-              <motion.button
-                variants={buttonVariants}
-                initial="rest"
-                whileHover="hover"
-                whileTap="tap"
+              </button>
+              <button
                 onClick={saveSettings}
                 className="flex-1 py-3 px-4 rounded-lg bg-gradient-to-r from-app-primary-color to-app-primary-light
                          text-app-quaternary hover:from-app-primary-light hover:to-app-primary-color 
-                         transition-all duration-200 font-mono text-sm shadow-lg"
+                         transition-all duration-200 font-mono text-sm shadow-lg hover:scale-105 active:scale-95"
               >
                 Save Settings
-              </motion.button>
+              </button>
             </div>
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>,
+        </div>
+      </div>,
     document.body
   );
 };

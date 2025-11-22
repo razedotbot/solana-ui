@@ -103,6 +103,49 @@
     }
 }
 
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.5s ease-out forwards;
+}
+
+.animate-slide-in {
+    animation: slideIn 0.5s ease-out forwards;
+}
+
 .scanline {
     position: relative;
 }
@@ -876,7 +919,60 @@
 .pb-safe {
   padding-bottom: var(--sab);
 }
+/* Custom Scrollbar Styles */
+/* Dedicated class for scrollable containers */
+.custom-scrollbar {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+  
+  /* iOS momentum scrolling */
+  -webkit-overflow-scrolling: touch;
+  
+  /* Prevent overscroll bounce */
+  overscroll-behavior-y: contain;
+}
+
 /* Webkit browsers (Chrome, Safari, newer Edge) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background-color: var(--color-scrollbar-track);
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background-color: var(--color-scrollbar-track);
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar-thumb);
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-scrollbar-thumb-hover);
+}
+
+/* Mobile-specific scrollbar styling for custom-scrollbar class */
+@media (max-width: 767px) {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+  
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb,
+  .custom-scrollbar:active::-webkit-scrollbar-thumb {
+    background-color: var(--color-scrollbar-thumb);
+  }
+}
+
+/* Global scrollbar styles for all elements */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
@@ -907,6 +1003,9 @@
 html, body {
   scrollbar-width: thin;
   scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+  
+  /* iOS momentum scrolling */
+  -webkit-overflow-scrolling: touch;
 }
 
 html::-webkit-scrollbar,
@@ -962,6 +1061,20 @@ body::-webkit-scrollbar-thumb:hover {
 }
 iframe::-webkit-scrollbar {
   display: none;
+}
+
+iframe {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+iframe:focus,
+iframe:focus-visible,
+iframe:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Mobile iframe fixes */
@@ -1083,11 +1196,12 @@ iframe::-webkit-scrollbar {
     transform: scale(0.98);
   }
   
-  /* Prevent text selection on buttons */
-  button {
+  /* Prevent text selection on buttons and add touch-action */
+  button, a, input[type="button"], input[type="submit"], [role="button"] {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     user-select: none;
+    touch-action: manipulation;
   }
   
   /* Improved input fields for mobile keyboards */

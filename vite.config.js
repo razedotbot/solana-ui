@@ -46,7 +46,7 @@ export default defineConfig({
           // Vendor chunks
           'vendor-react': ['react', 'react-dom'],
           'vendor-solana': ['@solana/web3.js', '@solana/spl-token'],
-          'vendor-ui': ['lucide-react', 'framer-motion', 'react-split'],
+          'vendor-ui': ['lucide-react', 'react-split'],
           'vendor-utils': ['bs58', 'buffer', 'crypto-js', 'd3'],
 
           'operations': [

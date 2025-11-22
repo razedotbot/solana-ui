@@ -8,6 +8,7 @@ import * as web3 from '@solana/web3.js';
 import bs58 from 'bs58';
 import { sendToJitoBundleService } from '../utils/jitoService';
 import type { ApiResponse } from '../types/api';
+import { createConnectionFromConfig } from '../utils/rpcManager';
 
 const STEPS_BURN = ['Token Address', 'Select Source', 'Burn Details', 'Review'];
 
@@ -99,9 +100,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     
     setIsLoadingBalances(true);
     try {
-      const savedConfig = loadConfigFromCookies() as { rpcEndpoint: string };
-      const rpcurl = savedConfig.rpcEndpoint;
-      const connection = new web3.Connection(rpcurl);
+      const savedConfig = loadConfigFromCookies();
+      const connection = await createConnectionFromConfig(savedConfig?.rpcEndpoints);
       
       const balancesMap = new Map<string, number>();
       
@@ -160,9 +160,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       
       setIsLoadingTokens(true);
       try {
-        const savedConfig = loadConfigFromCookies() as { rpcEndpoint: string };
-        const rpcurl = savedConfig.rpcEndpoint;
-        const connection = new web3.Connection(rpcurl);
+        const savedConfig = loadConfigFromCookies();
+        const connection = await createConnectionFromConfig(savedConfig?.rpcEndpoints);
 
         const keypair = web3.Keypair.fromSecretKey(
           bs58.decode(sourceWallet)
@@ -436,10 +435,6 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       position: relative;
     }
     
-    .modal-glow {
-      animation: modal-pulse 4s infinite;
-    }
-    
     .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
@@ -617,7 +612,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-2xl overflow-hidden transform modal-content modal-glow">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-2xl overflow-hidden transform modal-content">
         {/* Ambient grid background */}
         <div className="absolute inset-0 z-0 opacity-10 bg-grid">
         </div>
@@ -660,7 +655,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     index < currentStep 
                       ? 'border-app-primary bg-app-primary-color text-app-primary' 
                       : index === currentStep 
-                        ? 'border-app-primary color-primary bg-app-primary modal-glow' 
+                        ? 'border-app-primary color-primary bg-app-primary' 
                         : 'border-app-primary-20 text-app-muted bg-app-primary'
                   }`}>
                     {index < currentStep ? (
@@ -737,7 +732,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     <div className="relative h-12 w-12">
                       <div className="absolute inset-0 rounded-full border-2 border-t-app-primary border-r-app-primary-30 border-b-app-primary-10 border-l-app-primary-30 animate-spin"></div>
                       <div className="absolute inset-2 rounded-full border-2 border-t-transparent border-r-app-primary-70 border-b-app-primary-50 border-l-transparent animate-spin-slow"></div>
-                      <div className="absolute inset-0 rounded-full border border-app-primary-20 modal-glow"></div>
+                      <div className="absolute inset-0 rounded-full border border-app-primary-20"></div>
                     </div>
                   </div>
                 )}
@@ -821,7 +816,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                         >
                           <div className={`w-4 h-4 mr-3 rounded-full flex items-center justify-center transition-all duration-200
                                           ${sourceWallet === wallet.privateKey
-                                            ? 'bg-app-primary-color modal-glow' 
+                                            ? 'bg-app-primary-color' 
                                             : 'border border-app-secondary'}`}>
                             {sourceWallet === wallet.privateKey && (
                               <CheckCircle size={10} className="text-app-primary" />
@@ -853,7 +848,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                 </div>
 
                 {sourceWallet && (
-                  <div className="mt-4 p-4 rounded-lg border border-app-primary-30 bg-primary-05 modal-glow">
+                  <div className="mt-4 p-4 rounded-lg border border-app-primary-30 bg-primary-05">
                     <div className="flex justify-between items-center">
                       <span className="text-sm color-primary font-mono tracking-wide">SELECTED_WALLET</span>
                       <div className="flex items-center bg-app-tertiary px-2 py-1 rounded-lg border border-app-primary-20">
@@ -898,7 +893,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     <div className="relative h-12 w-12">
                       <div className="absolute inset-0 rounded-full border-2 border-t-app-primary border-r-app-primary-30 border-b-app-primary-10 border-l-app-primary-30 animate-spin"></div>
                       <div className="absolute inset-2 rounded-full border-2 border-t-transparent border-r-app-primary-70 border-b-app-primary-50 border-l-transparent animate-spin-slow"></div>
-                      <div className="absolute inset-0 rounded-full border border-app-primary-20 modal-glow"></div>
+                      <div className="absolute inset-0 rounded-full border border-app-primary-20"></div>
                     </div>
                   </div>
                 ) : (
@@ -971,7 +966,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                           <div className="relative" onMouseEnter={() => setShowInfoTip(true)} onMouseLeave={() => setShowInfoTip(false)}>
                             <Info size={14} className="text-app-secondary cursor-help" />
                             {showInfoTip && (
-                              <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded-lg shadow-lg text-xs text-app-primary w-48 z-10 font-mono modal-glow">
+                              <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded-lg shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
                                 <span className="color-primary">!</span> This amount will be permanently destroyed
                               </div>
                             )}
@@ -1286,12 +1281,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
           </form>
         </div>
         
-        {/*  decorative corner elements */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
-      </div>
+</div>
     </div>,
     document.body
   );

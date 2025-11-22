@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { BarChart } from 'lucide-react';
 import { type WalletType } from './Utils';
 import { brand } from './config/brandConfig';
@@ -210,14 +209,12 @@ const IconButton: React.FC<{
   };
   
   return (
-      <motion.button
-        className={`p-2 rounded-md transition-colors ${variants[variant]} ${className}`}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+      <button
+        className={`p-2 rounded-md transition-colors ${variants[variant]} ${className} hover:scale-105 active:scale-95`}
         onClick={onClick}
       >
         {icon}
-      </motion.button>
+      </button>
   );
 });
 IconButton.displayName = 'IconButton';
@@ -235,12 +232,31 @@ export const Frame: React.FC<FrameProps> = ({
   const { tokenAddress: tokenAddressParam } = useParams<{ tokenAddress?: string }>();
   
   const [frameLoading, setFrameLoading] = useState(true);
+  // Use static key to maintain iframe instance across navigations (postMessage handles routing)
   const [iframeKey] = useState(Date.now());
   const [isIframeReady, setIsIframeReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { getViewState, setViewState } = useIframeState();
   const previousViewRef = useRef<{ view: ViewType; tokenMint?: string } | null>(null);
   const lastNavigationSentRef = useRef<{ view: string; tokenMint?: string } | null>(null);
+  
+  // Calculate iframe src ONCE on mount based on initial route
+  // After initial load, ALL navigation uses postMessage (no iframe reloads)
+  const initialIframeSrc = useRef<string | null>(null);
+  if (!initialIframeSrc.current) {
+    const urlParams = new URLSearchParams();
+    urlParams.set('theme', brand.theme.name);
+    
+    // Determine the correct iframe params based on INITIAL route
+    if (location.pathname === '/holdings') {
+      urlParams.set('view', 'holdings');
+    } else if (location.pathname.startsWith('/token/') && tokenAddressParam) {
+      urlParams.set('tokenMint', tokenAddressParam);
+    }
+    // For monitor view, no additional params needed (will show homepage)
+    
+    initialIframeSrc.current = `http://localhost:3000/sol/?${urlParams.toString()}`;
+  }
   
   // State for iframe data
   const [tradingStats, setTradingStats] = useState<{
@@ -381,7 +397,9 @@ export const Frame: React.FC<FrameProps> = ({
     }));
   }, [wallets]);
 
-  // Consolidated navigation effect - handles all route changes
+  // Consolidated navigation effect - handles all route changes via postMessage
+  // IMPORTANT: Iframe src is static after initial load (see initialIframeSrc ref)
+  // ALL navigation after initial load uses postMessage (no iframe reloads)
   // Note: walletData is NOT in dependencies to avoid infinite loops
   // We capture the current wallets value when the route changes
   useEffect(() => {
@@ -391,7 +409,7 @@ export const Frame: React.FC<FrameProps> = ({
 
     const pathname = location.pathname;
     
-    // Determine which view and token to use
+    // Determine which view and token to use for postMessage navigation
     // Priority: route params > monitor/holdings routes
     // Note: We rely ONLY on route params to avoid race conditions with state updates
     let targetView: 'holdings' | 'token' | 'monitor';
@@ -585,76 +603,43 @@ export const Frame: React.FC<FrameProps> = ({
 
 
   
-  // Animation variants
-  const containerVariants: Variants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { 
-        duration: 0.5,
-        when: "beforeChildren",
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const loaderVariants: Variants = {
-    animate: {
-      rotate: 360,
-      transition: {
-        duration: 1.5,
-        repeat: Infinity,
-        ease: "linear"
-      }
-    }
-  };
-  
-
-  
   // Render loader
-  const renderLoader = (loading: boolean): React.JSX.Element => (
-    <AnimatePresence>
-      {loading && (
-        <motion.div 
-          className="absolute inset-0 flex flex-col items-center justify-center bg-app-primary-90 z-10"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <motion.div 
-            className="w-12 h-12 rounded-full border-2 border-t-transparent border-app-primary-30"
-            variants={loaderVariants}
-            animate="animate"
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+  const renderLoader = (loading: boolean): React.JSX.Element => {
+    if (!loading) return <></>;
+    return (
+      <div 
+        className="absolute inset-0 flex flex-col items-center justify-center bg-app-primary-90 z-10 animate-fade-in"
+      >
+        <div 
+          className="w-12 h-12 rounded-full border-2 border-t-transparent border-app-primary-30 animate-spin"
+          style={{ animationDuration: '1.5s' }}
+        />
+      </div>
+    );
+  };
   
 
   
   // Render iframe with single frame (SPA - no URL changes after initial load)
   const renderFrame = (): React.JSX.Element => {
-    // Use base URL with only theme - navigation handled via postMessage
-    const iframeSrc = `http://localhost:3000/sol/?theme=${brand.theme.name}`;
-    
     return (
       <div 
-        className={`relative flex-1 overflow-hidden iframe-container ${tokenAddress ? 'border-0' : ''}`}
+        className="relative flex-1 overflow-hidden iframe-container border-0"
       >
         {renderLoader(frameLoading || isLoadingChart)}
         
-        <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden border-0">
           <iframe 
             ref={iframeRef}
             key={`frame-${iframeKey}`}
-            src={iframeSrc}
-            className="absolute inset-0 w-full h-full border-0"
+            src={initialIframeSrc.current || 'http://localhost:3000/sol/'}
+            className="absolute inset-0 w-full h-full border-0 outline-none"
             style={{ 
               WebkitOverflowScrolling: 'touch',
               minHeight: '100%',
-              border: 'none'
+              border: 'none',
+              outline: 'none',
+              boxShadow: 'none'
             }}
             loading="eager"
             onLoad={handleFrameLoad}
@@ -668,44 +653,37 @@ export const Frame: React.FC<FrameProps> = ({
   };
 
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="relative w-full rounded-lg overflow-hidden h	full md:h-full min-h-[calc(100vh-8rem)] md:min-h-full bg-gradient-to-br from-app-primary to-app-secondary"
+    <div 
+      className="relative w-full rounded-lg overflow-hidden h	full md:h-full min-h-[calc(100vh-8rem)] md:min-h-full bg-gradient-to-br from-app-primary to-app-secondary border-0 animate-fade-in"
       style={{
         touchAction: 'manipulation',
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'touch',
+        border: 'none',
+        outline: 'none',
+        boxShadow: 'none'
       }}
     >
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-app-secondary-80 to-transparent pointer-events-none" />
       
       
-      <AnimatePresence mode="wait">
-        {isLoadingChart ? (
-          <div className="h-full flex items-center justify-center">
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-            >
-              <BarChart size={24} className="color-primary-light" />
-            </motion.div>
-          </div>
-        ) : (
-          <motion.div 
-            key="content"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex flex-1 h-full"
+      {isLoadingChart ? (
+        <div className="h-full flex items-center justify-center">
+          <div 
+            className="animate-spin"
+            style={{ animationDuration: '1.5s' }}
           >
-            {renderFrame()}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            <BarChart size={24} className="color-primary-light" />
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="flex flex-1 h-full animate-fade-in"
+        >
+          {renderFrame()}
+        </div>
+      )}
+    </div>
   );
 };
 

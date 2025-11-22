@@ -39,10 +39,7 @@ const MobileLayout = lazy(() => import('./Mobile'));
 const PnlModal = lazy(() => import('./modals/CalculatePNLModal').then(module => ({ default: module.PnlModal })));
 
 // Developer tools (development only)
-const ThemeCustomizer = lazy(() => import('./components/ThemeCustomizer').then(module => ({ default: module.ThemeCustomizer })));
-
-// Import theme initialization
-import { initializeTheme } from './stores/themeStore';
+// Theme customizer removed
 
 const ToolsDropdown: React.FC<{
   onAutomateClick: () => void;
@@ -155,6 +152,7 @@ const WalletManager: React.FC = () => {
     config: contextConfig,
     setConfig: setContextConfig,
     connection: contextConnection,
+    rpcManager: contextRpcManager,
     solBalances: contextSolBalances,
     setSolBalances: setContextSolBalances,
     tokenBalances: contextTokenBalances,
@@ -216,10 +214,6 @@ const WalletManager: React.FC = () => {
       position: { x: number; y: number };
       isDragging: boolean;
     };
-    themeCustomizer: {
-      isOpen: boolean;
-      position: { x: number; y: number };
-    };
     quickBuyEnabled: boolean;
     quickBuyAmount: number;
     quickBuyMinAmount: number;
@@ -264,8 +258,6 @@ const WalletManager: React.FC = () => {
     | { type: 'SET_AUTOMATE_CARD_OPEN'; payload: boolean }
     | { type: 'SET_AUTOMATE_CARD_POSITION'; payload: { x: number; y: number } }
     | { type: 'SET_AUTOMATE_CARD_DRAGGING'; payload: boolean }
-    | { type: 'SET_THEME_CUSTOMIZER_OPEN'; payload: boolean }
-    | { type: 'SET_THEME_CUSTOMIZER_POSITION'; payload: { x: number; y: number } }
     | { type: 'SET_QUICK_BUY_ENABLED'; payload: boolean }
     | { type: 'SET_QUICK_BUY_AMOUNT'; payload: number }
     | { type: 'SET_QUICK_BUY_MIN_AMOUNT'; payload: number }
@@ -308,10 +300,6 @@ const WalletManager: React.FC = () => {
       isOpen: false,
       position: { x: 200, y: 200 },
       isDragging: false
-    },
-    themeCustomizer: {
-      isOpen: false,
-      position: { x: 100, y: 100 },
     },
     quickBuyEnabled: true,
     quickBuyAmount: 0.01,
@@ -400,22 +388,6 @@ const WalletManager: React.FC = () => {
             isDragging: action.payload
           }
         };
-      case 'SET_THEME_CUSTOMIZER_OPEN':
-        return {
-          ...state,
-          themeCustomizer: {
-            ...state.themeCustomizer,
-            isOpen: action.payload
-          }
-        };
-      case 'SET_THEME_CUSTOMIZER_POSITION':
-        return {
-          ...state,
-          themeCustomizer: {
-            ...state.themeCustomizer,
-            position: action.payload
-          }
-        };
       case 'SET_QUICK_BUY_ENABLED':
         return { ...state, quickBuyEnabled: action.payload };
       case 'SET_QUICK_BUY_AMOUNT':
@@ -490,8 +462,6 @@ const WalletManager: React.FC = () => {
     setAutomateCardOpen: (open: boolean): void => dispatch({ type: 'SET_AUTOMATE_CARD_OPEN', payload: open }),
     setAutomateCardPosition: (position: { x: number; y: number }): void => dispatch({ type: 'SET_AUTOMATE_CARD_POSITION', payload: position }),
     setAutomateCardDragging: (dragging: boolean): void => dispatch({ type: 'SET_AUTOMATE_CARD_DRAGGING', payload: dragging }),
-    setThemeCustomizerOpen: (open: boolean): void => dispatch({ type: 'SET_THEME_CUSTOMIZER_OPEN', payload: open }),
-    setThemeCustomizerPosition: (position: { x: number; y: number }): void => dispatch({ type: 'SET_THEME_CUSTOMIZER_POSITION', payload: position }),
     setQuickBuyEnabled: (enabled: boolean): void => dispatch({ type: 'SET_QUICK_BUY_ENABLED', payload: enabled }),
     setQuickBuyAmount: (amount: number): void => dispatch({ type: 'SET_QUICK_BUY_AMOUNT', payload: amount }),
     setQuickBuyMinAmount: (amount: number): void => dispatch({ type: 'SET_QUICK_BUY_MIN_AMOUNT', payload: amount }),
@@ -599,26 +569,6 @@ const WalletManager: React.FC = () => {
 
 
   
-  // Initialize theme on mount
-  useEffect(() => {
-    initializeTheme();
-  }, []);
-
-  // Keyboard shortcut for theme customizer (Ctrl+Shift+T) - development only
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'T') {
-        e.preventDefault();
-        memoizedCallbacks.setThemeCustomizerOpen(!state.themeCustomizer.isOpen);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.themeCustomizer.isOpen, memoizedCallbacks]);
-  
   // Initialize app on mount - load quick buy preferences
   useEffect(() => {
     const initializeApp = (): void => {
@@ -704,9 +654,11 @@ const WalletManager: React.FC = () => {
   // Fetch SOL and token balances when wallets are added/removed, connection is established, or token address changes
   // Don't fetch when only wallet selection (isActive) changes
   useEffect(() => {
-    if (state.connection && state.wallets.length > 0) {
+    // Use rpcManager for rotation if available, otherwise fall back to connection
+    const connectionOrRpcManager = contextRpcManager || state.connection;
+    if (connectionOrRpcManager && state.wallets.length > 0) {
       void fetchWalletBalances(
-        state.connection,
+        connectionOrRpcManager,
         state.wallets,
         state.tokenAddress || '',
         memoizedCallbacks.setSolBalances,
@@ -716,7 +668,7 @@ const WalletManager: React.FC = () => {
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.connection, walletAddresses, state.tokenAddress]); // Use walletAddresses instead of state.wallets
+  }, [state.connection, contextRpcManager, walletAddresses, state.tokenAddress]); // Use walletAddresses instead of state.wallets
 
   // Trigger tick animation when wallet count changes
   useEffect(() => {
@@ -728,14 +680,17 @@ const WalletManager: React.FC = () => {
 
   // Helper functions
   const handleRefresh = useCallback(async () => {
-    if (!state.connection || state.wallets.length === 0) return;
+    // Use rpcManager for rotation if available, otherwise fall back to connection
+    const connectionOrRpcManager = contextRpcManager || state.connection;
+    if (!connectionOrRpcManager || state.wallets.length === 0) return;
     
     memoizedCallbacks.setIsRefreshing(true);
     
     try {
       // Use the consolidated fetchWalletBalances function with current balances to preserve them on errors
+      // Pass rpcManager to enable RPC rotation for each wallet
       await fetchWalletBalances(
-        state.connection,
+        connectionOrRpcManager,
         state.wallets,
         state.tokenAddress,
         memoizedCallbacks.setSolBalances,
@@ -749,7 +704,7 @@ const WalletManager: React.FC = () => {
       // Set refreshing to false
       memoizedCallbacks.setIsRefreshing(false);
     }
-  }, [state.connection, state.wallets, state.tokenAddress, state.solBalances, state.tokenBalances, memoizedCallbacks]);
+  }, [state.connection, contextRpcManager, state.wallets, state.tokenAddress, state.solBalances, state.tokenBalances, memoizedCallbacks]);
 
 
 
@@ -881,7 +836,7 @@ const WalletManager: React.FC = () => {
             </div>
 
             {/* Middle Column */}
-            <div className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto">
+            <div className="backdrop-blur-sm bg-app-primary-99 border-l border-r border-app-primary-40 overflow-y-auto">
               <Frame
                 isLoadingChart={state.isLoadingChart}
                 tokenAddress={state.tokenAddress}
@@ -893,7 +848,7 @@ const WalletManager: React.FC = () => {
             </div>
 
             {/* Right Column */}
-            <div className="backdrop-blur-sm bg-app-primary-99 overflow-y-auto relative">
+            <div className="backdrop-blur-sm bg-app-primary-99 border-l border-app-primary-40 overflow-y-auto relative">
               {/* Top Navigation - Only over Actions column */}
               <nav className="sticky top-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
                 <div className="flex items-center gap-2 md:gap-3">
@@ -1050,16 +1005,6 @@ const WalletManager: React.FC = () => {
       />
       
       {/* AutomateFloatingCard is now rendered globally in index.tsx and persists across all views */}
-      
-      {/* Theme Customizer - Development Only */}
-      {import.meta.env.DEV && (
-        <ThemeCustomizer
-          isOpen={state.themeCustomizer.isOpen}
-          onClose={(): void => memoizedCallbacks.setThemeCustomizerOpen(false)}
-          position={state.themeCustomizer.position}
-          onPositionChange={memoizedCallbacks.setThemeCustomizerPosition}
-        />
-      )}
     </div>
   );
 };

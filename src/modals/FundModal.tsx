@@ -5,14 +5,18 @@ import type { Connection } from '@solana/web3.js';
 import { useToast } from "../components/useToast";
 import { getWalletDisplayName } from '../Utils';
 import type { WalletType } from '../Utils';
+import { batchDistributeSOL, validateDistributionInputs } from '../utils/distribute';
 import { batchMixSOL, validateMixingInputs } from '../utils/mixer';
 
-interface MixerModalProps {
+type FundingMode = 'distribute' | 'mixer';
+
+interface FundModalProps {
   isOpen: boolean;
   onClose: () => void;
   wallets: WalletType[];
   solBalances: Map<string, number>;
   connection: Connection;
+  initialMode?: FundingMode;
 }
 
 interface WalletAmount {
@@ -20,19 +24,21 @@ interface WalletAmount {
   amount: string;
 }
 
-export const MixerModal: React.FC<MixerModalProps> = ({
+export const FundModal: React.FC<FundModalProps> = ({
   isOpen,
   onClose,
   wallets,
-  solBalances
+  solBalances,
+  initialMode = 'distribute'
 }) => {
   // States for the modal
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [fundingMode, setFundingMode] = useState<FundingMode>(initialMode);
   const { showToast } = useToast();
 
-  // States for mixer operation
+  // States for fund operation
   const [selectedRecipientWallets, setSelectedRecipientWallets] = useState<string[]>([]);
   const [selectedSenderWallet, setSelectedSenderWallet] = useState('');
   const [commonAmount, setCommonAmount] = useState('');
@@ -122,8 +128,9 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       resetForm();
+      setFundingMode(initialMode);
     }
-  }, [isOpen, resetForm]);
+  }, [isOpen, resetForm, initialMode]);
 
   // Update walletAmounts when selectedRecipientWallets change
   useEffect(() => {
@@ -164,8 +171,8 @@ export const MixerModal: React.FC<MixerModalProps> = ({
     }
   };
 
-  // Handle mixer operation
-  const handleMixer = async (e: React.FormEvent): Promise<void> => {
+  // Handle fund operation (distribute or mixer)
+  const handleFund = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
 
@@ -197,39 +204,56 @@ export const MixerModal: React.FC<MixerModalProps> = ({
         }))
         .filter(wallet => wallet.privateKey && wallet.amount);
 
-      // Validate all inputs
-      const validation = validateMixingInputs(
-        senderWallet,
-        recipientWallets,
-        senderBalance
-      );
+      // Validate all inputs based on mode
+      let validation;
+      if (fundingMode === 'distribute') {
+        validation = validateDistributionInputs(
+          senderWallet,
+          recipientWallets,
+          senderBalance
+        );
+      } else {
+        validation = validateMixingInputs(
+          senderWallet,
+          recipientWallets,
+          senderBalance
+        );
+      }
 
       if (!validation.valid) {
-        showToast(validation.error || "Invalid mixing data", "error");
+        showToast(validation.error || `Invalid ${fundingMode} data`, "error");
         setIsSubmitting(false);
         return;
       }
 
-      // Execute the mixing
-      const result = await batchMixSOL(senderWallet, recipientWallets);
+      // Execute the operation based on mode
+      let result;
+      if (fundingMode === 'distribute') {
+        result = await batchDistributeSOL(senderWallet, recipientWallets);
+      } else {
+        result = await batchMixSOL(senderWallet, recipientWallets);
+      }
       
       if (result.success) {
-        showToast("SOL mixed successfully", "success");
+        const modeText = fundingMode === 'distribute' ? 'distributed' : 'mixed';
+        showToast(`SOL ${modeText} successfully`, "success");
         resetForm();
         onClose();
       } else {
-        showToast(result.error || "Mixing failed", "error");
+        const modeText = fundingMode === 'distribute' ? 'Distribution' : 'Mixing';
+        showToast(result.error || `${modeText} failed`, "error");
       }
     } catch (error) {
-      console.error('Mixing error:', error);
+      console.error(`${fundingMode} error:`, error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      showToast("Mixing failed: " + (errorMessage || "Unknown error"), "error");
+      const modeText = fundingMode === 'distribute' ? 'Distribution' : 'Mixing';
+      showToast(`${modeText} failed: ` + (errorMessage || "Unknown error"), "error");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Function to handle recipient wallet selection toggles for mixer
+  // Function to handle recipient wallet selection toggles
   const toggleRecipientWalletSelection = (address: string): void => {
     setSelectedRecipientWallets(prev => {
       if (prev.includes(address)) {
@@ -240,12 +264,12 @@ export const MixerModal: React.FC<MixerModalProps> = ({
     });
   };
 
-  // Get available wallets for mixer recipient selection (exclude sender)
+  // Get available wallets for recipient selection (exclude sender)
   const getAvailableRecipientWallets = (): WalletType[] => {
     return wallets.filter(wallet => wallet.address !== selectedSenderWallet);
   };
 
-  // Get available wallets for sender selection in mixer (exclude recipients and zero balance wallets)
+  // Get available wallets for sender selection (exclude recipients and zero balance wallets)
   const getAvailableSenderWallets = (): WalletType[] => {
     return wallets.filter(wallet => 
       !selectedRecipientWallets.includes(wallet.address) && 
@@ -316,10 +340,33 @@ export const MixerModal: React.FC<MixerModalProps> = ({
     return wallet ? wallet.amount : '';
   };
 
+  // Get mode-specific text
+  const getModeText = (): {
+    title: string;
+    action: string;
+    summaryTitle: string;
+    totalLabel: string;
+    confirmText: string;
+    infoTip: string;
+  } => {
+    return {
+      title: fundingMode === 'distribute' ? 'DISTRIBUTE SOL' : 'SOL MIXER',
+      action: fundingMode === 'distribute' ? 'DISTRIBUTE SOL' : 'MIX SOL',
+      summaryTitle: fundingMode === 'distribute' ? 'DISTRIBUTION SUMMARY' : 'MIXING SUMMARY',
+      totalLabel: fundingMode === 'distribute' ? 'TOTAL TO SEND:' : 'TOTAL TO MIX:',
+      confirmText: fundingMode === 'distribute' ? 'I CONFIRM THIS DISTRIBUTION OPERATION' : 'I CONFIRM THIS MIXING OPERATION',
+      infoTip: fundingMode === 'distribute' 
+        ? 'This amount will be sent to each selected recipient wallet'
+        : 'This amount will be mixed to each selected recipient wallet'
+    };
+  };
+
+  const modeText = getModeText();
+
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
-  // Animation keyframes for  elements
+  // Animation keyframes for elements
   const modalStyleElement = document.createElement('style');
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
@@ -467,7 +514,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
   `;
   document.head.appendChild(modalStyleElement);
 
-  // Render the modal with  styling
+  // Render the modal
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-app-primary-85">
       <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-6xl overflow-hidden transform modal-content">
@@ -482,7 +529,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
               <ArrowsUpFromLine size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> SOL MIXER <span className="color-primary">/</span>
+              <span className="color-primary">/</span> {modeText.title} <span className="color-primary">/</span>
             </h2>
           </div>
           <button 
@@ -491,6 +538,35 @@ export const MixerModal: React.FC<MixerModalProps> = ({
           >
             <X size={18} />
           </button>
+        </div>
+
+        {/* Mode Selector */}
+        <div className="relative z-10 px-4 py-3 border-b border-app-primary-30 bg-app-tertiary">
+          <div className="flex items-center justify-center gap-4">
+            <span className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">Mode:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFundingMode('distribute')}
+                className={`px-4 py-2 rounded-lg text-sm font-mono transition-all duration-200 border ${
+                  fundingMode === 'distribute'
+                    ? 'bg-app-primary-color text-app-primary border-app-primary-40 shadow-md'
+                    : 'bg-app-secondary text-app-secondary-60 border-app-primary-30 hover:bg-app-primary-10'
+                }`}
+              >
+                DISTRIBUTE
+              </button>
+              <button
+                onClick={() => setFundingMode('mixer')}
+                className={`px-4 py-2 rounded-lg text-sm font-mono transition-all duration-200 border ${
+                  fundingMode === 'mixer'
+                    ? 'bg-app-primary-color text-app-primary border-app-primary-40 shadow-md'
+                    : 'bg-app-secondary text-app-secondary-60 border-app-primary-30 hover:bg-app-primary-10'
+                }`}
+              >
+                MIXER
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Progress Indicator */}
@@ -725,7 +801,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                             <Info size={14} className="text-app-secondary cursor-help" />
                             {showInfoTip && (
                               <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
-                                This amount will be mixed to each selected recipient wallet
+                                {modeText.infoTip}
                               </div>
                             )}
                           </div>
@@ -753,7 +829,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                     {selectedSenderWallet && commonAmount && selectedRecipientWallets.length > 0 && (
                       <div className="w-1/2 bg-app-tertiary rounded-lg p-3 border border-app-primary-30 modal-w-full-md modal-mt-4-md">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-app-secondary font-mono">TOTAL TO MIX:</span>
+                          <span className="text-sm text-app-secondary font-mono">{modeText.totalLabel}</span>
                           <span className={`text-sm font-semibold font-mono ${hasEnoughBalance ? 'color-primary' : 'text-error-alt'}`}>
                             {totalAmount.toFixed(4)} SOL
                           </span>
@@ -809,7 +885,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                     {selectedSenderWallet && totalAmount > 0 && (
                       <div className="w-2/5 bg-app-tertiary rounded-lg p-3 border border-app-primary-30 modal-w-full-md modal-mt-4-md">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-app-secondary font-mono">TOTAL TO MIX:</span>
+                          <span className="text-sm text-app-secondary font-mono">{modeText.totalLabel}</span>
                           <span className={`text-sm font-semibold font-mono ${hasEnoughBalance ? 'color-primary' : 'text-error-alt'}`}>
                             {totalAmount.toFixed(4)} SOL
                           </span>
@@ -869,7 +945,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
               {/* Left Side - Summary */}
               <div className="w-1/2 space-y-4 modal-w-full-lg">
                 <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">
-                  <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">MIXING SUMMARY</h3>
+                  <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">{modeText.summaryTitle}</h3>
                   
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -904,7 +980,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                     )}
                     
                     <div className="pt-2 border-t border-app-primary-20 flex items-center justify-between">
-                      <span className="text-sm font-medium text-app-secondary font-mono">TOTAL TO MIX:</span>
+                      <span className="text-sm font-medium text-app-secondary font-mono">{modeText.totalLabel}</span>
                       <span className="text-sm font-semibold color-primary font-mono">{totalAmount.toFixed(4)} SOL</span>
                     </div>
                     
@@ -932,7 +1008,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                       <CheckCircle size={14} className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? 'opacity-100' : 'opacity-0'}`} />
                     </div>
                     <span className="text-app-primary text-sm ml-2 cursor-pointer select-none font-mono">
-                      I CONFIRM THIS MIXING OPERATION
+                      {modeText.confirmText}
                     </span>
                   </div>
                 </div>
@@ -973,7 +1049,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
             </div>
           )}
           
-          {/* Back/Mix Buttons */}
+          {/* Back/Fund Buttons */}
           {currentStep === 1 && (
             <div className="flex justify-end gap-3 mt-6">
               <button
@@ -983,7 +1059,7 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                 BACK
               </button>
               <button
-                onClick={handleMixer}
+                onClick={handleFund}
                 disabled={!isConfirmed || isSubmitting}
                 className={`px-5 py-2.5 text-app-primary rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider 
                           ${!isConfirmed || isSubmitting
@@ -996,15 +1072,17 @@ export const MixerModal: React.FC<MixerModalProps> = ({
                     PROCESSING...
                   </>
                 ) : (
-                  "MIX SOL"
+                  modeText.action
                 )}
               </button>
             </div>
           )}
         </div>
 
-</div>
+
+      </div>
     </div>,
     document.body
   );
 };
+

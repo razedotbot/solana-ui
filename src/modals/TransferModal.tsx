@@ -399,10 +399,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       position: relative;
     }
     
-    .modal-glow {
-      animation: modal-pulse 4s infinite;
-    }
-    
     .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
@@ -514,7 +510,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-7xl max-h-[90vh] overflow-hidden transform modal-content modal-glow">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-7xl max-h-[90vh] overflow-hidden transform modal-content">
         {/* Ambient grid background */}
         <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
@@ -956,12 +952,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           </div>
         </div>
         
-        {/*  decorative corner elements */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
-      </div>
+</div>
     </div>,
     document.body
   );

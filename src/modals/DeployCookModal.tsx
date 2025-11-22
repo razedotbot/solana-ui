@@ -375,7 +375,7 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
               </h3>
             </div>
             
-            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
+            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg">
               <div className="p-6 space-y-6 relative">
                 {/* Ambient grid background */}
                 <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
@@ -664,7 +664,7 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
 
             {/* Summary Stats */}
             {selectedWallets.length > 0 && (
-              <div className="bg-app-primary border border-app-primary-40 rounded-lg p-3 mb-3 shadow-lg modal-glow">
+              <div className="bg-app-primary border border-app-primary-40 rounded-lg p-3 mb-3 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-app-secondary font-mono">SELECTED:</span>
@@ -680,7 +680,7 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
               </div>
             )}
 
-            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
+            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg relative">
               {/* Ambient grid background */}
               <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
               
@@ -699,7 +699,7 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
                         return (
                           <div
                             key={wallet?.id}
-                            className="p-3 rounded-lg border border-app-primary bg-primary-10 mb-2 shadow-lg modal-glow"
+                            className="p-3 rounded-lg border border-app-primary bg-primary-10 mb-2 shadow-lg"
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-4">
@@ -843,7 +843,7 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
   
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Left column - Token Details */}
-              <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
+              <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg relative">
                 {/* Ambient grid background */}
                 <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
@@ -930,15 +930,11 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
                   </div>
                 </div>
                 
-                {/*  decorative corner elements */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
+
               </div>
               
               {/* Right column - Selected Wallets */}
-              <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow relative">
+              <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg relative">
                 {/* Ambient grid background */}
                 <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
                 
@@ -969,15 +965,11 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
                   </div>
                 </div>
                 
-                {/*  decorative corner elements */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
+
               </div>
             </div>
   
-            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg modal-glow">
+            <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-lg">
               <div className="p-4 relative">
                 {/* Ambient grid background */}
                 <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
@@ -1040,9 +1032,6 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
       position: relative;
     }
     
-    .modal-glow {
-      animation: modal-pulse 4s infinite;
-    }
     
     .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
@@ -1128,7 +1117,7 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-app-primary-85">
-      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-content modal-glow">
+      <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-3xl overflow-hidden transform modal-content">
         {/* Ambient grid background */}
         <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
@@ -1203,12 +1192,7 @@ export const DeployCookModal: React.FC<DeployCookModalProps> = ({
           </form>
         </div>
         
-        {/*  decorative corner elements */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-app-primary opacity-70"></div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-app-primary opacity-70"></div>
-      </div>
+</div>
     </div>,
     document.body
   );

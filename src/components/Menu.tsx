@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import logo from '../logo.png';
 import { brand } from '../config/brandConfig';
 import { Tooltip } from './Tooltip';
@@ -37,25 +36,19 @@ const ServiceButton = ({
 
   return (
     <Tooltip content={description || label} position="top">
-      <motion.div 
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+      <div 
         className="flex flex-col items-center w-20 p-2 hover:bg-primary-20 border border-app-primary-30 
-                  hover-border-primary-60 rounded-lg cursor-pointer transition-all duration-300"
+                  hover-border-primary-60 rounded-lg cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95"
         onClick={handleClick}
       >
-        <motion.div 
+        <div 
           className="w-10 h-10 rounded-full flex items-center justify-center mb-2 
-                    bg-app-quaternary border border-app-primary-40 overflow-hidden"
-          whileHover={{ 
-            borderColor: "var(--color-primary)", 
-            boxShadow: "0 0 8px var(--color-primary-40)" 
-          }}
+                    bg-app-quaternary border border-app-primary-40 overflow-hidden transition-all duration-300 hover:border-app-primary hover:shadow-[0_0_8px_var(--color-primary-40)]"
         >
           {icon}
-        </motion.div>
+        </div>
         <span className="text-app-secondary text-xs font-mono tracking-wider">{label}</span>
-      </motion.div>
+      </div>
     </Tooltip>
   );
 };
@@ -147,36 +140,30 @@ const ServiceSelector = ({ onTokenAddressClear }: ServiceSelectorProps = {}): JS
                   border border-app-primary-30 hover-border-primary-60 rounded 
                   transition-all duration-300 btn"
         >
-        <motion.div 
-          className="flex items-center"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <div 
+          className="flex items-center hover:scale-105 active:scale-95 transition-transform"
         >
           <img 
             src={logo} 
             alt={brand.altText} 
             className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
           />
-        </motion.div>
+        </div>
         </button>
 
       {/* Service selector modal using portal */}
-      <AnimatePresence>
-        {isOpen && (
-          <DropdownPortal 
-            isOpen={isOpen} 
-            buttonRef={buttonRef}
-            onClose={closeSelector}
+      {isOpen && (
+        <DropdownPortal 
+          isOpen={isOpen} 
+          buttonRef={buttonRef}
+          onClose={closeSelector}
+        >
+          <div 
+            className="mt-2 bg-app-primary rounded-lg p-4 shadow-lg 
+                      w-80 border border-app-primary-40 border
+                      backdrop-blur-sm animate-slide-up"
+            style={{ animationDuration: '0.2s' }}
           >
-            <motion.div 
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 10, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="mt-2 bg-app-primary rounded-lg p-4 shadow-lg 
-                        w-80 border border-app-primary-40 border
-                        backdrop-blur-sm"
-            >
               <div className="relative">
                 {/*  scanline effect */}
                 <div className="absolute top-0 left-0 w-full h-full scanline pointer-events-none z-10 opacity-30"></div>
@@ -185,27 +172,11 @@ const ServiceSelector = ({ onTokenAddressClear }: ServiceSelectorProps = {}): JS
                 <div className="absolute top-0 right-0 w-3 h-3 bg-app-primary-color opacity-50 rounded-full blur-md"></div>
                 <div className="absolute bottom-0 left-0 w-3 h-3 bg-app-primary-color opacity-50 rounded-full blur-md"></div>
                 
-                <motion.div 
+                <div 
                   className="flex flex-wrap justify-center gap-3 relative z-20"
-                  variants={{
-                    hidden: { opacity: 0 },
-                    show: {
-                      opacity: 1,
-                      transition: {
-                        staggerChildren: 0.05
-                      }
-                    }
-                  }}
-                  initial="hidden"
-                  animate="show"
                 >
                   {/* Solana */}
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, y: 10 },
-                      show: { opacity: 1, y: 0 }
-                    }}
-                  >
+                  <div className="animate-slide-in" style={{ animationDelay: '0.05s' }}>
                     <ServiceButton 
                       icon={<div className="bg-[#9945FF] rounded-full w-8 h-8 flex items-center justify-center overflow-hidden">
                         <svg viewBox="0 0 397 311" width="22" height="22">
@@ -218,15 +189,10 @@ const ServiceSelector = ({ onTokenAddressClear }: ServiceSelectorProps = {}): JS
                       url={brand.appUrl}
                       description="Launchpad"
                     />
-                  </motion.div>
+                  </div>
                   
                   {/* Docs */}
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, y: 10 },
-                      show: { opacity: 1, y: 0 }
-                    }}
-                  >
+                  <div className="animate-slide-in" style={{ animationDelay: '0.1s' }}>
                     <ServiceButton 
                       icon={<div className="bg-[#0066FF] rounded-lg w-8 h-8 flex items-center justify-center">
                         <svg viewBox="0 0 24 24" width="18" height="18">
@@ -241,15 +207,10 @@ const ServiceSelector = ({ onTokenAddressClear }: ServiceSelectorProps = {}): JS
                       url={brand.docsUrl}
                       description="Documentation"
                     />
-                  </motion.div>
+                  </div>
                   
                   {/* GitHub */}
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, y: 10 },
-                      show: { opacity: 1, y: 0 }
-                    }}
-                  >
+                  <div className="animate-slide-in" style={{ animationDelay: '0.15s' }}>
                     <ServiceButton 
                       icon={<div className="bg-[#171515] rounded-full w-8 h-8 flex items-center justify-center">
                         <svg viewBox="0 0 24 24" width="18" height="18">
@@ -260,13 +221,12 @@ const ServiceSelector = ({ onTokenAddressClear }: ServiceSelectorProps = {}): JS
                       url={brand.githubOrg}
                       description="GitHub Repository"
                     />
-                  </motion.div>
-                </motion.div>
+                  </div>
+                </div>
               </div>
-            </motion.div>
+            </div>
           </DropdownPortal>
         )}
-      </AnimatePresence>
     </div>
   );
 };

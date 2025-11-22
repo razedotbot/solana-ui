@@ -6,6 +6,7 @@ import CryptoJS from 'crypto-js';
 import type { TradingStrategy } from './automate/types';
 import { formatAddress as _formatAddress, formatTokenBalance as _formatTokenBalance } from './utils/formatting';
 import { deriveWalletFromMnemonic } from './utils/hdWallet';
+import { createDefaultEndpoints } from './utils/rpcManager';
 
 export type WalletCategory = 'Soft' | 'Medium' | 'Hard';
 
@@ -53,7 +54,7 @@ export interface WalletType {
 }
 
 export interface ConfigType {
-  rpcEndpoint: string;
+  rpcEndpoints: string; // JSON string of RPCEndpoint[]
   transactionFee: string;
   selectedDex: string;
   isDropdownOpen: boolean;
@@ -461,7 +462,7 @@ export const refreshWalletBalance = async (
  * This is the main function for fetching wallet balances with progress tracking
  */
 export const fetchWalletBalances = async (
-  connection: Connection,
+  connectionOrRpcManager: Connection | { createConnection: () => Promise<Connection> },
   wallets: WalletType[],
   tokenAddress: string,
   setSolBalances: (balances: Map<string, number>) => void,
@@ -473,11 +474,22 @@ export const fetchWalletBalances = async (
   const newSolBalances = new Map(currentSolBalances || new Map<string, number>());
   const newTokenBalances = new Map(currentTokenBalances || new Map<string, number>());
   
+  // Check if we have an RPCManager (has createConnection method) or a Connection
+  const isRpcManager = typeof connectionOrRpcManager === 'object' && 'createConnection' in connectionOrRpcManager;
+  
   // Process wallets sequentially
   for (let i = 0; i < wallets.length; i++) {
     const wallet = wallets[i];
     
     try {
+      // Create a new connection for each wallet to rotate endpoints
+      let connection: Connection;
+      if (isRpcManager) {
+        connection = await (connectionOrRpcManager as { createConnection: () => Promise<Connection> }).createConnection();
+      } else {
+        connection = connectionOrRpcManager;
+      }
+      
       // Fetch SOL balance
       const solBalance = await fetchSolBalance(connection, wallet.address);
       newSolBalances.set(wallet.address, solBalance);
@@ -705,6 +717,10 @@ export const loadConfigFromCookies = (): ConfigType | null => {
       }
       if (config.tradingServerUrl === undefined) {
         config.tradingServerUrl = 'localhost:4444'; // Default URL
+      }
+      // Ensure rpcEndpoints exists
+      if (config.rpcEndpoints === undefined) {
+        config.rpcEndpoints = JSON.stringify(createDefaultEndpoints());
       }
       return config as ConfigType;
     } catch (error) {
