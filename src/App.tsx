@@ -198,7 +198,6 @@ const WalletManager: React.FC = () => {
     connection: Connection | null;
     solBalances: Map<string, number>;
     tokenBalances: Map<string, number>;
-    leftColumnCollapsed: boolean;
     showChartView: boolean;
 
     isLoadingChart: boolean;
@@ -269,7 +268,6 @@ const WalletManager: React.FC = () => {
     | { type: 'SET_USE_QUICK_SELL_RANGE'; payload: boolean }
     | { type: 'SET_IFRAME_DATA'; payload: IframeData | null }
     | { type: 'SET_NON_WHITELISTED_TRADES'; payload: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; tokenMint: string; marketCap: number; }[] }
-    | { type: 'TOGGLE_LEFT_COLUMN'; payload?: undefined }
     | { type: 'SET_SHOW_CHART_VIEW'; payload: boolean };
 
   // Determine token address from route
@@ -285,7 +283,6 @@ const WalletManager: React.FC = () => {
     connection: contextConnection,
     solBalances: contextSolBalances,
     tokenBalances: contextTokenBalances,
-    leftColumnCollapsed: false,
     showChartView: true, // Always show chart view in App
 
     isLoadingChart: false,
@@ -410,8 +407,6 @@ const WalletManager: React.FC = () => {
         return { ...state, iframeData: action.payload };
       case 'SET_NON_WHITELISTED_TRADES':
         return { ...state, nonWhitelistedTrades: action.payload };
-      case 'TOGGLE_LEFT_COLUMN':
-        return { ...state, leftColumnCollapsed: !state.leftColumnCollapsed };
       case 'SET_SHOW_CHART_VIEW':
         return { ...state, showChartView: action.payload };
       default:
@@ -473,7 +468,6 @@ const WalletManager: React.FC = () => {
     setUseQuickSellRange: (useRange: boolean): void => dispatch({ type: 'SET_USE_QUICK_SELL_RANGE', payload: useRange }),
     setIframeData: (data: IframeData | null): void => dispatch({ type: 'SET_IFRAME_DATA', payload: data }),
     setNonWhitelistedTrades: (trades: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; tokenMint: string; marketCap: number; }[]): void => dispatch({ type: 'SET_NON_WHITELISTED_TRADES', payload: trades }),
-    toggleLeftColumn: (): void => dispatch({ type: 'TOGGLE_LEFT_COLUMN' }),
     setShowChartView: (show: boolean): void => dispatch({ type: 'SET_SHOW_CHART_VIEW', payload: show })
   }), [dispatch, navigate, setContextConfig, setContextWallets, setContextSolBalances, setContextTokenBalances]);
 
@@ -737,28 +731,16 @@ const WalletManager: React.FC = () => {
       <div className="flex flex-col md:flex-row h-screen">
         {/* Desktop Layout - Only render when not mobile */}
         {!isMobile && (
-          <div className="w-full h-full relative">
+          <div className="w-full h-full relative flex">
             <Split
-              className="flex w-full h-full split-custom"
-              sizes={state.leftColumnCollapsed ? [0, 80, 20] : [20, 60, 20]}
-              minSize={[0, 250, 350]}
+              className="flex flex-1 h-full split-custom"
+              sizes={[25, 75]}
+              minSize={[0, 250]}
               gutterSize={12}
               gutterAlign="center"
               direction="horizontal"
               dragInterval={1}
               snapOffset={30}
-              onDragEnd={(sizes): void => {
-                // Auto-collapse when dragged very close to the edge
-                if (sizes[0] < 2 && !state.leftColumnCollapsed) {
-                  memoizedCallbacks.toggleLeftColumn();
-                }
-              }}
-              onDrag={(sizes): void => {
-                // Expand when dragging away from collapsed state
-                if (sizes[0] >= 2 && state.leftColumnCollapsed) {
-                  memoizedCallbacks.toggleLeftColumn();
-                }
-              }}
               gutter={(_index, direction): HTMLDivElement => {
                 const gutter = document.createElement('div');
                 gutter.className = `gutter gutter-${direction} gutter-animated`;
@@ -844,11 +826,17 @@ const WalletManager: React.FC = () => {
                 onDataUpdate={memoizedCallbacks.setIframeData}
                 onTokenSelect={memoizedCallbacks.setTokenAddress}
                 onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                quickBuyEnabled={state.quickBuyEnabled}
+                quickBuyAmount={state.quickBuyAmount}
+                quickBuyMinAmount={state.quickBuyMinAmount}
+                quickBuyMaxAmount={state.quickBuyMaxAmount}
+                useQuickBuyRange={state.useQuickBuyRange}
               />
             </div>
+          </Split>
 
-            {/* Right Column */}
-            <div className="backdrop-blur-sm bg-app-primary-99 border-l border-app-primary-40 overflow-y-auto relative">
+            {/* Right Column - Fixed Width */}
+            <div className="backdrop-blur-sm bg-app-primary-99 border-l border-app-primary-40 overflow-y-auto relative" style={{ width: '350px', minWidth: '350px', maxWidth: '350px' }}>
               {/* Top Navigation - Only over Actions column */}
               <nav className="sticky top-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
                 <div className="flex items-center gap-2 md:gap-3">
@@ -885,7 +873,6 @@ const WalletManager: React.FC = () => {
               iframeData={state.iframeData}
             />
             </div>
-          </Split>
           </div>
         )}
 
@@ -945,6 +932,11 @@ const WalletManager: React.FC = () => {
                 onDataUpdate={memoizedCallbacks.setIframeData}
                 onTokenSelect={memoizedCallbacks.setTokenAddress}
                 onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                quickBuyEnabled={state.quickBuyEnabled}
+                quickBuyAmount={state.quickBuyAmount}
+                quickBuyMinAmount={state.quickBuyMinAmount}
+                quickBuyMaxAmount={state.quickBuyMaxAmount}
+                useQuickBuyRange={state.useQuickBuyRange}
               />
             ),
             ActionsPage: (

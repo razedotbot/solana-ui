@@ -49,6 +49,11 @@ interface FrameProps {
     tokenMint: string;
     marketCap: number;
   }) => void;
+  quickBuyEnabled?: boolean;
+  quickBuyAmount?: number;
+  quickBuyMinAmount?: number;
+  quickBuyMaxAmount?: number;
+  useQuickBuyRange?: boolean;
 }
 
 // Iframe communication types
@@ -61,11 +66,23 @@ type IframeMessage =
   | AddWalletsMessage
   | ClearWalletsMessage
   | GetWalletsMessage
-  | ToggleNonWhitelistedTradesMessage;
+  | ToggleNonWhitelistedTradesMessage
+  | SetQuickBuyConfigMessage;
 
 interface ToggleNonWhitelistedTradesMessage {
   type: 'TOGGLE_NON_WHITELISTED_TRADES';
   enabled: boolean;
+}
+
+interface SetQuickBuyConfigMessage {
+  type: 'SET_QUICK_BUY_CONFIG';
+  config: {
+    enabled: boolean;
+    amount: number;
+    minAmount: number;
+    maxAmount: number;
+    useRange: boolean;
+  };
 }
 
 interface AddWalletsMessage {
@@ -225,7 +242,12 @@ export const Frame: React.FC<FrameProps> = ({
   wallets,
   onDataUpdate,
   onTokenSelect,
-  onNonWhitelistedTrade
+  onNonWhitelistedTrade,
+  quickBuyEnabled = true,
+  quickBuyAmount = 0.01,
+  quickBuyMinAmount = 0.01,
+  quickBuyMaxAmount = 0.05,
+  useQuickBuyRange = false
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -583,8 +605,9 @@ export const Frame: React.FC<FrameProps> = ({
         case 'ADD_WALLETS':
         case 'CLEAR_WALLETS':
         case 'TOGGLE_NON_WHITELISTED_TRADES':
-          // These are messages from iframe that may need handling in the future
-          // For now, no action needed
+        case 'SET_QUICK_BUY_CONFIG':
+          // These are messages sent TO iframe, not responses FROM iframe
+          // No action needed here
           break;
       }
     };
@@ -595,6 +618,27 @@ export const Frame: React.FC<FrameProps> = ({
 
   // Note: Wallet syncing is now handled in the navigation message
   // No separate wallet sync effect needed since NAVIGATE includes wallets
+  
+  // Send quickbuy configuration to iframe when ready or when settings change
+  useEffect(() => {
+    if (!isIframeReady || !iframeRef.current?.contentWindow) {
+      return;
+    }
+
+    // Send quickbuy configuration to iframe
+    const quickBuyConfig: SetQuickBuyConfigMessage = {
+      type: 'SET_QUICK_BUY_CONFIG',
+      config: {
+        enabled: quickBuyEnabled,
+        amount: quickBuyAmount,
+        minAmount: quickBuyMinAmount,
+        maxAmount: quickBuyMaxAmount,
+        useRange: useQuickBuyRange
+      }
+    };
+
+    sendMessageToIframe(quickBuyConfig);
+  }, [isIframeReady, quickBuyEnabled, quickBuyAmount, quickBuyMinAmount, quickBuyMaxAmount, useQuickBuyRange, sendMessageToIframe]);
   
   // Handle iframe load completion
   const handleFrameLoad = (): void => {

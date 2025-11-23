@@ -20,6 +20,15 @@ export type IframeMessage = NavigateMessage | WalletMessage | {
   enabled: boolean;
 } | {
   type: 'GET_WALLETS';
+} | {
+  type: 'SET_QUICK_BUY_CONFIG';
+  config: {
+    enabled: boolean;
+    amount: number;
+    minAmount: number;
+    maxAmount: number;
+    useRange: boolean;
+  };
 };
 
 interface QueuedMessage {

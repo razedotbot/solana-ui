@@ -145,21 +145,13 @@ export const createDefaultEndpoints = (): RPCEndpoint[] => {
       failureCount: 0,
     },
     {
-      id: 'default-4',
+      id: 'default-3',
       url: 'https://public.rpc.solanavibestation.com',
       name: 'Solana Vibe Station',
       isActive: true,
       priority: 4,
       failureCount: 0,
-    },
-    {
-      id: 'default-5',
-      url: 'https://solana.rpc.subquery.network/public',
-      name: 'SubQuery',
-      isActive: true,
-      priority: 5,
-      failureCount: 0,
-    },
+    }
   ];
 };
 

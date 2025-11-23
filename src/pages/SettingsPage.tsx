@@ -169,19 +169,6 @@ export const SettingsPage: React.FC = () => {
                   handleConfigChange('rpcEndpoints', JSON.stringify(endpoints));
                 }}
               />
-              
-              <div>
-                <label className="block text-xs sm:text-sm text-app-secondary font-mono mb-2 uppercase tracking-wider">
-                  Transaction Fee (SOL)
-                </label>
-                <input
-                  type="text"
-                  value={config.transactionFee}
-                  onChange={(e) => handleConfigChange('transactionFee', e.target.value)}
-                  className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
-                  placeholder="0.000005"
-                />
-              </div>
             </div>
           </div>
 
@@ -406,26 +393,44 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
               
-              <div>
-                <label className="block text-xs sm:text-sm text-app-secondary font-mono mb-2 uppercase tracking-wider">
-                  Default Slippage (%)
-                </label>
-                <input
-                  type="number"
-                  min="0.1"
-                  max="100"
-                  step="0.1"
-                  value={config.slippageBps ? (parseFloat(config.slippageBps) / 100).toString() : '99'}
-                  onChange={(e) => {
-                    const percentage = parseFloat(e.target.value) || 99;
-                    const bps = Math.round(percentage * 100).toString();
-                    handleConfigChange('slippageBps', bps);
-                  }}
-                  className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
-                  placeholder="99.0"
-                />
-                <div className="text-[10px] sm:text-xs text-app-secondary-80 font-mono mt-1">
-                  High slippage tolerance for volatile tokens (recommended: 99%)
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-xs sm:text-sm text-app-secondary font-mono mb-2 uppercase tracking-wider">
+                    Transaction Fee (SOL)
+                  </label>
+                  <input
+                    type="text"
+                    value={config.transactionFee}
+                    onChange={(e) => handleConfigChange('transactionFee', e.target.value)}
+                    className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
+                    placeholder="0.000005"
+                  />
+                  <div className="text-[10px] sm:text-xs text-app-secondary-80 font-mono mt-1">
+                    Transaction fee in SOL
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs sm:text-sm text-app-secondary font-mono mb-2 uppercase tracking-wider">
+                    Default Slippage (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="100"
+                    step="0.1"
+                    value={config.slippageBps ? (parseFloat(config.slippageBps) / 100).toString() : '99'}
+                    onChange={(e) => {
+                      const percentage = parseFloat(e.target.value) || 99;
+                      const bps = Math.round(percentage * 100).toString();
+                      handleConfigChange('slippageBps', bps);
+                    }}
+                    className="w-full bg-app-tertiary border border-app-primary-40 rounded p-2.5 sm:p-3 text-sm text-app-primary focus-border-primary focus:outline-none input font-mono touch-manipulation"
+                    placeholder="99.0"
+                  />
+                  <div className="text-[10px] sm:text-xs text-app-secondary-80 font-mono mt-1">
+                    High slippage tolerance for volatile tokens (recommended: 99%)
+                  </div>
                 </div>
               </div>  
             </div>

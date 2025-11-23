@@ -869,7 +869,6 @@ export const AutomatePage: React.FC = () => {
           {/* Right Column - Strategy Management */}
           <div
             className="md:col-span-2 lg:col-span-4 animate-slide-in"
-            style={{ animationDirection: 'reverse' }}
           >
 
             {/* Strategy Management Panel */}

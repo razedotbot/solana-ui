@@ -10,8 +10,7 @@ interface RPCEndpointManagerProps {
 const POPULAR_ENDPOINTS = [
   { name: 'dRPC', url: 'https://solana.drpc.org' },
   { name: 'PublicNode', url: 'https://solana-rpc.publicnode.com' },
-  { name: 'Solana Vibe Station', url: 'https://public.rpc.solanavibestation.com' },
-  { name: 'SubQuery', url: 'https://solana.rpc.subquery.network/public' },
+  { name: 'Solana Vibe Station', url: 'https://public.rpc.solanavibestation.com' }
 ];
 
 export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({ endpoints, onChange }) => {

@@ -42,39 +42,62 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Vendor chunks
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-solana': ['@solana/web3.js', '@solana/spl-token'],
-          'vendor-ui': ['lucide-react', 'react-split'],
-          'vendor-utils': ['bs58', 'buffer', 'crypto-js', 'd3'],
-
-          'operations': [
-            './src/utils/bonkcreate.ts',
-            './src/utils/cookcreate.ts',
-            './src/utils/consolidate.ts',
-            './src/utils/distribute.ts',
-            './src/utils/mixer.ts'
-          ],
-          
-          // Modal components
-          'modals': [
-            './src/modals/CalculatePNLModal.tsx'
-          ],
-          
-          // Page components
-          'pages': [
-            './src/Wallets.tsx',
-            './src/Frame.tsx',
-            './src/Actions.tsx',
-            './src/Mobile.tsx'
-          ],
-          
-          // Core components
-          'components': [
-            './src/components/TradingForm.tsx',
-            './src/components/PnlCard.tsx'
-          ]
+        manualChunks(id) {
+          // Core vendor libraries
+          if (id.includes('node_modules')) {
+            // React core - always used
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            
+            // React Router - used on most pages
+            if (id.includes('react-router')) {
+              return 'vendor-router';
+            }
+            
+            // Solana - these are large, keep separate
+            if (id.includes('@solana/web3.js')) {
+              return 'vendor-solana-web3';
+            }
+            if (id.includes('@solana/spl-token')) {
+              return 'vendor-solana-spl';
+            }
+            if (id.includes('@jup-ag/api')) {
+              return 'vendor-jupiter';
+            }
+            
+            // UI libraries - group smaller ones together
+            if (id.includes('lucide-react')) {
+              return 'vendor-ui-icons';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'vendor-ui-radix';
+            }
+            
+            // Heavy libraries - separate chunks
+            if (id.includes('d3')) {
+              return 'vendor-d3';
+            }
+            if (id.includes('html2canvas')) {
+              return 'vendor-html2canvas';
+            }
+            
+            // Crypto and encoding libraries - group together (all small)
+            if (id.includes('bs58') || id.includes('buffer') || 
+                id.includes('crypto-js') || id.includes('bip39') || 
+                id.includes('ed25519')) {
+              return 'vendor-crypto';
+            }
+            
+            // Other utilities
+            if (id.includes('js-cookie') || id.includes('clsx') || 
+                id.includes('tailwind-merge') || id.includes('class-variance')) {
+              return 'vendor-utils';
+            }
+            
+            // Everything else
+            return 'vendor-misc';
+          }
         },
         
         // Optimize chunk size
@@ -93,12 +116,26 @@ export default defineConfig({
     terserOptions: {
       compress: {
         drop_console: true,
-        drop_debugger: true
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+        passes: 2
+      },
+      mangle: {
+        safari10: true
       }
     },
     
-    // Set chunk size warning limit
-    chunkSizeWarningLimit: 500
+    // Set chunk size warning limit (increased to 600KB since we're splitting more)
+    chunkSizeWarningLimit: 600,
+    
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+    
+    // Improve tree shaking
+    reportCompressedSize: true,
+    
+    // Source maps for production debugging (optional, can be disabled for smaller builds)
+    sourcemap: false
   },
   
   // Development server configuration
