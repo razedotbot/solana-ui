@@ -1,4 +1,4 @@
-import type { RecentToken } from '../types/recentTokens';
+import type { RecentToken } from './types';
 
 const STORAGE_KEY = 'raze_recent_tokens';
 const MAX_RECENT_TOKENS = 10;
@@ -6,11 +6,7 @@ const MAX_RECENT_TOKENS = 10;
 /**
  * Add a token to recent history
  */
-export const addRecentToken = (
-  address: string,
-  symbol?: string,
-  name?: string
-): void => {
+export const addRecentToken = (address: string): void => {
   try {
     const recent = getRecentTokens();
     
@@ -20,8 +16,6 @@ export const addRecentToken = (
     // Add new entry at the beginning
     const newToken: RecentToken = {
       address,
-      symbol,
-      name,
       lastViewed: Date.now()
     };
     
@@ -40,8 +34,6 @@ export const addRecentToken = (
       try {
         const newToken: RecentToken = {
           address,
-          symbol,
-          name,
           lastViewed: Date.now()
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify([newToken]));

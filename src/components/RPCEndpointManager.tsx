@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
 import type { RPCEndpoint } from '../utils/rpcManager';
 
@@ -17,9 +17,64 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({ endpoint
   const [newEndpointUrl, setNewEndpointUrl] = useState('');
   const [newEndpointName, setNewEndpointName] = useState('');
   const [showPresets, setShowPresets] = useState(false);
+  const hasInitializedWeights = useRef(false);
+
+  const normalizeWeights = (endpointsToNormalize: RPCEndpoint[]): void => {
+    const active = endpointsToNormalize.filter(e => e.isActive);
+    if (active.length === 0) return;
+
+    const currentTotal = active.reduce((sum, e) => sum + (e.weight || 0), 0);
+    
+    if (currentTotal === 0) {
+      // Distribute evenly if no weights set
+      const evenWeight = Math.round(100 / active.length);
+      endpointsToNormalize.forEach(e => {
+        if (e.isActive) {
+          e.weight = evenWeight;
+        }
+      });
+    } else if (currentTotal !== 100) {
+      // Normalize proportionally to total 100
+      endpointsToNormalize.forEach(e => {
+        if (e.isActive && e.weight !== undefined) {
+          e.weight = Math.round((e.weight / currentTotal) * 100);
+        }
+      });
+    }
+  };
+
+  // Initialize weights for endpoints that don't have them (backward compatibility)
+  useEffect(() => {
+    // Only initialize once to avoid infinite loops
+    if (hasInitializedWeights.current) return;
+    
+    const needsWeightInit = endpoints.some(e => e.isActive && (e.weight === undefined || e.weight === null));
+    if (needsWeightInit) {
+      hasInitializedWeights.current = true;
+      const active = endpoints.filter(e => e.isActive);
+      const evenWeight = active.length > 0 ? Math.round(100 / active.length) : 0;
+      const updatedEndpoints = endpoints.map(e => {
+        if (e.isActive && (e.weight === undefined || e.weight === null)) {
+          return { ...e, weight: evenWeight };
+        }
+        return e;
+      });
+      // Normalize to ensure total is 100
+      normalizeWeights(updatedEndpoints);
+      onChange(updatedEndpoints);
+    }
+  }, [endpoints, onChange]); // Include dependencies as required by ESLint
+
+  // Calculate total weight of active endpoints
+  const activeEndpoints = endpoints.filter(e => e.isActive);
+  const totalWeight = activeEndpoints.reduce((sum, e) => sum + (e.weight || 0), 0);
 
   const addEndpoint = (): void => {
     if (!newEndpointUrl.trim()) return;
+
+    // Calculate default weight for new endpoint
+    const activeCount = endpoints.filter(e => e.isActive).length;
+    const defaultWeight = activeCount > 0 ? Math.round(100 / (activeCount + 1)) : 100;
 
     const newEndpoint: RPCEndpoint = {
       id: `rpc-${Date.now()}`,
@@ -27,12 +82,29 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({ endpoint
       name: newEndpointName.trim() || `RPC ${endpoints.length + 1}`,
       isActive: true,
       priority: endpoints.length + 1,
+      weight: defaultWeight,
       failureCount: 0,
     };
 
-    onChange([...endpoints, newEndpoint]);
+    // Normalize existing weights when adding new endpoint
+    const updatedEndpoints = [...endpoints, newEndpoint];
+    normalizeWeights(updatedEndpoints);
+    onChange(updatedEndpoints);
     setNewEndpointUrl('');
     setNewEndpointName('');
+  };
+
+  const updateEndpointWeight = (id: string, newWeight: number): void => {
+    const updatedEndpoints = endpoints.map(e => {
+      if (e.id === id) {
+        return { ...e, weight: Math.max(0, Math.min(100, newWeight)) };
+      }
+      return e;
+    });
+
+    // Normalize weights to total 100
+    normalizeWeights(updatedEndpoints);
+    onChange(updatedEndpoints);
   };
 
   const removeEndpoint = (id: string): void => {
@@ -40,7 +112,10 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({ endpoint
       alert('You must have at least one active RPC endpoint');
       return;
     }
-    onChange(endpoints.filter(e => e.id !== id));
+    const updatedEndpoints = endpoints.filter(e => e.id !== id);
+    // Normalize weights after removal
+    normalizeWeights(updatedEndpoints);
+    onChange(updatedEndpoints);
   };
 
   const toggleEndpoint = (id: string): void => {
@@ -52,11 +127,13 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({ endpoint
       return;
     }
 
-    onChange(
-      endpoints.map(e =>
-        e.id === id ? { ...e, isActive: !e.isActive } : e
-      )
+    const updatedEndpoints = endpoints.map(e =>
+      e.id === id ? { ...e, isActive: !e.isActive } : e
     );
+
+    // Normalize weights when toggling endpoints
+    normalizeWeights(updatedEndpoints);
+    onChange(updatedEndpoints);
   };
 
   const movePriority = (id: string, direction: 'up' | 'down'): void => {
@@ -87,9 +164,20 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({ endpoint
         <div className="text-[10px] sm:text-xs font-mono mb-3 flex items-start gap-2" style={{ color: 'var(--app-secondary-80, rgba(125, 223, 189, 0.8))' }}>
           <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
           <span>
-            Add multiple RPC endpoints for automatic rotation and fallback. Endpoints are tried in order until one succeeds.
+            Add multiple RPC endpoints with weights for weighted selection. Weights should total 100% across all active endpoints.
           </span>
         </div>
+        
+        {/* Weight Total Indicator */}
+        {activeEndpoints.length > 0 && (
+          <div className={`text-[10px] font-mono mb-2 px-2 py-1 rounded ${
+            totalWeight === 100 
+              ? 'bg-app-primary-color/20 text-app-primary-color border border-app-primary-color/40' 
+              : 'bg-ping-poor-10 text-ping-poor border border-ping-poor/40'
+          }`}>
+            Total Weight: {totalWeight}% {totalWeight !== 100 && '(Should be 100%)'}
+          </div>
+        )}
 
         {/* Endpoint List */}
         <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -131,6 +219,27 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({ endpoint
                   {endpoint.url}
                 </div>
               </div>
+
+              {/* Weight Input */}
+              {endpoint.isActive && (
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[9px] font-mono text-app-secondary-80 whitespace-nowrap">
+                    Weight:
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={endpoint.weight || 0}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      updateEndpointWeight(endpoint.id, value);
+                    }}
+                    className="w-14 bg-app-quaternary border border-app-primary-30 rounded px-1.5 py-0.5 text-[10px] text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
+                  />
+                  <span className="text-[9px] font-mono text-app-secondary-60">%</span>
+                </div>
+              )}
 
               {/* Status Badge */}
               {endpoint.failureCount > 0 && (

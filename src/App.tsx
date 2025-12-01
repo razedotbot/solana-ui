@@ -1,22 +1,25 @@
 import React, { useEffect, lazy, useCallback, useReducer, useMemo, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronDown, Settings, Wrench, Bot, Blocks } from 'lucide-react';
+import { ChevronDown, Settings, Wrench, Bot, Blocks, RefreshCw, Wallet, BookOpen, Columns2 } from 'lucide-react';
+import { brand } from './utils/brandConfig';
 import type { Connection } from '@solana/web3.js';
-import ServiceSelector from './components/Menu';
-import { initStyles } from './styles/Styles';
-import { 
+import logo from './logo.png';
+import ServerSelector from './components/ServerSelector';
+import { initStyles } from './components/Styles';
+import {
   saveWalletsToCookies,
   loadQuickBuyPreferencesFromCookies,
   saveQuickBuyPreferencesToCookies,
-  type WalletType, 
-  type ConfigType,
-} from './Utils';
-import Split from './components/Split';
-import {
   fetchWalletBalances,
-  handleSortWallets
+  handleSortWallets,
+  saveSplitSizesToCookies,
+  loadSplitSizesFromCookies,
+  saveViewModeToCookies,
+  loadViewModeFromCookies,
+  type ViewMode
 } from './Utils';
-import type { IframeData, ServerInfo } from './types/api';
+import type { WalletType, ConfigType, IframeData, ServerInfo, WalletCategory, CategoryQuickTradeSettings } from './utils/types';
+import Split from './components/Split';
 import { addRecentToken } from './utils/recentTokens';
 import { useAppContext } from './contexts/useAppContext';
 
@@ -36,30 +39,14 @@ const ActionsPage = lazy(() => import('./Actions').then(module => ({ default: mo
 const MobileLayout = lazy(() => import('./Mobile'));
 
 // Import modal components 
-const PnlModal = lazy(() => import('./modals/CalculatePNLModal').then(module => ({ default: module.PnlModal })));
+const PnlModal = lazy(() => import('./components/modals/CalculatePNLModal').then(module => ({ default: module.PnlModal })));
 
-// Developer tools (development only)
-// Theme customizer removed
-
-const ToolsDropdown: React.FC<{
-  onAutomateClick: () => void;
-  onDeployClick: () => void;
-  onSettingsClick: () => void;
-}> = ({ onAutomateClick, onDeployClick, onSettingsClick }) => {
+const ToolsDropdown: React.FC = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleAutomateClick = (): void => {
-    onAutomateClick();
-    setIsOpen(false);
-  };
-
-  const handleDeployClick = (): void => {
-    onDeployClick();
-    setIsOpen(false);
-  };
-
-  const handleSettingsClick = (): void => {
-    onSettingsClick();
+  const handleItemClick = (action: () => void): void => {
+    action();
     setIsOpen(false);
   };
 
@@ -72,11 +59,11 @@ const ToolsDropdown: React.FC<{
       >
         <Wrench size={16} className="color-primary" />
         <span className="text-xs font-mono color-primary font-medium tracking-wider">
-          TOOLS
+          MENU
         </span>
-        <ChevronDown 
-          size={12} 
-          className={`text-app-primary-40 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+        <ChevronDown
+          size={12}
+          className={`text-app-primary-40 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -84,27 +71,39 @@ const ToolsDropdown: React.FC<{
       {isOpen && (
         <>
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-40" 
+          <div
+            className="fixed inset-0 z-40"
             onClick={(): void => setIsOpen(false)}
           />
-          
+
           {/* Dropdown Panel */}
           <div className="absolute top-full right-0 mt-1 w-48 z-50">
-            <div className="bg-app-secondary border border-app-primary-20 rounded overflow-hidden shadow-xl">
+            <div className="bg-app-secondary border border-app-primary-20 rounded overflow-hidden shadow-xl max-h-[80vh] overflow-y-auto">
               {/* Header */}
               <div className="px-3 py-2 border-b border-app-primary-10">
                 <div className="flex items-center gap-2 text-[10px] font-mono text-app-secondary uppercase tracking-widest">
                   <Wrench size={10} />
-                  TOOLS
+                  MENU
                 </div>
               </div>
-              
+
               {/* Tools List */}
               <div className="py-1">
+
+                {/* Wallets */}
+                <button
+                  onClick={() => handleItemClick(() => navigate('/wallets'))}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                >
+                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
+                    <Wallet size={14} className="color-primary" />
+                  </div>
+                  <span className="text-xs font-mono font-medium">Wallets</span>
+                </button>
+
                 {/* Automate */}
                 <button
-                  onClick={handleAutomateClick}
+                  onClick={() => handleItemClick(() => navigate('/automate'))}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
@@ -115,7 +114,7 @@ const ToolsDropdown: React.FC<{
 
                 {/* Deploy */}
                 <button
-                  onClick={handleDeployClick}
+                  onClick={() => handleItemClick(() => navigate('/deploy'))}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
@@ -124,9 +123,20 @@ const ToolsDropdown: React.FC<{
                   <span className="text-xs font-mono font-medium">Deploy</span>
                 </button>
 
+                {/* Docs */}
+                <button
+                  onClick={() => handleItemClick(() => window.open(brand.docsUrl, '_blank', 'noopener,noreferrer'))}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                >
+                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
+                    <BookOpen size={14} className="color-primary" />
+                  </div>
+                  <span className="text-xs font-mono font-medium">Documentation</span>
+                </button>
+
                 {/* Settings */}
                 <button
-                  onClick={handleSettingsClick}
+                  onClick={() => handleItemClick(() => navigate('/settings'))}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
@@ -146,7 +156,7 @@ const ToolsDropdown: React.FC<{
 const WalletManager: React.FC = () => {
   const { tokenAddress: tokenAddressParam } = useParams<{ tokenAddress?: string }>();
   const navigate = useNavigate();
-  const { 
+  const {
     wallets: contextWallets,
     setWallets: setContextWallets,
     config: contextConfig,
@@ -156,29 +166,173 @@ const WalletManager: React.FC = () => {
     solBalances: contextSolBalances,
     setSolBalances: setContextSolBalances,
     tokenBalances: contextTokenBalances,
-    setTokenBalances: setContextTokenBalances,
-    isRefreshing: contextIsRefreshing
+    setTokenBalances: setContextTokenBalances
   } = useAppContext();
-  
+
   // Detect if we're on mobile or desktop to conditionally render layouts
   const [isMobile, setIsMobile] = useState(false);
-  
+
   useEffect(() => {
     const checkMobile = (): void => {
       setIsMobile(window.innerWidth < 768); // md breakpoint is 768px
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Track left column width for responsive header
+  const [leftColumnWidth, setLeftColumnWidth] = useState<number>(0);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
   
+  // View mode state - Simple (left column hidden) or Advanced (left column visible)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewModeFromCookies());
+  
+  // Store advanced sizes separately so we can restore them when switching back from simple mode
+  const [savedAdvancedSizes, setSavedAdvancedSizes] = useState<number[]>(() => {
+    const savedSizes = loadSplitSizesFromCookies();
+    return savedSizes || [25, 75];
+  });
+  
+  // Split panel sizes - load from cookies or use defaults
+  const [splitSizes, setSplitSizes] = useState<number[]>(() => {
+    const savedMode = loadViewModeFromCookies();
+    if (savedMode === 'simple') {
+      return [0, 100]; // Simple mode: left column hidden
+    }
+    const savedSizes = loadSplitSizesFromCookies();
+    return savedSizes || [25, 75]; // Default sizes
+  });
+
+  // Category settings for quick trade (loaded from localStorage)
+  const [categorySettings, setCategorySettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings>>(() => {
+    const saved = localStorage.getItem('categoryQuickTradeSettings');
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Record<WalletCategory, CategoryQuickTradeSettings>;
+      } catch (error) {
+        console.error('Error loading category settings:', error);
+      }
+    }
+    // Default settings
+    return {
+      Soft: {
+        enabled: true,
+        buyAmount: 0.01,
+        buyMinAmount: 0.01,
+        buyMaxAmount: 0.03,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      },
+      Medium: {
+        enabled: true,
+        buyAmount: 0.05,
+        buyMinAmount: 0.03,
+        buyMaxAmount: 0.07,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      },
+      Hard: {
+        enabled: true,
+        buyAmount: 0.1,
+        buyMinAmount: 0.07,
+        buyMaxAmount: 0.15,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      }
+    };
+  });
+  
+  // Sync categorySettings with localStorage when window gains focus or storage changes
+  useEffect(() => {
+    const syncCategorySettings = (): void => {
+      const saved = localStorage.getItem('categoryQuickTradeSettings');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as Record<WalletCategory, CategoryQuickTradeSettings>;
+          setCategorySettings(parsed);
+        } catch (error) {
+          console.error('Error syncing category settings:', error);
+        }
+      }
+    };
+
+    // Sync when window gains focus (user might have changed settings on another page)
+    window.addEventListener('focus', syncCategorySettings);
+    // Also sync on storage events (for cross-tab sync)
+    window.addEventListener('storage', syncCategorySettings);
+    
+    return () => {
+      window.removeEventListener('focus', syncCategorySettings);
+      window.removeEventListener('storage', syncCategorySettings);
+    };
+  }, []);
+
+  // Save split sizes to cookies when they change (debounced) - only in advanced mode
+  useEffect(() => {
+    if (viewMode === 'advanced' && splitSizes[0] > 5) {
+      const timeoutId = setTimeout(() => {
+        saveSplitSizesToCookies(splitSizes);
+        setSavedAdvancedSizes(splitSizes);
+      }, 300); // Debounce by 300ms to avoid excessive cookie writes
+      
+      return (): void => { clearTimeout(timeoutId); };
+    }
+    return undefined;
+  }, [splitSizes, viewMode]);
+  
+  // Save view mode to cookies when it changes
+  useEffect(() => {
+    saveViewModeToCookies(viewMode);
+  }, [viewMode]);
+  
+  // Handle view mode toggle
+  const handleViewModeToggle = useCallback(() => {
+    if (viewMode === 'simple') {
+      // Switch to advanced: restore saved sizes
+      setViewMode('advanced');
+      setSplitSizes(savedAdvancedSizes);
+    } else {
+      // Switch to simple: save current sizes and collapse left panel
+      setSavedAdvancedSizes(splitSizes);
+      saveSplitSizesToCookies(splitSizes);
+      setViewMode('simple');
+      setSplitSizes([0, 100]);
+    }
+  }, [viewMode, splitSizes, savedAdvancedSizes]);
+
+  useEffect(() => {
+    if (!leftColumnRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setLeftColumnWidth(entry.contentRect.width);
+      }
+    });
+
+    resizeObserver.observe(leftColumnRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   // Apply styles
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.textContent = initStyles();
     document.head.appendChild(styleElement);
-    
+
     return (): void => {
       // Safely remove style element if it's still a child
       if (styleElement.parentNode === document.head) {
@@ -223,20 +377,20 @@ const WalletManager: React.FC = () => {
     quickSellMaxPercentage: number;
     useQuickSellRange: boolean;
     iframeData: IframeData | null;
-  nonWhitelistedTrades: {
-    type: 'buy' | 'sell';
-    address: string;
-    tokensAmount: number;
-    avgPrice: number;
-    solAmount: number;
-    timestamp: number;
-    signature: string;
-    tokenMint: string;
-    marketCap: number;
-  }[];
+    nonWhitelistedTrades: {
+      type: 'buy' | 'sell';
+      address: string;
+      tokensAmount: number;
+      avgPrice: number;
+      solAmount: number;
+      timestamp: number;
+      signature: string;
+      tokenMint: string;
+      marketCap: number;
+    }[];
   }
 
-  type AppAction = 
+  type AppAction =
     | { type: 'SET_COPIED_ADDRESS'; payload: string | null }
     | { type: 'SET_TOKEN_ADDRESS'; payload: string }
     | { type: 'SET_CONFIG'; payload: ConfigType }
@@ -272,14 +426,14 @@ const WalletManager: React.FC = () => {
 
   // Determine token address from route
   const routeTokenAddress = tokenAddressParam || '';
-  
+
   const initialState: AppState = {
     copiedAddress: null,
     tokenAddress: routeTokenAddress,
     config: contextConfig,
     currentPage: 'wallets',
     wallets: contextWallets,
-    isRefreshing: contextIsRefreshing,
+    isRefreshing: false, // Always start fresh - don't inherit stale refreshing state from context
     connection: contextConnection,
     solBalances: contextSolBalances,
     tokenBalances: contextTokenBalances,
@@ -423,7 +577,7 @@ const WalletManager: React.FC = () => {
       dispatch({ type: 'SET_TOKEN_ADDRESS', payload: address });
       // Navigate to the new token route
       if (address) {
-        navigate(`/token/${address}`);
+        navigate(`/tokens/${address}`);
       } else {
         navigate('/monitor');
       }
@@ -454,7 +608,6 @@ const WalletManager: React.FC = () => {
     setSortDirection: (direction: 'asc' | 'desc'): void => dispatch({ type: 'SET_SORT_DIRECTION', payload: direction }),
     setTickEffect: (effect: boolean): void => dispatch({ type: 'SET_TICK_EFFECT', payload: effect }),
 
-    setAutomateCardOpen: (open: boolean): void => dispatch({ type: 'SET_AUTOMATE_CARD_OPEN', payload: open }),
     setAutomateCardPosition: (position: { x: number; y: number }): void => dispatch({ type: 'SET_AUTOMATE_CARD_POSITION', payload: position }),
     setAutomateCardDragging: (dragging: boolean): void => dispatch({ type: 'SET_AUTOMATE_CARD_DRAGGING', payload: dragging }),
     setQuickBuyEnabled: (enabled: boolean): void => dispatch({ type: 'SET_QUICK_BUY_ENABLED', payload: enabled }),
@@ -486,27 +639,27 @@ const WalletManager: React.FC = () => {
   useEffect(() => {
     if (state.iframeData?.recentTrades && state.iframeData.recentTrades.length > 0) {
       const latestTrade = state.iframeData.recentTrades[0];
-      
+
       // Create a unique key for this trade (address + signature + timestamp)
       const tradeKey = `${latestTrade.address}-${latestTrade.signature}-${latestTrade.timestamp}`;
-      
+
       // Skip if we've already processed this trade
       if (processedTradesRef.current.has(tradeKey)) {
         return;
       }
-      
+
       // Find the wallet that made the trade
       const tradingWallet = state.wallets.find(wallet => wallet.address === latestTrade.address);
-      
+
       if (tradingWallet) {
         // Get current balances
         const currentSolBalance = state.solBalances.get(latestTrade.address) || 0;
         const currentTokenBalance = state.tokenBalances.get(latestTrade.address) || 0;
-        
+
         // Calculate new balances based on trade type
         let newSolBalance = currentSolBalance;
         let newTokenBalance = currentTokenBalance;
-        
+
         if (latestTrade.type === 'buy') {
           // For buy trades: decrease SOL, increase tokens
           newSolBalance = Math.max(0, currentSolBalance - latestTrade.solAmount);
@@ -516,12 +669,12 @@ const WalletManager: React.FC = () => {
           newSolBalance = currentSolBalance + latestTrade.solAmount;
           newTokenBalance = Math.max(0, currentTokenBalance - latestTrade.tokensAmount);
         }
-        
+
         // Update balances if they changed
         if (newSolBalance !== currentSolBalance || newTokenBalance !== currentTokenBalance) {
           // Mark this trade as processed before dispatching
           processedTradesRef.current.add(tradeKey);
-          
+
           dispatch({
             type: 'UPDATE_BALANCE',
             payload: {
@@ -549,20 +702,14 @@ const WalletManager: React.FC = () => {
   // Track token views in recent tokens
   useEffect(() => {
     if (state.tokenAddress && state.iframeData) {
-      // Track the token - symbol and name will be undefined for now
-      // They can be enriched later when token metadata is available
-      addRecentToken(
-        state.tokenAddress,
-        undefined,
-        undefined
-      );
+      addRecentToken(state.tokenAddress);
     }
   }, [state.tokenAddress, state.iframeData]);
 
 
 
 
-  
+
   // Initialize app on mount - load quick buy preferences
   useEffect(() => {
     const initializeApp = (): void => {
@@ -606,7 +753,7 @@ const WalletManager: React.FC = () => {
     };
 
     window.addEventListener('openSettingsWalletsTab', handleOpenSettingsWalletsTab);
-    
+
     return (): void => {
       window.removeEventListener('openSettingsWalletsTab', handleOpenSettingsWalletsTab);
     };
@@ -640,7 +787,7 @@ const WalletManager: React.FC = () => {
   }, [contextConnection, state.connection, memoizedCallbacks]);
 
   // Create a stable wallet identifier that only changes when wallet addresses change (not selection)
-  const walletAddresses = useMemo(() => 
+  const walletAddresses = useMemo(() =>
     state.wallets.map(w => w.address).sort().join(','),
     [state.wallets]
   );
@@ -677,9 +824,9 @@ const WalletManager: React.FC = () => {
     // Use rpcManager for rotation if available, otherwise fall back to connection
     const connectionOrRpcManager = contextRpcManager || state.connection;
     if (!connectionOrRpcManager || state.wallets.length === 0) return;
-    
+
     memoizedCallbacks.setIsRefreshing(true);
-    
+
     try {
       // Use the consolidated fetchWalletBalances function with current balances to preserve them on errors
       // Pass rpcManager to enable RPC rotation for each wallet
@@ -725,7 +872,7 @@ const WalletManager: React.FC = () => {
     <div className="relative h-screen overflow-hidden bg-app-primary text-app-tertiary bg">
       {/*  scanline effect */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-10"></div>
-      
+
 
       {/* Main Content - Full Height */}
       <div className="flex flex-col md:flex-row h-screen">
@@ -734,17 +881,30 @@ const WalletManager: React.FC = () => {
           <div className="w-full h-full relative flex">
             <Split
               className="flex flex-1 h-full split-custom"
-              sizes={[25, 75]}
+              sizes={splitSizes}
               minSize={[0, 250]}
-              gutterSize={12}
+              gutterSize={viewMode === 'simple' ? 0 : 12}
               gutterAlign="center"
               direction="horizontal"
               dragInterval={1}
               snapOffset={30}
+              onDragEnd={(sizes: number[]): void => {
+                setSplitSizes(sizes);
+                // Auto-detect collapse: if left column is below 5%, switch to simple mode
+                if (sizes[0] < 5 && viewMode === 'advanced') {
+                  setViewMode('simple');
+                  setSplitSizes([0, 100]);
+                }
+              }}
               gutter={(_index, direction): HTMLDivElement => {
                 const gutter = document.createElement('div');
                 gutter.className = `gutter gutter-${direction} gutter-animated`;
                 
+                // Hide gutter in simple mode
+                if (viewMode === 'simple') {
+                  gutter.style.display = 'none';
+                }
+
                 // Add dots pattern
                 for (let i = 0; i < 5; i++) {
                   const dot = document.createElement('div');
@@ -752,126 +912,185 @@ const WalletManager: React.FC = () => {
                   dot.style.animationDelay = `${i * 0.1}s`;
                   gutter.appendChild(dot);
                 }
-                
+
                 return gutter;
               }}
             >
               {/* Left Column */}
-            <div 
-              className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col"
-            >
-              {/* Top Navigation - Left Column */}
-              <nav className="sticky top-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
-                <div className="flex items-center gap-2 md:gap-3">
-                  {/* Service Selector */}
-                  <ServiceSelector />
-                  
-                  {/* Spacer to push items to the right */}
-                  <div className="flex-1"></div>
-                  
-                  {/* Tools Dropdown */}
-                  <ToolsDropdown
-                    onAutomateClick={(): void => memoizedCallbacks.setAutomateCardOpen(true)}
-                    onDeployClick={(): void => navigate('/deploy')}
-                    onSettingsClick={(): void => navigate('/settings')}
-                  />
-                </div>
-              </nav>
-              
-              {/* Wallets Page Content */}
-              <div className="flex-1 overflow-y-auto">
-                {state.connection && (
-                  <WalletsPage
-                  wallets={state.wallets}
-                  setWallets={memoizedCallbacks.setWallets}
-                  handleRefresh={handleRefresh}
-                  isRefreshing={state.isRefreshing}
-                  setIsModalOpen={(): void => navigate('/wallets')}
-                  tokenAddress={state.tokenAddress}
-                  sortDirection={state.sortDirection}
-                  handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
-                  connection={state.connection}
-                  solBalances={state.solBalances}
-                  setSolBalances={memoizedCallbacks.setSolBalances}
-                  tokenBalances={state.tokenBalances}
-                  quickBuyEnabled={state.quickBuyEnabled}
-                  setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
-                  quickBuyAmount={state.quickBuyAmount}
-                  setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
-                  quickBuyMinAmount={state.quickBuyMinAmount}
-                  setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
-                  quickBuyMaxAmount={state.quickBuyMaxAmount}
-                  setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
-                  useQuickBuyRange={state.useQuickBuyRange}
-                  setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
-                  quickSellPercentage={state.quickSellPercentage}
-                  setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
-                  quickSellMinPercentage={state.quickSellMinPercentage}
-                  setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
-                  quickSellMaxPercentage={state.quickSellMaxPercentage}
-                  setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
-                  useQuickSellRange={state.useQuickSellRange}
-                  setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
-                />
-              )}
-              </div>
-            </div>
+              <div
+                ref={leftColumnRef}
+                className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col"
+              >
+                {/* Top Navigation - Left Column */}
+                <nav className="sticky top-0 border-b border-app-primary-70 px-1 sm:px-2 md:px-4 py-1.5 sm:py-2 backdrop-blur-sm bg-app-primary-99 z-30">
+                  <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+                    {/* Logo button that redirects to home */}
+                    <div className="min-w-0 flex-shrink-0">
+                      <button
+                        onClick={() => navigate('/')}
+                        className="flex items-center justify-center p-2 overflow-hidden
+                                border border-app-primary-30 hover-border-primary-60 rounded 
+                                transition-all duration-300 btn"
+                      >
+                        <div 
+                          className="flex items-center hover:scale-105 active:scale-95 transition-transform"
+                        >
+                          <img 
+                            src={logo} 
+                            alt={brand.altText} 
+                            className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
+                          />
+                        </div>
+                      </button>
+                    </div>
 
-            {/* Middle Column */}
-            <div className="backdrop-blur-sm bg-app-primary-99 border-l border-r border-app-primary-40 overflow-y-auto">
-              <Frame
-                isLoadingChart={state.isLoadingChart}
-                tokenAddress={state.tokenAddress}
-                wallets={state.wallets}
-                onDataUpdate={memoizedCallbacks.setIframeData}
-                onTokenSelect={memoizedCallbacks.setTokenAddress}
-                onNonWhitelistedTrade={handleNonWhitelistedTrade}
-                quickBuyEnabled={state.quickBuyEnabled}
-                quickBuyAmount={state.quickBuyAmount}
-                quickBuyMinAmount={state.quickBuyMinAmount}
-                quickBuyMaxAmount={state.quickBuyMaxAmount}
-                useQuickBuyRange={state.useQuickBuyRange}
-              />
+                    {/* Spacer to push items to the right */}
+                    <div className="flex-1 min-w-0"></div>
+
+                    {/* Right-aligned buttons container */}
+                    <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+                      {/* Refresh Button */}
+                      <button
+                        onClick={handleRefresh}
+                        disabled={state.isRefreshing || !state.connection}
+                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${leftColumnWidth > 200 ? 'min-w-auto' : 'min-w-[32px]'}`}
+                        title="Refresh wallet balances"
+                      >
+                        <RefreshCw
+                          size={14}
+                          className={`sm:w-4 sm:h-4 color-primary ${state.isRefreshing ? 'animate-spin' : ''}`}
+                        />
+                        {leftColumnWidth > 200 && (
+                          <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                            REFRESH
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Wallets Page Button */}
+                      <button
+                        onClick={(): void => navigate('/wallets')}
+                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${leftColumnWidth > 200 ? 'min-w-auto' : 'min-w-[32px]'}`}
+                        title="Open wallets page"
+                      >
+                        <Wallet size={14} className="sm:w-4 sm:h-4 color-primary" />
+                        {leftColumnWidth > 200 && (
+                          <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                            WALLETS
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </nav>
+
+                {/* Wallets Page Content */}
+                <div className="flex-1 overflow-y-auto">
+                  {state.connection && (
+                    <WalletsPage
+                      wallets={state.wallets}
+                      setWallets={memoizedCallbacks.setWallets}
+                      handleRefresh={handleRefresh}
+                      isRefreshing={state.isRefreshing}
+                      setIsModalOpen={(): void => navigate('/wallets')}
+                      tokenAddress={state.tokenAddress}
+                      sortDirection={state.sortDirection}
+                      handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
+                      connection={state.connection}
+                      solBalances={state.solBalances}
+                      setSolBalances={memoizedCallbacks.setSolBalances}
+                      tokenBalances={state.tokenBalances}
+                      quickBuyEnabled={state.quickBuyEnabled}
+                      setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
+                      quickBuyAmount={state.quickBuyAmount}
+                      setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
+                      quickBuyMinAmount={state.quickBuyMinAmount}
+                      setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
+                      quickBuyMaxAmount={state.quickBuyMaxAmount}
+                      setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
+                      useQuickBuyRange={state.useQuickBuyRange}
+                      setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
+                      quickSellPercentage={state.quickSellPercentage}
+                      setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
+                      quickSellMinPercentage={state.quickSellMinPercentage}
+                      setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
+                      quickSellMaxPercentage={state.quickSellMaxPercentage}
+                      setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
+                      useQuickSellRange={state.useQuickSellRange}
+                      setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
+                      categorySettings={categorySettings}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Middle Column */}
+              <div className="backdrop-blur-sm bg-app-primary-99 border-l border-r border-app-primary-40 overflow-y-auto">
+                <Frame
+                  isLoadingChart={state.isLoadingChart}
+                  tokenAddress={state.tokenAddress}
+                  wallets={state.wallets}
+                  onDataUpdate={memoizedCallbacks.setIframeData}
+                  onTokenSelect={memoizedCallbacks.setTokenAddress}
+                  onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                  quickBuyEnabled={state.quickBuyEnabled}
+                  quickBuyAmount={state.quickBuyAmount}
+                  quickBuyMinAmount={state.quickBuyMinAmount}
+                  quickBuyMaxAmount={state.quickBuyMaxAmount}
+                  useQuickBuyRange={state.useQuickBuyRange}
+                />
+              </div>
+            </Split>
+
+            {/* Non-resizable divider between middle and right column */}
+            <div className="gutter-divider gutter-divider-non-resizable">
             </div>
-          </Split>
 
             {/* Right Column - Fixed Width */}
-            <div className="backdrop-blur-sm bg-app-primary-99 border-l border-app-primary-40 overflow-y-auto relative" style={{ width: '350px', minWidth: '350px', maxWidth: '350px' }}>
+            <div className="backdrop-blur-sm bg-app-primary-99 overflow-hidden relative flex flex-col" style={{ width: '350px', minWidth: '350px', maxWidth: '350px' }}>
               {/* Top Navigation - Only over Actions column */}
-              <nav className="sticky top-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
-                <div className="flex items-center gap-2 md:gap-3">
-                  {/* Service Selector */}
-                  <ServiceSelector />
-                  
-                  {/* Spacer to push items to the right */}
-                  <div className="flex-1"></div>
-                  
+              <nav className="flex-shrink-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
+                <div className="flex items-center justify-between">
+                  {/* Server Selector */}
+                  <div className="flex items-center gap-2 px-2">
+                    <ServerSelector />
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <button
+                    onClick={handleViewModeToggle}
+                    className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                    title={viewMode === 'simple' ? 'Switch to Advanced mode' : 'Switch to Simple mode'}
+                  >
+                    <Columns2 size={16} className={`color-primary transition-opacity ${viewMode === 'simple' ? 'opacity-50' : 'opacity-100'}`} />
+                    <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                      {viewMode === 'simple' ? 'SIMPLE' : 'ADVANCED'}
+                    </span>
+                  </button>
+
                   {/* Tools Dropdown */}
-                  <ToolsDropdown
-                    onAutomateClick={(): void => memoizedCallbacks.setAutomateCardOpen(true)}
-                    onDeployClick={(): void => navigate('/deploy')}
-                    onSettingsClick={(): void => navigate('/settings')}
-                  />
+                  <ToolsDropdown />
                 </div>
               </nav>
-              
+
               <ActionsPage
-              tokenAddress={state.tokenAddress}
-              setTokenAddress={memoizedCallbacks.setTokenAddress}
-              transactionFee={state.config.transactionFee}
-              handleRefresh={handleRefresh}
-              wallets={state.wallets}
-              solBalances={state.solBalances}
-              tokenBalances={state.tokenBalances}
-              currentMarketCap={state.currentMarketCap}
-              setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
-              isAutomateCardOpen={state.automateCard.isOpen}
-              automateCardPosition={state.automateCard.position}
-              setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
-              isAutomateCardDragging={state.automateCard.isDragging}
-              setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
-              iframeData={state.iframeData}
-            />
+                tokenAddress={state.tokenAddress}
+                setTokenAddress={memoizedCallbacks.setTokenAddress}
+                transactionFee={state.config.transactionFee}
+                handleRefresh={handleRefresh}
+                wallets={state.wallets}
+                setWallets={memoizedCallbacks.setWallets}
+                solBalances={state.solBalances}
+                tokenBalances={state.tokenBalances}
+                currentMarketCap={state.currentMarketCap}
+                setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
+                isAutomateCardOpen={state.automateCard.isOpen}
+                automateCardPosition={state.automateCard.position}
+                setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
+                isAutomateCardDragging={state.automateCard.isDragging}
+                setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
+                iframeData={state.iframeData}
+              />
             </div>
           </div>
         )}
@@ -879,123 +1098,132 @@ const WalletManager: React.FC = () => {
         {/* Mobile Layout - Only render when mobile */}
         {isMobile && (
           <MobileLayout
-          currentPage={state.currentPage}
-          setCurrentPage={memoizedCallbacks.setCurrentPage}
-          children={{
-            WalletsPage: (
-              state.connection ? (
-                <WalletsPage
-                  wallets={state.wallets}
-                  setWallets={memoizedCallbacks.setWallets}
-                  handleRefresh={handleRefresh}
-                  isRefreshing={state.isRefreshing}
-                  setIsModalOpen={(): void => navigate('/wallets')}
-                  tokenAddress={state.tokenAddress}
-                  sortDirection={state.sortDirection}
-                  handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
-                  connection={state.connection}
-                  solBalances={state.solBalances}
-                  tokenBalances={state.tokenBalances}
-                  quickBuyEnabled={state.quickBuyEnabled}
-                  setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
-                  quickBuyAmount={state.quickBuyAmount}
-                  setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
-                  quickBuyMinAmount={state.quickBuyMinAmount}
-                  setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
-                  quickBuyMaxAmount={state.quickBuyMaxAmount}
-                  setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
-                  useQuickBuyRange={state.useQuickBuyRange}
-                  setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
-                  quickSellPercentage={state.quickSellPercentage}
-                  setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
-                  quickSellMinPercentage={state.quickSellMinPercentage}
-                  setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
-                  quickSellMaxPercentage={state.quickSellMaxPercentage}
-                  setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
-                  useQuickSellRange={state.useQuickSellRange}
-                  setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
-                />
-              ) : (
-                <div className="p-4 text-center text-app-secondary">
-                  <div className="loading-anim inline-block">
-                    <div className="h-4 w-4 rounded-full bg-app-primary-color mx-auto"></div>
-                  </div>
-                  <p className="mt-2 font-mono">CONNECTING TO NETWORK...</p>
-                </div>
-              )
-            ),
-            Frame: (
-              <Frame
-                isLoadingChart={state.isLoadingChart}
-                tokenAddress={state.tokenAddress}
-                wallets={state.wallets}
-                onDataUpdate={memoizedCallbacks.setIframeData}
-                onTokenSelect={memoizedCallbacks.setTokenAddress}
-                onNonWhitelistedTrade={handleNonWhitelistedTrade}
-                quickBuyEnabled={state.quickBuyEnabled}
-                quickBuyAmount={state.quickBuyAmount}
-                quickBuyMinAmount={state.quickBuyMinAmount}
-                quickBuyMaxAmount={state.quickBuyMaxAmount}
-                useQuickBuyRange={state.useQuickBuyRange}
-              />
-            ),
-            ActionsPage: (
-              <div className="h-full flex flex-col">
-                {/* Top Navigation - Mobile */}
-                <nav className="border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
-                  <div className="flex items-center gap-2">
-                    {/* Service Selector */}
-                  <ServiceSelector />
-                    
-                    {/* Spacer to push items to the right */}
-                    <div className="flex-1"></div>
-                    
-                    {/* Tools Dropdown */}
-                    <ToolsDropdown
-                      onAutomateClick={(): void => memoizedCallbacks.setAutomateCardOpen(true)}
-                      onDeployClick={(): void => navigate('/deploy')}
-                      onSettingsClick={(): void => navigate('/settings')}
-                    />
-                  </div>
-                </nav>
-                
-                <div className="flex-1 overflow-y-auto">
-                  <ActionsPage
-                    tokenAddress={state.tokenAddress}
-                    setTokenAddress={memoizedCallbacks.setTokenAddress}
-                    transactionFee={state.config.transactionFee}
-                    handleRefresh={handleRefresh}
+            currentPage={state.currentPage}
+            setCurrentPage={memoizedCallbacks.setCurrentPage}
+            children={{
+              WalletsPage: (
+                state.connection ? (
+                  <WalletsPage
                     wallets={state.wallets}
+                    setWallets={memoizedCallbacks.setWallets}
+                    handleRefresh={handleRefresh}
+                    isRefreshing={state.isRefreshing}
+                    setIsModalOpen={(): void => navigate('/wallets')}
+                    tokenAddress={state.tokenAddress}
+                    sortDirection={state.sortDirection}
+                    handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
+                    connection={state.connection}
                     solBalances={state.solBalances}
                     tokenBalances={state.tokenBalances}
-                    currentMarketCap={state.currentMarketCap}
-                    setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
-                    isAutomateCardOpen={state.automateCard.isOpen}
-                    automateCardPosition={state.automateCard.position}
-                    setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
-                    isAutomateCardDragging={state.automateCard.isDragging}
-                    setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
-                    iframeData={state.iframeData}
+                    quickBuyEnabled={state.quickBuyEnabled}
+                    setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
+                    quickBuyAmount={state.quickBuyAmount}
+                    setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
+                    quickBuyMinAmount={state.quickBuyMinAmount}
+                    setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
+                    quickBuyMaxAmount={state.quickBuyMaxAmount}
+                    setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
+                    useQuickBuyRange={state.useQuickBuyRange}
+                    setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
+                    quickSellPercentage={state.quickSellPercentage}
+                    setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
+                    quickSellMinPercentage={state.quickSellMinPercentage}
+                    setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
+                    quickSellMaxPercentage={state.quickSellMaxPercentage}
+                    setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
+                    useQuickSellRange={state.useQuickSellRange}
+                    setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
+                    categorySettings={categorySettings}
                   />
+                ) : (
+                  <div className="p-4 text-center text-app-secondary">
+                    <div className="loading-anim inline-block">
+                      <div className="h-4 w-4 rounded-full bg-app-primary-color mx-auto"></div>
+                    </div>
+                    <p className="mt-2 font-mono">CONNECTING TO NETWORK...</p>
+                  </div>
+                )
+              ),
+              Frame: (
+                <Frame
+                  isLoadingChart={state.isLoadingChart}
+                  tokenAddress={state.tokenAddress}
+                  wallets={state.wallets}
+                  onDataUpdate={memoizedCallbacks.setIframeData}
+                  onTokenSelect={memoizedCallbacks.setTokenAddress}
+                  onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                  quickBuyEnabled={state.quickBuyEnabled}
+                  quickBuyAmount={state.quickBuyAmount}
+                  quickBuyMinAmount={state.quickBuyMinAmount}
+                  quickBuyMaxAmount={state.quickBuyMaxAmount}
+                  useQuickBuyRange={state.useQuickBuyRange}
+                />
+              ),
+              ActionsPage: (
+                <div className="h-full flex flex-col">
+                  {/* Top Navigation - Mobile */}
+                  <nav className="border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
+                    <div className="flex items-center justify-between">
+                      {/* Server Selector */}
+                      <div className="flex items-center gap-2 px-2">
+                        <ServerSelector />
+                      </div>
+
+                      {/* View Mode Toggle */}
+                      <button
+                        onClick={handleViewModeToggle}
+                        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                        title={viewMode === 'simple' ? 'Switch to Advanced mode' : 'Switch to Simple mode'}
+                      >
+                        <Columns2 size={16} className={`color-primary transition-opacity ${viewMode === 'simple' ? 'opacity-50' : 'opacity-100'}`} />
+                        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                          {viewMode === 'simple' ? 'SIMPLE' : 'ADVANCED'}
+                        </span>
+                      </button>
+
+                      {/* Tools Dropdown */}
+                      <ToolsDropdown />
+                    </div>
+                  </nav>
+
+                  <div className="flex-1 overflow-y-auto">
+                    <ActionsPage
+                      tokenAddress={state.tokenAddress}
+                      setTokenAddress={memoizedCallbacks.setTokenAddress}
+                      transactionFee={state.config.transactionFee}
+                      handleRefresh={handleRefresh}
+                      wallets={state.wallets}
+                      setWallets={memoizedCallbacks.setWallets}
+                      solBalances={state.solBalances}
+                      tokenBalances={state.tokenBalances}
+                      currentMarketCap={state.currentMarketCap}
+                      setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
+                      isAutomateCardOpen={state.automateCard.isOpen}
+                      automateCardPosition={state.automateCard.position}
+                      setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
+                      isAutomateCardDragging={state.automateCard.isDragging}
+                      setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
+                      iframeData={state.iframeData}
+                    />
+                  </div>
                 </div>
-              </div>
-            )
-          }}
+              )
+            }}
           />
         )}
       </div>
-  
+
 
       {/* Modals */}
       <PnlModal
         isOpen={state.modals.calculatePNLModalOpen}
         onClose={(): void => memoizedCallbacks.setCalculatePNLModalOpen(false)}
-        handleRefresh={handleRefresh}    
+        handleRefresh={handleRefresh}
         tokenAddress={state.tokenAddress}
         iframeData={state.iframeData}
         tokenBalances={state.tokenBalances}
       />
-      
+
       {/* AutomateFloatingCard is now rendered globally in index.tsx and persists across all views */}
     </div>
   );

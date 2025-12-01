@@ -54,6 +54,7 @@ const defaultConfig: ConfigType = {
   batchDelay: '1000',
   tradingServerEnabled: 'false',
   tradingServerUrl: 'https://localhost:4444',
+  streamApiKey: '',
 };
 
 interface AppContextProviderProps {

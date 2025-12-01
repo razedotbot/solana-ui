@@ -1,11 +1,7 @@
-import type { WalletType } from '../Utils';
+import type { WalletType, ScriptType } from './types';
 
-// Script types for different DEX and operation combinations
-export type ScriptType = 
-  | 'buy' | 'sell'
-  | 'consolidate' | 'distribute' | 'mixer' | 'cleaner'
-  | 'bonkcreate' | 'cookcreate' | 'pumpcreate' | 'mooncreate' | 'boopcreate'
-  | 'deploy';
+// Re-export types for backward compatibility
+export type { ScriptType };
 
 /**
  * Counts the number of active wallets in the provided wallet array

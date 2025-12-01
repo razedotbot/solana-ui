@@ -6,6 +6,7 @@ import checker from 'vite-plugin-checker';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig({
+  base: '/',
   plugins: [
     react(),
     nodePolyfills({
@@ -39,91 +40,49 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
     },
   },
+  
+  // Pre-bundle dependencies that have CommonJS issues
+  optimizeDeps: {
+    include: [
+      '@solana/web3.js',
+      '@solana/spl-token',
+      '@solana/spl-token-registry',
+      'bs58',
+      'buffer',
+      'bip39',
+      'ed25519-hd-key',
+      'crypto-js',
+    ],
+    esbuildOptions: {
+      target: 'es2020',
+      // Define global for CommonJS modules
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          // Core vendor libraries
-          if (id.includes('node_modules')) {
-            // React core - always used
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'vendor-react';
-            }
-            
-            // React Router - used on most pages
-            if (id.includes('react-router')) {
-              return 'vendor-router';
-            }
-            
-            // Solana - these are large, keep separate
-            if (id.includes('@solana/web3.js')) {
-              return 'vendor-solana-web3';
-            }
-            if (id.includes('@solana/spl-token')) {
-              return 'vendor-solana-spl';
-            }
-            if (id.includes('@jup-ag/api')) {
-              return 'vendor-jupiter';
-            }
-            
-            // UI libraries - group smaller ones together
-            if (id.includes('lucide-react')) {
-              return 'vendor-ui-icons';
-            }
-            if (id.includes('@radix-ui')) {
-              return 'vendor-ui-radix';
-            }
-            
-            // Heavy libraries - separate chunks
-            if (id.includes('d3')) {
-              return 'vendor-d3';
-            }
-            if (id.includes('html2canvas')) {
-              return 'vendor-html2canvas';
-            }
-            
-            // Crypto and encoding libraries - group together (all small)
-            if (id.includes('bs58') || id.includes('buffer') || 
-                id.includes('crypto-js') || id.includes('bip39') || 
-                id.includes('ed25519')) {
-              return 'vendor-crypto';
-            }
-            
-            // Other utilities
-            if (id.includes('js-cookie') || id.includes('clsx') || 
-                id.includes('tailwind-merge') || id.includes('class-variance')) {
-              return 'vendor-utils';
-            }
-            
-            // Everything else
-            return 'vendor-misc';
-          }
+        // Simplified chunking - only split truly independent ESM libraries
+        // Avoid splitting CommonJS modules which can break require() calls
+        manualChunks: {
+          // Only split pure ESM libraries that are safe to chunk
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-router': ['react-router-dom'],
         },
         
         // Optimize chunk size
-        chunkFileNames: (chunkInfo) => {
-          const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId.split('/').pop().replace('.tsx', '').replace('.ts', '')
-            : 'chunk';
-          return `assets/${facadeModuleId}-[hash].js`;
-        }
-      }
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      },
     },
     
     // Optimize build performance
-    target: 'esnext',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug'],
-        passes: 2
-      },
-      mangle: {
-        safari10: true
-      }
-    },
+    target: 'es2020',
+    minify: 'esbuild', // Use esbuild instead of terser for better compatibility
+    // Note: esbuild minification is faster and more reliable than terser
     
     // Set chunk size warning limit (increased to 600KB since we're splitting more)
     chunkSizeWarningLimit: 600,
@@ -135,25 +94,45 @@ export default defineConfig({
     reportCompressedSize: true,
     
     // Source maps for production debugging (optional, can be disabled for smaller builds)
-    sourcemap: false
+    sourcemap: false,
+    
+    // CommonJS options for better compatibility
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+      requireReturnsDefault: 'auto'
+    }
+  },
+  
+  // Ensure proper module format
+  modulePreload: {
+    polyfill: true
   },
   
   // Development server configuration
   server: {
-    port: 3000,
-    host: true,
+    port: 3010,
+    host: '0.0.0.0',
     
-    allowedHosts: ['localhost', '127.0.0.1', '.ngrok-free.app'],
+    // Allow all hosts (no restrictions)
+    allowedHosts: true,
     
     // Add Permissions Policy headers for clipboard access
     headers: {
       'Permissions-Policy': 'clipboard-read=*, clipboard-write=*'
+    },
+    
+    strictPort: false,
+    
+    // File system options
+    fs: {
+      strict: false
     }
   },
   
   // Preview server configuration (for production builds)
   preview: {
-    port: 3000,
+    port: 3010,
     headers: {
       'Permissions-Policy': 'clipboard-read=*, clipboard-write=*'
     }

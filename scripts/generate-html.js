@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Read the brand configuration
-const brandConfigPath = path.join(__dirname, '../src/config/brand.json');
+const brandConfigPath = path.join(__dirname, '../brand.json');
 const templatePath = path.join(__dirname, '../index.template.html');
 const outputPath = path.join(__dirname, '../index.html');
 

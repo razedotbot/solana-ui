@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { RefreshCw, Zap, TrendingDown, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { saveWalletsToCookies, copyToClipboard, toggleWallet, getWalletDisplayName } from './Utils';
-import type { WalletType, WalletCategory } from './Utils';
+import type { WalletType, WalletCategory, CategoryQuickTradeSettings } from './utils/types';
 import { formatTokenBalance } from './utils/formatting';
-import { useToast } from "./components/useToast";
+import { useToast } from "./utils/useToast";
 import type { Connection } from '@solana/web3.js';
 import { executeBuy, createBuyConfig, validateBuyInputs } from './utils/buy';
 import { executeSell, createSellConfig, validateSellInputs } from './utils/sell';
 import { Tooltip } from './components/Tooltip';
-import type { CategoryQuickTradeSettings } from './modals/QuickTradeModal';
 
 interface WalletsPageProps {
   wallets: WalletType[];
@@ -616,8 +615,12 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                   className="cursor-pointer hover:opacity-80 transition-opacity"
                   title="Click to select/deselect all wallets with SOL balance"
                 >
-                  <span className="text-app-primary">{totalSol.toFixed(2)}</span> (
-                  <span className="color-primary">{activeSol.toFixed(2)}</span>) SOL
+                  <svg className="inline-block ml-1 mb-1 w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" className="color-primary"/>
+                    <path d="M12 6v12M8 10h8M8 14h8" stroke="currentColor" strokeWidth="1.5" className="color-primary"/>
+                  </svg>
+                  <span className="text-app-primary"> {totalSol.toFixed(1)}</span> (
+                  <span className="color-primary"> {activeSol.toFixed(1)}</span>) 
                 </span>
                 <button
                   onClick={handleSortBySol}
@@ -644,8 +647,13 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                     className="cursor-pointer hover:opacity-80 transition-opacity"
                     title="Click to select/deselect all wallets with token balance"
                   >
-                    <span className="text-app-primary">{formatTokenBalance(totalTokens)}</span> (
-                    <span className="color-primary">{formatTokenBalance(activeTokens)}</span>) Tokens
+                    <svg className="inline-block mb-1 ml-1 w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="8" cy="12" r="6" stroke="currentColor" strokeWidth="2" fill="none" className="color-primary"/>
+                      <circle cx="16" cy="12" r="6" stroke="currentColor" strokeWidth="2" fill="none" className="color-primary"/>
+                      <path d="M2 12h4M18 12h4" stroke="currentColor" strokeWidth="1.5" className="color-primary"/>
+                    </svg> 
+                    <span className="text-app-primary"> {formatTokenBalance(totalTokens)}</span> (
+                    <span className="color-primary"> {formatTokenBalance(activeTokens)}</span>) 
                   </span>
                   <button
                     onClick={handleSortByToken}
@@ -695,7 +703,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                       : 'border-app-primary-15 hover-border-primary-30'
                     }
                     ${hoverRow === wallet.id && !wallet.isActive ? 'bg-primary-08 border-app-primary-30' : ''}
-                    ${recentlyUpdatedWallets.has(wallet.address) ? 'animate-pulse border-l-2 border-l-success' : ''}
+                    ${recentlyUpdatedWallets.has(wallet.address) ? 'border-l-2 border-l-success' : ''}
                     ${clickedWalletId === wallet.id ? 'animate-click' : ''}
 
                   `}

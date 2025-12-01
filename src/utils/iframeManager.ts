@@ -3,38 +3,15 @@
  * Handles message queuing, deduplication, and request coalescing
  */
 
-export interface NavigateMessage {
-  type: 'NAVIGATE';
-  view: 'holdings' | 'token' | 'monitor';
-  tokenMint?: string;
-  wallets?: string[];
-}
+import type {
+  NavigateMessage,
+  WalletMessage,
+  IframeMessage,
+  QueuedMessage,
+} from './types';
 
-export interface WalletMessage {
-  type: 'ADD_WALLETS' | 'CLEAR_WALLETS';
-  wallets?: Array<string | { address: string; label?: string }>;
-}
-
-export type IframeMessage = NavigateMessage | WalletMessage | {
-  type: 'TOGGLE_NON_WHITELISTED_TRADES';
-  enabled: boolean;
-} | {
-  type: 'GET_WALLETS';
-} | {
-  type: 'SET_QUICK_BUY_CONFIG';
-  config: {
-    enabled: boolean;
-    amount: number;
-    minAmount: number;
-    maxAmount: number;
-    useRange: boolean;
-  };
-};
-
-interface QueuedMessage {
-  message: IframeMessage;
-  timestamp: number;
-}
+// Re-export types for backward compatibility
+export type { NavigateMessage, WalletMessage, IframeMessage };
 
 class IframeManager {
   private iframeWindow: Window | null = null;

@@ -1,7 +1,18 @@
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { loadConfigFromCookies } from '../Utils';
+import type {
+  WalletSell,
+  BundleMode,
+  SellConfig,
+  ServerResponse,
+  SellBundle,
+  SellResult,
+} from './types';
 import { addTradeHistory } from './trading';
+
+// Re-export types for backward compatibility
+export type { WalletSell, BundleMode, SellConfig, ServerResponse, SellBundle, SellResult };
 
 // Constants
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -13,45 +24,6 @@ const rateLimitState = {
   lastReset: Date.now(),
   maxBundlesPerSecond: MAX_BUNDLES_PER_SECOND
 };
-
-// Interfaces
-export interface WalletSell {
-  address: string;
-  privateKey: string;
-}
-
-export type BundleMode = 'single' | 'batch' | 'all-in-one';
-
-export interface SellConfig {
-  tokenAddress: string;
-  sellPercent: number; // Percentage of tokens to sell (1-100)
-  tokensAmount?: number; // Specific amount of tokens to sell (alternative to percentage)
-  slippageBps?: number; // Slippage tolerance in basis points (e.g., 100 = 1%)
-  outputMint?: string; // Output token (usually SOL) - mainly for Auto
-  jitoTipLamports?: number; // Custom Jito tip in lamports
-  transactionsFeeLamports?: number; // Transaction fee in lamports (used when wallets.length < 2)
-  bundleMode?: BundleMode; // Bundle execution mode: 'single', 'batch', or 'all-in-one'
-  batchDelay?: number; // Delay between batches in milliseconds (for batch mode)
-  singleDelay?: number; // Delay between wallets in milliseconds (for single mode)
-}
-
-export interface ServerResponse {
-  success?: boolean;
-  data?: unknown;
-  error?: string;
-  [key: string]: unknown;
-}
-
-export interface SellBundle {
-  transactions: string[]; // Base58 encoded transaction data
-  serverResponse?: ServerResponse; // For self-hosted server responses
-}
-
-export interface SellResult {
-  success: boolean;
-  result?: unknown;
-  error?: string;
-}
 
 // Define interface for bundle result from sending
 interface BundleResult {
@@ -105,7 +77,7 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
     }
     
     // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/solana/send`, {
+    const response = await fetch(`${baseUrl}/v2/sol/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -196,7 +168,7 @@ const getPartiallyPreparedSellTransactions = async (
       requestBody['outputMint'] = sellConfig.outputMint;
     }
 
-    const response = await fetch(`${baseUrl}/solana/sell`, {
+    const response = await fetch(`${baseUrl}/v2/sol/sell`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

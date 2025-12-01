@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Loader2, Move, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Loader2, Move, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import { 
   createMultipleLimitOrders, 
   getActiveOrders, 
@@ -11,7 +12,9 @@ import {
   type LimitOrderConfig,
   type ActiveOrdersResponse
 } from '../utils/limitorders';
-import { useToast } from './useToast';
+import { useToast } from '../utils/useToast';
+import { toggleWallet, saveWalletsToCookies, getWalletDisplayName } from '../Utils';
+import { formatTokenBalance } from '../utils/formatting';
 import type { WalletType } from '../Utils';
 
 interface PresetButtonProps {
@@ -358,9 +361,163 @@ const CalendarWidget = React.memo<CalendarWidgetProps>(({
 });
 CalendarWidget.displayName = 'CalendarWidget';
 
+// Wallet Selector Popup Component - rendered via portal
+interface WalletSelectorPopupProps {
+  wallets: WalletType[];
+  solBalances: Map<string, number>;
+  tokenBalances: Map<string, number>;
+  walletSelectorRef: React.RefObject<HTMLDivElement>;
+  onClose: () => void;
+  onToggleWallet: (id: number) => void;
+  onSelectAll: () => void;
+  onSelectAllWithBalance: () => void;
+}
+
+const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
+  wallets,
+  solBalances,
+  tokenBalances,
+  walletSelectorRef,
+  onClose,
+  onToggleWallet,
+  onSelectAll,
+  onSelectAllWithBalance
+}) => {
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, right: 0 });
+
+  // Calculate position based on button location
+  useEffect(() => {
+    if (walletSelectorRef.current) {
+      const rect = walletSelectorRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right
+      });
+    }
+  }, [walletSelectorRef]);
+
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent): void => {
+      if (
+        popupRef.current && 
+        !popupRef.current.contains(e.target as Node) && 
+        walletSelectorRef.current &&
+        !walletSelectorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose, walletSelectorRef]);
+
+  return (
+    <div 
+      ref={popupRef}
+      className="fixed z-[9999]"
+      style={{
+        top: position.top,
+        right: position.right,
+      }}
+    >
+      <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 min-w-[320px] max-h-[400px] overflow-hidden">
+        {/* Header with Select All buttons */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
+          <button
+            onClick={onSelectAll}
+            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
+          >
+            Select All
+          </button>
+          <button
+            onClick={onSelectAllWithBalance}
+            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
+          >
+            Select All with Balance
+          </button>
+        </div>
+
+        {/* Wallet List */}
+        <div className="overflow-y-auto max-h-[340px]">
+          {wallets.filter(w => !w.isArchived).map((wallet) => {
+            const solBal = solBalances.get(wallet.address) || 0;
+            const tokenBal = tokenBalances.get(wallet.address) || 0;
+            
+            return (
+              <div
+                key={wallet.id}
+                onClick={() => onToggleWallet(wallet.id)}
+                className={`
+                  flex items-center justify-between px-3 py-2 cursor-pointer transition-all duration-200
+                  border-b border-app-primary-20 last:border-b-0
+                  ${wallet.isActive 
+                    ? 'bg-primary-20 border-l-2 border-l-primary' 
+                    : 'hover:bg-app-primary-60'
+                  }
+                `}
+              >
+                {/* Selection indicator & wallet info */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {/* Selection checkbox */}
+                  <div className={`
+                    w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
+                    ${wallet.isActive 
+                      ? 'bg-app-primary-color border-app-primary-color' 
+                      : 'bg-transparent border-app-primary-40'
+                    }
+                  `}>
+                    {wallet.isActive && (
+                      <Check size={10} className="text-black" />
+                    )}
+                  </div>
+
+                  {/* Wallet name and address */}
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className={`text-xs font-mono truncate ${wallet.isActive ? 'text-app-primary' : 'text-app-secondary'}`}>
+                      {getWalletDisplayName(wallet)}
+                    </span>
+                    <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
+                      <Zap size={8} className="text-app-secondary-40" />
+                      <span>Off</span>
+                      <span className="text-app-primary-40">{wallet.address.slice(0, 5)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Balances */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {/* SOL Balance */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
+                    <span className={`text-xs font-mono ${solBal > 0 ? 'text-app-primary' : 'text-app-secondary-60'}`}>
+                      {solBal.toFixed(3)}
+                    </span>
+                  </div>
+
+                  {/* Token Balance */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-3 bg-app-primary-color rounded-sm"></div>
+                    <span className={`text-xs font-mono ${tokenBal > 0 ? 'color-primary' : 'text-app-secondary-60'}`}>
+                      {formatTokenBalance(tokenBal)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface TradingCardProps {
   tokenAddress: string;
   wallets: WalletType[];
+  setWallets: (wallets: WalletType[]) => void;
   selectedDex: string;
   setSelectedDex: (dex: string) => void;
   isDropdownOpen: boolean;
@@ -374,6 +531,7 @@ interface TradingCardProps {
   getScriptName: (script: string) => string;
   countActiveWallets: (wallets: WalletType[]) => number;
   currentMarketCap: number | null;
+  solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
   onOpenFloating: () => void;
   isFloatingCardOpen: boolean;
@@ -383,6 +541,7 @@ interface TradingCardProps {
 const TradingCard: React.FC<TradingCardProps> = ({ 
   tokenAddress, 
   wallets,
+  setWallets,
   selectedDex,
   buyAmount,
   setBuyAmount,
@@ -392,6 +551,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   isLoading,
   countActiveWallets,
   currentMarketCap,
+  solBalances,
   tokenBalances,
   onOpenFloating,
   isFloatingCardOpen,
@@ -404,7 +564,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
   const [isEditMode, setIsEditMode] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const walletSelectorRef = useRef<HTMLDivElement>(null);
   const [, setIsDropdownOpen] = useState(false);
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
   
   // Limit order state
   const [limitOrderSolAmount, setLimitOrderSolAmount] = useState('');
@@ -1028,6 +1190,54 @@ const TradingCard: React.FC<TradingCardProps> = ({
     }
   };
 
+  // Wallet selection handlers
+  const handleToggleWallet = (walletId: number): void => {
+    const updatedWallets = toggleWallet(wallets, walletId);
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  };
+
+  const handleSelectAll = (): void => {
+    const allActive = wallets.filter(w => !w.isArchived).every(w => w.isActive);
+    const updatedWallets = wallets.map(wallet => ({
+      ...wallet,
+      isActive: wallet.isArchived ? wallet.isActive : !allActive
+    }));
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  };
+
+  const handleSelectAllWithBalance = (): void => {
+    const walletsWithBalance = wallets.filter(wallet => {
+      if (wallet.isArchived) return false;
+      const solBal = solBalances.get(wallet.address) || 0;
+      const tokenBal = tokenBalances.get(wallet.address) || 0;
+      return solBal > 0 || tokenBal > 0;
+    });
+    
+    if (walletsWithBalance.length === 0) {
+      showToast('No wallets with balance found', 'error');
+      return;
+    }
+
+    const allWithBalanceActive = walletsWithBalance.every(w => w.isActive);
+    const updatedWallets = wallets.map(wallet => {
+      if (wallet.isArchived) return wallet;
+      const solBal = solBalances.get(wallet.address) || 0;
+      const tokenBal = tokenBalances.get(wallet.address) || 0;
+      const hasBalance = solBal > 0 || tokenBal > 0;
+      
+      if (allWithBalanceActive) {
+        return { ...wallet, isActive: false };
+      } else {
+        return { ...wallet, isActive: hasBalance ? true : wallet.isActive };
+      }
+    });
+    
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  };
+
   // Generate button text based on calculated amounts
   const getButtonText = (): React.ReactNode => {
     if (isLoading) {
@@ -1120,25 +1330,43 @@ const TradingCard: React.FC<TradingCardProps> = ({
             </button>
           </div>
           
-          {/* Wallet Counter */}
-          <div className="flex items-center px-3 py-2 border-l border-app-primary-20">
-            <div className="flex items-center gap-1 text-xs font-mono text-app-secondary-60">
-              <span className="color-primary">{countActiveWallets(wallets)}</span>
-              <svg 
-                width="12" 
-                height="12" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                className="color-primary"
-              >
-                <path 
-                  d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18zM3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 4h2v2h-2v-2z" 
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
+          {/* Wallet Counter - Clickable */}
+          <div className="relative" ref={walletSelectorRef}>
+            <button
+              onClick={() => setShowWalletSelector(!showWalletSelector)}
+              className="flex items-center justify-center px-4 py-2 border-l border-app-primary-20 hover:bg-app-primary-20 transition-colors cursor-pointer h-full"
+            >
+                <span className="text-[10px] font-mono color-primary font-semibold">{countActiveWallets(wallets)}</span>
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  className="color-primary"
+                >
+                  <path 
+                    d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18zM3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 4h2v2h-2v-2z" 
+                    fill="currentColor"
+                  />
+                </svg>
+            </button>
           </div>
         </div>
+      )}
+
+      {/* Wallet Selector Popup - Rendered via Portal to escape overflow constraints */}
+      {showWalletSelector && createPortal(
+        <WalletSelectorPopup
+          wallets={wallets}
+          solBalances={solBalances}
+          tokenBalances={tokenBalances}
+          walletSelectorRef={walletSelectorRef}
+          onClose={() => setShowWalletSelector(false)}
+          onToggleWallet={handleToggleWallet}
+          onSelectAll={handleSelectAll}
+          onSelectAllWithBalance={handleSelectAllWithBalance}
+        />,
+        document.body
       )}
 
       {/* Order Type Tabs - Only show for trading tab */}

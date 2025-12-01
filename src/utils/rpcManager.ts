@@ -6,6 +6,7 @@ export interface RPCEndpoint {
   name: string;
   isActive: boolean;
   priority: number; // Lower number = higher priority
+  weight: number; // Weight for selection (0-100, should total 100 for all active endpoints)
   lastUsed?: number;
   failureCount: number;
   lastFailure?: number;
@@ -32,6 +33,32 @@ export class RPCManager {
       }
       return a.failureCount - b.failureCount;
     });
+  }
+
+  private selectEndpointByWeight(availableEndpoints: RPCEndpoint[]): RPCEndpoint | null {
+    if (availableEndpoints.length === 0) return null;
+    if (availableEndpoints.length === 1) return availableEndpoints[0];
+
+    // Calculate total weight of available endpoints
+    const totalWeight = availableEndpoints.reduce((sum, e) => sum + (e.weight || 0), 0);
+    
+    if (totalWeight === 0) {
+      // If no weights set, use round-robin
+      this.currentIndex = (this.currentIndex + 1) % availableEndpoints.length;
+      return availableEndpoints[this.currentIndex];
+    }
+
+    // Weighted random selection
+    let random = Math.random() * totalWeight;
+    for (const endpoint of availableEndpoints) {
+      random -= (endpoint.weight || 0);
+      if (random <= 0) {
+        return endpoint;
+      }
+    }
+
+    // Fallback to first endpoint
+    return availableEndpoints[0];
   }
 
   private resetFailureIfNeeded(endpoint: RPCEndpoint): void {
@@ -67,12 +94,11 @@ export class RPCManager {
         e.failureCount = 0;
         e.lastFailure = undefined;
       });
-      return this.endpoints[0] || null;
+      return this.selectEndpointByWeight(this.endpoints) || this.endpoints[0] || null;
     }
 
-    // Rotate through available endpoints
-    this.currentIndex = (this.currentIndex + 1) % availableEndpoints.length;
-    return availableEndpoints[this.currentIndex];
+    // Use weighted selection
+    return this.selectEndpointByWeight(availableEndpoints);
   }
 
   public createConnection(): Promise<Connection> {
@@ -121,6 +147,27 @@ export class RPCManager {
   }
 
   public updateEndpoints(endpoints: RPCEndpoint[]): void {
+    // Normalize weights to ensure they total 100 for active endpoints
+    const activeEndpoints = endpoints.filter(e => e.isActive);
+    const totalWeight = activeEndpoints.reduce((sum, e) => sum + (e.weight || 0), 0);
+    
+    if (totalWeight > 0 && activeEndpoints.length > 0) {
+      // Normalize weights proportionally
+      endpoints.forEach(e => {
+        if (e.isActive && e.weight !== undefined) {
+          e.weight = Math.round((e.weight / totalWeight) * 100);
+        }
+      });
+    } else if (activeEndpoints.length > 0) {
+      // If no weights set, distribute evenly
+      const evenWeight = Math.round(100 / activeEndpoints.length);
+      endpoints.forEach(e => {
+        if (e.isActive) {
+          e.weight = evenWeight;
+        }
+      });
+    }
+
     this.endpoints = this.sortEndpoints(endpoints.filter(e => e.isActive));
     this.currentIndex = 0;
   }
@@ -134,6 +181,7 @@ export const createDefaultEndpoints = (): RPCEndpoint[] => {
       name: 'dRPC',
       isActive: true,
       priority: 1,
+      weight: 20,
       failureCount: 0,
     },
     {
@@ -142,6 +190,7 @@ export const createDefaultEndpoints = (): RPCEndpoint[] => {
       name: 'PublicNode',
       isActive: true,
       priority: 2,
+      weight: 60,
       failureCount: 0,
     },
     {
@@ -150,6 +199,7 @@ export const createDefaultEndpoints = (): RPCEndpoint[] => {
       name: 'Solana Vibe Station',
       isActive: true,
       priority: 4,
+      weight: 20,
       failureCount: 0,
     }
   ];

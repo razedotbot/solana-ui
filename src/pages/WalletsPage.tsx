@@ -27,8 +27,8 @@ import {
 } from 'lucide-react';
 import { UnifiedHeader } from '../components/Header';
 import bs58 from 'bs58';
-import { WalletTooltip } from '../styles/Styles';
-import type { WalletType, WalletCategory, MasterWallet, CustomQuickTradeSettings } from '../Utils';
+import { WalletTooltip } from '../components/Styles';
+import type { WalletType, WalletCategory, MasterWallet, CustomQuickTradeSettings } from '../utils/types';
 import { 
   formatAddress, 
   copyToClipboard, 
@@ -48,20 +48,21 @@ import {
   getMasterWalletMnemonic,
   updateMasterWalletAccountCount
 } from '../Utils';
-import CreateMasterWalletModal from '../modals/CreateMasterWalletModal';
-import CreateWalletModal from '../modals/CreateWalletModal';
-import ImportWalletModal from '../modals/ImportWalletModal';
-import ExportSeedPhraseModal from '../modals/ExportSeedPhraseModal';
-import { FundModal } from '../modals/FundModal';
-import { ConsolidateModal } from '../modals/ConsolidateModal';
-import { TransferModal } from '../modals/TransferModal';
-import { DepositModal } from '../modals/DepositModal';
-import { QuickTradeModal, type CategoryQuickTradeSettings } from '../modals/QuickTradeModal';
-import { WalletQuickTradeModal } from '../modals/WalletQuickTradeModal';
-import { BurnModal } from '../modals/BurnModal';
+import CreateMasterWalletModal from '../components/modals/CreateMasterWalletModal';
+import CreateWalletModal from '../components/modals/CreateWalletModal';
+import ImportWalletModal from '../components/modals/ImportWalletModal';
+import ExportSeedPhraseModal from '../components/modals/ExportSeedPhraseModal';
+import { FundModal } from '../components/modals/FundModal';
+import { ConsolidateModal } from '../components/modals/ConsolidateModal';
+import { TransferModal } from '../components/modals/TransferModal';
+import { DepositModal } from '../components/modals/DepositModal';
+import { QuickTradeModal } from '../components/modals/QuickTradeModal';
+import type { CategoryQuickTradeSettings } from '../utils/types';
+import { WalletQuickTradeModal } from '../components/modals/WalletQuickTradeModal';
+import { BurnModal } from '../components/modals/BurnModal';
 import { deriveMultipleWallets, validateMnemonic, getMnemonicWordCount } from '../utils/hdWallet';
 import { useAppContext } from '../contexts/useAppContext';
-import { useToast } from '../components/useToast';
+import { useToast } from '../utils/useToast';
 
 type SortField = 'solBalance';
 type SortDirection = 'asc' | 'desc';
@@ -944,12 +945,11 @@ export const WalletsPage: React.FC = () => {
 
       {/* Main Content - with left margin for sidebar */}
       <div className="relative flex-1 overflow-hidden w-full md:w-auto md:ml-48 bg-app-primary flex flex-col">
-        {/* Background effects layer */}
+        {/* Background effects */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          {/* Grid pattern background */}
           <div className="absolute inset-0 bg-app-primary opacity-90">
             <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
-            <div 
+            <div
               className="absolute inset-0"
               style={{
                 backgroundImage: `
@@ -957,34 +957,9 @@ export const WalletsPage: React.FC = () => {
                   linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
                 `,
                 backgroundSize: '20px 20px',
-                backgroundPosition: 'center center',
               }}
             ></div>
           </div>
-          
-          {/* Corner accent lines - 4 corners with gradient lines */}
-          <div className="absolute top-0 left-0 w-32 h-32 opacity-20">
-            <div className="absolute top-0 left-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-            <div className="absolute top-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-          </div>
-          <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
-            <div className="absolute top-0 right-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-            <div className="absolute top-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-          </div>
-          <div className="absolute bottom-0 left-0 w-32 h-32 opacity-20">
-            <div className="absolute bottom-0 left-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-            <div className="absolute bottom-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-          </div>
-          <div className="absolute bottom-0 right-0 w-32 h-32 opacity-20">
-            <div className="absolute bottom-0 right-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-            <div className="absolute bottom-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-          </div>
-
-          {/* Scanline overlay effect */}
-          <div className="absolute inset-0 scanline pointer-events-none opacity-30"></div>
-
-          {/* Gradient overlays for depth */}
-          <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 to-transparent pointer-events-none"></div>
         </div>
 
         {/* Content container */}

@@ -1,14 +1,12 @@
-// Apply passive touch event patch before any other imports
-import './utils/passiveTouchPatch';
-
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Buffer } from 'buffer';
 import Cookies from 'js-cookie';
 window.Buffer = Buffer;
-import { brand } from './config/brandConfig';
-import type { WindowWithToast, ServerInfo } from './types/api';
+import { brand } from './utils/brandConfig';
+import logoImage from './logo.png';
+import type { WindowWithToast, ServerInfo } from './utils/types';
 import { AppContextProvider } from './contexts/AppContext';
 import { IframeStateProvider } from './contexts/IframeStateContext';
 
@@ -16,28 +14,33 @@ import { IframeStateProvider } from './contexts/IframeStateContext';
 const loadBrandCSS = async (): Promise<void> => {
   try {
     // Use dynamic import for CSS files in Vite based on theme name
-    await import(`./styles/${brand.theme.name}.css`);
+    await import(`../${brand.theme.name}.css`);
   } catch (error) {
     console.error('Failed to load brand CSS:', error);
     // Fallback to globals.css
-    await import('./styles/green.css');
+    await import('../green.css');
   }
 };
 
 // Load brand CSS immediately
 void loadBrandCSS();
 import ToastProvider from "./components/Notifications";
-import { useToast } from "./components/useToast";
+import { useToast } from "./utils/useToast";
 import BeRightBack from './components/BeRightBack';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy load page components
 const App = lazy(() => import('./App'));
-const Homepage = lazy(() => import('./homepage'));
-const AutomatePage = lazy(() => import('./automate/AutomatePage'));
+const Homepage = lazy(() => import('./pages/HomePage'));
+const AutomatePage = lazy(() => import('./pages/AutomatePage'));
 const DeployPage = lazy(() => import('./pages/DeployPage'));
 const WalletsPage = lazy(() => import('./pages/WalletsPage').then(module => ({ default: module.WalletsPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
+
+// Preload function for App component (used by /holdings route)
+const preloadApp = (): void => {
+  void import('./App');
+};
 
 declare global {
   interface Window {
@@ -56,14 +59,31 @@ const SERVER_REGION_COOKIE = 'trading_server_region';
 const DISABLE_SERVER_CHECK = true;
 
 const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
-  { id: 'us', name: 'United States', url: 'https://us.fury.bot/', region: 'US', flag: '🇺🇸' },
-  { id: 'de', name: 'Germany', url: 'https://de.fury.bot/', region: 'DE', flag: '🇩🇪' },
+  { id: 'de', name: 'Germany', url: 'https://de.raze.sh/', region: 'DE', flag: '🇩🇪' },
 ];
 
 export const ServerCheckLoading = (): JSX.Element => {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-app-primary">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-t-2 spinner-app-primary"></div>
+    <div className="launch-animation">
+      <div className="logo-container">
+        <div className="corner corner-tl"></div>
+        <div className="corner corner-tr"></div>
+        <div className="corner corner-bl"></div>
+        <div className="corner corner-br"></div>
+        <div className="logo-orbit">
+          <div className="orbit-dot dot-1"></div>
+          <div className="orbit-dot dot-2"></div>
+          <div className="orbit-dot dot-3"></div>
+          <div className="orbit-dot dot-4"></div>
+        </div>
+        <div className="logo-hexagon">
+          <img src={logoImage} alt="Logo" />
+        </div>
+      </div>
+      <div className="loading-text">Initializing</div>
+      <div className="progress-container">
+        <div className="progress-bar"></div>
+      </div>
     </div>
   );
 };
@@ -84,7 +104,7 @@ export const Root = (): JSX.Element => {
       const scrollbarThumb = computedStyle.getPropertyValue('--color-scrollbar-thumb').trim() || 'rgba(11, 82, 46, 0.5)';
       const scrollbarTrack = computedStyle.getPropertyValue('--color-scrollbar-track').trim() || 'transparent';
       document.body.removeChild(testEl);
-      
+
       // Add global styles to disable text selection and apply custom scrollbar
       const style = document.createElement('style');
       style.id = 'custom-scrollbar-styles';
@@ -215,13 +235,13 @@ export const Root = (): JSX.Element => {
           background-color: ${scrollbarThumb} !important;
         }
       `;
-      
+
       // Remove existing style if present
       const existingStyle = document.getElementById('custom-scrollbar-styles');
       if (existingStyle) {
         existingStyle.remove();
       }
-      
+
       document.head.appendChild(style);
     };
 
@@ -270,14 +290,14 @@ export const Root = (): JSX.Element => {
       document.removeEventListener('dragstart', handleDragStart);
     };
   }, []);
-  
+
   const measurePing = async (url: string): Promise<number> => {
     const startTime = Date.now();
     try {
       const baseUrl = url.replace(/\/+$/, '');
-      const healthEndpoint = '/health';
+      const healthEndpoint = '/v2/health';
       const checkUrl = `${baseUrl}${healthEndpoint}`;
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout((): void => controller.abort(), 5000);
 
@@ -288,7 +308,7 @@ export const Root = (): JSX.Element => {
           'Accept': 'application/json',
         },
       });
-      
+
       clearTimeout(timeoutId);
       return Date.now() - startTime;
     } catch (ignore) {
@@ -299,9 +319,9 @@ export const Root = (): JSX.Element => {
   const checkServerConnection = async (url: string): Promise<boolean> => {
     try {
       const baseUrl = url.replace(/\/+$/, '');
-      const healthEndpoint = '/health';
+      const healthEndpoint = '/v2/health';
       const checkUrl = `${baseUrl}${healthEndpoint}`;
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout((): void => controller.abort(), 3000);
 
@@ -312,13 +332,13 @@ export const Root = (): JSX.Element => {
           'Accept': 'application/json',
         },
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         return false;
       }
-      
+
       const data = await response.json() as { status?: string };
       return data.status === 'healthy';
     } catch (ignore) {
@@ -339,16 +359,16 @@ export const Root = (): JSX.Element => {
       window.serverRegion = server.region;
       Cookies.set(SERVER_URL_COOKIE, server.url, { expires: 30 });
       Cookies.set(SERVER_REGION_COOKIE, server.id, { expires: 30 });
-      
+
       // Emit event to notify components of server change
-      const event = new CustomEvent('serverChanged', { 
-        detail: { server } 
+      const event = new CustomEvent('serverChanged', {
+        detail: { server }
       });
       window.dispatchEvent(event);
-      
+
       return true;
     }
-    
+
     return false;
   }, [availableServers]);
 
@@ -356,12 +376,12 @@ export const Root = (): JSX.Element => {
   // Initialize server connection
   useEffect((): void => {
     const initializeServer = async (): Promise<void> => {
-      
+
       // If server check is disabled, use saved server or default
       if (DISABLE_SERVER_CHECK) {
         const savedUrl = Cookies.get(SERVER_URL_COOKIE);
         const savedRegion = Cookies.get(SERVER_REGION_COOKIE);
-        
+
         if (savedUrl && savedRegion) {
           const savedServer = DEFAULT_REGIONAL_SERVERS.find((s): boolean => s.id === savedRegion && s.url === savedUrl);
           if (savedServer) {
@@ -371,15 +391,15 @@ export const Root = (): JSX.Element => {
             setAvailableServers([savedServer]);
             window.availableServers = [savedServer];
             setIsChecking(false);
-            
-            const event = new CustomEvent('serverChanged', { 
-              detail: { server: savedServer } 
+
+            const event = new CustomEvent('serverChanged', {
+              detail: { server: savedServer }
             });
             window.dispatchEvent(event);
             return;
           }
         }
-        
+
         // Use first default server if no saved preference
         const defaultServer = DEFAULT_REGIONAL_SERVERS[0];
         setServerUrl(defaultServer.url);
@@ -388,14 +408,14 @@ export const Root = (): JSX.Element => {
         setAvailableServers(DEFAULT_REGIONAL_SERVERS);
         window.availableServers = DEFAULT_REGIONAL_SERVERS;
         setIsChecking(false);
-        
-        const event = new CustomEvent('serverChanged', { 
-          detail: { server: defaultServer } 
+
+        const event = new CustomEvent('serverChanged', {
+          detail: { server: defaultServer }
         });
         window.dispatchEvent(event);
         return;
       }
-      
+
       // Always discover all available servers first
       const allServersWithPing = await Promise.all(
         DEFAULT_REGIONAL_SERVERS.map(async (server): Promise<ServerInfo> => {
@@ -403,7 +423,7 @@ export const Root = (): JSX.Element => {
           if (!isConnected) {
             return { ...server, ping: Infinity };
           }
-          
+
           const ping = await measurePing(server.url);
           return { ...server, ping };
         })
@@ -412,31 +432,31 @@ export const Root = (): JSX.Element => {
       // Filter out unreachable servers and sort by ping
       const reachableServers = allServersWithPing.filter((server): boolean => server.ping !== Infinity);
       reachableServers.sort((a, b): number => a.ping! - b.ping!);
-      
+
       // Always set available servers regardless of saved server
       setAvailableServers(reachableServers);
       window.availableServers = reachableServers;
-      
+
       // Check if there's a saved server preference
       const savedUrl = Cookies.get(SERVER_URL_COOKIE);
       const savedRegion = Cookies.get(SERVER_REGION_COOKIE);
-      
+
       if (savedUrl && savedRegion) {
         // Check if the saved server is in our reachable servers
         const savedServer = reachableServers.find((s): boolean => s.id === savedRegion && s.url === savedUrl);
-        
+
         if (savedServer) {
           setServerUrl(savedUrl);
           window.tradingServerUrl = savedUrl;
           window.serverRegion = savedServer.region;
           setIsChecking(false);
-          
+
           // Emit event to notify components
-          const event = new CustomEvent('serverChanged', { 
-            detail: { server: savedServer } 
+          const event = new CustomEvent('serverChanged', {
+            detail: { server: savedServer }
           });
           window.dispatchEvent(event);
-          
+
           return;
         }
       }
@@ -450,16 +470,16 @@ export const Root = (): JSX.Element => {
         Cookies.set(SERVER_URL_COOKIE, bestServer.url, { expires: 30 });
         Cookies.set(SERVER_REGION_COOKIE, bestServer.id, { expires: 30 });
         setIsChecking(false);
-        
+
         // Emit event to notify components
-        const event = new CustomEvent('serverChanged', { 
-          detail: { server: bestServer } 
+        const event = new CustomEvent('serverChanged', {
+          detail: { server: bestServer }
         });
         window.dispatchEvent(event);
-        
+
         return;
       }
-      
+
       setIsChecking(false);
     };
 
@@ -474,10 +494,19 @@ export const Root = (): JSX.Element => {
     }
   }, [availableServers, switchToServer]);
 
+  // Preload App component (/holdings route) after server check completes for faster navigation
+  useEffect((): (() => void) | void => {
+    if (!isChecking && serverUrl) {
+      // Small delay to prioritize initial render, then preload in background
+      const timeoutId = setTimeout(preloadApp, 100);
+      return (): void => clearTimeout(timeoutId);
+    }
+  }, [isChecking, serverUrl]);
+
   // Toast wrapper
   const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({ children }): JSX.Element => {
     const { showToast } = useToast();
-    
+
     // Expose showToast globally for modals
     useEffect((): (() => void) => {
       (window as WindowWithToast).showToast = showToast;
@@ -485,7 +514,7 @@ export const Root = (): JSX.Element => {
         delete (window as WindowWithToast).showToast;
       };
     }, [showToast]);
-    
+
     return <>{children}</>;
   };
 
@@ -501,37 +530,37 @@ export const Root = (): JSX.Element => {
         <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
           <ToastProvider>
             <ToastWrapper>
-              <AppContextProvider showToast={(window as WindowWithToast).showToast || (() => {})}>
+              <AppContextProvider showToast={(window as WindowWithToast).showToast || (() => { })}>
                 <IframeStateProvider>
                   {serverUrl ? (
                     <Suspense fallback={<ServerCheckLoading />}>
                       <Routes>
-                      {/* Homepage */}
-                      <Route path="/" element={<Homepage />} />
-                      
-                      {/* Main app routes */}
-                      <Route path="/holdings" element={<App />} />
-                      <Route path="/monitor" element={<App />} />
-                      <Route path="/token/:tokenAddress" element={<App />} />
-                      
-                      {/* Feature pages */}
-                      <Route path="/automate" element={<AutomatePage />} />
-                      <Route path="/deploy" element={<DeployPage />} />
-                      <Route path="/wallets" element={<WalletsPage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                      
-                      {/* Fallback - redirect to homepage */}
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </Suspense>
-                ) : (
-                  <BeRightBack 
-                    onOpenWallets={() => window.location.href = '/wallets'}
-                    onOpenSettings={() => {
-                      window.location.href = '/settings';
-                    }}
-                  />
-                )}
+                        {/* Homepage */}
+                        <Route path="/" element={<Homepage />} />
+
+                        {/* Main app routes */}
+                        <Route path="/holdings" element={<App />} />
+                        <Route path="/monitor" element={<App />} />
+                        <Route path="/tokens/:tokenAddress" element={<App />} />
+
+                        {/* Feature pages */}
+                        <Route path="/automate" element={<AutomatePage />} />
+                        <Route path="/deploy" element={<DeployPage />} />
+                        <Route path="/wallets" element={<WalletsPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+
+                        {/* Fallback - redirect to homepage */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </Suspense>
+                  ) : (
+                    <BeRightBack
+                      onOpenWallets={() => window.location.href = '/wallets'}
+                      onOpenSettings={() => {
+                        window.location.href = '/settings';
+                      }}
+                    />
+                  )}
                 </IframeStateProvider>
               </AppContextProvider>
             </ToastWrapper>
@@ -542,4 +571,19 @@ export const Root = (): JSX.Element => {
   );
 };
 
+// Remove the initial HTML loader once React mounts
+const removeInitialLoader = (): void => {
+  const initialLoader = document.getElementById('initial-loader');
+  const initialStyles = document.getElementById('initial-loader-styles');
+  if (initialLoader) {
+    initialLoader.remove();
+  }
+  if (initialStyles) {
+    initialStyles.remove();
+  }
+};
+
 ReactDOM.createRoot(document.getElementById('root')!).render(<Root />);
+
+// Remove the static HTML loader after React has mounted
+removeInitialLoader();

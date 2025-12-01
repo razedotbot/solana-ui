@@ -188,7 +188,7 @@ export const createMultipleLimitOrders = async (
     };
 
     const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/solana/limit/create`, {
+    const response = await fetch(`${baseUrl}/v2/sol/limit/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -236,7 +236,7 @@ export const getActiveOrders = async (
     }
 
     const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/solana/limit/active?${params.toString()}`, {
+    const response = await fetch(`${baseUrl}/v2/sol/limit/active?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -277,7 +277,7 @@ export const cancelOrder = async (
     };
 
     const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/solana/limit/cancel`, {
+    const response = await fetch(`${baseUrl}/v2/sol/limit/cancel`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -462,9 +462,9 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
       };
     }
 
-    console.info(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/solana/send`);
+    console.info(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/v2/sol/send`);
     
-    const response = await fetch(`${baseUrl}/solana/send`, {
+    const response = await fetch(`${baseUrl}/v2/sol/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

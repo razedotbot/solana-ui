@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import logoImage from '../logo.png';
-import { brand } from '../config/brandConfig';
+import { brand } from '../utils/brandConfig';
 
 // Define proper types
 interface PnlCardProps {

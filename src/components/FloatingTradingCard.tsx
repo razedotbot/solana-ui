@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, X, Move, Edit3, Check } from 'lucide-react';
+import { Loader2, X, Move, Edit3, Check, Zap } from 'lucide-react';
+import { toggleWallet, saveWalletsToCookies, getWalletDisplayName } from '../Utils';
+import { formatTokenBalance } from '../utils/formatting';
 import type { WalletType } from '../Utils';
 import type { ScriptType } from '../utils/wallets';
 
@@ -192,6 +194,159 @@ const TabButton = React.memo<TabButtonProps>(({ label, isActive, onClick, onEdit
 });
 TabButton.displayName = 'TabButton';
 
+// Wallet Selector Popup Component for FloatingTradingCard
+interface FloatingWalletSelectorProps {
+  wallets: WalletType[];
+  solBalances: Map<string, number>;
+  tokenBalances: Map<string, number>;
+  anchorRef: React.RefObject<HTMLButtonElement>;
+  onClose: () => void;
+  onToggleWallet: (id: number) => void;
+  onSelectAll: () => void;
+  onSelectAllWithBalance: () => void;
+}
+
+const FloatingWalletSelector: React.FC<FloatingWalletSelectorProps> = ({
+  wallets,
+  solBalances,
+  tokenBalances,
+  anchorRef,
+  onClose,
+  onToggleWallet,
+  onSelectAll,
+  onSelectAllWithBalance
+}) => {
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, right: 0 });
+
+  // Calculate position based on button location
+  useEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right
+      });
+    }
+  }, [anchorRef]);
+
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent): void => {
+      if (
+        popupRef.current && 
+        !popupRef.current.contains(e.target as Node) && 
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose, anchorRef]);
+
+  return (
+    <div 
+      ref={popupRef}
+      className="fixed z-[10000]"
+      style={{
+        top: position.top,
+        right: position.right,
+      }}
+    >
+      <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 min-w-[320px] max-h-[400px] overflow-hidden">
+        {/* Header with Select All buttons */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
+          <button
+            onClick={onSelectAll}
+            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
+          >
+            Select All
+          </button>
+          <button
+            onClick={onSelectAllWithBalance}
+            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
+          >
+            Select All with Balance
+          </button>
+        </div>
+
+        {/* Wallet List */}
+        <div className="overflow-y-auto max-h-[340px]">
+          {wallets.filter(w => !w.isArchived).map((wallet) => {
+            const solBal = solBalances.get(wallet.address) || 0;
+            const tokenBal = tokenBalances.get(wallet.address) || 0;
+            
+            return (
+              <div
+                key={wallet.id}
+                onClick={() => onToggleWallet(wallet.id)}
+                className={`
+                  flex items-center justify-between px-3 py-2 cursor-pointer transition-all duration-200
+                  border-b border-app-primary-20 last:border-b-0
+                  ${wallet.isActive 
+                    ? 'bg-primary-20 border-l-2 border-l-primary' 
+                    : 'hover:bg-app-primary-60'
+                  }
+                `}
+              >
+                {/* Selection indicator & wallet info */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {/* Selection checkbox */}
+                  <div className={`
+                    w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
+                    ${wallet.isActive 
+                      ? 'bg-app-primary-color border-app-primary-color' 
+                      : 'bg-transparent border-app-primary-40'
+                    }
+                  `}>
+                    {wallet.isActive && (
+                      <Check size={10} className="text-black" />
+                    )}
+                  </div>
+
+                  {/* Wallet name and address */}
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className={`text-xs font-mono truncate ${wallet.isActive ? 'text-app-primary' : 'text-app-secondary'}`}>
+                      {getWalletDisplayName(wallet)}
+                    </span>
+                    <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
+                      <Zap size={8} className="text-app-secondary-40" />
+                      <span>Off</span>
+                      <span className="text-app-primary-40">{wallet.address.slice(0, 5)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Balances */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {/* SOL Balance */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
+                    <span className={`text-xs font-mono ${solBal > 0 ? 'text-app-primary' : 'text-app-secondary-60'}`}>
+                      {solBal.toFixed(3)}
+                    </span>
+                  </div>
+
+                  {/* Token Balance */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-3 bg-app-primary-color rounded-sm"></div>
+                    <span className={`text-xs font-mono ${tokenBal > 0 ? 'color-primary' : 'text-app-secondary-60'}`}>
+                      {formatTokenBalance(tokenBal)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface FloatingTradingCardProps {
   isOpen: boolean;
   onClose: () => void;
@@ -201,6 +356,7 @@ interface FloatingTradingCardProps {
   onDraggingChange: (dragging: boolean) => void;
   tokenAddress: string;
   wallets: WalletType[];
+  setWallets: (wallets: WalletType[]) => void;
   selectedDex: string;
   setSelectedDex: (dex: string) => void;
   isDropdownOpen: boolean;
@@ -214,6 +370,7 @@ interface FloatingTradingCardProps {
   getScriptName: (dex: string, isBuy: boolean) => ScriptType;
   countActiveWallets: (wallets: WalletType[]) => number;
   currentMarketCap: number | null;
+  solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
 }
 
@@ -225,20 +382,73 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   isDragging,
   onDraggingChange,
   wallets,
+  setWallets,
   selectedDex,
   setBuyAmount,
   setSellAmount,
   handleTradeSubmit,
-  isLoading
+  isLoading,
+  countActiveWallets,
+  solBalances,
+  tokenBalances
 }) => {
 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
   const [manualProtocol] = useState<string | null>(null);
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
   const isMobile = useIsMobile();
   
   const cardRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
+  const walletButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Wallet selection handlers
+  const handleToggleWallet = (walletId: number): void => {
+    const updatedWallets = toggleWallet(wallets, walletId);
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  };
+
+  const handleSelectAll = (): void => {
+    const allActive = wallets.filter(w => !w.isArchived).every(w => w.isActive);
+    const updatedWallets = wallets.map(wallet => ({
+      ...wallet,
+      isActive: wallet.isArchived ? wallet.isActive : !allActive
+    }));
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  };
+
+  const handleSelectAllWithBalance = (): void => {
+    const walletsWithBalance = wallets.filter(wallet => {
+      if (wallet.isArchived) return false;
+      const solBal = solBalances.get(wallet.address) || 0;
+      const tokenBal = tokenBalances.get(wallet.address) || 0;
+      return solBal > 0 || tokenBal > 0;
+    });
+    
+    if (walletsWithBalance.length === 0) {
+      return;
+    }
+
+    const allWithBalanceActive = walletsWithBalance.every(w => w.isActive);
+    const updatedWallets = wallets.map(wallet => {
+      if (wallet.isArchived) return wallet;
+      const solBal = solBalances.get(wallet.address) || 0;
+      const tokenBal = tokenBalances.get(wallet.address) || 0;
+      const hasBalance = solBal > 0 || tokenBal > 0;
+      
+      if (allWithBalanceActive) {
+        return { ...wallet, isActive: false };
+      } else {
+        return { ...wallet, isActive: hasBalance ? true : wallet.isActive };
+      }
+    });
+    
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  };
   
   interface PresetTab {
     id: string;
@@ -455,6 +665,27 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
               </div>
               
               <div className="flex items-center gap-2">
+                {/* Wallet Selector Button - Mobile */}
+                <button
+                  ref={walletButtonRef}
+                  onClick={() => setShowWalletSelector(!showWalletSelector)}
+                  className="flex items-center gap-1 px-3 py-2 rounded hover:bg-app-primary-20 transition-colors min-h-[44px]"
+                >
+                  <span className="text-xs font-mono color-primary font-semibold">{countActiveWallets(wallets)}</span>
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    className="color-primary"
+                  >
+                    <path 
+                      d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18zM3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 4h2v2h-2v-2z" 
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+                
                 <button
                   onClick={() => setIsEditMode(!isEditMode)}
                   className={`p-2 rounded transition-all duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center
@@ -571,6 +802,27 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Wallet Selector Button */}
+            <button
+              ref={walletButtonRef}
+              onClick={() => setShowWalletSelector(!showWalletSelector)}
+              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-app-primary-20 transition-colors"
+            >
+              <span className="text-[10px] font-mono color-primary font-semibold">{countActiveWallets(wallets)}</span>
+              <svg 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                className="color-primary"
+              >
+                <path 
+                  d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18zM3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 4h2v2h-2v-2z" 
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+            
             <button
               onClick={() => setIsEditMode(!isEditMode)}
               className={`p-1.5 rounded transition-all duration-200
@@ -658,7 +910,24 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   );
 
   // Render to document.body using portal to ensure it floats above everything
-  return createPortal(content, document.body);
+  return (
+    <>
+      {createPortal(content, document.body)}
+      {showWalletSelector && createPortal(
+        <FloatingWalletSelector
+          wallets={wallets}
+          solBalances={solBalances}
+          tokenBalances={tokenBalances}
+          anchorRef={walletButtonRef}
+          onClose={() => setShowWalletSelector(false)}
+          onToggleWallet={handleToggleWallet}
+          onSelectAll={handleSelectAll}
+          onSelectAllWithBalance={handleSelectAllWithBalance}
+        />,
+        document.body
+      )}
+    </>
+  );
 };
 
 export default FloatingTradingCard;

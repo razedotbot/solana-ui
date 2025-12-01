@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { BarChart } from 'lucide-react';
-import { type WalletType } from './Utils';
-import { brand } from './config/brandConfig';
+import type { WalletType } from './utils/types';
+import { brand } from './utils/brandConfig';
 import { useIframeState, type ViewType } from './contexts/IframeStateContext';
 
 interface FrameProps {
@@ -67,22 +67,20 @@ type IframeMessage =
   | ClearWalletsMessage
   | GetWalletsMessage
   | ToggleNonWhitelistedTradesMessage
-  | SetQuickBuyConfigMessage;
+  | QuickBuyActivateMessage
+  | QuickBuyDeactivateMessage;
 
 interface ToggleNonWhitelistedTradesMessage {
   type: 'TOGGLE_NON_WHITELISTED_TRADES';
   enabled: boolean;
 }
 
-interface SetQuickBuyConfigMessage {
-  type: 'SET_QUICK_BUY_CONFIG';
-  config: {
-    enabled: boolean;
-    amount: number;
-    minAmount: number;
-    maxAmount: number;
-    useRange: boolean;
-  };
+interface QuickBuyActivateMessage {
+  type: 'QUICKBUY_ACTIVATE';
+}
+
+interface QuickBuyDeactivateMessage {
+  type: 'QUICKBUY_DEACTIVATE';
 }
 
 interface AddWalletsMessage {
@@ -244,10 +242,10 @@ export const Frame: React.FC<FrameProps> = ({
   onTokenSelect,
   onNonWhitelistedTrade,
   quickBuyEnabled = true,
-  quickBuyAmount = 0.01,
-  quickBuyMinAmount = 0.01,
-  quickBuyMaxAmount = 0.05,
-  useQuickBuyRange = false
+  quickBuyAmount: _quickBuyAmount = 0.01,
+  quickBuyMinAmount: _quickBuyMinAmount = 0.01,
+  quickBuyMaxAmount: _quickBuyMaxAmount = 0.05,
+  useQuickBuyRange: _useQuickBuyRange = false
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -261,6 +259,7 @@ export const Frame: React.FC<FrameProps> = ({
   const { getViewState, setViewState } = useIframeState();
   const previousViewRef = useRef<{ view: ViewType; tokenMint?: string } | null>(null);
   const lastNavigationSentRef = useRef<{ view: string; tokenMint?: string } | null>(null);
+  const quickBuyMessageSentRef = useRef(false);
   
   // Calculate iframe src ONCE on mount based on initial route
   // After initial load, ALL navigation uses postMessage (no iframe reloads)
@@ -272,12 +271,12 @@ export const Frame: React.FC<FrameProps> = ({
     // Determine the correct iframe params based on INITIAL route
     if (location.pathname === '/holdings') {
       urlParams.set('view', 'holdings');
-    } else if (location.pathname.startsWith('/token/') && tokenAddressParam) {
+    } else if (location.pathname.startsWith('/tokens/') && tokenAddressParam) {
       urlParams.set('tokenMint', tokenAddressParam);
     }
     // For monitor view, no additional params needed (will show homepage)
     
-    initialIframeSrc.current = `http://localhost:3000/sol/?${urlParams.toString()}`;
+    initialIframeSrc.current = `https://iframe.raze.sh/sol/?${urlParams.toString()}`;
   }
   
   // State for iframe data
@@ -357,7 +356,7 @@ export const Frame: React.FC<FrameProps> = ({
     const pathname = location.pathname;
     if (pathname === '/holdings') {
       return 'holdings';
-    } else if (pathname.startsWith('/token/') || tokenAddress) {
+    } else if (pathname.startsWith('/tokens/') || tokenAddress) {
       return 'token';
     }
     return 'monitor';
@@ -440,7 +439,7 @@ export const Frame: React.FC<FrameProps> = ({
     if (pathname === '/holdings') {
       targetView = 'holdings';
       targetTokenMint = undefined;
-    } else if (pathname.startsWith('/token/') && tokenAddressParam) {
+    } else if (pathname.startsWith('/tokens/') && tokenAddressParam) {
       // Route-based token view - use route param directly
       targetView = 'token';
       targetTokenMint = tokenAddressParam;
@@ -543,10 +542,15 @@ export const Frame: React.FC<FrameProps> = ({
         
         case 'TOKEN_SELECTED': {
           if (onTokenSelect) {
-            // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
-            // This fixes the issue where selecting a token from iframe doesn't update iframe view
-            lastNavigationSentRef.current = null;
-            onTokenSelect(event.data.tokenAddress);
+            const selectedToken = event.data.tokenAddress;
+            // Only navigate if we're not already on this token page
+            // This prevents redirect loops when iframe confirms navigation
+            if (tokenAddressParam !== selectedToken) {
+              // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
+              // This fixes the issue where selecting a token from iframe doesn't update iframe view
+              lastNavigationSentRef.current = null;
+              onTokenSelect(selectedToken);
+            }
           }
           break;
         }
@@ -585,7 +589,7 @@ export const Frame: React.FC<FrameProps> = ({
                 type: 'HOLDINGS',
                 payload: { wallets: walletData.map(w => w.address) }
               }, '*');
-            } else if (currentPath.startsWith('/token/')) {
+            } else if (currentPath.startsWith('/tokens/')) {
               // Token view needs wallet objects for tracking
               iframeRef.current.contentWindow.postMessage({
                 type: 'ADD_WALLETS',
@@ -605,7 +609,8 @@ export const Frame: React.FC<FrameProps> = ({
         case 'ADD_WALLETS':
         case 'CLEAR_WALLETS':
         case 'TOGGLE_NON_WHITELISTED_TRADES':
-        case 'SET_QUICK_BUY_CONFIG':
+        case 'QUICKBUY_ACTIVATE':
+        case 'QUICKBUY_DEACTIVATE':
           // These are messages sent TO iframe, not responses FROM iframe
           // No action needed here
           break;
@@ -614,31 +619,41 @@ export const Frame: React.FC<FrameProps> = ({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname]);
+  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname, tokenAddressParam]);
 
   // Note: Wallet syncing is now handled in the navigation message
   // No separate wallet sync effect needed since NAVIGATE includes wallets
   
-  // Send quickbuy configuration to iframe when ready or when settings change
+  // Send quickbuy activation/deactivation to iframe when ready or when settings change
   useEffect(() => {
     if (!isIframeReady || !iframeRef.current?.contentWindow) {
       return;
     }
 
-    // Send quickbuy configuration to iframe
-    const quickBuyConfig: SetQuickBuyConfigMessage = {
-      type: 'SET_QUICK_BUY_CONFIG',
-      config: {
-        enabled: quickBuyEnabled,
-        amount: quickBuyAmount,
-        minAmount: quickBuyMinAmount,
-        maxAmount: quickBuyMaxAmount,
-        useRange: useQuickBuyRange
-      }
+    // On initial load, add a small delay to ensure iframe message listener is ready
+    // For subsequent changes, send immediately since iframe is already ready
+    const sendMessage = (): void => {
+      if (!iframeRef.current?.contentWindow) return;
+      
+      // Send quickbuy activation or deactivation message to iframe
+      const quickBuyMessage = {
+        type: quickBuyEnabled ? 'QUICKBUY_ACTIVATE' : 'QUICKBUY_DEACTIVATE'
+      } as const;
+
+      sendMessageToIframe(quickBuyMessage);
+      quickBuyMessageSentRef.current = true;
     };
 
-    sendMessageToIframe(quickBuyConfig);
-  }, [isIframeReady, quickBuyEnabled, quickBuyAmount, quickBuyMinAmount, quickBuyMaxAmount, useQuickBuyRange, sendMessageToIframe]);
+    if (!quickBuyMessageSentRef.current) {
+      // First time: add delay to ensure iframe listener is ready
+      const timeoutId = setTimeout(sendMessage, 150);
+      return () => clearTimeout(timeoutId);
+    }
+    
+    // Subsequent changes: send immediately
+    sendMessage();
+    return undefined;
+  }, [isIframeReady, quickBuyEnabled, sendMessageToIframe]);
   
   // Handle iframe load completion
   const handleFrameLoad = (): void => {
@@ -676,7 +691,7 @@ export const Frame: React.FC<FrameProps> = ({
           <iframe 
             ref={iframeRef}
             key={`frame-${iframeKey}`}
-            src={initialIframeSrc.current || 'http://localhost:3000/sol/'}
+            src={initialIframeSrc.current || 'https://iframe.raze.sh/sol/'}
             className="absolute inset-0 w-full h-full border-0 outline-none"
             style={{ 
               WebkitOverflowScrolling: 'touch',
