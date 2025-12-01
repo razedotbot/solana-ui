@@ -10,8 +10,8 @@ You can deploy **Raze.bot** instantly using either **Vercel** or **Netlify** wit
 
 <div align="center">
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/furydotbot/raze.bot)
-[![Deploy with Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/furydotbot/raze.bot)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/razedotbot/solana-ui)
+[![Deploy with Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/razedotbot/solana-ui)
 
 </div>
 
@@ -29,21 +29,32 @@ It provides users with a seamless interface to connect various Solana wallets an
 Find the full documentation here:  
 👉 [https://docs.raze.bot/how-to-use](https://docs.raze.bot/how-to-use)
 
+Additional docs in this repo:
+- [Theme Customization](docs/CUSTOMIZATION.md) - CSS variables and theming
+- [Iframe Integration](docs/IFRAME.md) - Embed the trading app in your application
+- [Security Policy](docs/SECURITY.md) - Vulnerability reporting
+- [Security Audit](docs/AUDIT.md) - Encryption implementation details
+- [Whitelabel](docs/WHITELABEL.md) - Branding customization
+
 ---
 
 ## ✨ Features
 
-- 🔑 **Multi-Wallet Support** – Connect and manage multiple Solana wallets effortlessly.
-- 📈 **Trading Interface** – Intuitive UI for executing trades on the Solana network.
-- 📱 **Responsive Design** – Optimized for both desktop and mobile devices.
-- ⚡ **Fast Performance** – Built with modern web technologies for a smooth user experience.
+- 🔑 **Multi-Wallet Support** – Create, import, and manage multiple Solana wallets with HD wallet derivation
+- 📈 **Trading Interface** – Intuitive UI for executing buys/sells with quick trade functionality
+- 🤖 **Automation Tools** – Profile-based automation with conditions and actions
+- 🚀 **Token Deployment** – Deploy tokens to Pump.fun, Moonshot, Boop, and more
+- 📱 **Responsive Design** – Optimized for both desktop and mobile devices
+- ⚡ **Fast Performance** – Built with Vite and React for a smooth user experience
+- 🔐 **Secure Storage** – AES-encrypted wallet storage with IndexedDB fallback
+- 🎨 **Customizable Themes** – Full CSS variable support for theming
 
 ---
 
 ## 🚀 Demo
 
 Try the live version here:  
-👉 [https://sol.app.raze.bot/](https://sol.raze.bot)
+👉 [https://sol.raze.bot](https://sol.raze.bot)
 
 ---
 
@@ -51,7 +62,7 @@ Try the live version here:
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v14 or later)
+- [Node.js](https://nodejs.org/) (v18 or later recommended)
 - [npm](https://www.npmjs.com/) (comes with Node.js)
 
 ### Installation
@@ -65,89 +76,147 @@ npm run dev
 
 Visit: `http://localhost:5173`
 
+### Build for Production
+
+```bash
+npm run build
+npm run preview
+```
+
 ---
 
 ## 🗂 Project Structure
 
 ```
-raze.bot/
-├── src/                # Source code
-│   ├── modals/         # Modal components
-│   │   ├── CalculatePNLModal.tsx
-│   │   ├── CleanerModal.tsx
-│   │   ├── ConsolidateModal.tsx
-│   │   ├── DeployBonkModal.tsx
-│   │   ├── DeployBoopModal.tsx
-│   │   ├── DeployCookModal.tsx
-│   │   ├── DeployMoonModal.tsx
-│   │   ├── DeployPumpModal.tsx
-│   │   ├── DepositModal.tsx
-│   │   ├── DistributeModal.tsx
-│   │   ├── MixerModal.tsx
-│   │   ├── SettingsModal.tsx
-│   │   └── TransferModal.tsx
-│   ├── styles/         # CSS and styling
+solana-ui/
+├── src/
+│   ├── components/           # Reusable UI components
+│   │   ├── modals/           # Modal dialogs
+│   │   │   ├── BurnModal.tsx
+│   │   │   ├── CalculatePNLModal.tsx
+│   │   │   ├── ConsolidateModal.tsx
+│   │   │   ├── CreateMasterWalletModal.tsx
+│   │   │   ├── CreateWalletModal.tsx
+│   │   │   ├── DepositModal.tsx
+│   │   │   ├── DistributeModal.tsx
+│   │   │   ├── ExportSeedPhraseModal.tsx
+│   │   │   ├── FundModal.tsx
+│   │   │   ├── ImportWalletModal.tsx
+│   │   │   ├── MixerModal.tsx
+│   │   │   ├── QuickTradeModal.tsx
+│   │   │   ├── TransferModal.tsx
+│   │   │   └── WalletQuickTradeModal.tsx
+│   │   ├── tools/            # Trading tools & automation
+│   │   │   └── automate/     # Automation system
+│   │   │       ├── ProfileBuilder.tsx
+│   │   │       ├── ProfileCard.tsx
+│   │   │       ├── SniperFilterBuilder.tsx
+│   │   │       ├── TradingTools.tsx
+│   │   │       ├── UnifiedActionBuilder.tsx
+│   │   │       ├── UnifiedConditionBuilder.tsx
+│   │   │       └── UnifiedWalletManager.tsx
+│   │   ├── Config.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── FloatingTradingCard.tsx
+│   │   ├── Header.tsx
+│   │   ├── Notifications.tsx
+│   │   ├── PnlCard.tsx
+│   │   ├── RPCEndpointManager.tsx
+│   │   ├── ServerSelector.tsx
+│   │   ├── Split.tsx
 │   │   ├── Styles.tsx
-│   │   ├── betterskill.css
-│   │   ├── raze.css
-│   │   ├── yellow.css
-│   │   └── globals.css
-│   ├── utils/          # Utility functions
-│   │   ├── bonkcreate.ts
-│   │   ├── boopcreate.ts
-│   │   ├── buy.ts
-│   │   ├── cleaner.ts
-│   │   ├── consolidate.ts
-│   │   ├── cookcreate.ts
-│   │   ├── distribute.ts
-│   │   ├── jitoService.ts
-│   │   ├── limitorders.ts
-│   │   ├── mixer.ts
-│   │   ├── mooncreate.ts
-│   │   ├── pumpcreate.ts
-│   │   ├── sell.ts
-│   │   ├── trading.ts
-│   │   └── wallets.ts
-│   ├── types/          # TypeScript type definitions
-│   ├── Actions.tsx     # Action components
-│   ├── App.tsx         # Main application component
-│   ├── Chart.tsx       # Chart component
-│   ├── Config.tsx      # Configuration component
-│   ├── FloatingTradingCard.tsx
-│   ├── Manager.tsx     # Manager component
-│   ├── Menu.tsx        # Menu component
-│   ├── Mobile.tsx      # Mobile-specific components
-│   ├── Notifications.tsx
-│   ├── OperationsWallets.tsx
-│   ├── PnlCard.tsx     # P&L card component
-│   ├── ServerConfig.tsx
-│   ├── StepVisualizations.tsx
-│   ├── TradingForm.tsx # Trading form component
-│   ├── Utils.tsx       # Utility functions
-│   ├── Wallets.tsx     # Wallet management
-│   └── index.tsx       # Entry point
-├── index.html          # HTML template
-├── manifest.json       # Web app manifest
-├── tailwind.config.js  # Tailwind CSS configuration
-├── postcss.config.js   # PostCSS configuration
-├── vite.config.js      # Vite configuration
-├── package.json        # Project metadata and scripts
-├── AUDIT.md           # Security audit documentation
-├── SECURITY.md        # Security guidelines
-├── README-IFRAME-INTEGRATION.md
-└── README.md          # Project documentation
+│   │   ├── ToastContext.tsx
+│   │   ├── Tooltip.tsx
+│   │   └── TradingForm.tsx
+│   ├── contexts/             # React contexts
+│   │   ├── AppContext.tsx
+│   │   ├── AppContextInstance.tsx
+│   │   ├── IframeStateContext.tsx
+│   │   └── useAppContext.ts
+│   ├── pages/                # Page components
+│   │   ├── AutomatePage.tsx  # Automation profiles
+│   │   ├── DeployPage.tsx    # Token deployment
+│   │   ├── HomePage.tsx      # Landing page
+│   │   ├── SettingsPage.tsx  # App settings
+│   │   └── WalletsPage.tsx   # Wallet management
+│   ├── utils/                # Utility functions
+│   │   ├── types/            # TypeScript type definitions
+│   │   ├── brandConfig.ts    # Branding configuration
+│   │   ├── buy.ts            # Buy transaction logic
+│   │   ├── consolidate.ts    # Token consolidation
+│   │   ├── create.ts         # Wallet creation
+│   │   ├── distribute.ts     # SOL distribution
+│   │   ├── formatting.ts     # Number/string formatting
+│   │   ├── hdWallet.ts       # HD wallet derivation
+│   │   ├── iframeManager.ts  # Iframe communication
+│   │   ├── jitoService.ts    # Jito bundle service
+│   │   ├── limitorders.ts    # Limit order logic
+│   │   ├── mixer.ts          # Wallet mixer
+│   │   ├── recentTokens.ts   # Recent token tracking
+│   │   ├── rpcManager.ts     # RPC endpoint rotation
+│   │   ├── sell.ts           # Sell transaction logic
+│   │   ├── styleUtils.ts     # Style utilities
+│   │   ├── trading.ts        # Trading utilities
+│   │   ├── wallets.ts        # Wallet utilities
+│   │   └── websocket.ts      # WebSocket handling
+│   ├── Actions.tsx           # Trading actions component
+│   ├── App.tsx               # Main application component
+│   ├── Frame.tsx             # Chart/iframe component
+│   ├── Mobile.tsx            # Mobile layout
+│   ├── Utils.tsx             # Shared utilities
+│   ├── Wallets.tsx           # Wallet list component
+│   └── index.tsx             # Entry point
+├── docs/                     # Documentation
+│   ├── AUDIT.md              # Security audit
+│   ├── CUSTOMIZATION.md      # Theme customization
+│   ├── IFRAME.md             # Iframe integration
+│   ├── SECURITY.md           # Security policy
+│   └── WHITELABEL.md         # Whitelabel guide
+├── scripts/
+│   └── generate-html.js      # HTML template generator
+├── brand.json                # Brand configuration
+├── green.css                 # Default theme
+├── index.html                # HTML template
+├── index.template.html       # Template source
+├── manifest.json             # Web app manifest
+├── package.json              # Project dependencies
+├── postcss.config.js         # PostCSS configuration
+├── tailwind.config.js        # Tailwind CSS configuration
+├── tsconfig.json             # TypeScript configuration
+├── vite.config.js            # Vite configuration
+└── README.md                 # This file
 ```
 
 ---
 
 ## 🧪 Technologies Used
 
-- [React](https://reactjs.org/)
-- [Next.js](https://nextjs.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Solana Web3.js](https://solana-labs.github.io/solana-web3.js/)
-- [Fury TypeScript SDK](https://github.com/furydotbot/typescript-sdk)
+- [React 18](https://reactjs.org/) - UI library
+- [Vite](https://vitejs.dev/) - Build tool and dev server
+- [TypeScript](https://www.typescriptlang.org/) - Type safety
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
+- [Solana Web3.js](https://solana-labs.github.io/solana-web3.js/) - Solana blockchain interaction
+- [Jupiter API](https://station.jup.ag/docs/apis/swap-api) - Token swaps
+- [Zustand](https://zustand-demo.pmnd.rs/) - State management
+- [React Router](https://reactrouter.com/) - Client-side routing
+- [Lucide React](https://lucide.dev/) - Icon library
+- [Fury TypeScript SDK](https://github.com/furydotbot/typescript-sdk) - Backend integrations
+
+---
+
+## 🎨 Customization
+
+### Theme Customization
+
+Edit `green.css` or create your own theme file. See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for all available CSS variables.
+
+### Branding
+
+Update `brand.json` to customize:
+- Logo and app name
+- Colors and theme
+- Documentation URLs
+- Social links
 
 ---
 
