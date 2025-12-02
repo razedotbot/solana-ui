@@ -276,7 +276,7 @@ export const Frame: React.FC<FrameProps> = ({
     }
     // For monitor view, no additional params needed (will show homepage)
     
-    initialIframeSrc.current = `https://iframe.raze.sh/sol/?${urlParams.toString()}`;
+    initialIframeSrc.current = `https://frame.raze.sh/sol/?${urlParams.toString()}`;
   }
   
   // State for iframe data
@@ -691,7 +691,7 @@ export const Frame: React.FC<FrameProps> = ({
           <iframe 
             ref={iframeRef}
             key={`frame-${iframeKey}`}
-            src={initialIframeSrc.current || 'https://iframe.raze.sh/sol/'}
+            src={initialIframeSrc.current || 'https://frame.raze.sh/sol/'}
             className="absolute inset-0 w-full h-full border-0 outline-none"
             style={{ 
               WebkitOverflowScrolling: 'touch',
