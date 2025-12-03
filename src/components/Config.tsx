@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, CreditCard } from 'lucide-react';
+import { X, Settings, CreditCard, BookOpen } from 'lucide-react';
 import type { ConfigType } from '../Utils';
 import { RPCEndpointManager } from './RPCEndpointManager';
 import { createDefaultEndpoints, type RPCEndpoint } from '../utils/rpcManager';
@@ -11,6 +11,7 @@ interface ConfigProps {
   config: ConfigType;
   onConfigChange: (key: keyof ConfigType, value: string) => void;
   onSave: () => void;
+  onShowTutorial?: () => void;
 }
 
 const Config: React.FC<ConfigProps> = ({
@@ -18,7 +19,8 @@ const Config: React.FC<ConfigProps> = ({
   onClose,
   config,
   onConfigChange,
-  onSave
+  onSave,
+  onShowTutorial
 }) => {
   // Add  styles when the modal is opened
   useEffect(() => {
@@ -218,6 +220,21 @@ const Config: React.FC<ConfigProps> = ({
               <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-[#02b36d30] transition-all duration-300"></div>
             </div>
           </div>
+          
+          {onShowTutorial && (
+            <div className="group animate-[fadeIn_0.45s_ease]">
+              <button
+                onClick={() => {
+                  onClose();
+                  onShowTutorial();
+                }}
+                className="w-full px-5 py-2.5 bg-[#091217] border border-[#02b36d30] text-[#7ddfbd] rounded-lg transition-all duration-300 font-mono tracking-wider font-medium hover:border-[#02b36d] hover:text-[#02b36d] flex items-center justify-center gap-2"
+              >
+                <BookOpen size={16} />
+                RESTART TUTORIAL
+              </button>
+            </div>
+          )}
           
           <div className="pt-4 animate-[fadeIn_0.5s_ease]">
             <button

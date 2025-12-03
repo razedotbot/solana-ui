@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/useAppContext';
-import { UnifiedHeader } from '../components/Header';
-import { 
-  PlusCircle, X, CheckCircle, Info, Search, ChevronRight, ChevronLeft, 
-  Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, ExternalLink 
+import { HorizontalHeader } from '../components/HorizontalHeader';
+import {
+  PlusCircle, X, CheckCircle, Info, Search, ChevronRight, ChevronLeft,
+  Settings, DollarSign, ArrowUp, ArrowDown, Upload, RefreshCw, Copy, ExternalLink
 } from 'lucide-react';
 import { getWalletDisplayName } from '../Utils';
 import type { WalletType } from '../utils/types';
@@ -33,7 +33,7 @@ export const DeployPage: React.FC = () => {
   const { wallets: propWallets, solBalances, refreshBalances } = useAppContext();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  
+
   // Form state
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('pumpfun');
@@ -42,15 +42,15 @@ export const DeployPage: React.FC = () => {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   // Platform-specific options
   const [pumpType, setPumpType] = useState<boolean>(false); // Mayhem mode
   const [bonkType, setBonkType] = useState<'meme' | 'tech'>('meme');
   const [meteoraMode, setMeteoraMode] = useState<'simple' | 'advanced'>('simple'); // Simple (5) or Advanced (20)
-  
+
   // Meteora-specific options
   const [meteoraConfigAddress, setMeteoraConfigAddress] = useState<string>(METEORA_CONFIGS.standard);
-  
+
   // Get Jito tip from cookies settings (transactionFee is in lamports)
   const getJitoTipFromSettings = (): number => {
     const appConfig = loadConfigFromCookies();
@@ -60,20 +60,20 @@ export const DeployPage: React.FC = () => {
     }
     return 0.001; // Default tip
   };
-  
+
   // MAX_WALLETS depends on platform and mode:
   // - Pump.fun & Bonk.fun: 5 wallets max
   // - Meteora Simple: 5 wallets max (single bundle)
   // - Meteora Advanced: 20 wallets max (multi-stage with LUT)
-  const MAX_WALLETS = selectedPlatform === 'meteora' 
+  const MAX_WALLETS = selectedPlatform === 'meteora'
     ? (meteoraMode === 'advanced' ? MAX_WALLETS_METEORA : MAX_WALLETS_STANDARD)
     : MAX_WALLETS_STANDARD;
   const isMeteoraAdvancedMode = selectedPlatform === 'meteora' && meteoraMode === 'advanced';
-  
+
   // Success state
   const [deployedMintAddress, setDeployedMintAddress] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  
+
   // Token metadata
   const [tokenData, setTokenData] = useState<TokenMetadata>({
     name: '',
@@ -84,18 +84,18 @@ export const DeployPage: React.FC = () => {
     telegram: '',
     website: ''
   });
-  
+
   // Wallet amounts
   const [walletAmounts, setWalletAmounts] = useState<Record<string, string>>({});
-  
+
   // Filter/sort state
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState('balance');
   const [sortDirection, setSortDirection] = useState('desc');
   const [balanceFilter, setBalanceFilter] = useState('nonZero');
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Filter wallets with SOL balance > 0
   const wallets = propWallets.filter(wallet => (solBalances.get(wallet.address) || 0) > 0);
 
@@ -111,37 +111,37 @@ export const DeployPage: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml'];
     if (!validTypes.includes(file.type)) {
       showToast("Please select a valid image file (JPEG, PNG, GIF, SVG)", "error");
       return;
     }
-    
+
     if (file.size > 2 * 1024 * 1024) {
       showToast("Image file size should be less than 2MB", "error");
       return;
     }
-    
+
     setIsUploading(true);
     setUploadProgress(0);
-    
+
     try {
       const formData = new FormData();
       formData.append('image', file);
-      
+
       const baseUrl = 'https://public.raze.sh';
       const uploadUrl = `${baseUrl}/api/upload`;
-      
+
       const xhr = new XMLHttpRequest();
-      
+
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded / event.total) * 100);
           setUploadProgress(progress);
         }
       });
-      
+
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           const response = JSON.parse(xhr.responseText) as { url: string };
@@ -152,15 +152,15 @@ export const DeployPage: React.FC = () => {
         }
         setIsUploading(false);
       });
-      
+
       xhr.addEventListener('error', () => {
         showToast("Failed to upload image", "error");
         setIsUploading(false);
       });
-      
+
       xhr.open('POST', uploadUrl);
       xhr.send(formData);
-      
+
     } catch (error) {
       console.error('Error uploading image:', error);
       showToast("Failed to upload image", "error");
@@ -178,12 +178,12 @@ export const DeployPage: React.FC = () => {
   const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
     let filtered = walletList;
     if (search) {
-      filtered = filtered.filter((wallet: WalletType) => 
+      filtered = filtered.filter((wallet: WalletType) =>
         wallet.address.toLowerCase().includes(search.toLowerCase()) ||
         (wallet.label && wallet.label.toLowerCase().includes(search.toLowerCase()))
       );
     }
-    
+
     if (balanceFilter !== 'all') {
       if (balanceFilter === 'nonZero') {
         filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) > 0);
@@ -193,10 +193,10 @@ export const DeployPage: React.FC = () => {
         filtered = filtered.filter((wallet: WalletType) => (solBalances.get(wallet.address) || 0) < 0.1 && (solBalances.get(wallet.address) || 0) > 0);
       }
     }
-    
+
     return filtered.sort((a: WalletType, b: WalletType) => {
       if (sortOption === 'address') {
-        return sortDirection === 'asc' 
+        return sortDirection === 'asc'
           ? a.address.localeCompare(b.address)
           : b.address.localeCompare(a.address);
       } else if (sortOption === 'balance') {
@@ -248,7 +248,7 @@ export const DeployPage: React.FC = () => {
           showToast(`Maximum ${MAX_WALLETS} wallets can be selected`, "error");
           return false;
         }
-        const hasAllAmounts = selectedWallets.every(wallet => 
+        const hasAllAmounts = selectedWallets.every(wallet =>
           walletAmounts[wallet] && Number(walletAmounts[wallet]) > 0
         );
         if (!hasAllAmounts) {
@@ -275,7 +275,7 @@ export const DeployPage: React.FC = () => {
     if (!isConfirmed) return;
 
     setIsSubmitting(true);
-    
+
     try {
       // Build wallet array for create operation
       const walletsForCreate: WalletForCreate[] = selectedWallets.map(privateKey => {
@@ -289,13 +289,13 @@ export const DeployPage: React.FC = () => {
           amount: parseFloat(walletAmounts[privateKey]) || 0.1
         };
       });
-      
+
       // Build create config
       const meteoraConfigObj: MeteoraConfig | undefined = selectedPlatform === 'meteora' ? {
         configAddress: meteoraConfigAddress || METEORA_CONFIGS.standard,
         jitoTipAmountSOL: getJitoTipFromSettings()
       } : undefined;
-      
+
       const config = createDeployConfig({
         platform: selectedPlatform,
         token: {
@@ -311,12 +311,12 @@ export const DeployPage: React.FC = () => {
         bonkType: selectedPlatform === 'bonk' ? bonkType : undefined,
         meteoraConfig: meteoraConfigObj
       });
-      
+
       console.info('Executing create with config:', config);
-      
+
       // Execute create operation (handles signing and sending)
       const result = await executeCreate(walletsForCreate, config);
-      
+
       if (result.success) {
         // Reset form
         setSelectedWallets([]);
@@ -332,10 +332,10 @@ export const DeployPage: React.FC = () => {
         });
         setIsConfirmed(false);
         setCurrentStep(0);
-        
+
         // Refresh balances
         void refreshBalances();
-        
+
         // Show success modal with mint address
         if (result.mintAddress) {
           setDeployedMintAddress(result.mintAddress);
@@ -397,7 +397,7 @@ export const DeployPage: React.FC = () => {
                 <PlusCircle size={14} className="color-primary" />
                 <span className="color-primary">&#62;</span> Token Details <span className="color-primary">&#60;</span>
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
@@ -423,12 +423,12 @@ export const DeployPage: React.FC = () => {
                     placeholder="SYMBOL"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
                     <span className="color-primary">&#62;</span> Logo <span className="color-primary">*</span> <span className="color-primary">&#60;</span>
                   </label>
-                  
+
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -436,17 +436,16 @@ export const DeployPage: React.FC = () => {
                     accept="image/jpeg, image/png, image/gif, image/svg+xml"
                     className="hidden"
                   />
-                  
+
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={triggerFileInput}
                       disabled={isUploading}
-                      className={`px-3 py-2.5 rounded-lg flex items-center gap-2 transition-all text-sm ${
-                        isUploading 
-                          ? 'bg-app-tertiary text-app-secondary cursor-not-allowed border border-app-primary-20' 
-                          : 'bg-app-tertiary hover:bg-app-secondary border border-app-primary-40 hover:border-app-primary text-app-primary'
-                      }`}
+                      className={`px-3 py-2.5 rounded-lg flex items-center gap-2 transition-all text-sm ${isUploading
+                        ? 'bg-app-tertiary text-app-secondary cursor-not-allowed border border-app-primary-20'
+                        : 'bg-app-tertiary hover:bg-app-secondary border border-app-primary-40 hover:border-app-primary text-app-primary'
+                        }`}
                     >
                       {isUploading ? (
                         <>
@@ -460,11 +459,11 @@ export const DeployPage: React.FC = () => {
                         </>
                       )}
                     </button>
-                    
+
                     {tokenData.imageUrl && (
                       <div className="flex items-center gap-2">
                         <div className="h-10 w-10 rounded overflow-hidden border border-app-primary-40 bg-app-tertiary flex items-center justify-center">
-                          <img 
+                          <img
                             src={tokenData.imageUrl}
                             alt="Logo"
                             className="max-h-full max-w-full object-contain"
@@ -551,23 +550,22 @@ export const DeployPage: React.FC = () => {
                       setSelectedWallets(selectedWallets.slice(0, MAX_WALLETS_STANDARD));
                     }
                   }}
-                  className={`p-4 rounded-lg border transition-all text-left ${
-                    selectedPlatform === 'pumpfun'
-                      ? 'border-app-primary-color bg-primary-10 shadow-lg'
-                      : 'border-app-primary-30 hover:border-app-primary-60'
-                  }`}
+                  className={`p-4 rounded-lg border transition-all text-left ${selectedPlatform === 'pumpfun'
+                    ? 'border-app-primary-color bg-primary-10 shadow-lg'
+                    : 'border-app-primary-30 hover:border-app-primary-60'
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 flex-shrink-0">
                       <svg width="32" height="32" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
                         <g transform="rotate(45 256 256)">
-                          <path d="M156 256V156a100 100 0 0 1 200 0v100Z" fill="#f2f7f8"/>
-                          <path d="M156 256v100a100 100 0 0 0 200 0V256Z" fill="#4dd994"/>
-                          <path d="M356 256V156a100 100 0 0 0-56-90q20 34 20 90v100Z" fill="#c1cdd2"/>
-                          <path d="M356 256v100a100 100 0 0 1-56 90q20-36 20-90V256Z" fill="#2a9d70"/>
-                          <path stroke="#163430" strokeWidth="24" strokeLinecap="round" d="M156 256h200"/>
-                          <rect x="156" y="56" width="200" height="400" rx="100" ry="100" fill="none" stroke="#163430" strokeWidth="24"/>
-                          <path d="M190 300a65 65 0 0 0 20 100" fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round" strokeDasharray="60 20"/>
+                          <path d="M156 256V156a100 100 0 0 1 200 0v100Z" fill="#f2f7f8" />
+                          <path d="M156 256v100a100 100 0 0 0 200 0V256Z" fill="#4dd994" />
+                          <path d="M356 256V156a100 100 0 0 0-56-90q20 34 20 90v100Z" fill="#c1cdd2" />
+                          <path d="M356 256v100a100 100 0 0 1-56 90q20-36 20-90V256Z" fill="#2a9d70" />
+                          <path stroke="#163430" strokeWidth="24" strokeLinecap="round" d="M156 256h200" />
+                          <rect x="156" y="56" width="200" height="400" rx="100" ry="100" fill="none" stroke="#163430" strokeWidth="24" />
+                          <path d="M190 300a65 65 0 0 0 20 100" fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round" strokeDasharray="60 20" />
                         </g>
                       </svg>
                     </div>
@@ -586,31 +584,30 @@ export const DeployPage: React.FC = () => {
                       setSelectedWallets(selectedWallets.slice(0, MAX_WALLETS_STANDARD));
                     }
                   }}
-                  className={`p-4 rounded-lg border transition-all text-left ${
-                    selectedPlatform === 'bonk'
-                      ? 'border-app-primary-color bg-primary-10 shadow-lg'
-                      : 'border-app-primary-30 hover:border-app-primary-60'
-                  }`}
+                  className={`p-4 rounded-lg border transition-all text-left ${selectedPlatform === 'bonk'
+                    ? 'border-app-primary-color bg-primary-10 shadow-lg'
+                    : 'border-app-primary-30 hover:border-app-primary-60'
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 flex-shrink-0">
                       <svg width="32" height="32" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
                         <g clipPath="url(#a)">
                           <g clipPath="url(#b)">
-                            <path d="M104 162.1s-15.5 19.55-10.35 108c0 0-33.85 86.75-22.35 131.05 11.5 44.2 56.25 42 56.25 42s71.8 63.1 126.9 7.5c55.2-55.85-45.95-271.8-45.95-271.8l-12.65-74.65s-13.8 10.9-12.05 82.75c1.75 71.8-28.15 21.2-28.15 21.2z" fill="#3c2d0c"/>
-                            <path d="m109.75 240.3-19 53.45-6.9 37.35s-23.55 83.4 73.6 82.15c0 0 75.8 67.85 125.25 22.4l13.25-14.4 23-35.65 37.95-113.2s-12.1-77.55-88.5-109.7c0 0-6.3-3.35-17.8 1.2 0 0-31.65-71.25-51.7-62.6 0 0-17.2 9.15-2.35 79.35L169.6 192.7s-29.5-56-56.8-44.75c-25.45 10.2-3.05 92.35-3.05 92.35" fill="#e78c19"/>
-                            <path d="m207.9 136.35 2.35 31.05s1.75 17.8 20.65 11.5c5.4-1.75 10.05-5.5 9.6-11.6-.35-4.6-3.5-8.8-5.65-12.65-3.85-7.4-7-15.25-11.6-22.4-2.3-3.65-7.15-11.75-12.4-10.8 0 0-4-1.15-2.95 14.9M125 171c.3-.2 8-9.95 24.1 13.75 16.05 23.65 14.4 20.6 14.4 20.6s8.7 9.5-9 21.7a65 65 0 0 1-12.55 7 25 25 0 0 1-8.65 1.65c-3.4-.1-4.95-1.85-5.75-5-2.7-10.35-5.75-20.65-7.3-31.2-1.15-8.2-3.5-23.2 4.7-28.5" fill="#efb99d"/>
-                            <path d="M311.5 218.85c0 5.6-8.2 10.15-18.4 10.15s-18.4-4.5-18.4-10.15 8.5-14 18.5-14c10.1 0 18.3 8.35 18.3 14m-106.1 44c5.5-9.65 4.85-20.3-1.35-23.8s-15.6 1.5-21.05 11.1c-5.5 9.6-4.85 20.25 1.35 23.8 6.15 3.5 15.6-1.5 21.05-11.1m26.1 46.45 50.25-26.15s62.6-32.7 77.8-7.5 0 63.75 0 63.75-6.55 45.1-52.6 49.1l-24.75 3.4-31.65.8s-50.85 2.95-88.2-24.7l-11.85-14.4s-23.8-32.7-7.15-56.25 73.6 12.85 73.6 12.85 8 4.35 14.5-.9" fill="#fbfbfb"/>
-                            <path d="M345.5 179.1a12.05 12.05 0 1 0 0-24.1 12.05 12.05 0 0 0 0 24.1m-26.7-29.65a12.05 12.05 0 1 0 0-24.15 12.05 12.05 0 0 0 0 24.15M276 140a12.05 12.05 0 1 0 0-24.2 12.05 12.05 0 0 0 0 24.15m9.5-97.65c2.6 35.6-2.55 67.85-11.25 67.85-8.65 0-20.15-34.8-20.15-67.85 0-13.6 7.15-15.85 15.8-15.85 8.8 0 14.65 2.25 15.6 15.85m79.95 22.2c-13.15 33.1-31.75 60-39.5 56.2s-3-40.05 11.35-69.85c6-12.3 13.4-11.1 21.1-7.35 7.75 3.85 12.1 8.3 7 21m57.2 64.7c-28.95 21-58.95 33.65-63.5 26.25-4.55-7.35 19-35.4 47-52.85 11.6-7.15 17.2-2.2 21.8 5.05 4.45 7.4 5.75 13.5-5.3 21.55" fill="#e72d36"/>
-                            <path d="m229.15 274.4-3.15.35q.15.5.2 1.2c0 3.6-5.75 6.65-12.9 6.9q-.1.5 0 .95c.35 4.45 8.1 7.5 17.15 6.8s16.25-4.95 15.9-9.4c-.45-4.45-8.05-7.5-17.2-6.8m63.5-15.6-3.15.35q.15.5.2 1.15c0 3.65-5.75 6.7-12.9 6.95v.9c.35 4.5 8.1 7.5 17.15 6.8s16.25-4.9 15.9-9.35c-.35-4.5-8.05-7.5-17.2-6.8m20.85 18.5s-25.2 7.4-23.65 21.55c1.5 14.2 31.85 21.55 31.85 21.55s8.2 3.3 12.9-4.55c4.7-7.75 11.6-18.3 9.75-33.4 0 0-.6-11.25-30.85-5.15" fill="#000"/>
+                            <path d="M104 162.1s-15.5 19.55-10.35 108c0 0-33.85 86.75-22.35 131.05 11.5 44.2 56.25 42 56.25 42s71.8 63.1 126.9 7.5c55.2-55.85-45.95-271.8-45.95-271.8l-12.65-74.65s-13.8 10.9-12.05 82.75c1.75 71.8-28.15 21.2-28.15 21.2z" fill="#3c2d0c" />
+                            <path d="m109.75 240.3-19 53.45-6.9 37.35s-23.55 83.4 73.6 82.15c0 0 75.8 67.85 125.25 22.4l13.25-14.4 23-35.65 37.95-113.2s-12.1-77.55-88.5-109.7c0 0-6.3-3.35-17.8 1.2 0 0-31.65-71.25-51.7-62.6 0 0-17.2 9.15-2.35 79.35L169.6 192.7s-29.5-56-56.8-44.75c-25.45 10.2-3.05 92.35-3.05 92.35" fill="#e78c19" />
+                            <path d="m207.9 136.35 2.35 31.05s1.75 17.8 20.65 11.5c5.4-1.75 10.05-5.5 9.6-11.6-.35-4.6-3.5-8.8-5.65-12.65-3.85-7.4-7-15.25-11.6-22.4-2.3-3.65-7.15-11.75-12.4-10.8 0 0-4-1.15-2.95 14.9M125 171c.3-.2 8-9.95 24.1 13.75 16.05 23.65 14.4 20.6 14.4 20.6s8.7 9.5-9 21.7a65 65 0 0 1-12.55 7 25 25 0 0 1-8.65 1.65c-3.4-.1-4.95-1.85-5.75-5-2.7-10.35-5.75-20.65-7.3-31.2-1.15-8.2-3.5-23.2 4.7-28.5" fill="#efb99d" />
+                            <path d="M311.5 218.85c0 5.6-8.2 10.15-18.4 10.15s-18.4-4.5-18.4-10.15 8.5-14 18.5-14c10.1 0 18.3 8.35 18.3 14m-106.1 44c5.5-9.65 4.85-20.3-1.35-23.8s-15.6 1.5-21.05 11.1c-5.5 9.6-4.85 20.25 1.35 23.8 6.15 3.5 15.6-1.5 21.05-11.1m26.1 46.45 50.25-26.15s62.6-32.7 77.8-7.5 0 63.75 0 63.75-6.55 45.1-52.6 49.1l-24.75 3.4-31.65.8s-50.85 2.95-88.2-24.7l-11.85-14.4s-23.8-32.7-7.15-56.25 73.6 12.85 73.6 12.85 8 4.35 14.5-.9" fill="#fbfbfb" />
+                            <path d="M345.5 179.1a12.05 12.05 0 1 0 0-24.1 12.05 12.05 0 0 0 0 24.1m-26.7-29.65a12.05 12.05 0 1 0 0-24.15 12.05 12.05 0 0 0 0 24.15M276 140a12.05 12.05 0 1 0 0-24.2 12.05 12.05 0 0 0 0 24.15m9.5-97.65c2.6 35.6-2.55 67.85-11.25 67.85-8.65 0-20.15-34.8-20.15-67.85 0-13.6 7.15-15.85 15.8-15.85 8.8 0 14.65 2.25 15.6 15.85m79.95 22.2c-13.15 33.1-31.75 60-39.5 56.2s-3-40.05 11.35-69.85c6-12.3 13.4-11.1 21.1-7.35 7.75 3.85 12.1 8.3 7 21m57.2 64.7c-28.95 21-58.95 33.65-63.5 26.25-4.55-7.35 19-35.4 47-52.85 11.6-7.15 17.2-2.2 21.8 5.05 4.45 7.4 5.75 13.5-5.3 21.55" fill="#e72d36" />
+                            <path d="m229.15 274.4-3.15.35q.15.5.2 1.2c0 3.6-5.75 6.65-12.9 6.9q-.1.5 0 .95c.35 4.45 8.1 7.5 17.15 6.8s16.25-4.95 15.9-9.4c-.45-4.45-8.05-7.5-17.2-6.8m63.5-15.6-3.15.35q.15.5.2 1.15c0 3.65-5.75 6.7-12.9 6.95v.9c.35 4.5 8.1 7.5 17.15 6.8s16.25-4.9 15.9-9.35c-.35-4.5-8.05-7.5-17.2-6.8m20.85 18.5s-25.2 7.4-23.65 21.55c1.5 14.2 31.85 21.55 31.85 21.55s8.2 3.3 12.9-4.55c4.7-7.75 11.6-18.3 9.75-33.4 0 0-.6-11.25-30.85-5.15" fill="#000" />
                           </g>
                         </g>
                         <defs>
                           <clipPath id="a">
-                            <path fill="#fff" d="M0 0h500v500H0z"/>
+                            <path fill="#fff" d="M0 0h500v500H0z" />
                           </clipPath>
                           <clipPath id="b">
-                            <path fill="#fff" d="M-50-50h600v600H-50z"/>
+                            <path fill="#fff" d="M-50-50h600v600H-50z" />
                           </clipPath>
                         </defs>
                       </svg>
@@ -624,21 +621,20 @@ export const DeployPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedPlatform('meteora')}
-                  className={`p-4 rounded-lg border transition-all text-left ${
-                    selectedPlatform === 'meteora'
-                      ? 'border-app-primary-color bg-primary-10 shadow-lg'
-                      : 'border-app-primary-30 hover:border-app-primary-60'
-                  }`}
+                  className={`p-4 rounded-lg border transition-all text-left ${selectedPlatform === 'meteora'
+                    ? 'border-app-primary-color bg-primary-10 shadow-lg'
+                    : 'border-app-primary-30 hover:border-app-primary-60'
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 flex-shrink-0">
                       <svg width="32" height="32" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                        <path d="M185.89 66.887c3.313-3.314 8.445-3.119 10.567.39 2.296 3.767 4.029 7.839 5.263 12.105.693 2.425-.109 5.261-2.122 7.275l-64.902 64.902c-3.919 3.92-8.792 6.626-13.967 7.731l-5.393 1.147c-5.154 1.126-10.07 3.834-13.968 7.732l-49.829 49.829c-2.122-8.186-3.053-13.708 3.595-20.357zm14.055 27.96c2.166-2.165 5.501-.909 5.285 1.95-1.343 17.497-9.68 35.926-24.535 50.782-11.326 12.409-43.29 31.379-66.136 44.091-4.678 2.598-8.49-2.945-4.656-6.779l90.021-90.021zm-29.864-54.204c2.057-2.058 5.089-2.49 7.168-1.061 4.331 2.945 8.381 7.211 10.46 12.365.78 1.992.108 4.44-1.602 6.15l-69.905 69.904c-3.919 3.919-8.792 6.627-13.967 7.731l-5.392 1.148c-5.154 1.126-10.07 3.833-13.968 7.73L39.76 187.726c-2.122-8.185-1.104-15.656 5.544-22.304l25.163-25.164zm-29.626-12.427c3.898-3.898 9.485-5.414 14.076-3.682a52 52 0 0 1 8.273 4.028c3.465 2.08 3.638 7.147.39 10.395l-63.927 63.927c-3.66 3.659-8.641 5.609-13.405 5.262-5.003-.368-10.265 1.69-14.141 5.566l-35.017 35.016c-2.122-8.185.628-17.389 7.277-24.038zm-10.24-6.217c3.075-.043 4.266 3.617 1.927 5.956L98.945 61.152l-27.72 27.72-7.037 7.037-10.785 10.785c-2.253 2.252-5.587.216-4.331-2.642l10.48-23.82a77 77 0 0 1 1.95-4.419l.065-.151c6.041-12.798 15.765-26.377 24.904-35.516 14.661-14.66 27.827-17.995 43.744-18.147" fill="url(#meteora-gradient)"/>
+                        <path d="M185.89 66.887c3.313-3.314 8.445-3.119 10.567.39 2.296 3.767 4.029 7.839 5.263 12.105.693 2.425-.109 5.261-2.122 7.275l-64.902 64.902c-3.919 3.92-8.792 6.626-13.967 7.731l-5.393 1.147c-5.154 1.126-10.07 3.834-13.968 7.732l-49.829 49.829c-2.122-8.186-3.053-13.708 3.595-20.357zm14.055 27.96c2.166-2.165 5.501-.909 5.285 1.95-1.343 17.497-9.68 35.926-24.535 50.782-11.326 12.409-43.29 31.379-66.136 44.091-4.678 2.598-8.49-2.945-4.656-6.779l90.021-90.021zm-29.864-54.204c2.057-2.058 5.089-2.49 7.168-1.061 4.331 2.945 8.381 7.211 10.46 12.365.78 1.992.108 4.44-1.602 6.15l-69.905 69.904c-3.919 3.919-8.792 6.627-13.967 7.731l-5.392 1.148c-5.154 1.126-10.07 3.833-13.968 7.73L39.76 187.726c-2.122-8.185-1.104-15.656 5.544-22.304l25.163-25.164zm-29.626-12.427c3.898-3.898 9.485-5.414 14.076-3.682a52 52 0 0 1 8.273 4.028c3.465 2.08 3.638 7.147.39 10.395l-63.927 63.927c-3.66 3.659-8.641 5.609-13.405 5.262-5.003-.368-10.265 1.69-14.141 5.566l-35.017 35.016c-2.122-8.185.628-17.389 7.277-24.038zm-10.24-6.217c3.075-.043 4.266 3.617 1.927 5.956L98.945 61.152l-27.72 27.72-7.037 7.037-10.785 10.785c-2.253 2.252-5.587.216-4.331-2.642l10.48-23.82a77 77 0 0 1 1.95-4.419l.065-.151c6.041-12.798 15.765-26.377 24.904-35.516 14.661-14.66 27.827-17.995 43.744-18.147" fill="url(#meteora-gradient)" />
                         <defs>
                           <linearGradient id="meteora-gradient" x1="236.796" y1="22.232" x2="67.909" y2="217.509" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#f5bd00"/>
-                            <stop offset=".365" stopColor="#f54b00"/>
-                            <stop offset="1" stopColor="#6e45ff"/>
+                            <stop stopColor="#f5bd00" />
+                            <stop offset=".365" stopColor="#f54b00" />
+                            <stop offset="1" stopColor="#6e45ff" />
                           </linearGradient>
                         </defs>
                       </svg>
@@ -662,22 +658,20 @@ export const DeployPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPumpType(false)}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${
-                      !pumpType
-                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                    }`}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${!pumpType
+                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                      }`}
                   >
                     NORMAL
                   </button>
                   <button
                     type="button"
                     onClick={() => setPumpType(true)}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${
-                      pumpType
-                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                    }`}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${pumpType
+                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                      }`}
                   >
                     MAYHEM
                   </button>
@@ -694,22 +688,20 @@ export const DeployPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setBonkType('meme')}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${
-                      bonkType === 'meme'
-                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                    }`}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${bonkType === 'meme'
+                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                      }`}
                   >
                     MEME
                   </button>
                   <button
                     type="button"
                     onClick={() => setBonkType('tech')}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${
-                      bonkType === 'tech'
-                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                    }`}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${bonkType === 'tech'
+                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                      }`}
                   >
                     TECH
                   </button>
@@ -734,11 +726,10 @@ export const DeployPage: React.FC = () => {
                           setSelectedWallets(selectedWallets.slice(0, MAX_WALLETS_STANDARD));
                         }
                       }}
-                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${
-                        meteoraMode === 'simple'
-                          ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                          : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                      }`}
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${meteoraMode === 'simple'
+                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                        }`}
                     >
                       <div className="text-sm font-bold">SIMPLE</div>
                       <div className="text-xs opacity-70 mt-1">Up to 5 wallets</div>
@@ -746,11 +737,10 @@ export const DeployPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setMeteoraMode('advanced')}
-                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${
-                        meteoraMode === 'advanced'
-                          ? 'bg-amber-500 text-black border border-amber-400 shadow-lg'
-                          : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-amber-500/50'
-                      }`}
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${meteoraMode === 'advanced'
+                        ? 'bg-amber-500 text-black border border-amber-400 shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-amber-500/50'
+                        }`}
                     >
                       <div className="text-sm font-bold">ADVANCED</div>
                       <div className="text-xs opacity-70 mt-1">Up to 20 wallets</div>
@@ -759,11 +749,10 @@ export const DeployPage: React.FC = () => {
                 </div>
 
                 {/* Info Banner */}
-                <div className={`border rounded-lg p-3 ${
-                  meteoraMode === 'advanced' 
-                    ? 'bg-amber-500/10 border-amber-500/30' 
-                    : 'bg-app-tertiary border-app-primary-30'
-                }`}>
+                <div className={`border rounded-lg p-3 ${meteoraMode === 'advanced'
+                  ? 'bg-amber-500/10 border-amber-500/30'
+                  : 'bg-app-tertiary border-app-primary-30'
+                  }`}>
                   <div className="flex items-center gap-2 mb-2">
                     <Info size={14} className={meteoraMode === 'advanced' ? 'text-amber-500' : 'color-primary'} />
                     <span className={`text-xs font-mono font-bold ${meteoraMode === 'advanced' ? 'text-amber-400' : 'text-app-primary'}`}>
@@ -812,7 +801,7 @@ export const DeployPage: React.FC = () => {
             )}
           </div>
         );
-        
+
       case 1:
         return (
           <div className="space-y-4">
@@ -851,8 +840,8 @@ export const DeployPage: React.FC = () => {
                   placeholder="SEARCH..."
                 />
               </div>
-              
-              <select 
+
+              <select
                 className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary focus:outline-none focus:border-app-primary font-mono"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
@@ -860,7 +849,7 @@ export const DeployPage: React.FC = () => {
                 <option value="address">ADDRESS</option>
                 <option value="balance">BALANCE</option>
               </select>
-              
+
               <button
                 type="button"
                 className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:border-app-primary hover:color-primary transition-all"
@@ -869,7 +858,7 @@ export const DeployPage: React.FC = () => {
                 {sortDirection === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
               </button>
 
-              <select 
+              <select
                 className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary focus:outline-none focus:border-app-primary font-mono"
                 value={balanceFilter}
                 onChange={(e) => setBalanceFilter(e.target.value)}
@@ -882,14 +871,13 @@ export const DeployPage: React.FC = () => {
             </div>
 
             {/* Info */}
-            <div className={`border rounded-lg p-3 flex items-center gap-2 ${
-              isMeteoraAdvancedMode 
-                ? 'bg-amber-500/10 border-amber-500/30' 
-                : 'bg-app-tertiary border-app-primary-30'
-            }`}>
+            <div className={`border rounded-lg p-3 flex items-center gap-2 ${isMeteoraAdvancedMode
+              ? 'bg-amber-500/10 border-amber-500/30'
+              : 'bg-app-tertiary border-app-primary-30'
+              }`}>
               <Info size={14} className={isMeteoraAdvancedMode ? 'text-amber-500' : 'color-primary'} />
               <span className={`text-xs font-mono ${isMeteoraAdvancedMode ? 'text-amber-400' : 'text-app-secondary'}`}>
-                {isMeteoraAdvancedMode 
+                {isMeteoraAdvancedMode
                   ? `ADVANCED MODE: SELECT UP TO ${MAX_WALLETS} WALLETS. MULTI-STAGE DEPLOYMENT.`
                   : `SELECT UP TO ${MAX_WALLETS} WALLETS. FIRST WALLET IS THE CREATOR.`
                 }
@@ -923,7 +911,7 @@ export const DeployPage: React.FC = () => {
                   {selectedWallets.map((privateKey, index) => {
                     const wallet = getWalletByPrivateKey(privateKey);
                     const solBalance = wallet ? solBalances.get(wallet.address) || 0 : 0;
-                    
+
                     return (
                       <div
                         key={wallet?.id}
@@ -998,7 +986,7 @@ export const DeployPage: React.FC = () => {
                   })}
                 </div>
               )}
-              
+
               {/* Available Wallets */}
               {selectedWallets.length < MAX_WALLETS && (
                 <div>
@@ -1007,7 +995,7 @@ export const DeployPage: React.FC = () => {
                   </div>
                   {filterWallets(wallets.filter(w => !selectedWallets.includes(w.privateKey)), searchTerm).map((wallet: WalletType) => {
                     const solBalance = solBalances.get(wallet.address) || 0;
-                    
+
                     return (
                       <div
                         key={wallet.id}
@@ -1035,7 +1023,7 @@ export const DeployPage: React.FC = () => {
                   )}
                 </div>
               )}
-              
+
               {selectedWallets.length >= MAX_WALLETS && (
                 <div className="text-center py-3 bg-app-tertiary border border-app-primary-30 rounded-lg">
                   <div className="color-primary font-mono text-xs">MAX WALLETS REACHED</div>
@@ -1113,7 +1101,7 @@ export const DeployPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-                
+
                 {(tokenData.twitter || tokenData.telegram || tokenData.website) && (
                   <>
                     <div className="h-px bg-app-primary-20 my-2"></div>
@@ -1140,14 +1128,14 @@ export const DeployPage: React.FC = () => {
                     </div>
                   </>
                 )}
-                
+
                 <div className="h-px bg-app-primary-20 my-2"></div>
                 <div className="flex justify-between text-xs">
                   <span className="text-app-secondary font-mono">TOTAL SOL:</span>
                   <span className="color-primary font-mono font-bold">{calculateTotalAmount().toFixed(4)} SOL</span>
                 </div>
               </div>
-              
+
               {/* Selected Wallets */}
               <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4 space-y-3">
                 <h4 className="text-xs font-medium text-app-secondary font-mono uppercase">WALLETS ({selectedWallets.length})</h4>
@@ -1155,7 +1143,7 @@ export const DeployPage: React.FC = () => {
                   {selectedWallets.map((key, index) => {
                     const wallet = getWalletByPrivateKey(key);
                     const solBalance = wallet ? solBalances.get(wallet.address) || 0 : 0;
-                    
+
                     return (
                       <div key={index} className="flex justify-between items-center p-2 bg-app-tertiary rounded border border-app-primary-30 text-xs">
                         <div className="flex items-center gap-2">
@@ -1178,7 +1166,7 @@ export const DeployPage: React.FC = () => {
             {/* Confirmation */}
             <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   onClick={() => setIsConfirmed(!isConfirmed)}
                   className="relative w-5 h-5 cursor-pointer flex-shrink-0"
                 >
@@ -1187,27 +1175,27 @@ export const DeployPage: React.FC = () => {
                     <CheckCircle size={14} className="absolute top-0.5 left-0.5 text-app-quaternary" />
                   )}
                 </div>
-                <label 
+                <label
                   onClick={() => setIsConfirmed(!isConfirmed)}
                   className="text-xs text-app-primary cursor-pointer select-none font-mono"
                 >
-                  I CONFIRM DEPLOYMENT OF THIS TOKEN ON {selectedPlatform.toUpperCase()} 
-                  {isMeteoraAdvancedMode && ' (ADVANCED MODE)'} USING {selectedWallets.length} WALLET{selectedWallets.length !== 1 ? 'S' : ''}. 
+                  I CONFIRM DEPLOYMENT OF THIS TOKEN ON {selectedPlatform.toUpperCase()}
+                  {isMeteoraAdvancedMode && ' (ADVANCED MODE)'} USING {selectedWallets.length} WALLET{selectedWallets.length !== 1 ? 'S' : ''}.
                   {isMeteoraAdvancedMode && ' THIS WILL SEND MULTIPLE BUNDLES IN SEQUENCE.'} THIS ACTION CANNOT BE UNDONE.
                 </label>
               </div>
             </div>
           </div>
         );
-      
+
       default:
         return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-app-primary text-app-tertiary flex">
-      <UnifiedHeader />
+    <div className="min-h-screen bg-app-primary text-app-tertiary flex flex-col">
+      <HorizontalHeader />
 
       {/* Success Modal */}
       {deployedMintAddress && (
@@ -1219,7 +1207,7 @@ export const DeployPage: React.FC = () => {
                 <CheckCircle size={32} className="color-primary" />
               </div>
             </div>
-            
+
             {/* Title */}
             <h2 className="text-xl font-bold text-app-primary font-mono text-center mb-2">
               TOKEN DEPLOYED!
@@ -1227,7 +1215,7 @@ export const DeployPage: React.FC = () => {
             <p className="text-sm text-app-secondary font-mono text-center mb-6">
               Your token has been successfully deployed on {selectedPlatform.toUpperCase()}.
             </p>
-            
+
             {/* Token Address */}
             <div className="mb-6">
               <label className="text-xs font-medium text-app-secondary font-mono uppercase tracking-wider mb-2 block">
@@ -1242,18 +1230,17 @@ export const DeployPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void handleCopyAddress()}
-                  className={`p-3 rounded-lg border transition-all ${
-                    copied
-                      ? 'bg-app-primary-color border-app-primary text-app-quaternary'
-                      : 'bg-app-tertiary border-app-primary-30 text-app-primary hover:border-app-primary'
-                  }`}
+                  className={`p-3 rounded-lg border transition-all ${copied
+                    ? 'bg-app-primary-color border-app-primary text-app-quaternary'
+                    : 'bg-app-tertiary border-app-primary-30 text-app-primary hover:border-app-primary'
+                    }`}
                   title="Copy address"
                 >
                   {copied ? <CheckCircle size={18} /> : <Copy size={18} />}
                 </button>
               </div>
             </div>
-            
+
             {/* Actions */}
             <div className="flex gap-3">
               <button
@@ -1276,7 +1263,7 @@ export const DeployPage: React.FC = () => {
         </div>
       )}
 
-      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full md:w-auto md:ml-48 bg-app-primary">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
         {/* Background effects */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <div className="absolute inset-0 bg-app-primary opacity-90">
@@ -1311,26 +1298,23 @@ export const DeployPage: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               {STEPS_DEPLOY.map((step, index) => (
                 <div key={step} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-sm ${
-                    index <= currentStep 
-                      ? 'bg-app-primary-color text-app-quaternary' 
-                      : 'bg-app-tertiary text-app-secondary'
-                  }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-sm ${index <= currentStep
+                    ? 'bg-app-primary-color text-app-quaternary'
+                    : 'bg-app-tertiary text-app-secondary'
+                    }`}>
                     {index + 1}
                   </div>
                   {index < STEPS_DEPLOY.length - 1 && (
-                    <div className={`w-16 sm:w-24 h-0.5 mx-2 ${
-                      index < currentStep ? 'bg-app-primary-color' : 'bg-app-tertiary'
-                    }`}></div>
+                    <div className={`w-16 sm:w-24 h-0.5 mx-2 ${index < currentStep ? 'bg-app-primary-color' : 'bg-app-tertiary'
+                      }`}></div>
                   )}
                 </div>
               ))}
             </div>
             <div className="flex justify-between">
               {STEPS_DEPLOY.map((step, index) => (
-                <div key={step} className={`text-xs font-mono ${
-                  index <= currentStep ? 'color-primary' : 'text-app-secondary'
-                }`}>
+                <div key={step} className={`text-xs font-mono ${index <= currentStep ? 'color-primary' : 'text-app-secondary'
+                  }`}>
                   {step}
                 </div>
               ))}
@@ -1349,11 +1333,10 @@ export const DeployPage: React.FC = () => {
                 type="button"
                 onClick={handleBack}
                 disabled={currentStep === 0 || isSubmitting}
-                className={`px-4 py-2.5 rounded-lg flex items-center gap-2 font-mono text-sm transition-all ${
-                  currentStep === 0
-                    ? 'bg-app-tertiary text-app-secondary cursor-not-allowed opacity-50'
-                    : 'bg-app-tertiary text-app-primary border border-app-primary-30 hover:border-app-primary'
-                }`}
+                className={`px-4 py-2.5 rounded-lg flex items-center gap-2 font-mono text-sm transition-all ${currentStep === 0
+                  ? 'bg-app-tertiary text-app-secondary cursor-not-allowed opacity-50'
+                  : 'bg-app-tertiary text-app-primary border border-app-primary-30 hover:border-app-primary'
+                  }`}
               >
                 <ChevronLeft size={16} />
                 BACK
@@ -1363,11 +1346,10 @@ export const DeployPage: React.FC = () => {
                 type={currentStep === 2 ? 'submit' : 'button'}
                 onClick={currentStep === 2 ? undefined : handleNext}
                 disabled={currentStep === 2 ? (isSubmitting || !isConfirmed) : isSubmitting}
-                className={`px-4 py-2.5 rounded-lg flex items-center gap-2 font-mono text-sm transition-all ${
-                  (currentStep === 2 && (isSubmitting || !isConfirmed))
-                    ? 'bg-app-primary-color/50 text-app-quaternary cursor-not-allowed opacity-50'
-                    : 'bg-app-primary-color text-app-quaternary hover:bg-app-primary-light'
-                }`}
+                className={`px-4 py-2.5 rounded-lg flex items-center gap-2 font-mono text-sm transition-all ${(currentStep === 2 && (isSubmitting || !isConfirmed))
+                  ? 'bg-app-primary-color/50 text-app-quaternary cursor-not-allowed opacity-50'
+                  : 'bg-app-primary-color text-app-quaternary hover:bg-app-primary-light'
+                  }`}
               >
                 {currentStep === 2 ? (
                   isSubmitting ? (

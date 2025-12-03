@@ -6,12 +6,12 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { 
-  Zap, 
-  Users, 
-  Bot, 
-  Activity, 
-  Key, 
+import {
+  Zap,
+  Users,
+  Bot,
+  Activity,
+  Key,
   AlertCircle,
   Rocket,
   Clock,
@@ -20,7 +20,7 @@ import {
   Crosshair,
   RefreshCw
 } from 'lucide-react';
-import { UnifiedHeader } from '../components/Header';
+import { HorizontalHeader } from '../components/HorizontalHeader';
 import { useAppContext } from '../contexts/useAppContext';
 import { formatAddress } from '../utils/formatting';
 import { executeTrade } from '../utils/trading';
@@ -29,7 +29,7 @@ import type { WalletType } from '../utils/types';
 
 // Import unified components
 import { TradingTools } from '../components/tools';
-import type { 
+import type {
   ToolType,
   SniperProfile,
   CopyTradeProfile,
@@ -49,8 +49,8 @@ import {
 } from '../components/tools/automate/storage';
 
 // Import WebSocket managers
-import { 
-  SniperBotWebSocketManager, 
+import {
+  SniperBotWebSocketManager,
   CopyTradeWebSocketManager
 } from '../utils/websocket';
 import type { MultiTokenWebSocketManager } from '../utils/websocket';
@@ -147,7 +147,7 @@ export const AutomatePage: React.FC = () => {
     const activeSniper = sniperProfiles.filter(p => p.isActive).length;
     const activeCopyTrade = copyTradeProfiles.filter(p => p.isActive).length;
     const activeAutomate = strategies.filter(s => s.isActive).length;
-    
+
     const successful = executionLogs.filter(l => l.success).length;
     const failed = executionLogs.filter(l => !l.success).length;
 
@@ -182,7 +182,7 @@ export const AutomatePage: React.FC = () => {
     toolType: ToolType
   ): Promise<boolean> => {
     const walletsToUse = contextWallets.filter(w => walletAddresses.includes(w.address));
-    
+
     if (walletsToUse.length === 0) {
       contextShowToast?.('No wallets available for trading', 'error');
       return false;
@@ -198,14 +198,14 @@ export const AutomatePage: React.FC = () => {
     try {
       const tradingConfig: TradingConfig = {
         tokenAddress,
-        ...(actionType === 'buy' 
+        ...(actionType === 'buy'
           ? { solAmount: amount }
           : { sellPercent: amount }
         )
       };
 
       const selectedDex = contextConfig?.selectedDex || 'raydium';
-      
+
       await executeTrade(
         selectedDex,
         walletsForTrade,
@@ -231,7 +231,7 @@ export const AutomatePage: React.FC = () => {
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // Log failure
       const logEntry: ExecutionLogEntry = {
         id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -269,7 +269,7 @@ export const AutomatePage: React.FC = () => {
     const matchingProfiles = currentProfiles.filter(profile => {
       if (!profile.isActive) return false;
       if (profile.eventType !== 'both' && profile.eventType !== event.type) return false;
-      
+
       // Check cooldown
       if (profile.lastExecuted) {
         let cooldownMs = profile.cooldown;
@@ -277,10 +277,10 @@ export const AutomatePage: React.FC = () => {
         if (profile.cooldownUnit === 'minutes') cooldownMs *= 60000;
         if (Date.now() - profile.lastExecuted < cooldownMs) return false;
       }
-      
+
       // Check max executions
       if (profile.maxExecutions && profile.executionCount >= profile.maxExecutions) return false;
-      
+
       // Check filters (if any)
       if (profile.filters.length > 0) {
         const enabledFilters = profile.filters.filter(f => f.enabled);
@@ -296,7 +296,7 @@ export const AutomatePage: React.FC = () => {
           if (!allMatch) return false;
         }
       }
-      
+
       return true;
     });
 
@@ -354,13 +354,13 @@ export const AutomatePage: React.FC = () => {
     const matchingProfiles = currentProfiles.filter(profile => {
       if (!profile.isActive) return false;
       if (!profile.walletAddresses.includes(trade.signerAddress)) return false;
-      
+
       // Check token filtering
       if (profile.tokenFilterMode === 'specific') {
         if (!profile.specificTokens.includes(trade.tokenMint)) return false;
       }
       if (profile.blacklistedTokens.includes(trade.tokenMint)) return false;
-      
+
       // Check cooldown
       if (profile.lastExecuted) {
         let cooldownMs = profile.cooldown;
@@ -368,10 +368,10 @@ export const AutomatePage: React.FC = () => {
         if (profile.cooldownUnit === 'minutes') cooldownMs *= 60000;
         if (Date.now() - profile.lastExecuted < cooldownMs) return false;
       }
-      
+
       // Check max executions
       if (profile.maxExecutions && profile.executionCount >= profile.maxExecutions) return false;
-      
+
       return true;
     });
 
@@ -418,7 +418,7 @@ export const AutomatePage: React.FC = () => {
   // ========== Initialize Sniper WebSocket ==========
   useEffect(() => {
     const activeSniper = sniperProfiles.some(p => p.isActive);
-    
+
     if (!activeSniper) {
       if (sniperWsRef.current) {
         sniperWsRef.current.disconnect();
@@ -457,7 +457,7 @@ export const AutomatePage: React.FC = () => {
   useEffect(() => {
     const activeCopyTrade = copyTradeProfiles.filter(p => p.isActive);
     const walletsToMonitor = [...new Set(activeCopyTrade.flatMap(p => p.walletAddresses))];
-    
+
     if (walletsToMonitor.length === 0) {
       if (copyTradeWsRef.current) {
         copyTradeWsRef.current.disconnect();
@@ -515,17 +515,17 @@ export const AutomatePage: React.FC = () => {
   const hasActiveProfiles = stats.activeProfiles > 0;
 
   return (
-    <div className="min-h-screen bg-app-primary text-app-tertiary flex">
-      {/* Unified Header */}
-      <UnifiedHeader tokenAddress="" />
+    <div className="min-h-screen bg-app-primary text-app-tertiary flex flex-col">
+      {/* Horizontal Header */}
+      <HorizontalHeader />
 
       {/* Main Content */}
-      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full md:w-auto md:ml-48 bg-app-primary">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
         {/* Background effects */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <div className="absolute inset-0 bg-app-primary opacity-90">
             <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
-            <div 
+            <div
               className="absolute inset-0"
               style={{
                 backgroundImage: `
@@ -568,28 +568,25 @@ export const AutomatePage: React.FC = () => {
                   <div className="text-app-secondary-80 text-[10px] sm:text-xs">FAILED</div>
                 </div>
               </div>
-              
+
               {/* Connection Status Badges */}
               <div className="flex items-center gap-2">
-                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${
-                  sniperConnected 
-                    ? 'bg-app-primary-10 color-primary border border-app-primary-color/30' 
-                    : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
-                }`}>
+                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${sniperConnected
+                  ? 'bg-app-primary-10 color-primary border border-app-primary-color/30'
+                  : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
+                  }`}>
                   <Zap className="w-3 h-3" />
                 </div>
-                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${
-                  copyTradeConnected 
-                    ? 'bg-app-primary-10 color-primary border border-app-primary-color/30' 
-                    : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
-                }`}>
+                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${copyTradeConnected
+                  ? 'bg-app-primary-10 color-primary border border-app-primary-color/30'
+                  : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
+                  }`}>
                   <Users className="w-3 h-3" />
                 </div>
-                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${
-                  automateConnected 
-                    ? 'bg-app-primary-10 color-primary border border-app-primary-color/30' 
-                    : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
-                }`}>
+                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${automateConnected
+                  ? 'bg-app-primary-10 color-primary border border-app-primary-color/30'
+                  : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
+                  }`}>
                   <Bot className="w-3 h-3" />
                 </div>
               </div>
@@ -662,11 +659,10 @@ export const AutomatePage: React.FC = () => {
                       {recentEvents.slice(0, 15).map(event => (
                         <div key={event.id} className="px-4 py-2.5 hover:bg-app-primary-10 transition-colors">
                           <div className="flex items-center justify-between mb-1">
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                              event.type === 'deploy' ? 'bg-blue-500/20 text-blue-400' :
+                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${event.type === 'deploy' ? 'bg-blue-500/20 text-blue-400' :
                               event.type === 'migration' ? 'bg-purple-500/20 text-purple-400' :
-                              'bg-app-primary-10 color-primary'
-                            }`}>
+                                'bg-app-primary-10 color-primary'
+                              }`}>
                               {event.type.toUpperCase()}
                             </span>
                             {event.executed && (
@@ -674,7 +670,7 @@ export const AutomatePage: React.FC = () => {
                             )}
                           </div>
                           <div className="text-xs font-mono text-app-secondary-60 truncate">
-                            {event.type === 'trade' 
+                            {event.type === 'trade'
                               ? formatAddress((event.data as CopyTradeData).tokenMint)
                               : formatAddress((event.data as SniperEvent).data.mint)
                             }
@@ -706,23 +702,22 @@ export const AutomatePage: React.FC = () => {
                   ) : (
                     <div className="divide-y divide-app-primary-20">
                       {executionLogs.slice(0, 15).map(log => (
-                        <div 
-                          key={log.id} 
+                        <div
+                          key={log.id}
                           className={`px-4 py-2.5 ${log.success ? 'bg-success-10' : 'bg-error-alt-10'}`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
-                              {log.success 
+                              {log.success
                                 ? <CheckCircle className="w-3 h-3 text-success" />
                                 : <XCircle className="w-3 h-3 text-error-alt" />
                               }
                               <span className="text-xs font-mono text-app-primary">{log.profileName}</span>
                             </div>
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                              log.action === 'BUY' 
-                                ? 'bg-success-20 text-success' 
-                                : 'bg-error-alt-20 text-error-alt'
-                            }`}>
+                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${log.action === 'BUY'
+                              ? 'bg-success-20 text-success'
+                              : 'bg-error-alt-20 text-error-alt'
+                              }`}>
                               {log.action}
                             </span>
                           </div>

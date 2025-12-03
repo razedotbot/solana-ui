@@ -22,6 +22,7 @@ import type { WalletType, ConfigType, IframeData, ServerInfo, WalletCategory, Ca
 import Split from './components/Split';
 import { addRecentToken } from './utils/recentTokens';
 import { useAppContext } from './contexts/useAppContext';
+import { OnboardingTutorial } from './components/OnboardingTutorial';
 
 // Extend Window interface to include server-related properties
 declare global {
@@ -54,6 +55,7 @@ const ToolsDropdown: React.FC = () => {
     <div className="relative z-40">
       {/* Main Button */}
       <button
+        id="nav-tools"
         onClick={(): void => setIsOpen(!isOpen)}
         className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover-border-primary-60 rounded transition-all duration-300"
       >
@@ -171,6 +173,9 @@ const WalletManager: React.FC = () => {
 
   // Detect if we're on mobile or desktop to conditionally render layouts
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Tutorial visibility state
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     const checkMobile = (): void => {
@@ -185,16 +190,16 @@ const WalletManager: React.FC = () => {
   // Track left column width for responsive header
   const [leftColumnWidth, setLeftColumnWidth] = useState<number>(0);
   const leftColumnRef = useRef<HTMLDivElement>(null);
-  
+
   // View mode state - Simple (left column hidden) or Advanced (left column visible)
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewModeFromCookies());
-  
+
   // Store advanced sizes separately so we can restore them when switching back from simple mode
   const [savedAdvancedSizes, setSavedAdvancedSizes] = useState<number[]>(() => {
     const savedSizes = loadSplitSizesFromCookies();
     return savedSizes || [25, 75];
   });
-  
+
   // Split panel sizes - load from cookies or use defaults
   const [splitSizes, setSplitSizes] = useState<number[]>(() => {
     const savedMode = loadViewModeFromCookies();
@@ -252,7 +257,7 @@ const WalletManager: React.FC = () => {
       }
     };
   });
-  
+
   // Sync categorySettings with localStorage when window gains focus or storage changes
   useEffect(() => {
     const syncCategorySettings = (): void => {
@@ -271,7 +276,7 @@ const WalletManager: React.FC = () => {
     window.addEventListener('focus', syncCategorySettings);
     // Also sync on storage events (for cross-tab sync)
     window.addEventListener('storage', syncCategorySettings);
-    
+
     return () => {
       window.removeEventListener('focus', syncCategorySettings);
       window.removeEventListener('storage', syncCategorySettings);
@@ -285,17 +290,17 @@ const WalletManager: React.FC = () => {
         saveSplitSizesToCookies(splitSizes);
         setSavedAdvancedSizes(splitSizes);
       }, 300); // Debounce by 300ms to avoid excessive cookie writes
-      
+
       return (): void => { clearTimeout(timeoutId); };
     }
     return undefined;
   }, [splitSizes, viewMode]);
-  
+
   // Save view mode to cookies when it changes
   useEffect(() => {
     saveViewModeToCookies(viewMode);
   }, [viewMode]);
-  
+
   // Handle view mode toggle
   const handleViewModeToggle = useCallback(() => {
     if (viewMode === 'simple') {
@@ -870,6 +875,7 @@ const WalletManager: React.FC = () => {
 
   return (
     <div className="relative h-screen overflow-hidden bg-app-primary text-app-tertiary bg">
+      <OnboardingTutorial forceShow={showTutorial} onClose={() => setShowTutorial(false)} autoShowForNewUsers={true} />
       {/*  scanline effect */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-10"></div>
 
@@ -899,7 +905,7 @@ const WalletManager: React.FC = () => {
               gutter={(_index, direction): HTMLDivElement => {
                 const gutter = document.createElement('div');
                 gutter.className = `gutter gutter-${direction} gutter-animated`;
-                
+
                 // Hide gutter in simple mode
                 if (viewMode === 'simple') {
                   gutter.style.display = 'none';
@@ -932,13 +938,13 @@ const WalletManager: React.FC = () => {
                                 border border-app-primary-30 hover-border-primary-60 rounded 
                                 transition-all duration-300 btn"
                       >
-                        <div 
+                        <div
                           className="flex items-center hover:scale-105 active:scale-95 transition-transform"
                         >
-                          <img 
-                            src={logo} 
-                            alt={brand.altText} 
-                            className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
+                          <img
+                            src={logo}
+                            alt={brand.altText}
+                            className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
                           />
                         </div>
                       </button>

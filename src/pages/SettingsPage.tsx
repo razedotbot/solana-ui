@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Globe, Zap, Save, Wifi, Key, Server, AlertCircle, RefreshCw } from 'lucide-react';
+import { Globe, Zap, Save, Wifi, Key, Server, AlertCircle, RefreshCw, BookOpen } from 'lucide-react';
 import { useAppContext } from '../contexts/useAppContext';
 import { useToast } from '../utils/useToast';
 import { saveConfigToCookies } from '../Utils';
-import { UnifiedHeader } from '../components/Header';
+import { HorizontalHeader } from '../components/HorizontalHeader';
 import type { ServerInfo } from '../utils/types';
 import { RPCEndpointManager } from '../components/RPCEndpointManager';
 import { createDefaultEndpoints, type RPCEndpoint } from '../utils/rpcManager';
+import { OnboardingTutorial } from '../components/OnboardingTutorial';
 
 export const SettingsPage: React.FC = () => {
   const { showToast } = useToast();
@@ -16,6 +17,7 @@ export const SettingsPage: React.FC = () => {
   const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
   const [isChangingServer, setIsChangingServer] = useState(false);
   const [isLoadingServers, setIsLoadingServers] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const handleConfigChange = (key: keyof typeof config, value: string): void => {
     const newConfig = { ...config, [key]: value };
@@ -95,12 +97,12 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-app-primary text-app-tertiary flex overflow-hidden">
-      {/* Unified Header */}
-      <UnifiedHeader />
+    <div className="h-screen bg-app-primary text-app-tertiary flex flex-col overflow-hidden">
+      {/* Horizontal Header */}
+      <HorizontalHeader />
 
-      {/* Main Content - with left margin for sidebar matching WalletsPage */}
-      <div className="relative flex-1 overflow-hidden w-full md:w-auto md:ml-48 bg-app-primary flex flex-col">
+      {/* Main Content - full width with top padding */}
+      <div className="relative flex-1 overflow-hidden w-full pt-16 bg-app-primary flex flex-col">
         {/* Background effects */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <div className="absolute inset-0 bg-app-primary opacity-90">
@@ -121,7 +123,7 @@ export const SettingsPage: React.FC = () => {
         {/* Content container - scrollable area */}
         <div className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden">
           <div className="max-w-4xl mx-auto px-4 py-8">
-            
+
             {/* Header Title */}
             <div className="mb-6 flex items-center justify-between border-b border-app-primary-20 pb-4">
               <div className="flex items-center gap-3">
@@ -138,7 +140,7 @@ export const SettingsPage: React.FC = () => {
                 <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                   <Globe size={80} />
                 </div>
-                
+
                 <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-2 flex items-center gap-2 uppercase tracking-wider">
                   <Globe size={16} className="color-primary" />
                   Network RPC
@@ -146,7 +148,7 @@ export const SettingsPage: React.FC = () => {
                 <p className="text-[10px] text-app-secondary-80 font-mono mb-4">
                   Configure RPC endpoints with custom weights (0-100%). Higher weights increase selection probability. Total must equal 100%.
                 </p>
-                
+
                 <div className="space-y-4 relative z-10">
                   <RPCEndpointManager
                     endpoints={
@@ -171,7 +173,7 @@ export const SettingsPage: React.FC = () => {
                   <Server size={16} className="color-primary" />
                   Trading Server
                 </h3>
-                
+
                 <div className="space-y-4 relative z-10">
                   <div className="flex items-center justify-between p-3 bg-app-tertiary border border-app-primary-20 rounded-lg gap-4 transition-colors hover:border-app-primary-40">
                     <div className="flex-1 min-w-0">
@@ -180,18 +182,16 @@ export const SettingsPage: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleConfigChange('tradingServerEnabled', config.tradingServerEnabled === 'true' ? 'false' : 'true')}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors touch-manipulation flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-primary-color focus:ring-offset-app-secondary ${
-                        config.tradingServerEnabled === 'true' ? 'bg-app-primary-color' : 'bg-app-quaternary border border-app-primary-30'
-                      }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors touch-manipulation flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-primary-color focus:ring-offset-app-secondary ${config.tradingServerEnabled === 'true' ? 'bg-app-primary-color' : 'bg-app-quaternary border border-app-primary-30'
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          config.tradingServerEnabled === 'true' ? 'translate-x-6' : 'translate-x-1'
-                        }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.tradingServerEnabled === 'true' ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                       />
                     </button>
                   </div>
-                  
+
                   {config.tradingServerEnabled === 'true' ? (
                     <div className="animate-fade-in-down">
                       <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
@@ -206,7 +206,7 @@ export const SettingsPage: React.FC = () => {
                           placeholder="http://localhost:4444"
                         />
                         <div className="absolute right-3 top-2.5">
-                           <Wifi size={16} className="text-app-secondary-60" />
+                          <Wifi size={16} className="text-app-secondary-60" />
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 mt-2 text-[10px] text-app-secondary-60 font-mono">
@@ -247,11 +247,10 @@ export const SettingsPage: React.FC = () => {
                                 type="button"
                                 onClick={(): void => void handleServerSwitch(server.id)}
                                 disabled={isChangingServer}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded text-left transition-all duration-200 group ${
-                                  server.region === currentRegion
-                                    ? 'bg-app-primary-color/10 border border-app-primary-color/40'
-                                    : 'bg-transparent hover:bg-app-quaternary border border-transparent hover:border-app-primary-20'
-                                }`}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded text-left transition-all duration-200 group ${server.region === currentRegion
+                                  ? 'bg-app-primary-color/10 border border-app-primary-color/40'
+                                  : 'bg-transparent hover:bg-app-quaternary border border-transparent hover:border-app-primary-20'
+                                  }`}
                               >
                                 <div className="flex items-center gap-3">
                                   <span className="text-lg">{server.flag}</span>
@@ -298,7 +297,7 @@ export const SettingsPage: React.FC = () => {
                   <Key size={16} className="color-primary" />
                   API Access
                 </h3>
-                
+
                 <div className="space-y-4 relative z-10">
                   <div>
                     <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
@@ -331,7 +330,7 @@ export const SettingsPage: React.FC = () => {
                   <Zap size={16} className="color-primary" />
                   Execution Engine
                 </h3>
-                
+
                 <div className="space-y-5 relative z-10">
                   <div>
                     <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
@@ -343,13 +342,12 @@ export const SettingsPage: React.FC = () => {
                         { value: 'batch', label: 'Batch Mode', icon: '📦', description: 'Process 5 wallets per block.' },
                         { value: 'all-in-one', label: 'All-In-One', icon: '🚀', description: 'Concurrent execution. Maximum speed.' }
                       ].map(option => (
-                        <div 
+                        <div
                           key={option.value}
-                          className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 touch-manipulation group/item ${
-                            config.bundleMode === option.value 
-                              ? 'bg-app-primary-color/10 border-app-primary-color/50 shadow-[inset_0_0_10px_rgba(2,179,109,0.1)]' 
-                              : 'bg-app-quaternary border-app-primary-20 hover:border-app-primary-40 hover:bg-app-tertiary'
-                          }`}
+                          className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 touch-manipulation group/item ${config.bundleMode === option.value
+                            ? 'bg-app-primary-color/10 border-app-primary-color/50 shadow-[inset_0_0_10px_rgba(2,179,109,0.1)]'
+                            : 'bg-app-quaternary border-app-primary-20 hover:border-app-primary-40 hover:bg-app-tertiary'
+                            }`}
                           onClick={() => handleConfigChange('bundleMode', option.value)}
                         >
                           <div className="flex items-center justify-between gap-3">
@@ -364,11 +362,10 @@ export const SettingsPage: React.FC = () => {
                                 </div>
                               </div>
                             </div>
-                            <div className={`w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors ${
-                              config.bundleMode === option.value 
-                                ? 'border-app-primary-color bg-app-primary-color' 
-                                : 'border-app-primary-40 bg-transparent'
-                            }`}>
+                            <div className={`w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors ${config.bundleMode === option.value
+                              ? 'border-app-primary-color bg-app-primary-color'
+                              : 'border-app-primary-40 bg-transparent'
+                              }`}>
                               {config.bundleMode === option.value && (
                                 <div className="w-1.5 h-1.5 rounded-full bg-black"></div>
                               )}
@@ -378,7 +375,7 @@ export const SettingsPage: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
@@ -394,7 +391,7 @@ export const SettingsPage: React.FC = () => {
                         className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
                         Batch Delay (ms)
@@ -410,7 +407,7 @@ export const SettingsPage: React.FC = () => {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-app-primary-20 pt-4">
                     <div>
                       <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
@@ -426,7 +423,7 @@ export const SettingsPage: React.FC = () => {
                         <span className="absolute right-3 top-2.5 text-xs text-app-secondary-60 font-mono">SOL</span>
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
                         Max Slippage (%)
@@ -445,10 +442,38 @@ export const SettingsPage: React.FC = () => {
                           }}
                           className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
                         />
-                         <span className="absolute right-3 top-2.5 text-xs text-app-secondary-60 font-mono">%</span>
+                        <span className="absolute right-3 top-2.5 text-xs text-app-secondary-60 font-mono">%</span>
                       </div>
                     </div>
-                  </div>  
+                  </div>
+                </div>
+              </div>
+
+              {/* Help & Tutorial Section */}
+              <div className="bg-app-secondary border border-app-primary-20 rounded-lg p-5 sm:p-6 shadow-lg relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <BookOpen size={80} />
+                </div>
+
+                <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-4 flex items-center gap-2 uppercase tracking-wider">
+                  <BookOpen size={16} className="color-primary" />
+                  Help & Tutorial
+                </h3>
+
+                <div className="space-y-4 relative z-10">
+                  <div className="flex items-center justify-between p-3 bg-app-tertiary border border-app-primary-20 rounded-lg gap-4 transition-colors hover:border-app-primary-40">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-app-primary font-mono">Onboarding Tutorial</div>
+                      <div className="text-xs text-app-secondary-80 font-mono mt-0.5">Take a guided tour of the application features</div>
+                    </div>
+                    <button
+                      onClick={() => setShowTutorial(true)}
+                      className="px-4 py-2 bg-app-primary-color/20 border border-app-primary-color/40 text-app-primary-color rounded-lg font-mono text-xs font-bold hover:bg-app-primary-color/30 hover:border-app-primary-color/60 transition-all flex items-center gap-2"
+                    >
+                      <BookOpen size={14} />
+                      START TUTORIAL
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -466,6 +491,9 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Onboarding Tutorial */}
+      <OnboardingTutorial forceShow={showTutorial} onClose={() => setShowTutorial(false)} />
     </div>
   );
 };
