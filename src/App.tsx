@@ -1,28 +1,28 @@
 import React, { useEffect, lazy, useCallback, useReducer, useMemo, useState, useRef } from 'react';
-import { ChevronDown, Settings, Globe, Wifi } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ChevronDown, Settings, Wrench, Bot, Blocks, RefreshCw, Wallet, BookOpen, Columns2 } from 'lucide-react';
+import { brand } from './utils/brandConfig';
 import type { Connection } from '@solana/web3.js';
-import { Connection as SolanaConnection } from '@solana/web3.js';
-import ServiceSelector from './components/Menu';
-import { WalletTooltip, initStyles } from './styles/Styles';
-import { 
+import logo from './logo.png';
+import ServerSelector from './components/ServerSelector';
+import { initStyles } from './components/Styles';
+import {
   saveWalletsToCookies,
-  loadWalletsFromCookies,
-  saveConfigToCookies,
-  loadConfigFromCookies,
   loadQuickBuyPreferencesFromCookies,
   saveQuickBuyPreferencesToCookies,
-  type WalletType, 
-  type ConfigType,
-} from './Utils';
-import Split from 'react-split';
-import { useToast } from "./components/useToast";
-import {
   fetchWalletBalances,
-  handleSortWallets
+  handleSortWallets,
+  saveSplitSizesToCookies,
+  loadSplitSizesFromCookies,
+  saveViewModeToCookies,
+  loadViewModeFromCookies,
+  type ViewMode
 } from './Utils';
-import { countActiveWallets, getScriptName } from './utils/wallets';
-import { executeTrade } from './utils/trading';
-import type { IframeData } from './types/api';
+import type { WalletType, ConfigType, IframeData, ServerInfo, WalletCategory, CategoryQuickTradeSettings } from './utils/types';
+import Split from './components/Split';
+import { addRecentToken } from './utils/recentTokens';
+import { useAppContext } from './contexts/useAppContext';
+import { OnboardingTutorial } from './components/OnboardingTutorial';
 
 // Extend Window interface to include server-related properties
 declare global {
@@ -34,236 +34,118 @@ declare global {
 }
 
 // Lazy loaded components
-const SettingsModal = lazy(() => import('./modals/SettingsModal'));
-const WalletOverview = lazy(() => import('./modals/WalletsModal'));
 const WalletsPage = lazy(() => import('./Wallets').then(module => ({ default: module.WalletsPage })));
-const ChartPage = lazy(() => import('./Chart').then(module => ({ default: module.ChartPage })));
+const Frame = lazy(() => import('./Frame').then(module => ({ default: module.Frame })));
 const ActionsPage = lazy(() => import('./Actions').then(module => ({ default: module.ActionsPage })));
 const MobileLayout = lazy(() => import('./Mobile'));
 
 // Import modal components 
-const BurnModal = lazy(() => import('./modals/BurnModal').then(module => ({ default: module.BurnModal })));
-const PnlModal = lazy(() => import('./modals/CalculatePNLModal').then(module => ({ default: module.PnlModal })));
-const DeployModal = lazy(() => import('./modals/DeployModal').then(module => ({ default: module.DeployModal })));
-const CustomBuyModal = lazy(() => import('./modals/CustomBuyModal').then(module => ({ default: module.CustomBuyModal })));
-const FloatingTradingCard = lazy(() => import('./components/FloatingTradingCard'));
-const AutomateFloatingCard = lazy(() => import('./components/AutomateFloatingCard'));
+const PnlModal = lazy(() => import('./components/modals/CalculatePNLModal').then(module => ({ default: module.PnlModal })));
 
-// Developer tools (development only)
-const ThemeCustomizer = lazy(() => import('./components/ThemeCustomizer').then(module => ({ default: module.ThemeCustomizer })));
-
-// Import theme initialization
-import { initializeTheme } from './stores/themeStore';
-
-interface ServerInfo {
-  id: string;
-  name: string;
-  url: string;
-  region: string;
-  flag: string;
-  ping?: number;
-}
-
-const ServerRegionSelector: React.FC = () => {
+const ToolsDropdown: React.FC = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [currentRegion, setCurrentRegion] = useState<string>('US');
-  const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
-  const [isChanging, setIsChanging] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Function to update server data from window
-  const updateServerData = useCallback((): void => {
-    if (window.serverRegion) {
-      setCurrentRegion(window.serverRegion);
-    }
-    
-    if (window.availableServers && window.availableServers.length > 0) {
-      setAvailableServers(window.availableServers);
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Initial load
-    updateServerData();
-    
-    // Set up polling to check for server updates
-    const checkForUpdates = (): void => {
-      updateServerData();
-    };
-    
-    // Check every 500ms for server updates
-    const interval = setInterval(checkForUpdates, 500);
-    
-    // Also listen for window events if available
-    const handleServerUpdate = (): void => {
-      updateServerData();
-    };
-    
-    // Custom event listener for server updates
-    window.addEventListener('serverChanged', handleServerUpdate);
-    
-    // Cleanup
-    return (): void => {
-      clearInterval(interval);
-      window.removeEventListener('serverChanged', handleServerUpdate);
-    };
-  }, [updateServerData]);
-
-  const handleServerSwitch = async (serverId: string): Promise<void> => {
-    if (!window.switchServer) {
-      console.error('Server switching not available');
-      return;
-    }
-
-    setIsChanging(true);
+  const handleItemClick = (action: () => void): void => {
+    action();
     setIsOpen(false);
-
-    try {
-      const success = await window.switchServer(serverId);
-      if (success) {
-        const server = availableServers.find((s): boolean => s.id === serverId);
-        if (server) {
-          setCurrentRegion(server.region);
-        }
-      } else {
-        console.error('Failed to switch server');
-      }
-    } catch (error) {
-      console.error('Error switching server:', error);
-    } finally {
-      setIsChanging(false);
-    }
-  };
-
-  const getCurrentServer = (): ServerInfo => {
-    return availableServers.find((server): boolean => server.region === currentRegion) || {
-      id: 'unknown',
-      name: 'Unknown',
-      url: '',
-      region: currentRegion,
-      flag: '🌐',
-      ping: 0
-    };
-  };
-
-  const currentServer = getCurrentServer();
-
-  const getPingColor = (ping?: number): string => {
-    if (!ping || ping === Infinity) return 'text-app-secondary-40';
-    if (ping < 50) return 'text-ping-good';
-    if (ping < 100) return 'text-ping-medium';
-    return 'text-ping-poor';
-  };
-
-  const getPingBg = (ping?: number): string => {
-    if (!ping || ping === Infinity) return 'bg-app-primary-10';
-    if (ping < 50) return 'bg-ping-good-10';
-    if (ping < 100) return 'bg-ping-medium-20';
-    return 'bg-ping-poor-10';
   };
 
   return (
-    <div className="relative">
+    <div className="relative z-40">
       {/* Main Button */}
       <button
-        onClick={(): void => void (!isChanging && !isLoading && setIsOpen(!isOpen))}
-        disabled={isChanging || isLoading}
-        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover-border-primary-60 rounded transition-all duration-300 min-w-[80px]"
+        id="nav-tools"
+        onClick={(): void => setIsOpen(!isOpen)}
+        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover-border-primary-60 rounded transition-all duration-300"
       >
-        {/* Status indicator */}
-        <div className="absolute -top-1 -left-1 w-2 h-2 rounded-full bg-app-primary-color animate-pulse"></div>
-        
-        {isChanging ? (
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 border border-app-primary border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-xs font-mono text-app-secondary">SYNC</span>
-          </div>
-        ) : isLoading ? (
-          <div className="flex items-center gap-2">
-            <Globe size={14} className="color-primary animate-pulse" />
-            <span className="text-xs font-mono text-app-secondary">LOAD</span>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-mono color-primary font-medium tracking-wider">
-                {currentServer.region}
-              </span>
-            </div>
-            
-            {currentServer.ping && currentServer.ping < Infinity && (
-              <div className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${getPingBg(currentServer.ping)} ${getPingColor(currentServer.ping)}`}>
-                {currentServer.ping}ms
-              </div>
-            )}
-            
-            <ChevronDown 
-              size={12} 
-              className={`text-app-primary-40 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
-            />
-          </>
-        )}
+        <Wrench size={16} className="color-primary" />
+        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+          MENU
+        </span>
+        <ChevronDown
+          size={12}
+          className={`text-app-primary-40 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {/* Dropdown */}
-      {isOpen && !isChanging && !isLoading && (
+      {isOpen && (
         <>
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-40" 
+          <div
+            className="fixed inset-0 z-40"
             onClick={(): void => setIsOpen(false)}
           />
-          
+
           {/* Dropdown Panel */}
-          <div className="absolute top-full right-0 mt-1 w-56 z-50">
-            <div className="bg-app-secondary border border-app-primary-20 rounded overflow-hidden">
+          <div className="absolute top-full right-0 mt-1 w-48 z-50">
+            <div className="bg-app-secondary border border-app-primary-20 rounded overflow-hidden shadow-xl max-h-[80vh] overflow-y-auto">
               {/* Header */}
               <div className="px-3 py-2 border-b border-app-primary-10">
                 <div className="flex items-center gap-2 text-[10px] font-mono text-app-secondary uppercase tracking-widest">
-                  <Wifi size={10} />
-                  SELECT REGION
+                  <Wrench size={10} />
+                  MENU
                 </div>
               </div>
-              
-              {/* Server List */}
+
+              {/* Tools List */}
               <div className="py-1">
-                {availableServers.length > 0 ? (
-                  availableServers.map((server) => (
-                    <button
-                      key={server.id}
-                      onClick={(): void => void handleServerSwitch(server.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-left transition-all duration-200 ${
-                        server.region === currentRegion
-                          ? 'bg-primary-10 color-primary'
-                          : 'hover:bg-primary-05 text-app-tertiary'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-base">{server.flag}</span>
-                        <div>
-                          <div className="text-xs font-mono font-medium">{server.name}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {server.ping && server.ping < Infinity && (
-                          <div className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${getPingBg(server.ping)} ${getPingColor(server.ping)}`}>
-                            {server.ping}ms
-                          </div>
-                        )}
-                        
-                        {server.region === currentRegion && (
-                          <div className="w-1.5 h-1.5 bg-app-primary-color rounded-full"></div>
-                        )}
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-3 py-4 text-center">
-                    <div className="text-app-secondary-60 text-xs font-mono">NO SERVERS</div>
+
+                {/* Wallets */}
+                <button
+                  onClick={() => handleItemClick(() => navigate('/wallets'))}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                >
+                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
+                    <Wallet size={14} className="color-primary" />
                   </div>
-                )}
+                  <span className="text-xs font-mono font-medium">Wallets</span>
+                </button>
+
+                {/* Automate */}
+                <button
+                  onClick={() => handleItemClick(() => navigate('/automate'))}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                >
+                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
+                    <Bot size={14} className="color-primary" />
+                  </div>
+                  <span className="text-xs font-mono font-medium">Automate</span>
+                </button>
+
+                {/* Deploy */}
+                <button
+                  onClick={() => handleItemClick(() => navigate('/deploy'))}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                >
+                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
+                    <Blocks size={14} className="color-primary" />
+                  </div>
+                  <span className="text-xs font-mono font-medium">Deploy</span>
+                </button>
+
+                {/* Docs */}
+                <button
+                  onClick={() => handleItemClick(() => window.open(brand.docsUrl, '_blank', 'noopener,noreferrer'))}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                >
+                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
+                    <BookOpen size={14} className="color-primary" />
+                  </div>
+                  <span className="text-xs font-mono font-medium">Documentation</span>
+                </button>
+
+                {/* Settings */}
+                <button
+                  onClick={() => handleItemClick(() => navigate('/settings'))}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                >
+                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
+                    <Settings size={14} className="color-primary" />
+                  </div>
+                  <span className="text-xs font-mono font-medium">Settings</span>
+                </button>
               </div>
             </div>
           </div>
@@ -274,14 +156,193 @@ const ServerRegionSelector: React.FC = () => {
 };
 
 const WalletManager: React.FC = () => {
+  const { tokenAddress: tokenAddressParam } = useParams<{ tokenAddress?: string }>();
+  const navigate = useNavigate();
+  const {
+    wallets: contextWallets,
+    setWallets: setContextWallets,
+    config: contextConfig,
+    setConfig: setContextConfig,
+    connection: contextConnection,
+    rpcManager: contextRpcManager,
+    solBalances: contextSolBalances,
+    setSolBalances: setContextSolBalances,
+    tokenBalances: contextTokenBalances,
+    setTokenBalances: setContextTokenBalances
+  } = useAppContext();
+
+  // Detect if we're on mobile or desktop to conditionally render layouts
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Tutorial visibility state
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = (): void => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint is 768px
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Track left column width for responsive header
+  const [leftColumnWidth, setLeftColumnWidth] = useState<number>(0);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
+
+  // View mode state - Simple (left column hidden) or Advanced (left column visible)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewModeFromCookies());
+
+  // Store advanced sizes separately so we can restore them when switching back from simple mode
+  const [savedAdvancedSizes, setSavedAdvancedSizes] = useState<number[]>(() => {
+    const savedSizes = loadSplitSizesFromCookies();
+    return savedSizes || [25, 75];
+  });
+
+  // Split panel sizes - load from cookies or use defaults
+  const [splitSizes, setSplitSizes] = useState<number[]>(() => {
+    const savedMode = loadViewModeFromCookies();
+    if (savedMode === 'simple') {
+      return [0, 100]; // Simple mode: left column hidden
+    }
+    const savedSizes = loadSplitSizesFromCookies();
+    return savedSizes || [25, 75]; // Default sizes
+  });
+
+  // Category settings for quick trade (loaded from localStorage)
+  const [categorySettings, setCategorySettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings>>(() => {
+    const saved = localStorage.getItem('categoryQuickTradeSettings');
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Record<WalletCategory, CategoryQuickTradeSettings>;
+      } catch (error) {
+        console.error('Error loading category settings:', error);
+      }
+    }
+    // Default settings
+    return {
+      Soft: {
+        enabled: true,
+        buyAmount: 0.01,
+        buyMinAmount: 0.01,
+        buyMaxAmount: 0.03,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      },
+      Medium: {
+        enabled: true,
+        buyAmount: 0.05,
+        buyMinAmount: 0.03,
+        buyMaxAmount: 0.07,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      },
+      Hard: {
+        enabled: true,
+        buyAmount: 0.1,
+        buyMinAmount: 0.07,
+        buyMaxAmount: 0.15,
+        useBuyRange: false,
+        sellPercentage: 100,
+        sellMinPercentage: 50,
+        sellMaxPercentage: 100,
+        useSellRange: false
+      }
+    };
+  });
+
+  // Sync categorySettings with localStorage when window gains focus or storage changes
+  useEffect(() => {
+    const syncCategorySettings = (): void => {
+      const saved = localStorage.getItem('categoryQuickTradeSettings');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as Record<WalletCategory, CategoryQuickTradeSettings>;
+          setCategorySettings(parsed);
+        } catch (error) {
+          console.error('Error syncing category settings:', error);
+        }
+      }
+    };
+
+    // Sync when window gains focus (user might have changed settings on another page)
+    window.addEventListener('focus', syncCategorySettings);
+    // Also sync on storage events (for cross-tab sync)
+    window.addEventListener('storage', syncCategorySettings);
+
+    return () => {
+      window.removeEventListener('focus', syncCategorySettings);
+      window.removeEventListener('storage', syncCategorySettings);
+    };
+  }, []);
+
+  // Save split sizes to cookies when they change (debounced) - only in advanced mode
+  useEffect(() => {
+    if (viewMode === 'advanced' && splitSizes[0] > 5) {
+      const timeoutId = setTimeout(() => {
+        saveSplitSizesToCookies(splitSizes);
+        setSavedAdvancedSizes(splitSizes);
+      }, 300); // Debounce by 300ms to avoid excessive cookie writes
+
+      return (): void => { clearTimeout(timeoutId); };
+    }
+    return undefined;
+  }, [splitSizes, viewMode]);
+
+  // Save view mode to cookies when it changes
+  useEffect(() => {
+    saveViewModeToCookies(viewMode);
+  }, [viewMode]);
+
+  // Handle view mode toggle
+  const handleViewModeToggle = useCallback(() => {
+    if (viewMode === 'simple') {
+      // Switch to advanced: restore saved sizes
+      setViewMode('advanced');
+      setSplitSizes(savedAdvancedSizes);
+    } else {
+      // Switch to simple: save current sizes and collapse left panel
+      setSavedAdvancedSizes(splitSizes);
+      saveSplitSizesToCookies(splitSizes);
+      setViewMode('simple');
+      setSplitSizes([0, 100]);
+    }
+  }, [viewMode, splitSizes, savedAdvancedSizes]);
+
+  useEffect(() => {
+    if (!leftColumnRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setLeftColumnWidth(entry.contentRect.width);
+      }
+    });
+
+    resizeObserver.observe(leftColumnRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   // Apply styles
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.textContent = initStyles();
     document.head.appendChild(styleElement);
-    
+
     return (): void => {
-      document.head.removeChild(styleElement);
+      // Safely remove style element if it's still a child
+      if (styleElement.parentNode === document.head) {
+        document.head.removeChild(styleElement);
+      }
     };
   }, []);
 
@@ -289,8 +350,6 @@ const WalletManager: React.FC = () => {
   interface AppState {
     copiedAddress: string | null;
     tokenAddress: string;
-    isModalOpen: boolean;
-    isSettingsOpen: boolean;
     config: ConfigType;
     currentPage: 'wallets' | 'chart' | 'actions';
     wallets: WalletType[];
@@ -298,32 +357,20 @@ const WalletManager: React.FC = () => {
     connection: Connection | null;
     solBalances: Map<string, number>;
     tokenBalances: Map<string, number>;
-    leftColumnCollapsed: boolean;
+    showChartView: boolean;
 
     isLoadingChart: boolean;
     currentMarketCap: number | null;
     modals: {
-      burnModalOpen: boolean;
       calculatePNLModalOpen: boolean;
-      deployModalOpen: boolean;
-      customBuyModalOpen: boolean;
     };
     sortDirection: 'asc' | 'desc';
     tickEffect: boolean;
 
-    floatingCard: {
-      isOpen: boolean;
-      position: { x: number; y: number };
-      isDragging: boolean;
-    };
     automateCard: {
       isOpen: boolean;
       position: { x: number; y: number };
       isDragging: boolean;
-    };
-    themeCustomizer: {
-      isOpen: boolean;
-      position: { x: number; y: number };
     };
     quickBuyEnabled: boolean;
     quickBuyAmount: number;
@@ -335,24 +382,22 @@ const WalletManager: React.FC = () => {
     quickSellMaxPercentage: number;
     useQuickSellRange: boolean;
     iframeData: IframeData | null;
-  nonWhitelistedTrades: {
-    type: 'buy' | 'sell';
-    address: string;
-    tokensAmount: number;
-    avgPrice: number;
-    solAmount: number;
-    timestamp: number;
-    signature: string;
-    tokenMint: string;
-    marketCap: number;
-  }[];
+    nonWhitelistedTrades: {
+      type: 'buy' | 'sell';
+      address: string;
+      tokensAmount: number;
+      avgPrice: number;
+      solAmount: number;
+      timestamp: number;
+      signature: string;
+      tokenMint: string;
+      marketCap: number;
+    }[];
   }
 
-  type AppAction = 
+  type AppAction =
     | { type: 'SET_COPIED_ADDRESS'; payload: string | null }
     | { type: 'SET_TOKEN_ADDRESS'; payload: string }
-    | { type: 'SET_MODAL_OPEN'; payload: boolean }
-    | { type: 'SET_SETTINGS_OPEN'; payload: boolean }
     | { type: 'SET_CONFIG'; payload: ConfigType }
     | { type: 'SET_CURRENT_PAGE'; payload: 'wallets' | 'chart' | 'actions' }
     | { type: 'SET_WALLETS'; payload: WalletType[] }
@@ -368,14 +413,9 @@ const WalletManager: React.FC = () => {
     | { type: 'SET_TICK_EFFECT'; payload: boolean }
 
     | { type: 'UPDATE_BALANCE'; payload: { address: string; solBalance?: number; tokenBalance?: number } }
-    | { type: 'SET_FLOATING_CARD_OPEN'; payload: boolean }
-    | { type: 'SET_FLOATING_CARD_POSITION'; payload: { x: number; y: number } }
-    | { type: 'SET_FLOATING_CARD_DRAGGING'; payload: boolean }
     | { type: 'SET_AUTOMATE_CARD_OPEN'; payload: boolean }
     | { type: 'SET_AUTOMATE_CARD_POSITION'; payload: { x: number; y: number } }
     | { type: 'SET_AUTOMATE_CARD_DRAGGING'; payload: boolean }
-    | { type: 'SET_THEME_CUSTOMIZER_OPEN'; payload: boolean }
-    | { type: 'SET_THEME_CUSTOMIZER_POSITION'; payload: { x: number; y: number } }
     | { type: 'SET_QUICK_BUY_ENABLED'; payload: boolean }
     | { type: 'SET_QUICK_BUY_AMOUNT'; payload: number }
     | { type: 'SET_QUICK_BUY_MIN_AMOUNT'; payload: number }
@@ -387,59 +427,35 @@ const WalletManager: React.FC = () => {
     | { type: 'SET_USE_QUICK_SELL_RANGE'; payload: boolean }
     | { type: 'SET_IFRAME_DATA'; payload: IframeData | null }
     | { type: 'SET_NON_WHITELISTED_TRADES'; payload: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; tokenMint: string; marketCap: number; }[] }
-    | { type: 'TOGGLE_LEFT_COLUMN'; payload?: undefined };
+    | { type: 'SET_SHOW_CHART_VIEW'; payload: boolean };
+
+  // Determine token address from route
+  const routeTokenAddress = tokenAddressParam || '';
 
   const initialState: AppState = {
     copiedAddress: null,
-    tokenAddress: '',
-    isModalOpen: false,
-    isSettingsOpen: false,
-    config: {
-      rpcEndpoint: 'https://solana-rpc.publicnode.com',
-      transactionFee: '0.001',
-      selectedDex: 'auto',
-      isDropdownOpen: false,
-      buyAmount: '',
-      sellAmount: '',
-      slippageBps: '9900', // Default 99% slippage
-      bundleMode: 'batch', // Default bundle mode
-      singleDelay: '200', // Default 200ms delay between wallets in single mode
-      batchDelay: '1000', // Default 1000ms delay between batches
-      tradingServerEnabled: 'false',
-      tradingServerUrl: 'https://localhost:4444',
-    },
+    tokenAddress: routeTokenAddress,
+    config: contextConfig,
     currentPage: 'wallets',
-    wallets: [],
-    isRefreshing: false,
-    connection: null,
-    solBalances: new Map(),
-    tokenBalances: new Map(),
-    leftColumnCollapsed: false,
+    wallets: contextWallets,
+    isRefreshing: false, // Always start fresh - don't inherit stale refreshing state from context
+    connection: contextConnection,
+    solBalances: contextSolBalances,
+    tokenBalances: contextTokenBalances,
+    showChartView: true, // Always show chart view in App
 
     isLoadingChart: false,
     currentMarketCap: null,
     modals: {
-      burnModalOpen: false,
-      calculatePNLModalOpen: false,
-      deployModalOpen: false,
-      customBuyModalOpen: false
+      calculatePNLModalOpen: false
     },
     sortDirection: 'asc',
     tickEffect: false,
 
-    floatingCard: {
-      isOpen: false,
-      position: { x: 100, y: 100 },
-      isDragging: false
-    },
     automateCard: {
       isOpen: false,
       position: { x: 200, y: 200 },
       isDragging: false
-    },
-    themeCustomizer: {
-      isOpen: false,
-      position: { x: 100, y: 100 },
     },
     quickBuyEnabled: true,
     quickBuyAmount: 0.01,
@@ -460,10 +476,6 @@ const WalletManager: React.FC = () => {
         return { ...state, copiedAddress: action.payload };
       case 'SET_TOKEN_ADDRESS':
         return { ...state, tokenAddress: action.payload };
-      case 'SET_MODAL_OPEN':
-        return { ...state, isModalOpen: action.payload };
-      case 'SET_SETTINGS_OPEN':
-        return { ...state, isSettingsOpen: action.payload };
       case 'SET_CONFIG':
         return { ...state, config: action.payload };
       case 'SET_CURRENT_PAGE':
@@ -508,30 +520,6 @@ const WalletManager: React.FC = () => {
         }
         return newState;
       }
-      case 'SET_FLOATING_CARD_OPEN':
-        return {
-          ...state,
-          floatingCard: {
-            ...state.floatingCard,
-            isOpen: action.payload
-          }
-        };
-      case 'SET_FLOATING_CARD_POSITION':
-        return {
-          ...state,
-          floatingCard: {
-            ...state.floatingCard,
-            position: action.payload
-          }
-        };
-      case 'SET_FLOATING_CARD_DRAGGING':
-        return {
-          ...state,
-          floatingCard: {
-            ...state.floatingCard,
-            isDragging: action.payload
-          }
-        };
       case 'SET_AUTOMATE_CARD_OPEN':
         return {
           ...state,
@@ -556,22 +544,6 @@ const WalletManager: React.FC = () => {
             isDragging: action.payload
           }
         };
-      case 'SET_THEME_CUSTOMIZER_OPEN':
-        return {
-          ...state,
-          themeCustomizer: {
-            ...state.themeCustomizer,
-            isOpen: action.payload
-          }
-        };
-      case 'SET_THEME_CUSTOMIZER_POSITION':
-        return {
-          ...state,
-          themeCustomizer: {
-            ...state.themeCustomizer,
-            position: action.payload
-          }
-        };
       case 'SET_QUICK_BUY_ENABLED':
         return { ...state, quickBuyEnabled: action.payload };
       case 'SET_QUICK_BUY_AMOUNT':
@@ -594,47 +566,55 @@ const WalletManager: React.FC = () => {
         return { ...state, iframeData: action.payload };
       case 'SET_NON_WHITELISTED_TRADES':
         return { ...state, nonWhitelistedTrades: action.payload };
-      case 'TOGGLE_LEFT_COLUMN':
-        return { ...state, leftColumnCollapsed: !state.leftColumnCollapsed };
+      case 'SET_SHOW_CHART_VIEW':
+        return { ...state, showChartView: action.payload };
       default:
         return state;
     }
   };
 
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const { showToast } = useToast();
 
   // Memoized callbacks to prevent unnecessary re-renders
   const memoizedCallbacks = useMemo(() => ({
     setCopiedAddress: (address: string | null): void => dispatch({ type: 'SET_COPIED_ADDRESS', payload: address }),
-    setTokenAddress: (address: string): void => dispatch({ type: 'SET_TOKEN_ADDRESS', payload: address }),
-    setIsModalOpen: (open: boolean): void => dispatch({ type: 'SET_MODAL_OPEN', payload: open }),
-    setIsSettingsOpen: (open: boolean): void => dispatch({ type: 'SET_SETTINGS_OPEN', payload: open }),
-    setConfig: (config: ConfigType): void => dispatch({ type: 'SET_CONFIG', payload: config }),
+    setTokenAddress: (address: string): void => {
+      dispatch({ type: 'SET_TOKEN_ADDRESS', payload: address });
+      // Navigate to the new token route
+      if (address) {
+        navigate(`/tokens/${address}`);
+      } else {
+        navigate('/monitor');
+      }
+    },
+    setConfig: (config: ConfigType): void => {
+      dispatch({ type: 'SET_CONFIG', payload: config });
+      setContextConfig(config);
+    },
     setCurrentPage: (page: 'wallets' | 'chart' | 'actions'): void => dispatch({ type: 'SET_CURRENT_PAGE', payload: page }),
-    setWallets: (wallets: WalletType[]): void => dispatch({ type: 'SET_WALLETS', payload: wallets }),
+    setWallets: (wallets: WalletType[]): void => {
+      dispatch({ type: 'SET_WALLETS', payload: wallets });
+      setContextWallets(wallets);
+    },
     setIsRefreshing: (refreshing: boolean): void => dispatch({ type: 'SET_REFRESHING', payload: refreshing }),
     setConnection: (connection: Connection | null): void => dispatch({ type: 'SET_CONNECTION', payload: connection }),
-    setSolBalances: (balances: Map<string, number>): void => dispatch({ type: 'SET_SOL_BALANCES', payload: balances }),
-    setTokenBalances: (balances: Map<string, number>): void => dispatch({ type: 'SET_TOKEN_BALANCES', payload: balances }),
+    setSolBalances: (balances: Map<string, number>): void => {
+      dispatch({ type: 'SET_SOL_BALANCES', payload: balances });
+      setContextSolBalances(balances);
+    },
+    setTokenBalances: (balances: Map<string, number>): void => {
+      dispatch({ type: 'SET_TOKEN_BALANCES', payload: balances });
+      setContextTokenBalances(balances);
+    },
 
     setIsLoadingChart: (loading: boolean): void => dispatch({ type: 'SET_LOADING_CHART', payload: loading }),
     setCurrentMarketCap: (cap: number | null): void => dispatch({ type: 'SET_MARKET_CAP', payload: cap }),
-    setBurnModalOpen: (open: boolean): void => dispatch({ type: 'SET_MODAL', payload: { modal: 'burnModalOpen', open } }),
     setCalculatePNLModalOpen: (open: boolean): void => dispatch({ type: 'SET_MODAL', payload: { modal: 'calculatePNLModalOpen', open } }),
-    setDeployModalOpen: (open: boolean): void => dispatch({ type: 'SET_MODAL', payload: { modal: 'deployModalOpen', open } }),
-    setCustomBuyModalOpen: (open: boolean): void => dispatch({ type: 'SET_MODAL', payload: { modal: 'customBuyModalOpen', open } }),
     setSortDirection: (direction: 'asc' | 'desc'): void => dispatch({ type: 'SET_SORT_DIRECTION', payload: direction }),
     setTickEffect: (effect: boolean): void => dispatch({ type: 'SET_TICK_EFFECT', payload: effect }),
 
-    setFloatingCardOpen: (open: boolean): void => dispatch({ type: 'SET_FLOATING_CARD_OPEN', payload: open }),
-    setFloatingCardPosition: (position: { x: number; y: number }): void => dispatch({ type: 'SET_FLOATING_CARD_POSITION', payload: position }),
-    setFloatingCardDragging: (dragging: boolean): void => dispatch({ type: 'SET_FLOATING_CARD_DRAGGING', payload: dragging }),
-    setAutomateCardOpen: (open: boolean): void => dispatch({ type: 'SET_AUTOMATE_CARD_OPEN', payload: open }),
     setAutomateCardPosition: (position: { x: number; y: number }): void => dispatch({ type: 'SET_AUTOMATE_CARD_POSITION', payload: position }),
     setAutomateCardDragging: (dragging: boolean): void => dispatch({ type: 'SET_AUTOMATE_CARD_DRAGGING', payload: dragging }),
-    setThemeCustomizerOpen: (open: boolean): void => dispatch({ type: 'SET_THEME_CUSTOMIZER_OPEN', payload: open }),
-    setThemeCustomizerPosition: (position: { x: number; y: number }): void => dispatch({ type: 'SET_THEME_CUSTOMIZER_POSITION', payload: position }),
     setQuickBuyEnabled: (enabled: boolean): void => dispatch({ type: 'SET_QUICK_BUY_ENABLED', payload: enabled }),
     setQuickBuyAmount: (amount: number): void => dispatch({ type: 'SET_QUICK_BUY_AMOUNT', payload: amount }),
     setQuickBuyMinAmount: (amount: number): void => dispatch({ type: 'SET_QUICK_BUY_MIN_AMOUNT', payload: amount }),
@@ -646,16 +626,16 @@ const WalletManager: React.FC = () => {
     setUseQuickSellRange: (useRange: boolean): void => dispatch({ type: 'SET_USE_QUICK_SELL_RANGE', payload: useRange }),
     setIframeData: (data: IframeData | null): void => dispatch({ type: 'SET_IFRAME_DATA', payload: data }),
     setNonWhitelistedTrades: (trades: { type: 'buy' | 'sell'; address: string; tokensAmount: number; avgPrice: number; solAmount: number; timestamp: number; signature: string; tokenMint: string; marketCap: number; }[]): void => dispatch({ type: 'SET_NON_WHITELISTED_TRADES', payload: trades }),
-    toggleLeftColumn: (): void => dispatch({ type: 'TOGGLE_LEFT_COLUMN' })
-  }), [dispatch]);
+    setShowChartView: (show: boolean): void => dispatch({ type: 'SET_SHOW_CHART_VIEW', payload: show })
+  }), [dispatch, navigate, setContextConfig, setContextWallets, setContextSolBalances, setContextTokenBalances]);
 
-  // Separate callbacks for config updates to prevent unnecessary re-renders
-  const configCallbacks = useMemo(() => ({
-    setBuyAmount: (amount: string): void => dispatch({ type: 'SET_CONFIG', payload: { ...state.config, buyAmount: amount } }),
-    setSellAmount: (amount: string): void => dispatch({ type: 'SET_CONFIG', payload: { ...state.config, sellAmount: amount } }),
-    setSelectedDex: (dex: string): void => dispatch({ type: 'SET_CONFIG', payload: { ...state.config, selectedDex: dex } }),
-    setIsDropdownOpen: (open: boolean): void => dispatch({ type: 'SET_CONFIG', payload: { ...state.config, isDropdownOpen: open } })
-  }), [state.config]);
+
+  // Update token address when route changes
+  useEffect(() => {
+    if (tokenAddressParam !== state.tokenAddress) {
+      dispatch({ type: 'SET_TOKEN_ADDRESS', payload: tokenAddressParam || '' });
+    }
+  }, [tokenAddressParam, state.tokenAddress]);
 
   // Track processed trades to avoid infinite loops
   const processedTradesRef = useRef<Set<string>>(new Set());
@@ -664,27 +644,27 @@ const WalletManager: React.FC = () => {
   useEffect(() => {
     if (state.iframeData?.recentTrades && state.iframeData.recentTrades.length > 0) {
       const latestTrade = state.iframeData.recentTrades[0];
-      
+
       // Create a unique key for this trade (address + signature + timestamp)
       const tradeKey = `${latestTrade.address}-${latestTrade.signature}-${latestTrade.timestamp}`;
-      
+
       // Skip if we've already processed this trade
       if (processedTradesRef.current.has(tradeKey)) {
         return;
       }
-      
+
       // Find the wallet that made the trade
       const tradingWallet = state.wallets.find(wallet => wallet.address === latestTrade.address);
-      
+
       if (tradingWallet) {
         // Get current balances
         const currentSolBalance = state.solBalances.get(latestTrade.address) || 0;
         const currentTokenBalance = state.tokenBalances.get(latestTrade.address) || 0;
-        
+
         // Calculate new balances based on trade type
         let newSolBalance = currentSolBalance;
         let newTokenBalance = currentTokenBalance;
-        
+
         if (latestTrade.type === 'buy') {
           // For buy trades: decrease SOL, increase tokens
           newSolBalance = Math.max(0, currentSolBalance - latestTrade.solAmount);
@@ -694,12 +674,12 @@ const WalletManager: React.FC = () => {
           newSolBalance = currentSolBalance + latestTrade.solAmount;
           newTokenBalance = Math.max(0, currentTokenBalance - latestTrade.tokensAmount);
         }
-        
+
         // Update balances if they changed
         if (newSolBalance !== currentSolBalance || newTokenBalance !== currentTokenBalance) {
           // Mark this trade as processed before dispatching
           processedTradesRef.current.add(tradeKey);
-          
+
           dispatch({
             type: 'UPDATE_BALANCE',
             payload: {
@@ -724,111 +704,20 @@ const WalletManager: React.FC = () => {
     }
   }, [state.iframeData?.marketCap, memoizedCallbacks]);
 
-  // Handle trade submission
-  const handleTradeSubmit = async (wallets: WalletType[], isBuyMode: boolean, dex?: string, buyAmount?: string, sellAmount?: string): Promise<void> => {
-    memoizedCallbacks.setIsRefreshing(true);
-    
-    if (!state.tokenAddress) {
-      showToast("Please select a token first", "error");
-      memoizedCallbacks.setIsRefreshing(false);
-      return;
-    }
-    
-    // Use the selected DEX or the dex parameter if provided
-    const dexToUse = dex || state.config.selectedDex;
-    await originalHandleTradeSubmit(dexToUse, wallets, isBuyMode, buyAmount, sellAmount);
-  };
-
-  // Simplified trade submit function using TradingLogic module
-  const originalHandleTradeSubmit = async (dex: string, wallets: WalletType[], isBuyMode: boolean, buyAmount?: string, sellAmount?: string): Promise<void> => {
-    try {
-      const config = {
-        tokenAddress: state.tokenAddress,
-        solAmount: isBuyMode ? parseFloat(buyAmount || state.config.buyAmount) : undefined,
-        sellPercent: !isBuyMode ? parseFloat(sellAmount || state.config.sellAmount) : undefined
-      };
-      
-      const result = await executeTrade(dex, wallets, config, isBuyMode, state.solBalances);
-      
-      if (result.success) {
-        showToast(`${isBuyMode ? 'Buy' : 'Sell'} transactions submitted successfully`, "success");
-      } else {
-        showToast(`${dex} ${isBuyMode ? 'Buy' : 'Sell'} failed: ${result.error}`, "error");
-      }
-    } catch (error) {
-      console.error(`${dex} ${isBuyMode ? 'Buy' : 'Sell'} error:`, error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      showToast(`Error: ${errorMessage}`, "error");
-    } finally {
-      memoizedCallbacks.setIsRefreshing(false);
-    }
-  };
-
-  // Read tokenAddress from URL parameter on mount
+  // Track token views in recent tokens
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('tokenAddress');
-    if (tokenFromUrl) {
-      memoizedCallbacks.setTokenAddress(tokenFromUrl);
+    if (state.tokenAddress && state.iframeData) {
+      addRecentToken(state.tokenAddress);
     }
-  }, [memoizedCallbacks]);
-
-  // Update URL when tokenAddress changes
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (state.tokenAddress) {
-      url.searchParams.set('tokenAddress', state.tokenAddress);
-    } else {
-      url.searchParams.delete('tokenAddress');
-    }
-    window.history.replaceState({}, '', url.toString());
-  }, [state.tokenAddress]);
+  }, [state.tokenAddress, state.iframeData]);
 
 
-  
-  // Initialize theme on mount
-  useEffect(() => {
-    initializeTheme();
-  }, []);
 
-  // Keyboard shortcut for theme customizer (Ctrl+Shift+T) - development only
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'T') {
-        e.preventDefault();
-        memoizedCallbacks.setThemeCustomizerOpen(!state.themeCustomizer.isOpen);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.themeCustomizer.isOpen, memoizedCallbacks]);
-  
-  // Initialize app on mount
+
+
+  // Initialize app on mount - load quick buy preferences
   useEffect(() => {
     const initializeApp = (): void => {
-      // Load saved config
-      const savedConfig = loadConfigFromCookies();
-      if (savedConfig) {
-        memoizedCallbacks.setConfig(savedConfig);
-        
-        // Create connection after loading config
-        try {
-          const conn = new SolanaConnection(savedConfig.rpcEndpoint);
-          memoizedCallbacks.setConnection(conn);
-        } catch (error) {
-          console.error('Error creating connection:', error);
-        }
-      }
-      
-      // Load saved wallets
-      const savedWallets = loadWalletsFromCookies();
-      if (savedWallets && savedWallets.length > 0) {
-        memoizedCallbacks.setWallets(savedWallets);
-      }
-      
       // Load saved quick buy preferences
       const savedQuickBuyPreferences = loadQuickBuyPreferencesFromCookies();
       if (savedQuickBuyPreferences) {
@@ -862,18 +751,18 @@ const WalletManager: React.FC = () => {
     }
   }, [state.wallets]);
 
-  // Listen for custom event to open settings modal
+  // Listen for custom event to open settings page
   useEffect(() => {
     const handleOpenSettingsWalletsTab = (): void => {
-      memoizedCallbacks.setIsSettingsOpen(true);
+      navigate('/settings');
     };
 
     window.addEventListener('openSettingsWalletsTab', handleOpenSettingsWalletsTab);
-    
+
     return (): void => {
       window.removeEventListener('openSettingsWalletsTab', handleOpenSettingsWalletsTab);
     };
-  }, [memoizedCallbacks]);
+  }, [navigate]);
 
   // Save quick buy preferences when they change (debounced)
   useEffect(() => {
@@ -895,18 +784,15 @@ const WalletManager: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [state.quickBuyEnabled, state.quickBuyAmount, state.quickBuyMinAmount, state.quickBuyMaxAmount, state.quickSellPercentage, state.useQuickBuyRange, state.quickSellMinPercentage, state.quickSellMaxPercentage, state.useQuickSellRange]);
 
-  // Update connection when RPC endpoint changes
+  // Sync connection from context when it changes
   useEffect(() => {
-    try {
-      const conn = new SolanaConnection(state.config.rpcEndpoint);
-      memoizedCallbacks.setConnection(conn);
-    } catch (error) {
-      console.error('Error creating connection:', error);
+    if (contextConnection !== state.connection) {
+      memoizedCallbacks.setConnection(contextConnection);
     }
-  }, [state.config.rpcEndpoint, memoizedCallbacks]);
+  }, [contextConnection, state.connection, memoizedCallbacks]);
 
   // Create a stable wallet identifier that only changes when wallet addresses change (not selection)
-  const walletAddresses = useMemo(() => 
+  const walletAddresses = useMemo(() =>
     state.wallets.map(w => w.address).sort().join(','),
     [state.wallets]
   );
@@ -914,9 +800,11 @@ const WalletManager: React.FC = () => {
   // Fetch SOL and token balances when wallets are added/removed, connection is established, or token address changes
   // Don't fetch when only wallet selection (isActive) changes
   useEffect(() => {
-    if (state.connection && state.wallets.length > 0) {
+    // Use rpcManager for rotation if available, otherwise fall back to connection
+    const connectionOrRpcManager = contextRpcManager || state.connection;
+    if (connectionOrRpcManager && state.wallets.length > 0) {
       void fetchWalletBalances(
-        state.connection,
+        connectionOrRpcManager,
         state.wallets,
         state.tokenAddress || '',
         memoizedCallbacks.setSolBalances,
@@ -926,7 +814,7 @@ const WalletManager: React.FC = () => {
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.connection, walletAddresses, state.tokenAddress]); // Use walletAddresses instead of state.wallets
+  }, [state.connection, contextRpcManager, walletAddresses, state.tokenAddress]); // Use walletAddresses instead of state.wallets
 
   // Trigger tick animation when wallet count changes
   useEffect(() => {
@@ -938,14 +826,17 @@ const WalletManager: React.FC = () => {
 
   // Helper functions
   const handleRefresh = useCallback(async () => {
-    if (!state.connection || state.wallets.length === 0) return;
-    
+    // Use rpcManager for rotation if available, otherwise fall back to connection
+    const connectionOrRpcManager = contextRpcManager || state.connection;
+    if (!connectionOrRpcManager || state.wallets.length === 0) return;
+
     memoizedCallbacks.setIsRefreshing(true);
-    
+
     try {
       // Use the consolidated fetchWalletBalances function with current balances to preserve them on errors
+      // Pass rpcManager to enable RPC rotation for each wallet
       await fetchWalletBalances(
-        state.connection,
+        connectionOrRpcManager,
         state.wallets,
         state.tokenAddress,
         memoizedCallbacks.setSolBalances,
@@ -959,18 +850,8 @@ const WalletManager: React.FC = () => {
       // Set refreshing to false
       memoizedCallbacks.setIsRefreshing(false);
     }
-  }, [state.connection, state.wallets, state.tokenAddress, state.solBalances, state.tokenBalances, memoizedCallbacks]);
+  }, [state.connection, contextRpcManager, state.wallets, state.tokenAddress, state.solBalances, state.tokenBalances, memoizedCallbacks]);
 
-  const handleConfigChange = useCallback((key: keyof ConfigType, value: string): void => {
-    const newConfig = { ...state.config, [key]: value };
-    saveConfigToCookies(newConfig);
-    memoizedCallbacks.setConfig(newConfig);
-  }, [state.config, memoizedCallbacks]);
-
-  const handleSaveSettings = useCallback((): void => {
-    saveConfigToCookies(state.config);
-    memoizedCallbacks.setIsSettingsOpen(false);
-  }, [state.config, memoizedCallbacks]);
 
 
 
@@ -992,42 +873,44 @@ const WalletManager: React.FC = () => {
   }, [state.nonWhitelistedTrades, memoizedCallbacks]);
 
 
-
   return (
     <div className="relative h-screen overflow-hidden bg-app-primary text-app-tertiary bg">
+      <OnboardingTutorial forceShow={showTutorial} onClose={() => setShowTutorial(false)} autoShowForNewUsers={true} />
       {/*  scanline effect */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-10"></div>
-      
+
 
       {/* Main Content - Full Height */}
       <div className="flex flex-col md:flex-row h-screen">
-        {/* Desktop Layout */}
-        <div className="hidden md:block w-full h-full relative">
+        {/* Desktop Layout - Only render when not mobile */}
+        {!isMobile && (
+          <div className="w-full h-full relative flex">
             <Split
-              className="flex w-full h-full split-custom"
-              sizes={state.leftColumnCollapsed ? [0, 80, 20] : [20, 60, 20]}
-              minSize={[0, 250, 350]}
-              gutterSize={12}
+              className="flex flex-1 h-full split-custom"
+              sizes={splitSizes}
+              minSize={[0, 250]}
+              gutterSize={viewMode === 'simple' ? 0 : 12}
               gutterAlign="center"
               direction="horizontal"
               dragInterval={1}
               snapOffset={30}
-              onDragEnd={(sizes): void => {
-                // Auto-collapse when dragged very close to the edge
-                if (sizes[0] < 2 && !state.leftColumnCollapsed) {
-                  memoizedCallbacks.toggleLeftColumn();
-                }
-              }}
-              onDrag={(sizes): void => {
-                // Expand when dragging away from collapsed state
-                if (sizes[0] >= 2 && state.leftColumnCollapsed) {
-                  memoizedCallbacks.toggleLeftColumn();
+              onDragEnd={(sizes: number[]): void => {
+                setSplitSizes(sizes);
+                // Auto-detect collapse: if left column is below 5%, switch to simple mode
+                if (sizes[0] < 5 && viewMode === 'advanced') {
+                  setViewMode('simple');
+                  setSplitSizes([0, 100]);
                 }
               }}
               gutter={(_index, direction): HTMLDivElement => {
                 const gutter = document.createElement('div');
                 gutter.className = `gutter gutter-${direction} gutter-animated`;
-                
+
+                // Hide gutter in simple mode
+                if (viewMode === 'simple') {
+                  gutter.style.display = 'none';
+                }
+
                 // Add dots pattern
                 for (let i = 0; i < 5; i++) {
                   const dot = document.createElement('div');
@@ -1035,345 +918,319 @@ const WalletManager: React.FC = () => {
                   dot.style.animationDelay = `${i * 0.1}s`;
                   gutter.appendChild(dot);
                 }
-                
+
                 return gutter;
               }}
             >
               {/* Left Column */}
-            <div 
-              className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto"
-            >
-                {state.connection && (
-                  <WalletsPage
-                  wallets={state.wallets}
-                  setWallets={memoizedCallbacks.setWallets}
-                  handleRefresh={handleRefresh}
-                  isRefreshing={state.isRefreshing}
-                  setIsModalOpen={memoizedCallbacks.setIsModalOpen}
-                  tokenAddress={state.tokenAddress}
-                  sortDirection={state.sortDirection}
-                  handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
-                  connection={state.connection}
-                  solBalances={state.solBalances}
-                  setSolBalances={memoizedCallbacks.setSolBalances}
-                  tokenBalances={state.tokenBalances}
-                  quickBuyEnabled={state.quickBuyEnabled}
-                  setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
-                  quickBuyAmount={state.quickBuyAmount}
-                  setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
-                  quickBuyMinAmount={state.quickBuyMinAmount}
-                  setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
-                  quickBuyMaxAmount={state.quickBuyMaxAmount}
-                  setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
-                  useQuickBuyRange={state.useQuickBuyRange}
-                  setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
-                  quickSellPercentage={state.quickSellPercentage}
-                  setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
-                  quickSellMinPercentage={state.quickSellMinPercentage}
-                  setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
-                  quickSellMaxPercentage={state.quickSellMaxPercentage}
-                  setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
-                  useQuickSellRange={state.useQuickSellRange}
-                  setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
-                />
-              )}
-            </div>
-
-            {/* Middle Column */}
-            <div className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto">
-              <ChartPage
-              isLoadingChart={state.isLoadingChart}
-              tokenAddress={state.tokenAddress}
-              wallets={state.wallets}
-              onDataUpdate={memoizedCallbacks.setIframeData}
-              onTokenSelect={memoizedCallbacks.setTokenAddress}
-              onNonWhitelistedTrade={handleNonWhitelistedTrade}
-            />
-            </div>
-
-            {/* Right Column */}
-            <div className="backdrop-blur-sm bg-app-primary-99 overflow-y-auto relative">
-              {/* Top Navigation - Only over Actions column */}
-              <nav className="sticky top-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
-                <div className="flex items-center gap-2 md:gap-3">
-                  {/* Service Selector */}
-                  <ServiceSelector onTokenAddressClear={(): void => memoizedCallbacks.setTokenAddress('')} />
-                  
-                  {/* Spacer to push items to the right */}
-                  <div className="flex-1"></div>
-                  
-                  {/* Settings Button */}
-                  <WalletTooltip content="Open Settings" position="bottom">
-                    <button 
-                      className="p-1.5 md:p-2 border border-app-primary-40 hover-border-primary bg-app-secondary rounded btn min-h-[36px] min-w-[36px] md:min-h-0 md:min-w-0 flex items-center justify-center"
-                      onClick={(): void => memoizedCallbacks.setIsSettingsOpen(true)}
-                    >
-                      <Settings size={18} className="md:w-5 md:h-5 color-primary" />
-                    </button>
-                  </WalletTooltip>
-
-                  {/* Server Region Selector */}
-                  <ServerRegionSelector />
-                </div>
-              </nav>
-              
-              <ActionsPage
-              tokenAddress={state.tokenAddress}
-              setTokenAddress={memoizedCallbacks.setTokenAddress}
-              transactionFee={state.config.transactionFee}
-              handleRefresh={handleRefresh}
-              wallets={state.wallets}
-              solBalances={state.solBalances}
-              tokenBalances={state.tokenBalances}
-              currentMarketCap={state.currentMarketCap}
-              setBurnModalOpen={memoizedCallbacks.setBurnModalOpen}
-              setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
-              setDeployModalOpen={memoizedCallbacks.setDeployModalOpen}
-              setCustomBuyModalOpen={memoizedCallbacks.setCustomBuyModalOpen}
-              onOpenFloating={(): void => memoizedCallbacks.setFloatingCardOpen(true)}
-              isFloatingCardOpen={state.floatingCard.isOpen}
-              isAutomateCardOpen={state.automateCard.isOpen}
-              setAutomateCardOpen={memoizedCallbacks.setAutomateCardOpen}
-              automateCardPosition={state.automateCard.position}
-              setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
-              isAutomateCardDragging={state.automateCard.isDragging}
-              setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
-              iframeData={state.iframeData}
-            />
-            </div>
-          </Split>
-        </div>
-
-        {/* Mobile Layout */}
-        <MobileLayout
-          currentPage={state.currentPage}
-          setCurrentPage={memoizedCallbacks.setCurrentPage}
-          children={{
-            WalletsPage: (
-              state.connection ? (
-                <WalletsPage
-                  wallets={state.wallets}
-                  setWallets={memoizedCallbacks.setWallets}
-                  handleRefresh={handleRefresh}
-                  isRefreshing={state.isRefreshing}
-                  setIsModalOpen={memoizedCallbacks.setIsModalOpen}
-                  tokenAddress={state.tokenAddress}
-                  sortDirection={state.sortDirection}
-                  handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
-                  connection={state.connection}
-                  solBalances={state.solBalances}
-                  tokenBalances={state.tokenBalances}
-                  quickBuyEnabled={state.quickBuyEnabled}
-                  setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
-                  quickBuyAmount={state.quickBuyAmount}
-                  setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
-                  quickBuyMinAmount={state.quickBuyMinAmount}
-                  setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
-                  quickBuyMaxAmount={state.quickBuyMaxAmount}
-                  setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
-                  useQuickBuyRange={state.useQuickBuyRange}
-                  setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
-                  quickSellPercentage={state.quickSellPercentage}
-                  setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
-                  quickSellMinPercentage={state.quickSellMinPercentage}
-                  setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
-                  quickSellMaxPercentage={state.quickSellMaxPercentage}
-                  setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
-                  useQuickSellRange={state.useQuickSellRange}
-                  setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
-                />
-              ) : (
-                <div className="p-4 text-center text-app-secondary">
-                  <div className="loading-anim inline-block">
-                    <div className="h-4 w-4 rounded-full bg-app-primary-color mx-auto"></div>
-                  </div>
-                  <p className="mt-2 font-mono">CONNECTING TO NETWORK...</p>
-                </div>
-              )
-            ),
-            ChartPage: (
-              <ChartPage
-                isLoadingChart={state.isLoadingChart}
-                tokenAddress={state.tokenAddress}
-                wallets={state.wallets}
-                onDataUpdate={memoizedCallbacks.setIframeData}
-                onTokenSelect={memoizedCallbacks.setTokenAddress}
-                onNonWhitelistedTrade={handleNonWhitelistedTrade}
-              />
-            ),
-            ActionsPage: (
-              <div className="h-full flex flex-col">
-                {/* Top Navigation - Mobile */}
-                <nav className="border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
-                  <div className="flex items-center gap-2">
-                    {/* Service Selector */}
-                    <ServiceSelector onTokenAddressClear={(): void => memoizedCallbacks.setTokenAddress('')} />
-                    
-                    {/* Spacer to push items to the right */}
-                    <div className="flex-1"></div>
-                    
-                    {/* Settings Button */}
-                    <WalletTooltip content="Open Settings" position="bottom">
-                      <button 
-                        className="p-1.5 border border-app-primary-40 hover-border-primary bg-app-secondary rounded btn min-h-[36px] min-w-[36px] flex items-center justify-center"
-                        onClick={(): void => memoizedCallbacks.setIsSettingsOpen(true)}
+              <div
+                ref={leftColumnRef}
+                className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col"
+              >
+                {/* Top Navigation - Left Column */}
+                <nav className="sticky top-0 border-b border-app-primary-70 px-1 sm:px-2 md:px-4 py-1.5 sm:py-2 backdrop-blur-sm bg-app-primary-99 z-30">
+                  <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+                    {/* Logo button that redirects to home */}
+                    <div className="min-w-0 flex-shrink-0">
+                      <button
+                        onClick={() => navigate('/')}
+                        className="flex items-center justify-center p-2 overflow-hidden
+                                border border-app-primary-30 hover-border-primary-60 rounded 
+                                transition-all duration-300 btn"
                       >
-                        <Settings size={18} className="color-primary" />
+                        <div
+                          className="flex items-center hover:scale-105 active:scale-95 transition-transform"
+                        >
+                          <img
+                            src={logo}
+                            alt={brand.altText}
+                            className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
+                          />
+                        </div>
                       </button>
-                    </WalletTooltip>
+                    </div>
 
-                    {/* Server Region Selector */}
-                    <ServerRegionSelector />
+                    {/* Spacer to push items to the right */}
+                    <div className="flex-1 min-w-0"></div>
+
+                    {/* Right-aligned buttons container */}
+                    <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+                      {/* Refresh Button */}
+                      <button
+                        onClick={handleRefresh}
+                        disabled={state.isRefreshing || !state.connection}
+                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${leftColumnWidth > 200 ? 'min-w-auto' : 'min-w-[32px]'}`}
+                        title="Refresh wallet balances"
+                      >
+                        <RefreshCw
+                          size={14}
+                          className={`sm:w-4 sm:h-4 color-primary ${state.isRefreshing ? 'animate-spin' : ''}`}
+                        />
+                        {leftColumnWidth > 200 && (
+                          <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                            REFRESH
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Wallets Page Button */}
+                      <button
+                        onClick={(): void => navigate('/wallets')}
+                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${leftColumnWidth > 200 ? 'min-w-auto' : 'min-w-[32px]'}`}
+                        title="Open wallets page"
+                      >
+                        <Wallet size={14} className="sm:w-4 sm:h-4 color-primary" />
+                        {leftColumnWidth > 200 && (
+                          <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                            WALLETS
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </nav>
-                
+
+                {/* Wallets Page Content */}
                 <div className="flex-1 overflow-y-auto">
-                  <ActionsPage
-                    tokenAddress={state.tokenAddress}
-                    setTokenAddress={memoizedCallbacks.setTokenAddress}
-                    transactionFee={state.config.transactionFee}
-                    handleRefresh={handleRefresh}
-                    wallets={state.wallets}
-                    solBalances={state.solBalances}
-                    tokenBalances={state.tokenBalances}
-                    currentMarketCap={state.currentMarketCap}
-                    setBurnModalOpen={memoizedCallbacks.setBurnModalOpen}
-                    setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
-                    setDeployModalOpen={memoizedCallbacks.setDeployModalOpen}
-                    setCustomBuyModalOpen={memoizedCallbacks.setCustomBuyModalOpen}
-                    onOpenFloating={(): void => memoizedCallbacks.setFloatingCardOpen(true)}
-                    isFloatingCardOpen={state.floatingCard.isOpen}
-                    isAutomateCardOpen={state.automateCard.isOpen}
-                    setAutomateCardOpen={memoizedCallbacks.setAutomateCardOpen}
-                    automateCardPosition={state.automateCard.position}
-                    setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
-                    isAutomateCardDragging={state.automateCard.isDragging}
-                    setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
-                    iframeData={state.iframeData}
-                  />
+                  {state.connection && (
+                    <WalletsPage
+                      wallets={state.wallets}
+                      setWallets={memoizedCallbacks.setWallets}
+                      handleRefresh={handleRefresh}
+                      isRefreshing={state.isRefreshing}
+                      setIsModalOpen={(): void => navigate('/wallets')}
+                      tokenAddress={state.tokenAddress}
+                      sortDirection={state.sortDirection}
+                      handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
+                      connection={state.connection}
+                      solBalances={state.solBalances}
+                      setSolBalances={memoizedCallbacks.setSolBalances}
+                      tokenBalances={state.tokenBalances}
+                      quickBuyEnabled={state.quickBuyEnabled}
+                      setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
+                      quickBuyAmount={state.quickBuyAmount}
+                      setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
+                      quickBuyMinAmount={state.quickBuyMinAmount}
+                      setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
+                      quickBuyMaxAmount={state.quickBuyMaxAmount}
+                      setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
+                      useQuickBuyRange={state.useQuickBuyRange}
+                      setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
+                      quickSellPercentage={state.quickSellPercentage}
+                      setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
+                      quickSellMinPercentage={state.quickSellMinPercentage}
+                      setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
+                      quickSellMaxPercentage={state.quickSellMaxPercentage}
+                      setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
+                      useQuickSellRange={state.useQuickSellRange}
+                      setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
+                      categorySettings={categorySettings}
+                    />
+                  )}
                 </div>
               </div>
-            )
-          }}
-        />
+
+              {/* Middle Column */}
+              <div className="backdrop-blur-sm bg-app-primary-99 border-l border-r border-app-primary-40 overflow-y-auto">
+                <Frame
+                  isLoadingChart={state.isLoadingChart}
+                  tokenAddress={state.tokenAddress}
+                  wallets={state.wallets}
+                  onDataUpdate={memoizedCallbacks.setIframeData}
+                  onTokenSelect={memoizedCallbacks.setTokenAddress}
+                  onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                  quickBuyEnabled={state.quickBuyEnabled}
+                  quickBuyAmount={state.quickBuyAmount}
+                  quickBuyMinAmount={state.quickBuyMinAmount}
+                  quickBuyMaxAmount={state.quickBuyMaxAmount}
+                  useQuickBuyRange={state.useQuickBuyRange}
+                />
+              </div>
+            </Split>
+
+            {/* Non-resizable divider between middle and right column */}
+            <div className="gutter-divider gutter-divider-non-resizable">
+            </div>
+
+            {/* Right Column - Fixed Width */}
+            <div className="backdrop-blur-sm bg-app-primary-99 overflow-hidden relative flex flex-col" style={{ width: '350px', minWidth: '350px', maxWidth: '350px' }}>
+              {/* Top Navigation - Only over Actions column */}
+              <nav className="flex-shrink-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
+                <div className="flex items-center justify-between">
+                  {/* Server Selector */}
+                  <div className="flex items-center gap-2 px-2">
+                    <ServerSelector />
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <button
+                    onClick={handleViewModeToggle}
+                    className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                    title={viewMode === 'simple' ? 'Switch to Advanced mode' : 'Switch to Simple mode'}
+                  >
+                    <Columns2 size={16} className={`color-primary transition-opacity ${viewMode === 'simple' ? 'opacity-50' : 'opacity-100'}`} />
+                    <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                      {viewMode === 'simple' ? 'SIMPLE' : 'ADVANCED'}
+                    </span>
+                  </button>
+
+                  {/* Tools Dropdown */}
+                  <ToolsDropdown />
+                </div>
+              </nav>
+
+              <ActionsPage
+                tokenAddress={state.tokenAddress}
+                setTokenAddress={memoizedCallbacks.setTokenAddress}
+                transactionFee={state.config.transactionFee}
+                handleRefresh={handleRefresh}
+                wallets={state.wallets}
+                setWallets={memoizedCallbacks.setWallets}
+                solBalances={state.solBalances}
+                tokenBalances={state.tokenBalances}
+                currentMarketCap={state.currentMarketCap}
+                setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
+                isAutomateCardOpen={state.automateCard.isOpen}
+                automateCardPosition={state.automateCard.position}
+                setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
+                isAutomateCardDragging={state.automateCard.isDragging}
+                setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
+                iframeData={state.iframeData}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Layout - Only render when mobile */}
+        {isMobile && (
+          <MobileLayout
+            currentPage={state.currentPage}
+            setCurrentPage={memoizedCallbacks.setCurrentPage}
+            children={{
+              WalletsPage: (
+                state.connection ? (
+                  <WalletsPage
+                    wallets={state.wallets}
+                    setWallets={memoizedCallbacks.setWallets}
+                    handleRefresh={handleRefresh}
+                    isRefreshing={state.isRefreshing}
+                    setIsModalOpen={(): void => navigate('/wallets')}
+                    tokenAddress={state.tokenAddress}
+                    sortDirection={state.sortDirection}
+                    handleSortWallets={(): void => void handleSortWallets(state.wallets, state.sortDirection, memoizedCallbacks.setSortDirection, state.solBalances, memoizedCallbacks.setWallets)}
+                    connection={state.connection}
+                    solBalances={state.solBalances}
+                    tokenBalances={state.tokenBalances}
+                    quickBuyEnabled={state.quickBuyEnabled}
+                    setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
+                    quickBuyAmount={state.quickBuyAmount}
+                    setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
+                    quickBuyMinAmount={state.quickBuyMinAmount}
+                    setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
+                    quickBuyMaxAmount={state.quickBuyMaxAmount}
+                    setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
+                    useQuickBuyRange={state.useQuickBuyRange}
+                    setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
+                    quickSellPercentage={state.quickSellPercentage}
+                    setQuickSellPercentage={memoizedCallbacks.setQuickSellPercentage}
+                    quickSellMinPercentage={state.quickSellMinPercentage}
+                    setQuickSellMinPercentage={memoizedCallbacks.setQuickSellMinPercentage}
+                    quickSellMaxPercentage={state.quickSellMaxPercentage}
+                    setQuickSellMaxPercentage={memoizedCallbacks.setQuickSellMaxPercentage}
+                    useQuickSellRange={state.useQuickSellRange}
+                    setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
+                    categorySettings={categorySettings}
+                  />
+                ) : (
+                  <div className="p-4 text-center text-app-secondary">
+                    <div className="loading-anim inline-block">
+                      <div className="h-4 w-4 rounded-full bg-app-primary-color mx-auto"></div>
+                    </div>
+                    <p className="mt-2 font-mono">CONNECTING TO NETWORK...</p>
+                  </div>
+                )
+              ),
+              Frame: (
+                <Frame
+                  isLoadingChart={state.isLoadingChart}
+                  tokenAddress={state.tokenAddress}
+                  wallets={state.wallets}
+                  onDataUpdate={memoizedCallbacks.setIframeData}
+                  onTokenSelect={memoizedCallbacks.setTokenAddress}
+                  onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                  quickBuyEnabled={state.quickBuyEnabled}
+                  quickBuyAmount={state.quickBuyAmount}
+                  quickBuyMinAmount={state.quickBuyMinAmount}
+                  quickBuyMaxAmount={state.quickBuyMaxAmount}
+                  useQuickBuyRange={state.useQuickBuyRange}
+                />
+              ),
+              ActionsPage: (
+                <div className="h-full flex flex-col">
+                  {/* Top Navigation - Mobile */}
+                  <nav className="border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
+                    <div className="flex items-center justify-between">
+                      {/* Server Selector */}
+                      <div className="flex items-center gap-2 px-2">
+                        <ServerSelector />
+                      </div>
+
+                      {/* View Mode Toggle */}
+                      <button
+                        onClick={handleViewModeToggle}
+                        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                        title={viewMode === 'simple' ? 'Switch to Advanced mode' : 'Switch to Simple mode'}
+                      >
+                        <Columns2 size={16} className={`color-primary transition-opacity ${viewMode === 'simple' ? 'opacity-50' : 'opacity-100'}`} />
+                        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                          {viewMode === 'simple' ? 'SIMPLE' : 'ADVANCED'}
+                        </span>
+                      </button>
+
+                      {/* Tools Dropdown */}
+                      <ToolsDropdown />
+                    </div>
+                  </nav>
+
+                  <div className="flex-1 overflow-y-auto">
+                    <ActionsPage
+                      tokenAddress={state.tokenAddress}
+                      setTokenAddress={memoizedCallbacks.setTokenAddress}
+                      transactionFee={state.config.transactionFee}
+                      handleRefresh={handleRefresh}
+                      wallets={state.wallets}
+                      setWallets={memoizedCallbacks.setWallets}
+                      solBalances={state.solBalances}
+                      tokenBalances={state.tokenBalances}
+                      currentMarketCap={state.currentMarketCap}
+                      setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
+                      isAutomateCardOpen={state.automateCard.isOpen}
+                      automateCardPosition={state.automateCard.position}
+                      setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
+                      isAutomateCardDragging={state.automateCard.isDragging}
+                      setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
+                      iframeData={state.iframeData}
+                    />
+                  </div>
+                </div>
+              )
+            }}
+          />
+        )}
       </div>
-  
-      {/*  Settings Modal */}
-      <SettingsModal
-        isOpen={state.isSettingsOpen}
-        onClose={(): void => memoizedCallbacks.setIsSettingsOpen(false)}
-        config={state.config}
-        onConfigChange={handleConfigChange}
-        onSave={handleSaveSettings}
-        connection={state.connection}
-        showToast={showToast}
-      />
-  
-      {/*  Wallet Overview */}
-      <WalletOverview
-        isOpen={state.isModalOpen}
-        onClose={(): void => memoizedCallbacks.setIsModalOpen(false)}
-        wallets={state.wallets}
-        setWallets={memoizedCallbacks.setWallets}
-        solBalances={state.solBalances}
-        setSolBalances={memoizedCallbacks.setSolBalances}
-        tokenBalances={state.tokenBalances}
-        setTokenBalances={memoizedCallbacks.setTokenBalances}
-        tokenAddress={state.tokenAddress}
-        connection={state.connection}
-        handleRefresh={handleRefresh}
-        isRefreshing={state.isRefreshing}
-        showToast={showToast}
-        onOpenSettings={(): void => {
-          memoizedCallbacks.setIsModalOpen(false); // Close wallet overview first
-          memoizedCallbacks.setIsSettingsOpen(true);
-        }}
-      />
+
 
       {/* Modals */}
-      <BurnModal
-        isOpen={state.modals.burnModalOpen}
-        onClose={(): void => memoizedCallbacks.setBurnModalOpen(false)}
-        handleRefresh={handleRefresh}
-        tokenAddress={state.tokenAddress}
-        solBalances={state.solBalances} 
-        tokenBalances={state.tokenBalances}
-      />
       <PnlModal
         isOpen={state.modals.calculatePNLModalOpen}
         onClose={(): void => memoizedCallbacks.setCalculatePNLModalOpen(false)}
-        handleRefresh={handleRefresh}    
-        tokenAddress={state.tokenAddress}
-        iframeData={state.iframeData}
-        tokenBalances={state.tokenBalances}
-      />
-      
-      <DeployModal
-        isOpen={state.modals.deployModalOpen}
-        onClose={(): void => memoizedCallbacks.setDeployModalOpen(false)}
-        handleRefresh={handleRefresh} 
-        solBalances={state.solBalances}
-      />
-      
-      
-      <CustomBuyModal
-        isOpen={state.modals.customBuyModalOpen}
-        onClose={(): void => memoizedCallbacks.setCustomBuyModalOpen(false)}
         handleRefresh={handleRefresh}
         tokenAddress={state.tokenAddress}
-        solBalances={state.solBalances} 
-        tokenBalances={state.tokenBalances}
-      />
-      
-      <FloatingTradingCard
-        isOpen={state.floatingCard.isOpen}
-        onClose={(): void => memoizedCallbacks.setFloatingCardOpen(false)}
-        position={state.floatingCard.position}
-        onPositionChange={memoizedCallbacks.setFloatingCardPosition}
-        isDragging={state.floatingCard.isDragging}
-        onDraggingChange={memoizedCallbacks.setFloatingCardDragging}
-        tokenAddress={state.tokenAddress}
-        wallets={state.wallets}
-        selectedDex={state.config.selectedDex}
-        setSelectedDex={configCallbacks.setSelectedDex}
-        isDropdownOpen={state.config.isDropdownOpen}
-        setIsDropdownOpen={configCallbacks.setIsDropdownOpen}
-        buyAmount={state.config.buyAmount}
-        setBuyAmount={configCallbacks.setBuyAmount}
-        sellAmount={state.config.sellAmount}
-        setSellAmount={configCallbacks.setSellAmount}
-        handleTradeSubmit={handleTradeSubmit}
-        isLoading={state.isRefreshing}
-        getScriptName={getScriptName}
-        countActiveWallets={countActiveWallets}
-        currentMarketCap={state.currentMarketCap}
-        tokenBalances={state.tokenBalances}
-      />
-      
-      <AutomateFloatingCard
-        isOpen={state.automateCard.isOpen}
-        onClose={(): void => memoizedCallbacks.setAutomateCardOpen(false)}
-        position={state.automateCard.position}
-        onPositionChange={memoizedCallbacks.setAutomateCardPosition}
-        isDragging={state.automateCard.isDragging}
-        onDraggingChange={memoizedCallbacks.setAutomateCardDragging}
-        tokenAddress={state.tokenAddress}
-        wallets={state.wallets}
-        solBalances={state.solBalances}
-        tokenBalances={state.tokenBalances}
-        nonWhitelistedTrades={state.nonWhitelistedTrades}
         iframeData={state.iframeData}
+        tokenBalances={state.tokenBalances}
       />
-      
-      {/* Theme Customizer - Development Only */}
-      {import.meta.env.DEV && (
-        <ThemeCustomizer
-          isOpen={state.themeCustomizer.isOpen}
-          onClose={(): void => memoizedCallbacks.setThemeCustomizerOpen(false)}
-          position={state.themeCustomizer.position}
-          onPositionChange={memoizedCallbacks.setThemeCustomizerPosition}
-        />
-      )}
+
+      {/* AutomateFloatingCard is now rendered globally in index.tsx and persists across all views */}
     </div>
   );
 };

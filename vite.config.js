@@ -3,10 +3,22 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig({
+  base: '/',
   plugins: [
     react(),
+    nodePolyfills({
+      // Enable polyfills for specific globals and modules
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+      // Enable polyfills for specific modules (e.g., crypto, stream, etc.)
+      protocolImports: true,
+    }),
     checker({
       overlay: true,
       typescript: {
@@ -28,90 +40,99 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
     },
   },
+  
+  // Pre-bundle dependencies that have CommonJS issues
+  optimizeDeps: {
+    include: [
+      '@solana/web3.js',
+      '@solana/spl-token',
+      '@solana/spl-token-registry',
+      'bs58',
+      'buffer',
+      'bip39',
+      'ed25519-hd-key',
+      'crypto-js',
+    ],
+    esbuildOptions: {
+      target: 'es2020',
+      // Define global for CommonJS modules
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {
+        // Simplified chunking - only split truly independent ESM libraries
+        // Avoid splitting CommonJS modules which can break require() calls
         manualChunks: {
-          // Vendor chunks
+          // Only split pure ESM libraries that are safe to chunk
           'vendor-react': ['react', 'react-dom'],
-          'vendor-solana': ['@solana/web3.js', '@solana/spl-token'],
-          'vendor-ui': ['lucide-react', 'framer-motion', 'react-split'],
-          'vendor-utils': ['bs58', 'buffer', 'crypto-js', 'd3'],
-
-          'operations': [
-            './src/utils/bonkcreate.ts',
-            './src/utils/cookcreate.ts',
-            './src/utils/consolidate.ts',
-            './src/utils/distribute.ts',
-            './src/utils/mixer.ts'
-          ],
-          
-          // Modal components
-          'modals': [
-            './src/modals/BurnModal.tsx',
-            './src/modals/CalculatePNLModal.tsx', 
-            './src/modals/DeployModal.tsx',
-            './src/modals/CustomBuyModal.tsx',
-            './src/modals/SettingsModal.tsx',
-            './src/modals/WalletsModal.tsx'
-          ],
-          
-          // Page components
-          'pages': [
-            './src/Wallets.tsx',
-            './src/Chart.tsx',
-            './src/Actions.tsx',
-            './src/Mobile.tsx'
-          ],
-          
-          // Core components
-          'components': [
-            './src/components/FloatingTradingCard.tsx',
-            './src/components/TradingForm.tsx',
-            './src/components/PnlCard.tsx'
-          ]
+          'vendor-router': ['react-router-dom'],
         },
         
         // Optimize chunk size
-        chunkFileNames: (chunkInfo) => {
-          const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId.split('/').pop().replace('.tsx', '').replace('.ts', '')
-            : 'chunk';
-          return `assets/${facadeModuleId}-[hash].js`;
-        }
-      }
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      },
     },
     
     // Optimize build performance
-    target: 'esnext',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
-    },
+    target: 'es2020',
+    minify: 'esbuild', // Use esbuild instead of terser for better compatibility
+    // Note: esbuild minification is faster and more reliable than terser
     
-    // Set chunk size warning limit
-    chunkSizeWarningLimit: 500
+    // Set chunk size warning limit (increased to 600KB since we're splitting more)
+    chunkSizeWarningLimit: 600,
+    
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+    
+    // Improve tree shaking
+    reportCompressedSize: true,
+    
+    // Source maps for production debugging (optional, can be disabled for smaller builds)
+    sourcemap: false,
+    
+    // CommonJS options for better compatibility
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+      requireReturnsDefault: 'auto'
+    }
+  },
+  
+  // Ensure proper module format
+  modulePreload: {
+    polyfill: true
   },
   
   // Development server configuration
   server: {
-    port: 3000,
-    host: true,
+    port: 3010,
+    host: '0.0.0.0',
     
-    allowedHosts: ['localhost', '127.0.0.1', '.ngrok-free.app'],
+    // Allow all hosts (no restrictions)
+    allowedHosts: true,
     
     // Add Permissions Policy headers for clipboard access
     headers: {
       'Permissions-Policy': 'clipboard-read=*, clipboard-write=*'
+    },
+    
+    strictPort: false,
+    
+    // File system options
+    fs: {
+      strict: false
     }
   },
   
   // Preview server configuration (for production builds)
   preview: {
-    port: 3000,
+    port: 3010,
     headers: {
       'Permissions-Policy': 'clipboard-read=*, clipboard-write=*'
     }

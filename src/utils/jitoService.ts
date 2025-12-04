@@ -1,11 +1,11 @@
-import type { ApiResponse } from '../types/api';
+import type { ApiResponse } from './types';
 
 interface WindowWithConfig {
   tradingServerUrl?: string;
 }
 
 /**
- * Sends a signed transaction to the server's /solana/send endpoint
+ * Sends a signed transaction to the server's /v2/sol/send endpoint
  * which then forwards it to the Jito bundle service
  * @param serializedTransaction - bs58-encoded serialized transaction
  * @returns Result from the bundle service
@@ -14,7 +14,7 @@ export const sendToJitoBundleService = async (serializedTransaction: string): Pr
     try {
       // Get the server base URL
       const baseUrl = (window as unknown as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || "";
-      const sendBundleEndpoint = `${baseUrl}/solana/send`;
+      const sendBundleEndpoint = `${baseUrl}/v2/sol/send`;
       
       // Create the request payload - this matches what the server endpoint expects
       const payload = {

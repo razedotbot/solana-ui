@@ -3,37 +3,22 @@ import { Keypair, PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import Cookies from 'js-cookie';
 import CryptoJS from 'crypto-js';
-import type { TradingStrategy } from './automate/types';
 import { formatAddress as _formatAddress, formatTokenBalance as _formatTokenBalance } from './utils/formatting';
+import { deriveWalletFromMnemonic } from './utils/hdWallet';
+import { createDefaultEndpoints } from './utils/rpcManager';
+import type {
+  WalletCategory,
+  WalletSource,
+  MasterWallet,
+  CustomQuickTradeSettings,
+  WalletType,
+  ConfigType,
+  QuickBuyPreferences,
+  TradingStrategy,
+} from './utils/types';
 
-export type WalletCategory = 'Soft' | 'Medium' | 'Hard';
-
-export interface WalletType {
-  id: number;
-  address: string;
-  privateKey: string;
-  isActive: boolean;
-  tokenBalance?: number;
-  label?: string;
-  category?: WalletCategory;
-  isArchived?: boolean;
-  [key: string]: unknown;
-}
-
-export interface ConfigType {
-  rpcEndpoint: string;
-  transactionFee: string;
-  selectedDex: string;
-  isDropdownOpen: boolean;
-  buyAmount: string;
-  sellAmount: string;
-  slippageBps: string; // Slippage in basis points (e.g., "100" = 1%)
-  bundleMode: string; // Default bundle mode preference ('single', 'batch', 'all-in-one')
-  singleDelay: string; // Delay between wallets in single mode (milliseconds)
-  batchDelay: string; // Delay between batches in batch mode (milliseconds)
-  tradingServerEnabled: string; // Whether to use self-hosted trading server ('true' or 'false')
-  tradingServerUrl: string; // URL of the self-hosted trading server
-}
+// Re-export types for backward compatibility
+export type { WalletCategory, WalletSource, MasterWallet, CustomQuickTradeSettings, WalletType, ConfigType, QuickBuyPreferences };
 
 export const toggleWallet = (wallets: WalletType[], id: number): WalletType[] => {
   return wallets.map(wallet => 
@@ -77,6 +62,7 @@ const TRADING_STRATEGIES_COOKIE_KEY = 'tradingStrategies';
 // Encryption setup
 const ENCRYPTION_KEY = 'raze-bot-wallet-encryption-key';
 const ENCRYPTED_STORAGE_KEY = 'encrypted_wallets';
+const ENCRYPTED_MASTER_WALLETS_KEY = 'encrypted_master_wallets';
 
 // Encryption helper functions
 const encryptData = (data: string): string => {
@@ -135,17 +121,137 @@ export const migrateToEncryptedStorage = (): boolean => {
   }
 };
 
+// ============= Master Wallet Storage Functions =============
+
+/**
+ * Save master wallets to encrypted storage
+ */
+export const saveMasterWallets = (masterWallets: MasterWallet[]): void => {
+  try {
+    const data = JSON.stringify(masterWallets);
+    const encrypted = encryptData(data);
+    localStorage.setItem(ENCRYPTED_MASTER_WALLETS_KEY, encrypted);
+  } catch (error) {
+    console.error('Error saving master wallets:', error);
+    throw new Error('Failed to save master wallets');
+  }
+};
+
+/**
+ * Load master wallets from encrypted storage
+ */
+export const loadMasterWallets = (): MasterWallet[] => {
+  try {
+    const encrypted = localStorage.getItem(ENCRYPTED_MASTER_WALLETS_KEY);
+    if (!encrypted) {
+      return [];
+    }
+    
+    const decrypted = decryptData(encrypted);
+    const masterWallets = JSON.parse(decrypted) as MasterWallet[];
+    return masterWallets;
+  } catch (error) {
+    console.error('Error loading master wallets:', error);
+    return [];
+  }
+};
+
+/**
+ * Create a new master wallet entry
+ */
+export const createMasterWallet = (
+  name: string,
+  mnemonic: string,
+  color?: string
+): MasterWallet => {
+  const encryptedMnemonic = encryptData(mnemonic);
+  
+  return {
+    id: `master_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name,
+    encryptedMnemonic,
+    accountCount: 0,
+    createdAt: Date.now(),
+    color,
+  };
+};
+
+/**
+ * Get mnemonic from master wallet (decrypted)
+ */
+export const getMasterWalletMnemonic = (masterWallet: MasterWallet): string => {
+  try {
+    return decryptData(masterWallet.encryptedMnemonic);
+  } catch (error) {
+    console.error('Error decrypting master wallet mnemonic:', error);
+    throw new Error('Failed to decrypt mnemonic');
+  }
+};
+
+/**
+ * Update master wallet account count
+ */
+export const updateMasterWalletAccountCount = (
+  masterWallets: MasterWallet[],
+  masterWalletId: string,
+  accountCount: number
+): MasterWallet[] => {
+  return masterWallets.map(mw => 
+    mw.id === masterWalletId ? { ...mw, accountCount } : mw
+  );
+};
+
+/**
+ * Delete a master wallet
+ */
+export const deleteMasterWallet = (
+  masterWallets: MasterWallet[],
+  masterWalletId: string
+): MasterWallet[] => {
+  return masterWallets.filter(mw => mw.id !== masterWalletId);
+};
+
+/**
+ * Create HD-derived wallet from master wallet
+ */
+// Generate unique wallet ID with timestamp and random component
+const generateWalletId = (): number => {
+  // Use timestamp + random number to ensure uniqueness even when created rapidly
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+};
+
+export const createHDWalletFromMaster = (
+  masterWallet: MasterWallet,
+  accountIndex: number,
+  category: WalletCategory = 'Medium'
+): WalletType => {
+  const mnemonic = getMasterWalletMnemonic(masterWallet);
+  const derived = deriveWalletFromMnemonic(mnemonic, accountIndex);
+  
+  return {
+    id: generateWalletId() + accountIndex, // Ensure unique ID
+    address: derived.address,
+    privateKey: derived.privateKey,
+    isActive: false,
+    category,
+    source: 'hd-derived',
+    masterWalletId: masterWallet.id,
+    derivationIndex: accountIndex,
+  };
+};
+
 export const createNewWallet = (): WalletType => {
   const keypair = Keypair.generate();
   const address = keypair.publicKey.toString();
   const privateKey = bs58.encode(keypair.secretKey);
   
   return {
-    id: Date.now(),
+    id: generateWalletId(),
     address,
     privateKey,
     isActive: false,
-    category: 'Medium'
+    category: 'Medium',
+    source: 'imported' // Mark as imported (not HD-derived)
   };
 };
 
@@ -176,11 +282,12 @@ export const importWallet = (
     const address = keypair.publicKey.toString();
     
     const wallet: WalletType = {
-      id: Date.now(),
+      id: generateWalletId(),
       address,
       privateKey: privateKeyString,
       isActive: false,
-      category: 'Medium'
+      category: 'Medium',
+      source: 'imported' // Mark as imported (not HD-derived)
     };
     
     return { wallet };
@@ -237,6 +344,15 @@ export const getActiveWallets = (): WalletType[] => {
     return [];
   }
 };
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('RPC request timeout')), timeoutMs)
+    )
+  ]);
+};
+
 export const fetchTokenBalance = async (
   connection: Connection,
   walletAddress: string,
@@ -246,13 +362,16 @@ export const fetchTokenBalance = async (
     const walletPublicKey = new PublicKey(walletAddress);
     const tokenMintPublicKey = new PublicKey(tokenMint);
 
-    // Find token account
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-      walletPublicKey,
-      {
-        mint: tokenMintPublicKey
-      }, 
-      "processed"
+    // Find token account with 1s timeout
+    const tokenAccounts = await withTimeout(
+      connection.getParsedTokenAccountsByOwner(
+        walletPublicKey,
+        {
+          mint: tokenMintPublicKey
+        }, 
+        "processed"
+      ),
+      1000
     );
 
     // If no token account found, return 0
@@ -274,7 +393,10 @@ export const fetchSolBalance = async (
 ): Promise<number> => {
   try {
     const publicKey = new PublicKey(walletAddress);
-    const balance = await connection.getBalance(publicKey, "processed");
+    const balance = await withTimeout(
+      connection.getBalance(publicKey, "processed"),
+      1000
+    );
     return balance / 1e9;
   } catch (error) {
     console.error('Error fetching SOL balance:', error);
@@ -307,7 +429,7 @@ export const refreshWalletBalance = async (
  * This is the main function for fetching wallet balances with progress tracking
  */
 export const fetchWalletBalances = async (
-  connection: Connection,
+  connectionOrRpcManager: Connection | { createConnection: () => Promise<Connection> },
   wallets: WalletType[],
   tokenAddress: string,
   setSolBalances: (balances: Map<string, number>) => void,
@@ -319,11 +441,22 @@ export const fetchWalletBalances = async (
   const newSolBalances = new Map(currentSolBalances || new Map<string, number>());
   const newTokenBalances = new Map(currentTokenBalances || new Map<string, number>());
   
+  // Check if we have an RPCManager (has createConnection method) or a Connection
+  const isRpcManager = typeof connectionOrRpcManager === 'object' && 'createConnection' in connectionOrRpcManager;
+  
   // Process wallets sequentially
   for (let i = 0; i < wallets.length; i++) {
     const wallet = wallets[i];
     
     try {
+      // Create a new connection for each wallet to rotate endpoints
+      let connection: Connection;
+      if (isRpcManager) {
+        connection = await (connectionOrRpcManager as { createConnection: () => Promise<Connection> }).createConnection();
+      } else {
+        connection = connectionOrRpcManager;
+      }
+      
       // Fetch SOL balance
       const solBalance = await fetchSolBalance(connection, wallet.address);
       newSolBalances.set(wallet.address, solBalance);
@@ -552,6 +685,14 @@ export const loadConfigFromCookies = (): ConfigType | null => {
       if (config.tradingServerUrl === undefined) {
         config.tradingServerUrl = 'localhost:4444'; // Default URL
       }
+      // Ensure rpcEndpoints exists
+      if (config.rpcEndpoints === undefined) {
+        config.rpcEndpoints = JSON.stringify(createDefaultEndpoints());
+      }
+      // Handle backward compatibility for streamApiKey
+      if (config.streamApiKey === undefined) {
+        config.streamApiKey = ''; // Default to empty (user must configure)
+      }
       return config as ConfigType;
     } catch (error) {
       console.error('Error parsing saved config:', error);
@@ -592,18 +733,6 @@ export const downloadAllWallets = (wallets: WalletType[]): void => {
   URL.revokeObjectURL(url);
 };
 
-export interface QuickBuyPreferences {
-  quickBuyEnabled: boolean;
-  quickBuyAmount: number;
-  quickBuyMinAmount: number;
-  quickBuyMaxAmount: number;
-  useQuickBuyRange: boolean;
-  quickSellPercentage: number;
-  quickSellMinPercentage: number;
-  quickSellMaxPercentage: number;
-  useQuickSellRange: boolean;
-}
-
 export const saveQuickBuyPreferencesToCookies = (preferences: QuickBuyPreferences): void => {
   Cookies.set(QUICK_BUY_COOKIE_KEY, JSON.stringify(preferences), { expires: 30 });
 };
@@ -641,4 +770,54 @@ export const loadTradingStrategiesFromCookies = (): TradingStrategy[] => {
     }
   }
   return [];
+};
+
+// Split panel sizes cookie management
+const SPLIT_SIZES_COOKIE_KEY = 'splitSizes';
+const VIEW_MODE_COOKIE_KEY = 'viewMode';
+
+export type ViewMode = 'simple' | 'advanced';
+
+export const saveViewModeToCookies = (mode: ViewMode): void => {
+  try {
+    Cookies.set(VIEW_MODE_COOKIE_KEY, mode, { expires: 365 }); // 1 year expiry
+  } catch (error) {
+    console.error('Error saving view mode to cookies:', error);
+  }
+};
+
+export const loadViewModeFromCookies = (): ViewMode => {
+  try {
+    const savedMode = Cookies.get(VIEW_MODE_COOKIE_KEY);
+    if (savedMode === 'simple' || savedMode === 'advanced') {
+      return savedMode;
+    }
+  } catch (error) {
+    console.error('Error loading view mode from cookies:', error);
+  }
+  return 'advanced'; // Default to advanced mode
+};
+
+export const saveSplitSizesToCookies = (sizes: number[]): void => {
+  try {
+    Cookies.set(SPLIT_SIZES_COOKIE_KEY, JSON.stringify(sizes), { expires: 365 }); // 1 year expiry
+  } catch (error) {
+    console.error('Error saving split sizes to cookies:', error);
+  }
+};
+
+export const loadSplitSizesFromCookies = (): number[] | null => {
+  try {
+    const savedSizes = Cookies.get(SPLIT_SIZES_COOKIE_KEY);
+    if (savedSizes) {
+      const sizes = JSON.parse(savedSizes) as number[];
+      // Validate sizes array
+      if (Array.isArray(sizes) && sizes.length === 2 && sizes.every(size => typeof size === 'number' && size > 0 && size < 100)) {
+        return sizes;
+      }
+    }
+  } catch (error) {
+    console.error('Error loading split sizes from cookies:', error);
+  }
+  return null;
 };

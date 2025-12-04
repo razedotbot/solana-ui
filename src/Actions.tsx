@@ -1,19 +1,24 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
-   Blocks,
-   Trash2,
    ChartSpline,
-   Workflow,
    Activity,
-   Bot
+   ArrowUpRight,
+   ArrowDownRight,
+   Clock,
+   Check,
+   Zap
  } from 'lucide-react';
-import { brand } from './config/brandConfig';
+import { brand } from './utils/brandConfig';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
-import type { WalletType } from "./Utils";
-import { useToast } from "./components/useToast";
-import { countActiveWallets } from './utils/wallets';
+import type { WalletType, IframeData } from "./utils/types";
+import { useToast } from "./utils/useToast";
+import { countActiveWallets, getScriptName } from './utils/wallets';
+import { toggleWallet, saveWalletsToCookies, getWalletDisplayName } from './Utils';
+import { formatTokenBalance } from './utils/formatting';
 import TradingCard from './components/TradingForm';
-import type { IframeData } from './types/api';
+import FloatingTradingCard from './components/FloatingTradingCard';
+import { getLatestTrades, type TradeHistoryEntry } from './utils/trading';
 
 import { executeTrade } from './utils/trading';
 
@@ -51,18 +56,13 @@ interface ActionsPageProps {
   transactionFee: string;
   handleRefresh: () => void;
   wallets: WalletType[];
+  setWallets: (wallets: WalletType[]) => void;
   solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
   currentMarketCap: number | null;
-  setBurnModalOpen: (open: boolean) => void;
   setCalculatePNLModalOpen: (open: boolean) => void;
-  setDeployModalOpen: (open: boolean) => void;
-  setCustomBuyModalOpen: (open: boolean) => void;
-  onOpenFloating: () => void;
-  isFloatingCardOpen: boolean;
   // Automate card state props
   isAutomateCardOpen: boolean;
-  setAutomateCardOpen: (open: boolean) => void;
   automateCardPosition: { x: number; y: number };
   setAutomateCardPosition: (position: { x: number; y: number }) => void;
   isAutomateCardDragging: boolean;
@@ -81,6 +81,13 @@ const DataBox: React.FC<{
   if (!tokenAddress || !iframeData) return null;
 
   const { tradingStats, solPrice, currentWallets, tokenPrice } = iframeData;
+  
+  // Verify that tokenPrice matches the current tokenAddress
+  // Only show data if tokenPrice exists and matches, or if tokenPrice is null (initial state)
+  // This prevents showing PnL data for a different token
+  if (tokenPrice && tokenPrice.tokenMint !== tokenAddress) {
+    return null;
+  }
 
   // Calculate holdings value
   const totalTokens = Array.from(tokenBalances.values()).reduce((sum, balance) => sum + balance, 0);
@@ -259,21 +266,303 @@ const DataBox: React.FC<{
 });
 DataBox.displayName = 'DataBox';
 
+// Latest Trade component - shows only the most recent trade for current token
+const LatestTrades: React.FC<{
+  tokenAddress?: string;
+}> = React.memo(({ tokenAddress }) => {
+  const [latestTrade, setLatestTrade] = useState<TradeHistoryEntry | null>(null);
+  const [tradeAppearedAt, setTradeAppearedAt] = useState<number | null>(null);
+  const [isFullyOpaque, setIsFullyOpaque] = useState(true);
+  const previousTradeIdRef = useRef<string | null>(null);
+  
+  const loadLatestTrade = useCallback(() => {
+    if (!tokenAddress) {
+      setLatestTrade(null);
+      setTradeAppearedAt(null);
+      previousTradeIdRef.current = null;
+      return;
+    }
+    
+    const trades = getLatestTrades(50);
+    // Get the most recent trade for the current token
+    const tokenTrades = trades.filter(trade => trade.tokenAddress === tokenAddress);
+    const newTrade = tokenTrades.length > 0 ? tokenTrades[0] : null;
+    
+    // Check if this is a new trade (different ID)
+    if (newTrade && newTrade.id !== previousTradeIdRef.current) {
+      setTradeAppearedAt(Date.now());
+      previousTradeIdRef.current = newTrade.id;
+    }
+    
+    setLatestTrade(newTrade);
+  }, [tokenAddress]);
+  
+  useEffect(() => {
+    loadLatestTrade();
+    
+    // Listen for trade history updates
+    const handleTradeUpdate = (): void => {
+      loadLatestTrade();
+    };
+    
+    window.addEventListener('tradeHistoryUpdated', handleTradeUpdate);
+    
+    return () => {
+      window.removeEventListener('tradeHistoryUpdated', handleTradeUpdate);
+    };
+  }, [loadLatestTrade]);
+  
+  // Update opacity state to track first 3 seconds
+  useEffect(() => {
+    if (tradeAppearedAt !== null) {
+      setIsFullyOpaque(true);
+      const timer = setTimeout(() => {
+        setIsFullyOpaque(false);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [tradeAppearedAt]);
+  
+  const formatTimeAgo = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
+  };
+  
+  const formatAmount = (trade: TradeHistoryEntry): string => {
+    if (trade.amountType === 'percentage') {
+      return `${trade.amount}%`;
+    }
+    return `${trade.amount.toFixed(3)} SOL`;
+  };
+  
+  // Only show when token is selected and there's a trade
+  if (!tokenAddress || !latestTrade) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-3">
+      <div className={`flex items-center justify-between py-1.5 px-2 rounded border text-xs ${
+        latestTrade.success
+          ? latestTrade.type === 'buy'
+            ? `bg-app-secondary-80 border-app-primary-40 ${isFullyOpaque ? 'opacity-100' : ''}`
+            : `bg-app-secondary-80 border-warning-40 ${isFullyOpaque ? 'opacity-100' : ''}`
+          : `bg-app-secondary-60 border-app-primary-20 ${isFullyOpaque ? 'opacity-100' : 'opacity-60'}`
+      }`}>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {/* Compact icon */}
+          {latestTrade.type === 'buy' ? (
+            <ArrowUpRight 
+              size={12} 
+              className={`flex-shrink-0 ${latestTrade.success ? 'color-primary' : 'text-app-secondary-60'}`} 
+            />
+          ) : (
+            <ArrowDownRight 
+              size={12} 
+              className={`flex-shrink-0 ${latestTrade.success ? 'text-warning' : 'text-app-secondary-60'}`} 
+            />
+          )}
+          
+          {/* Compact info */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className={`font-mono font-semibold ${
+              latestTrade.success
+                ? latestTrade.type === 'buy'
+                  ? 'color-primary'
+                  : 'text-warning'
+                : 'text-app-secondary-60'
+            }`}>
+              {latestTrade.type === 'buy' ? 'BUY' : 'SELL'}
+            </span>
+            <span className="text-app-secondary-60">•</span>
+            <span className="text-app-secondary-60 font-mono truncate">{formatAmount(latestTrade)}</span>
+            {latestTrade.walletsCount > 1 && (
+              <>
+                <span className="text-app-secondary-60">•</span>
+                <span className="text-app-secondary-60 font-mono">{latestTrade.walletsCount}w</span>
+              </>
+            )}
+          </div>
+        </div>
+        
+        {/* Compact timestamp */}
+        <div className="flex items-center gap-1 text-app-secondary-60 font-mono ml-2 flex-shrink-0">
+          <Clock size={10} />
+          <span>{formatTimeAgo(latestTrade.timestamp)}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+LatestTrades.displayName = 'LatestTrades';
+
+// Wallet Selector Popup Component for Actions page
+interface ActionsWalletSelectorProps {
+  wallets: WalletType[];
+  solBalances: Map<string, number>;
+  tokenBalances: Map<string, number>;
+  anchorRef: React.RefObject<HTMLDivElement>;
+  onClose: () => void;
+  onToggleWallet: (id: number) => void;
+  onSelectAll: () => void;
+  onSelectAllWithBalance: () => void;
+}
+
+const ActionsWalletSelector: React.FC<ActionsWalletSelectorProps> = ({
+  wallets,
+  solBalances,
+  tokenBalances,
+  anchorRef,
+  onClose,
+  onToggleWallet,
+  onSelectAll,
+  onSelectAllWithBalance
+}) => {
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, right: 0 });
+
+  // Calculate position based on anchor location
+  useEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right
+      });
+    }
+  }, [anchorRef]);
+
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent): void => {
+      if (
+        popupRef.current && 
+        !popupRef.current.contains(e.target as Node) && 
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose, anchorRef]);
+
+  return (
+    <div 
+      ref={popupRef}
+      className="fixed z-[9999]"
+      style={{
+        top: position.top,
+        right: position.right,
+      }}
+    >
+      <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 min-w-[320px] max-h-[400px] overflow-hidden">
+        {/* Header with Select All buttons */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
+          <button
+            onClick={onSelectAll}
+            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
+          >
+            Select All
+          </button>
+          <button
+            onClick={onSelectAllWithBalance}
+            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
+          >
+            Select All with Balance
+          </button>
+        </div>
+
+        {/* Wallet List */}
+        <div className="overflow-y-auto max-h-[340px]">
+          {wallets.filter(w => !w.isArchived).map((wallet) => {
+            const solBal = solBalances.get(wallet.address) || 0;
+            const tokenBal = tokenBalances.get(wallet.address) || 0;
+            
+            return (
+              <div
+                key={wallet.id}
+                onClick={() => onToggleWallet(wallet.id)}
+                className={`
+                  flex items-center justify-between px-3 py-2 cursor-pointer transition-all duration-200
+                  border-b border-app-primary-20 last:border-b-0
+                  ${wallet.isActive 
+                    ? 'bg-primary-20 border-l-2 border-l-primary' 
+                    : 'hover:bg-app-primary-60'
+                  }
+                `}
+              >
+                {/* Selection indicator & wallet info */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {/* Selection checkbox */}
+                  <div className={`
+                    w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
+                    ${wallet.isActive 
+                      ? 'bg-app-primary-color border-app-primary-color' 
+                      : 'bg-transparent border-app-primary-40'
+                    }
+                  `}>
+                    {wallet.isActive && (
+                      <Check size={10} className="text-black" />
+                    )}
+                  </div>
+
+                  {/* Wallet name and address */}
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className={`text-xs font-mono truncate ${wallet.isActive ? 'text-app-primary' : 'text-app-secondary'}`}>
+                      {getWalletDisplayName(wallet)}
+                    </span>
+                    <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
+                      <Zap size={8} className="text-app-secondary-40" />
+                      <span>Off</span>
+                      <span className="text-app-primary-40">{wallet.address.slice(0, 5)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Balances */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {/* SOL Balance */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
+                    <span className={`text-xs font-mono ${solBal > 0 ? 'text-app-primary' : 'text-app-secondary-60'}`}>
+                      {solBal.toFixed(3)}
+                    </span>
+                  </div>
+
+                  {/* Token Balance */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-3 bg-app-primary-color rounded-sm"></div>
+                    <span className={`text-xs font-mono ${tokenBal > 0 ? 'color-primary' : 'text-app-secondary-60'}`}>
+                      {formatTokenBalance(tokenBal)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ActionsPage: React.FC<ActionsPageProps> = ({ 
   tokenAddress, 
   setTokenAddress,
   wallets, 
+  setWallets,
   solBalances, 
   tokenBalances, 
   currentMarketCap,
-  setBurnModalOpen,
   setCalculatePNLModalOpen,
-  setDeployModalOpen,
-  setCustomBuyModalOpen,
-  onOpenFloating,
-  isFloatingCardOpen,
-  // Automate card state props
-  setAutomateCardOpen,
   iframeData
 }) => {
   // State management
@@ -287,7 +576,89 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   // Auto-buy settings
   const [autoBuyAmount, setAutoBuyAmount] = useState('0.01'); // Default SOL amount for auto-buy
   const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true); // Auto redirect to token after buy
+  
+  // Floating card state
+  const [isFloatingCardOpen, setIsFloatingCardOpen] = useState(false);
+  // Calculate center position on mount - will be updated when card opens
+  const [floatingCardPosition, setFloatingCardPosition] = useState(() => {
+    // Start at center of viewport
+    const cardWidth = 320; // w-80 = 20rem = 320px
+    const cardHeight = 400; // approximate height
+    return {
+      x: Math.max(0, (window.innerWidth - cardWidth) / 2),
+      y: Math.max(0, (window.innerHeight - cardHeight) / 2)
+    };
+  });
+  const [isFloatingCardDragging, setIsFloatingCardDragging] = useState(false);
+  
+  // Wallet selector state
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
+  const activeWalletsRef = useRef<HTMLDivElement>(null);
+  
+  // Wallet selection handlers
+  const handleToggleWallet = useCallback((walletId: number): void => {
+    const updatedWallets = toggleWallet(wallets, walletId);
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  }, [wallets, setWallets]);
 
+  const handleSelectAll = useCallback((): void => {
+    const allActive = wallets.filter(w => !w.isArchived).every(w => w.isActive);
+    const updatedWallets = wallets.map(wallet => ({
+      ...wallet,
+      isActive: wallet.isArchived ? wallet.isActive : !allActive
+    }));
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  }, [wallets, setWallets]);
+
+  const handleSelectAllWithBalance = useCallback((): void => {
+    const walletsWithBalance = wallets.filter(wallet => {
+      if (wallet.isArchived) return false;
+      const solBal = solBalances.get(wallet.address) || 0;
+      const tokenBal = tokenBalances.get(wallet.address) || 0;
+      return solBal > 0 || tokenBal > 0;
+    });
+    
+    if (walletsWithBalance.length === 0) {
+      showToast('No wallets with balance found', 'error');
+      return;
+    }
+
+    const allWithBalanceActive = walletsWithBalance.every(w => w.isActive);
+    const updatedWallets = wallets.map(wallet => {
+      if (wallet.isArchived) return wallet;
+      const solBal = solBalances.get(wallet.address) || 0;
+      const tokenBal = tokenBalances.get(wallet.address) || 0;
+      const hasBalance = solBal > 0 || tokenBal > 0;
+      
+      if (allWithBalanceActive) {
+        return { ...wallet, isActive: false };
+      } else {
+        return { ...wallet, isActive: hasBalance ? true : wallet.isActive };
+      }
+    });
+    
+    setWallets(updatedWallets);
+    saveWalletsToCookies(updatedWallets);
+  }, [wallets, solBalances, tokenBalances, setWallets, showToast]);
+  
+  // Handler to open floating card
+  const handleOpenFloating = useCallback(() => {
+    // Recalculate center position when opening
+    const cardWidth = 320;
+    const cardHeight = 400;
+    setFloatingCardPosition({
+      x: Math.max(0, (window.innerWidth - cardWidth) / 2),
+      y: Math.max(0, (window.innerHeight - cardHeight) / 2)
+    });
+    setIsFloatingCardOpen(true);
+  }, []);
+  
+  // Handler to close floating card
+  const handleCloseFloating = useCallback(() => {
+    setIsFloatingCardOpen(false);
+  }, []);
 
   // Wrapper function to match TradingForm's expected signature
   const getScriptNameWrapper = useCallback((script: string): string => {
@@ -326,9 +697,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       const result = await executeTrade(dexToUse, wallets, config, isBuyMode, solBalances);
       
       if (result.success) {
-        showToast(`${dexToUse} ${isBuyMode ? 'Buy' : 'Sell'} transactions submitted successfully`, "success");
+        showToast(`${isBuyMode ? 'Buy' : 'Sell'} transactions submitted successfully`, "success");
       } else {
-        showToast(`${dexToUse} ${isBuyMode ? 'Buy' : 'Sell'} failed: ${result.error}`, "error");
+        showToast(`${isBuyMode ? 'Buy' : 'Sell'} failed: ${result.error}`, "error");
       }
     } catch (error) {
       console.error(`Trading error:`, error);
@@ -338,6 +709,18 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       setIsLoading(false);
     }
   }, [tokenAddress, selectedDex, solBalances, showToast, setIsLoading]);
+
+  // Wrapper for FloatingTradingCard's handleTradeSubmit signature
+  const handleFloatingTradeSubmit = useCallback((
+    wallets: WalletType[], 
+    isBuy: boolean, 
+    dex?: string, 
+    buyAmount?: string, 
+    sellAmount?: string
+  ): void => {
+    // Fire and forget - FloatingTradingCard doesn't await the result
+    void handleTradeSubmit(wallets, isBuy, dex, buyAmount, sellAmount);
+  }, [handleTradeSubmit]);
 
   // Track last processed message to prevent duplicates
   const lastProcessedMessageRef = useRef<{tokenMint: string, timestamp: number} | null>(null);
@@ -433,7 +816,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   }, [tokenAddress]); // Re-run when tokenAddress changes
 
   return (
-    <div className="flex-1 overflow-y-auto bg-app-primary p-4 md:p-6 relative">
+    <div className="flex-1 overflow-y-auto bg-app-primary p-4 md:p-6 pb-32 relative min-h-full">
       {/* Background effects - keeping original */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         {/* Grid background */}
@@ -477,6 +860,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           <TradingCard
             tokenAddress={tokenAddress}
             wallets={wallets}
+            setWallets={setWallets}
             selectedDex={selectedDex}
             setSelectedDex={setSelectedDex}
             isDropdownOpen={isDropdownOpen}
@@ -490,10 +874,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             getScriptName={getScriptNameWrapper}
             countActiveWallets={countActiveWallets}
             currentMarketCap={currentMarketCap}
+            solBalances={solBalances}
             tokenBalances={tokenBalances}
-            onOpenFloating={onOpenFloating}
-            isFloatingCardOpen={isFloatingCardOpen}
             solPrice={iframeData?.solPrice ?? null}
+            onOpenFloating={handleOpenFloating}
+            isFloatingCardOpen={isFloatingCardOpen}
           />
         ) : (
           <div className="relative overflow-hidden rounded-xl shadow-xl bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm p-6 border border-app-primary-20">
@@ -582,8 +967,12 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 </div>
               </div>
               
-              {/* Active wallets info */}
-              <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
+              {/* Active wallets info - Clickable */}
+              <div 
+                ref={activeWalletsRef}
+                onClick={() => setShowWalletSelector(!showWalletSelector)}
+                className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden cursor-pointer hover:border-app-primary-60 transition-all duration-200"
+              >
                 {/*  corner accents - smaller version */}
                 <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
                   <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
@@ -597,6 +986,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 <div className="text-app-secondary font-mono text-xs tracking-wide mb-3 flex items-center">
                   <span className="mr-2 text-app-primary-color">⟁</span>
                   <span>ACTIVE WALLETS</span>
+                  <span className="ml-auto text-[10px] text-app-secondary-60">Click to select</span>
                 </div>
                 
                 <div className="text-xs text-app-secondary-60 flex items-center justify-between bg-app-primary-dark p-2 rounded border border-app-primary-40">
@@ -615,117 +1005,46 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           </div>
         )}
         
-        {/* Token Operations */}
-        <div className="space-y-4">          
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
-              {/* AUTOMATE Button */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setAutomateCardOpen(true);
-                }}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Bot size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">AUTOMATE</span>
-              </button>
-              
-              {/* Deploy Button */}
-              <button
-                onClick={() => setDeployModalOpen(true)}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Blocks size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">Deploy</span>
-              </button>
-              
-              {/* Burn Button */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setBurnModalOpen(true);
-                }}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Trash2 size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">Burn</span>
-              </button>
-              
-              {/* Stagger Button */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setCustomBuyModalOpen(true);
-                }}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg
-                          bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 border border-app-primary-30 hover-border-primary-60
-                          transition-all duration-300"
-              >
-                <div className="p-3 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Workflow size={20} className="color-primary" />
-                </div>
-                <span className="text-xs font-mono tracking-wider text-app-secondary uppercase">Stagger</span>
-              </button>
-          </div>
-          
-          {/* Live Data Section */}
+        {/* Live Data Section */}
+        {tokenAddress && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
-                  <Activity size={16} className="color-primary" />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded-lg">
+                    <Activity size={16} className="color-primary" />
+                  </div>
+                  <span className="font-mono text-sm tracking-wider text-app-secondary uppercase">Live Data</span>
                 </div>
-                <span className="font-mono text-sm tracking-wider text-app-secondary uppercase">Live Data</span>
+                
+                {/* Share PNL Button moved next to Live Data */}
+                <button
+                  onClick={() => {
+                    if (!tokenAddress) {
+                      showToast("Please select a token first", "error");
+                      return;
+                    }
+                    setCalculatePNLModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg
+                            bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-color
+                            shadow-md shadow-app-primary-40 hover-shadow-app-primary-60
+                            transition-all duration-300 relative overflow-hidden"
+                >
+                  <ChartSpline size={16} className="text-black relative z-10" />
+                  <span className="text-sm font-mono tracking-wider text-black font-medium relative z-10">Share PNL</span>
+                </button>
               </div>
-              
-              {/* Share PNL Button moved next to Live Data */}
-              <button
-                onClick={() => {
-                  if (!tokenAddress) {
-                    showToast("Please select a token first", "error");
-                    return;
-                  }
-                  setCalculatePNLModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg
-                          bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-color
-                          shadow-md shadow-app-primary-40 hover-shadow-app-primary-60
-                          transition-all duration-300 relative overflow-hidden"
-              >
-                <ChartSpline size={16} className="text-black relative z-10" />
-                <span className="text-sm font-mono tracking-wider text-black font-medium relative z-10">Share PNL</span>
-              </button>
+              <DataBox iframeData={iframeData} tokenAddress={tokenAddress} tokenBalances={tokenBalances} />
+              <LatestTrades tokenAddress={tokenAddress} />
             </div>
-            <DataBox iframeData={iframeData} tokenAddress={tokenAddress} tokenBalances={tokenBalances} />
           </div>
-        </div>
+        )}
       </div>
 
-      <br></br>
-      
-      {/*  GitHub & Website Section */}
-      <div className="mb-4 mx-auto max-w-4xl">
+      {/*  GitHub & Website Section - Fixed at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 md:px-6 md:pb-6">
+        <div className="mx-auto max-w-4xl">
         <div className="bg-gradient-to-br from-app-secondary-50 to-app-primary-dark-50 backdrop-blur-sm 
                      rounded-xl p-4 relative overflow-hidden border border-app-primary-10 
                      hover-border-primary-30 transition-all duration-300">
@@ -802,7 +1121,53 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             </a>
           </div>
         </div>
+        </div>
       </div>
+      
+      {/* Floating Trading Card */}
+      {tokenAddress && (
+        <FloatingTradingCard
+          isOpen={isFloatingCardOpen}
+          onClose={handleCloseFloating}
+          position={floatingCardPosition}
+          onPositionChange={setFloatingCardPosition}
+          isDragging={isFloatingCardDragging}
+          onDraggingChange={setIsFloatingCardDragging}
+          tokenAddress={tokenAddress}
+          wallets={wallets}
+          setWallets={setWallets}
+          selectedDex={selectedDex}
+          setSelectedDex={setSelectedDex}
+          isDropdownOpen={isDropdownOpen}
+          setIsDropdownOpen={setIsDropdownOpen}
+          buyAmount={buyAmount}
+          setBuyAmount={setBuyAmount}
+          sellAmount={sellAmount}
+          setSellAmount={setSellAmount}
+          handleTradeSubmit={handleFloatingTradeSubmit}
+          isLoading={isLoading}
+          getScriptName={getScriptName}
+          countActiveWallets={countActiveWallets}
+          currentMarketCap={currentMarketCap}
+          solBalances={solBalances}
+          tokenBalances={tokenBalances}
+        />
+      )}
+      
+      {/* Wallet Selector Popup - Rendered via Portal when no token is set */}
+      {!tokenAddress && showWalletSelector && createPortal(
+        <ActionsWalletSelector
+          wallets={wallets}
+          solBalances={solBalances}
+          tokenBalances={tokenBalances}
+          anchorRef={activeWalletsRef}
+          onClose={() => setShowWalletSelector(false)}
+          onToggleWallet={handleToggleWallet}
+          onSelectAll={handleSelectAll}
+          onSelectAllWithBalance={handleSelectAllWithBalance}
+        />,
+        document.body
+      )}
       
     </div>
   );

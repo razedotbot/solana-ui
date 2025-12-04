@@ -1,6 +1,6 @@
 # Theme Customization Guide
 
-This document provides a comprehensive overview of all customizable theme properties available in the leva panel.
+This document provides a comprehensive overview of all customizable CSS variables available for theming the application.
 
 ## Table of Contents
 
@@ -11,6 +11,7 @@ This document provides a comprehensive overview of all customizable theme proper
 - [Animations](#animations)
 - [Effects](#effects)
 - [Usage](#usage)
+- [Creating Custom Themes](#creating-custom-themes)
 
 ## Colors
 
@@ -199,28 +200,29 @@ Default border width for borders throughout the UI.
 
 ## Usage
 
-### Accessing the Theme Panel
+### Customizing the Theme
 
-1. Open the theme customizer in your application
-2. Navigate through the organized folders (Primary Colors, Background Colors, Gradients, etc.)
-3. Adjust values in real-time to see immediate updates
-4. Save your customizations as presets for future use
+To customize the theme, edit the CSS file directly:
 
-### Saving Presets
+1. Open `green.css` in the project root
+2. Modify the CSS variables under `:root`
+3. Save the file - changes will be reflected immediately in development mode
 
-1. Customize your theme as desired
-2. Click "SAVE CURRENT" in the presets section
-3. Enter a name for your preset
-4. Your preset is now saved and can be loaded anytime
+### Creating a New Theme
 
-### Exporting/Importing Themes
+1. Copy `green.css` to a new file (e.g., `blue.css`)
+2. Modify the CSS variables to your desired colors
+3. Update `brand.json` to reference your new theme:
 
-- **Export**: Click the "EXPORT" button to download your current theme as a JSON file
-- **Import**: Click the "IMPORT" button to load a previously exported theme
+```json
+{
+  "theme": {
+    "name": "blue"
+  }
+}
+```
 
-### Resetting to Default
-
-Click "RESET TO DEFAULT" to restore all values to their original defaults.
+4. Import your theme CSS file in the application
 
 ## Developer Notes
 
@@ -238,38 +240,9 @@ All theme variables are automatically applied to CSS custom properties (CSS vari
 }
 ```
 
-### TypeScript Types
-
-All theme properties are fully typed. See `src/types/theme.ts` for complete TypeScript definitions.
-
-### Programmatic Access
-
-Access the theme store programmatically:
-
-```typescript
-import { useThemeStore } from './stores/themeStore';
-
-// Get current theme
-const currentTheme = useThemeStore.getState().currentTheme;
-
-// Update theme
-useThemeStore.getState().updateTheme({
-  colors: {
-    primary: {
-      primary: '#ff0000'
-    }
-  }
-});
-```
-
 ## File Structure
 
-- **Types**: `src/types/theme.ts` - TypeScript interfaces
-- **Config**: `src/config/levaConfig.ts` - Leva control definitions
-- **Store**: `src/stores/themeStore.ts` - Zustand state management
-- **Component**: `src/components/ThemeCustomizer.tsx` - UI component
-- **CSS Manager**: `src/utils/cssVariableManager.ts` - CSS variable application
-- **Styles**: `src/styles/green.css` - Default theme values
+- **Styles**: `green.css` - Default theme values (in project root)
 
 ## Complete Variable Reference
 
@@ -351,31 +324,67 @@ useThemeStore.getState().updateTheme({
 --border-width
 ```
 
-## Examples
+## Creating Custom Themes
 
-### Creating a Custom Theme
+### Example: Cyberpunk Blue Theme
 
-1. **Cyberpunk Blue Theme**:
-   - Primary: `#00ffff`
-   - Primary Light: `#66ffff`
-   - Background Primary: `#0a0a1a`
-   - Accent Gradient Start: `#00ffff`
-   - Grid Size: `25px`
+```css
+:root {
+  --color-primary: #00ffff;
+  --color-primary-light: #66ffff;
+  --color-primary-dark: #00cccc;
+  --color-primary-darker: #009999;
+  
+  --color-bg-primary: #0a0a1a;
+  --color-bg-secondary: #0f0f2a;
+  --color-bg-tertiary: #14143a;
+  
+  --color-gradient-accent-start: #00ffff;
+  --color-gradient-accent-end: #0088ff;
+  
+  --grid-size: 25px;
+}
+```
 
-2. **Warm Orange Theme**:
-   - Primary: `#ff6b35`
-   - Primary Light: `#ff8c5a`
-   - Background Primary: `#1a0a00`
-   - Glow Intensity: `0.7`
+### Example: Warm Orange Theme
 
-3. **Minimal Dark Theme**:
-   - All backgrounds: Various shades of `#000000`
-   - Border Radius: All set to `2px` for sharp edges
-   - Grid Size: `30px`
-   - Animation speeds: Slow down all animations
+```css
+:root {
+  --color-primary: #ff6b35;
+  --color-primary-light: #ff8c5a;
+  --color-primary-dark: #e55a2b;
+  --color-primary-darker: #cc4a20;
+  
+  --color-bg-primary: #1a0a00;
+  --color-bg-secondary: #2a1400;
+  --color-bg-tertiary: #3a1e00;
+  
+  --glow-intensity: 0.7;
+}
+```
+
+### Example: Minimal Dark Theme
+
+```css
+:root {
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #0a0a0a;
+  --color-bg-tertiary: #141414;
+  --color-bg-quaternary: #050505;
+  
+  --border-radius-sm: 2px;
+  --border-radius-md: 2px;
+  --border-radius-lg: 4px;
+  --border-radius-xl: 4px;
+  
+  --grid-size: 30px;
+  --transition-speed: 0.15s;
+  --hover-speed: 0.1s;
+}
+```
 
 ---
 
-**Last Updated**: November 2024
-**Version**: 2.0.0
+**Last Updated**: December 2024
+**Version**: 5.0.0
 

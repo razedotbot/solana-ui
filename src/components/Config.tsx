@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, Server, CreditCard } from 'lucide-react';
+import { X, Settings, CreditCard, BookOpen } from 'lucide-react';
 import type { ConfigType } from '../Utils';
+import { RPCEndpointManager } from './RPCEndpointManager';
+import { createDefaultEndpoints, type RPCEndpoint } from '../utils/rpcManager';
 
 interface ConfigProps {
   isOpen: boolean;
@@ -9,6 +11,7 @@ interface ConfigProps {
   config: ConfigType;
   onConfigChange: (key: keyof ConfigType, value: string) => void;
   onSave: () => void;
+  onShowTutorial?: () => void;
 }
 
 const Config: React.FC<ConfigProps> = ({
@@ -16,7 +19,8 @@ const Config: React.FC<ConfigProps> = ({
   onClose,
   config,
   onConfigChange,
-  onSave
+  onSave,
+  onShowTutorial
 }) => {
   // Add  styles when the modal is opened
   useEffect(() => {
@@ -127,7 +131,10 @@ const Config: React.FC<ConfigProps> = ({
       document.body.style.overflow = 'hidden';
       
       return () => {
-        document.head.removeChild(styleElement);
+        // Safely remove style element if it's still a child
+        if (styleElement.parentNode === document.head) {
+          document.head.removeChild(styleElement);
+        }
         // Restore scrolling when modal is closed
         document.body.style.overflow = '';
       };
@@ -179,24 +186,18 @@ const Config: React.FC<ConfigProps> = ({
         </div>
 
         {/* Content */}
-        <div className="relative z-10 p-5 space-y-5">
+        <div className="relative z-10 p-5 space-y-5 max-h-[70vh] overflow-y-auto">
           <div className="group animate-[fadeIn_0.3s_ease]">
-            <div className="flex items-center gap-1 mb-2">
-              <label className="text-sm font-medium text-[#7ddfbd] group-hover:text-[#02b36d] transition-colors duration-200 font-mono uppercase tracking-wider">
-                <span className="text-[#02b36d]">&#62;</span> RPC Endpoint URL <span className="text-[#02b36d]">&#60;</span>
-              </label>
-              <Server size={14} className="text-[#7ddfbd]" />
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                value={config.rpcEndpoint}
-                onChange={(e) => onConfigChange('rpcEndpoint', e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input- font-mono tracking-wider"
-                placeholder="ENTER RPC ENDPOINT URL"
-              />
-              <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-[#02b36d30] transition-all duration-300"></div>
-            </div>
+            <RPCEndpointManager
+              endpoints={
+                config.rpcEndpoints
+                  ? JSON.parse(config.rpcEndpoints) as RPCEndpoint[]
+                  : createDefaultEndpoints()
+              }
+              onChange={(endpoints) => {
+                onConfigChange('rpcEndpoints', JSON.stringify(endpoints));
+              }}
+            />
           </div>
           
           <div className="group animate-[fadeIn_0.4s_ease]">
@@ -220,6 +221,21 @@ const Config: React.FC<ConfigProps> = ({
             </div>
           </div>
           
+          {onShowTutorial && (
+            <div className="group animate-[fadeIn_0.45s_ease]">
+              <button
+                onClick={() => {
+                  onClose();
+                  onShowTutorial();
+                }}
+                className="w-full px-5 py-2.5 bg-[#091217] border border-[#02b36d30] text-[#7ddfbd] rounded-lg transition-all duration-300 font-mono tracking-wider font-medium hover:border-[#02b36d] hover:text-[#02b36d] flex items-center justify-center gap-2"
+              >
+                <BookOpen size={16} />
+                RESTART TUTORIAL
+              </button>
+            </div>
+          )}
+          
           <div className="pt-4 animate-[fadeIn_0.5s_ease]">
             <button
               onClick={onSave}
@@ -230,11 +246,7 @@ const Config: React.FC<ConfigProps> = ({
           </div>
         </div>
         
-        {/*  decorative corner elements */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#02b36d] opacity-70"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#02b36d] opacity-70"></div>
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#02b36d] opacity-70"></div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#02b36d] opacity-70"></div>
+
       </div>
     </div>,
     document.body

@@ -1,146 +1,126 @@
-# Theme Customization Tool
+# Whitelabel Guide
 
 ## Overview
 
-A real-time theme customization developer tool built with Leva, Zustand, and CSS variables. This tool allows instant modification of design tokens with preset management and import/export capabilities.
+This guide explains how to customize the Solana UI for your own brand.
 
-## Features
+## Brand Configuration
 
-- ✨ **Real-time Preview**: Changes instantly reflected via CSS variables
-- 💾 **Preset System**: Save, load, and delete named theme presets
-- 📥 **Import/Export**: Download/upload theme configurations as JSON
-- 🔄 **Persistence**: Auto-save current theme to localStorage
-- 🛠️ **Development Only**: Panel hidden in production builds
-- 🎨 **Professional UI**: Matches existing app design with green theme
-
-## Usage
-
-### Opening the Theme Customizer
-
-**Keyboard Shortcut**: Press `Ctrl+Shift+T` to toggle the theme customizer panel.
-
-> **Note**: The theme customizer is only available in development mode (`npm run dev`).
-
-### Customizing Colors
-
-The theme customizer organizes colors into logical groups:
-
-1. **Primary Colors**: Main brand colors (primary, light, dark, darker variants)
-2. **Background Colors**: Background layers (primary, secondary, tertiary, quaternary, overlay)
-3. **Text Colors**: Text styling (primary, secondary, tertiary, muted, faded)
-4. **Status Colors**: Feedback colors (success, error, warning)
-5. **Ping Status**: Connection quality indicators (good, medium, poor)
-6. **Scrollbar**: Scrollbar styling (thumb, track)
-
-### Saving Presets
-
-1. Customize your theme using the color pickers
-2. Click **"SAVE CURRENT"** in the Presets section
-3. Enter a name for your preset
-4. Press Enter or click the save icon
-
-### Loading Presets
-
-- Click on any saved preset in the list to apply it instantly
-- The active preset is highlighted with a green border
-- Delete unwanted presets using the trash icon
-
-### Exporting Themes
-
-1. Click **"EXPORT"** button
-2. Enter a name for the theme export
-3. A JSON file will be downloaded with your theme configuration
-
-### Importing Themes
-
-1. Click **"IMPORT"** button
-2. Select a previously exported theme JSON file
-3. The theme will be applied immediately
-
-### Resetting to Default
-
-Click **"RESET TO DEFAULT"** to restore the original green theme values.
-
-## Technical Details
-
-### Architecture
-
-- **State Management**: Zustand store (`src/stores/themeStore.ts`)
-- **CSS Variables**: Dynamic updates via `src/utils/cssVariableManager.ts`
-- **UI Controls**: Leva integration (`src/config/levaConfig.ts`)
-- **Component**: Draggable panel (`src/components/ThemeCustomizer.tsx`)
-
-### File Structure
-
-```
-src/
-├── types/theme.ts              # TypeScript interfaces
-├── stores/themeStore.ts        # Zustand state management
-├── utils/cssVariableManager.ts # CSS variable utilities
-├── config/levaConfig.ts        # Leva control schemas
-└── components/
-    └── ThemeCustomizer.tsx     # Main UI component
-```
-
-### Data Persistence
-
-- **Current Theme**: Saved to localStorage under `theme-store`
-- **Presets**: Stored alongside the current theme
-- **Auto-save**: Changes persist across page refreshes
-
-### Theme Export Format
+All brand-related settings are centralized in `brand.json`:
 
 ```json
 {
-  "version": "1.0.0",
-  "name": "My Custom Theme",
-  "description": "Exported theme",
-  "theme": {
-    "colors": {
-      "primary": { ... },
-      "background": { ... },
-      "text": { ... },
-      "status": { ... },
-      "ping": { ... },
-      "scrollbar": { ... }
+  "brand": {
+    "name": "Your Brand",
+    "displayName": "YOUR BRAND",
+    "altText": "Your Brand Description",
+    "domain": "yourdomain.com",
+    "appUrl": "https://app.yourdomain.com",
+    "docsUrl": "https://docs.yourdomain.com",
+    "githubUrl": "https://github.com/yourbrand/repo",
+    "githubOrg": "https://github.com/yourbrand",
+    "social": {
+      "twitter": "@yourbrand",
+      "github": "yourbrand"
+    },
+    "seo": {
+      "title": "Your Brand - Trading Platform",
+      "ogTitle": "Your Brand - Solana Trading",
+      "description": "Your brand description for SEO",
+      "ogImage": "https://yourdomain.com/images/og.jpg",
+      "twitterImage": "https://yourdomain.com/images/twitter.png"
+    },
+    "favicon": {
+      "baseUrl": "https://yourdomain.com/images/favicon",
+      "themeColor": "#000000",
+      "tileColor": "#000000"
+    },
+    "theme": {
+      "name": "green"
     }
-  },
-  "exportedAt": 1234567890
+  }
 }
 ```
 
-## Development
+## Customization Steps
 
-### Adding New Theme Properties
+### 1. Update Brand Configuration
 
-1. Add the property to `ThemeConfig` interface in `src/types/theme.ts`
-2. Update `DEFAULT_THEME` with the default value
-3. Add Leva control in `src/config/levaConfig.ts`
-4. Update CSS variable application in `src/utils/cssVariableManager.ts`
+Edit `brand.json` with your brand details:
 
-### Customizing the UI
+- **name**: Internal brand name
+- **displayName**: Display name shown in the UI (typically uppercase)
+- **altText**: Alt text for logo images
+- **domain**: Your domain without protocol
+- **appUrl**: Full URL to your app
+- **docsUrl**: Link to your documentation
 
-The theme customizer UI can be styled by modifying:
-- `src/components/ThemeCustomizer.tsx` - Component structure and styling
-- CSS classes follow the existing green theme patterns
+### 2. Replace Logo
 
-## Keyboard Shortcuts
+Replace `src/logo.png` with your logo. The logo should:
+- Be a PNG with transparent background
+- Work well at small sizes (32-64px height)
+- Have good contrast against dark backgrounds
 
-- `Ctrl+Shift+T` - Toggle theme customizer panel
-- `Enter` - Save preset name when editing
-- `Escape` - Cancel preset name editing
+### 3. Customize Theme
 
-## Mobile Support
+Create a new CSS file or edit `green.css`:
 
-On mobile devices, the theme customizer displays as a full-screen modal instead of a draggable panel for better usability.
-
-## Production Builds
-
-The theme customizer is automatically excluded from production builds via:
-
-```typescript
-process.env.NODE_ENV === 'development'
+```css
+:root {
+  --color-primary: #your-brand-color;
+  --color-primary-light: #your-lighter-color;
+  --color-primary-dark: #your-darker-color;
+  /* See docs/CUSTOMIZATION.md for all variables */
+}
 ```
 
-This ensures zero runtime cost in production deployments.
+Update the theme name in `brand.json`:
 
+```json
+{
+  "theme": {
+    "name": "your-theme-name"
+  }
+}
+```
+
+### 4. Update Favicon
+
+Place your favicon files at the URL specified in `brand.json`:
+- favicon.ico
+- favicon-16x16.png
+- favicon-32x32.png
+- apple-touch-icon.png
+
+### 5. Update SEO
+
+Configure the SEO section in `brand.json`:
+- **title**: Browser tab title
+- **ogTitle**: Open Graph title for social sharing
+- **description**: Meta description
+- **ogImage**: Image for social sharing (1200x630px recommended)
+- **twitterImage**: Twitter card image
+
+### 6. Regenerate HTML
+
+After updating `brand.json`, regenerate the HTML template:
+
+```bash
+npm run generate-html
+```
+
+This updates `index.html` with your brand configuration.
+
+## Build and Deploy
+
+```bash
+npm run build
+```
+
+Deploy the `dist` folder to your hosting provider.
+
+## Additional Resources
+
+- [Theme Customization](CUSTOMIZATION.md) - Full CSS variable reference
+- [Iframe Integration](IFRAME.md) - Embed in external applications

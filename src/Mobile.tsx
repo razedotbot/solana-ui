@@ -6,7 +6,7 @@ interface MobileLayoutProps {
   setCurrentPage: (page: 'wallets' | 'chart' | 'actions') => void;
   children: {
     WalletsPage: React.ReactNode;
-    ChartPage: React.ReactNode;
+    Frame: React.ReactNode;
     ActionsPage: React.ReactNode;
   };
 }
@@ -55,7 +55,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
               currentPage === 'chart' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
             }`}
           >
-            {children.ChartPage}
+            {children.Frame}
           </div>
           
           {/* Actions Page */}
@@ -117,10 +117,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
                 `}>
                   {tab.label}
                 </span>
-                {/* Active indicator */}
-                {isActive && (
-                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-app-primary-color rounded-t" />
-                )}
               </button>
             );
           })}

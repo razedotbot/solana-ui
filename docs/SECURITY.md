@@ -15,4 +15,4 @@ If you discover a security vulnerability, we encourage you to report it **privat
 
 We will review and address your report as promptly as possible.
 
-Thank you for helping us keep Fury Bot and our users safe!
+Thank you for helping us keep Raze.bot and our users safe!

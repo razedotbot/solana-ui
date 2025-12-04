@@ -19,7 +19,7 @@ This guide shows how to integrate the trading app as an iframe in your TypeScrip
 ```html
 <iframe 
   id="trading-iframe" 
-  src="https://frame.fury.bot/sol/" 
+  src="https://frame.raze.sh/sol/" 
   frameborder="0">
 </iframe>
 ```
