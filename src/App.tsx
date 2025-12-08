@@ -810,7 +810,8 @@ const WalletManager: React.FC = () => {
         memoizedCallbacks.setSolBalances,
         memoizedCallbacks.setTokenBalances,
         state.solBalances,
-        state.tokenBalances
+        state.tokenBalances,
+        true // Only fetch if balance is 0 or null
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

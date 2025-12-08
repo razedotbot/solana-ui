@@ -230,12 +230,22 @@ export const Homepage: React.FC = () => {
         <div className="relative z-10 p-4 md:p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
           <div className="flex flex-col items-center text-center space-y-6 py-12 animate-fade-in">
 
-            <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/60 relative drop-shadow-[0_0_30px_rgba(2,179,109,0.3)]" style={{ fontFamily: "'Instrument Serif', serif" }}>
+            <h1 
+              className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight relative" 
+              style={{ 
+                fontFamily: "'Instrument Serif', serif",
+                color: '#ffffff',
+                textShadow: '0 0 30px rgba(2, 179, 109, 0.3), 0 0 10px rgba(255, 255, 255, 0.1)'
+              }}
+            >
               <span className="relative">
                 {displayedText}
                 <span 
-                  className={`inline-block w-[4px] h-[0.9em] ml-1 bg-app-primary-color align-middle transition-opacity duration-100 ${showCursor ? 'opacity-100' : 'opacity-0'}`}
-                  style={{ boxShadow: '0 0 10px rgba(2, 179, 109, 0.8), 0 0 20px rgba(2, 179, 109, 0.4)' }}
+                  className={`inline-block w-[4px] h-[0.9em] ml-1 transition-opacity duration-100 ${showCursor ? 'opacity-100' : 'opacity-0'}`}
+                  style={{ 
+                    backgroundColor: '#02b36d',
+                    boxShadow: '0 0 10px rgba(2, 179, 109, 0.8), 0 0 20px rgba(2, 179, 109, 0.4)' 
+                  }}
                 />
               </span>
             </h1>

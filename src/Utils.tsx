@@ -435,7 +435,8 @@ export const fetchWalletBalances = async (
   setSolBalances: (balances: Map<string, number>) => void,
   setTokenBalances: (balances: Map<string, number>) => void,
   currentSolBalances?: Map<string, number>,
-  currentTokenBalances?: Map<string, number>
+  currentTokenBalances?: Map<string, number>,
+  onlyIfZeroOrNull: boolean = false
 ): Promise<{ solBalances: Map<string, number>; tokenBalances: Map<string, number> }> => {
   // Start with existing balances to preserve them on errors
   const newSolBalances = new Map(currentSolBalances || new Map<string, number>());
@@ -457,20 +458,32 @@ export const fetchWalletBalances = async (
         connection = connectionOrRpcManager;
       }
       
-      // Fetch SOL balance
-      const solBalance = await fetchSolBalance(connection, wallet.address);
-      newSolBalances.set(wallet.address, solBalance);
+      // Check current SOL balance
+      const currentSolBalance = currentSolBalances?.get(wallet.address);
+      const shouldFetchSol = !onlyIfZeroOrNull || currentSolBalance === undefined || currentSolBalance === null || currentSolBalance === 0;
       
-      // Update SOL balances immediately to show progress
-      setSolBalances(new Map(newSolBalances));
+      // Fetch SOL balance only if needed
+      if (shouldFetchSol) {
+        const solBalance = await fetchSolBalance(connection, wallet.address);
+        newSolBalances.set(wallet.address, solBalance);
+        
+        // Update SOL balances immediately to show progress
+        setSolBalances(new Map(newSolBalances));
+      }
       
       // Fetch token balance if token address is provided
       if (tokenAddress) {
-        const tokenBalance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
-        newTokenBalances.set(wallet.address, tokenBalance);
+        // Check current token balance
+        const currentTokenBalance = currentTokenBalances?.get(wallet.address);
+        const shouldFetchToken = !onlyIfZeroOrNull || currentTokenBalance === undefined || currentTokenBalance === null || currentTokenBalance === 0;
         
-        // Update token balances immediately to show progress
-        setTokenBalances(new Map(newTokenBalances));
+        if (shouldFetchToken) {
+          const tokenBalance = await fetchTokenBalance(connection, wallet.address, tokenAddress);
+          newTokenBalances.set(wallet.address, tokenBalance);
+          
+          // Update token balances immediately to show progress
+          setTokenBalances(new Map(newTokenBalances));
+        }
       }
     } catch (error) {
       console.error(`Error fetching balances for ${wallet.address}:`, error);
