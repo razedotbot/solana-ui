@@ -187,10 +187,6 @@ const WalletManager: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Track left column width for responsive header
-  const [leftColumnWidth, setLeftColumnWidth] = useState<number>(0);
-  const leftColumnRef = useRef<HTMLDivElement>(null);
-
   // View mode state - Simple (left column hidden) or Advanced (left column visible)
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewModeFromCookies());
 
@@ -315,22 +311,6 @@ const WalletManager: React.FC = () => {
       setSplitSizes([0, 100]);
     }
   }, [viewMode, splitSizes, savedAdvancedSizes]);
-
-  useEffect(() => {
-    if (!leftColumnRef.current) return;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setLeftColumnWidth(entry.contentRect.width);
-      }
-    });
-
-    resizeObserver.observe(leftColumnRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []);
 
   // Apply styles
   useEffect(() => {
@@ -887,6 +867,7 @@ const WalletManager: React.FC = () => {
         {!isMobile && (
           <div className="w-full h-full relative flex">
             <Split
+              key={viewMode} // Force remount when switching modes to recreate gutter
               className="flex flex-1 h-full split-custom"
               sizes={splitSizes}
               minSize={[0, 250]}
@@ -925,7 +906,6 @@ const WalletManager: React.FC = () => {
             >
               {/* Left Column */}
               <div
-                ref={leftColumnRef}
                 className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col"
               >
                 {/* Top Navigation - Left Column */}
@@ -960,14 +940,14 @@ const WalletManager: React.FC = () => {
                       <button
                         onClick={handleRefresh}
                         disabled={state.isRefreshing || !state.connection}
-                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${leftColumnWidth > 200 ? 'min-w-auto' : 'min-w-[32px]'}`}
+                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${(viewMode === 'advanced' && splitSizes[0] > 15) ? 'min-w-auto' : 'min-w-[32px]'}`}
                         title="Refresh wallet balances"
                       >
                         <RefreshCw
                           size={14}
                           className={`sm:w-4 sm:h-4 color-primary ${state.isRefreshing ? 'animate-spin' : ''}`}
                         />
-                        {leftColumnWidth > 200 && (
+                        {(viewMode === 'advanced' && splitSizes[0] > 15) && (
                           <span className="text-xs font-mono color-primary font-medium tracking-wider">
                             REFRESH
                           </span>
@@ -977,11 +957,11 @@ const WalletManager: React.FC = () => {
                       {/* Wallets Page Button */}
                       <button
                         onClick={(): void => navigate('/wallets')}
-                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${leftColumnWidth > 200 ? 'min-w-auto' : 'min-w-[32px]'}`}
+                        className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${(viewMode === 'advanced' && splitSizes[0] > 15) ? 'min-w-auto' : 'min-w-[32px]'}`}
                         title="Open wallets page"
                       >
                         <Wallet size={14} className="sm:w-4 sm:h-4 color-primary" />
-                        {leftColumnWidth > 200 && (
+                        {(viewMode === 'advanced' && splitSizes[0] > 15) && (
                           <span className="text-xs font-mono color-primary font-medium tracking-wider">
                             WALLETS
                           </span>

@@ -56,10 +56,11 @@ const SERVER_URL_COOKIE = 'trading_server_url';
 const SERVER_REGION_COOKIE = 'trading_server_region';
 
 // TEMPORARY: Set to true to disable server status check
-const DISABLE_SERVER_CHECK = true;
+const DISABLE_SERVER_CHECK = false;
 
 const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
   { id: 'de', name: 'Germany', url: 'https://de.raze.sh/', region: 'DE', flag: '🇩🇪' },
+  { id: 'us', name: 'United States', url: 'https://us.raze.sh/', region: 'US', flag: '🇺🇸' },
 ];
 
 export const ServerCheckLoading = (): JSX.Element => {
@@ -291,31 +292,6 @@ export const Root = (): JSX.Element => {
     };
   }, []);
 
-  const measurePing = async (url: string): Promise<number> => {
-    const startTime = Date.now();
-    try {
-      const baseUrl = url.replace(/\/+$/, '');
-      const healthEndpoint = '/v2/health';
-      const checkUrl = `${baseUrl}${healthEndpoint}`;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout((): void => controller.abort(), 5000);
-
-      await fetch(checkUrl, {
-        signal: controller.signal,
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      clearTimeout(timeoutId);
-      return Date.now() - startTime;
-    } catch (ignore) {
-      return Infinity; // Return infinite ping if unreachable
-    }
-  };
-
   const checkServerConnection = async (url: string): Promise<boolean> => {
     try {
       const baseUrl = url.replace(/\/+$/, '');
@@ -376,6 +352,46 @@ export const Root = (): JSX.Element => {
   // Initialize server connection
   useEffect((): void => {
     const initializeServer = async (): Promise<void> => {
+      const measurePing = async (url: string): Promise<number> => {
+        const startTime = Date.now();
+        try {
+          const baseUrl = url.replace(/\/+$/, '');
+          const healthEndpoint = '/v2/health';
+          const checkUrl = `${baseUrl}${healthEndpoint}`;
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout((): void => controller.abort(), 5000);
+
+          await fetch(checkUrl, {
+            signal: controller.signal,
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
+          });
+
+          clearTimeout(timeoutId);
+          return Date.now() - startTime;
+        } catch (ignore) {
+          return Infinity; // Return infinite ping if unreachable
+        }
+      };
+
+      const measureAveragePing = async (url: string, samples: number = 3): Promise<number> => {
+        const pings: number[] = [];
+        
+        for (let i = 0; i < samples; i++) {
+          const ping = await measurePing(url);
+          if (ping === Infinity) {
+            return Infinity; // If any ping fails, return Infinity
+          }
+          pings.push(ping);
+        }
+        
+        // Calculate average of all ping measurements
+        const average = pings.reduce((sum, ping) => sum + ping, 0) / pings.length;
+        return average;
+      };
 
       // If server check is disabled, use saved server or default
       if (DISABLE_SERVER_CHECK) {
@@ -424,7 +440,7 @@ export const Root = (): JSX.Element => {
             return { ...server, ping: Infinity };
           }
 
-          const ping = await measurePing(server.url);
+          const ping = await measureAveragePing(server.url, 3);
           return { ...server, ping };
         })
       );
