@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import type { Connection } from '@solana/web3.js';
 import { 
   loadWalletsFromCookies, 
@@ -72,8 +72,13 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({ children
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [rpcManager, setRpcManager] = useState<RPCManager | null>(null);
 
-  // Load initial data from cookies
+  // Load initial data from cookies (only once on mount)
+  const hasLoadedInitialData = useRef(false);
   useEffect(() => {
+    // Only load once to prevent wallets from being reset when showToast changes
+    if (hasLoadedInitialData.current) return;
+    hasLoadedInitialData.current = true;
+    
     try {
       const savedWallets = loadWalletsFromCookies();
       if (savedWallets && savedWallets.length > 0) {
