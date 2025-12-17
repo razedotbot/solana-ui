@@ -143,24 +143,16 @@ export const HomepageHeader: React.FC<HeaderProps> = ({
     <aside className="hidden md:flex fixed left-0 top-0 h-screen w-48 border-r border-app-primary-40 backdrop-blur-sm bg-app-primary-80-alpha z-30 flex-col p-4 gap-6 overflow-y-auto shadow-inner-black-80">
       {/* Logo button at top */}
       <div className="flex justify-center">
-        <div className="relative inline-block">
-          <button
-            onClick={handleLogoClick}
-            className="flex items-center justify-center p-2 overflow-hidden
-                    border border-app-primary-30 hover-border-primary-60 rounded 
-                    transition-all duration-300 btn"
-          >
-            <div 
-              className="flex items-center hover:scale-105 active:scale-95 transition-transform"
-            >
-              <img 
-                src={logo} 
-                alt={brand.altText} 
-                className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
-              />
-            </div>
-          </button>
-        </div>
+        <button
+          onClick={handleLogoClick}
+          className="hover:scale-105 active:scale-95 transition-transform"
+        >
+          <img 
+            src={logo} 
+            alt={brand.altText} 
+            className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
+          />
+        </button>
       </div>
       
       {/* Vertical Navigation Menu */}
@@ -181,24 +173,16 @@ export const UnifiedHeader: React.FC<HeaderProps> = () => {
     <aside className="hidden md:flex fixed left-0 top-0 h-screen w-48 border-r border-app-primary-40 backdrop-blur-sm bg-app-primary-80-alpha z-30 flex-col p-4 gap-6 overflow-y-auto shadow-inner-black-80">
       {/* Logo button at top */}
       <div className="flex justify-center">
-        <div className="relative inline-block">
-          <button
-            onClick={handleLogoClick}
-            className="flex items-center justify-center p-2 overflow-hidden
-                    border border-app-primary-30 hover-border-primary-60 rounded 
-                    transition-all duration-300 btn"
-          >
-            <div 
-              className="flex items-center hover:scale-105 active:scale-95 transition-transform"
-            >
-              <img 
-                src={logo} 
-                alt={brand.altText} 
-                className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
-              />
-            </div>
-          </button>
-        </div>
+        <button
+          onClick={handleLogoClick}
+          className="hover:scale-105 active:scale-95 transition-transform"
+        >
+          <img 
+            src={logo} 
+            alt={brand.altText} 
+            className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]" 
+          />
+        </button>
       </div>
       
       {/* Vertical Navigation Menu */}

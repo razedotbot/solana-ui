@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Buffer } from 'buffer';
@@ -540,16 +540,13 @@ export const Root = (): JSX.Element => {
     return <ServerCheckLoading />;
   }
 
-  // Memoize showToast callback to prevent unnecessary re-renders
-  const showToastCallback = useMemo(() => (window as WindowWithToast).showToast || (() => { }), []);
-
   return (
     <div className="h-screen w-screen">
       <ErrorBoundary>
         <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
           <ToastProvider>
             <ToastWrapper>
-              <AppContextProvider showToast={showToastCallback}>
+              <AppContextProvider showToast={(window as WindowWithToast).showToast || (() => { })}>
                 <IframeStateProvider>
                   {serverUrl ? (
                     <Suspense fallback={<ServerCheckLoading />}>

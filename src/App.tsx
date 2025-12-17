@@ -4,7 +4,6 @@ import { ChevronDown, Settings, Wrench, Bot, Blocks, RefreshCw, Wallet, BookOpen
 import { brand } from './utils/brandConfig';
 import type { Connection } from '@solana/web3.js';
 import logo from './logo.png';
-import ServerSelector from './components/ServerSelector';
 import { initStyles } from './components/Styles';
 import {
   saveWalletsToCookies,
@@ -910,32 +909,7 @@ const WalletManager: React.FC = () => {
               >
                 {/* Top Navigation - Left Column */}
                 <nav className="sticky top-0 border-b border-app-primary-70 px-1 sm:px-2 md:px-4 py-1.5 sm:py-2 backdrop-blur-sm bg-app-primary-99 z-30">
-                  <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
-                    {/* Logo button that redirects to home */}
-                    <div className="min-w-0 flex-shrink-0">
-                      <button
-                        onClick={() => navigate('/')}
-                        className="flex items-center justify-center p-2 overflow-hidden
-                                border border-app-primary-30 hover-border-primary-60 rounded 
-                                transition-all duration-300 btn"
-                      >
-                        <div
-                          className="flex items-center hover:scale-105 active:scale-95 transition-transform"
-                        >
-                          <img
-                            src={logo}
-                            alt={brand.altText}
-                            className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
-                          />
-                        </div>
-                      </button>
-                    </div>
-
-                    {/* Spacer to push items to the right */}
-                    <div className="flex-1 min-w-0"></div>
-
-                    {/* Right-aligned buttons container */}
-                    <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+                  <div className="flex items-center gap-1 sm:gap-2 md:gap-3 justify-between">
                       {/* Refresh Button */}
                       <button
                         onClick={handleRefresh}
@@ -967,7 +941,6 @@ const WalletManager: React.FC = () => {
                           </span>
                         )}
                       </button>
-                    </div>
                   </div>
                 </nav>
 
@@ -1037,14 +1010,22 @@ const WalletManager: React.FC = () => {
             <div className="backdrop-blur-sm bg-app-primary-99 overflow-hidden relative flex flex-col" style={{ width: '350px', minWidth: '350px', maxWidth: '350px' }}>
               {/* Top Navigation - Only over Actions column */}
               <nav className="flex-shrink-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
-                <div className="flex items-center justify-between">
-                  {/* Server Selector */}
-                  <div className="flex items-center gap-2 px-2">
-                    <ServerSelector />
-                  </div>
-
-                  {/* View Mode Toggle */}
+                <div className="flex items-center justify-between gap-2">
+                  {/* Logo button that redirects to home */}
                   <button
+                    onClick={() => navigate('/')}
+                    className="hover:scale-105 active:scale-95 transition-transform"
+                  >
+                    <img
+                      src={logo}
+                      alt={brand.altText}
+                      className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
+                    />
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    {/* View Mode Toggle */}
+                    <button
                     onClick={handleViewModeToggle}
                     className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
                     title={viewMode === 'simple' ? 'Switch to Advanced mode' : 'Switch to Simple mode'}
@@ -1055,8 +1036,9 @@ const WalletManager: React.FC = () => {
                     </span>
                   </button>
 
-                  {/* Tools Dropdown */}
-                  <ToolsDropdown />
+                    {/* Tools Dropdown */}
+                    <ToolsDropdown />
+                  </div>
                 </div>
               </nav>
 
@@ -1150,14 +1132,22 @@ const WalletManager: React.FC = () => {
                 <div className="h-full flex flex-col">
                   {/* Top Navigation - Mobile */}
                   <nav className="border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
-                    <div className="flex items-center justify-between">
-                      {/* Server Selector */}
-                      <div className="flex items-center gap-2 px-2">
-                        <ServerSelector />
-                      </div>
-
-                      {/* View Mode Toggle */}
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Logo button that redirects to home */}
                       <button
+                        onClick={() => navigate('/')}
+                        className="hover:scale-105 active:scale-95 transition-transform"
+                      >
+                        <img
+                          src={logo}
+                          alt={brand.altText}
+                          className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
+                        />
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        {/* View Mode Toggle */}
+                        <button
                         onClick={handleViewModeToggle}
                         className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
                         title={viewMode === 'simple' ? 'Switch to Advanced mode' : 'Switch to Simple mode'}
@@ -1168,8 +1158,9 @@ const WalletManager: React.FC = () => {
                         </span>
                       </button>
 
-                      {/* Tools Dropdown */}
-                      <ToolsDropdown />
+                        {/* Tools Dropdown */}
+                        <ToolsDropdown />
+                      </div>
                     </div>
                   </nav>
 
