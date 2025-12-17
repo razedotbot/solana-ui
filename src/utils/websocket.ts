@@ -38,7 +38,7 @@ export type { WebSocketCopyTradeData as CopyTradeData } from './types';
 // Shared Constants
 // ============================================================================
 
-export const WS_URL = 'wss://solana.raze.sh/ws';
+export const WS_URL = 'wss://de.raze.sh/ws/sol';
 export const RECONNECT_DELAY = 3000; // 3 seconds
 export const MAX_RECONNECT_ATTEMPTS = 10;
 
