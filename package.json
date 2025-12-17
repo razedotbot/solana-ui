@@ -16,7 +16,7 @@
     "@jup-ag/api": "^6.0.30",
     "@radix-ui/react-select": "^2.1.4",
     "@radix-ui/react-switch": "^1.1.2",
-    "@solana/spl-token": "^0.4.14",
+    "@solana/spl-token": "0.1.8",
     "@solana/spl-token-registry": "^0.2.4574",
     "@solana/web3.js": "^1.95.8",
     "@types/bip39": "^2.4.2",
@@ -63,5 +63,8 @@
     "vite-bundle-analyzer": "^0.7.0",
     "vite-plugin-checker": "^0.11.0",
     "vite-plugin-node-polyfills": "^0.24.0"
+  },
+  "overrides": {
+    "node-fetch": "^2.7.0"
   }
 }
