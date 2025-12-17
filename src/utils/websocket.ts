@@ -38,7 +38,6 @@ export type { WebSocketCopyTradeData as CopyTradeData } from './types';
 // Shared Constants
 // ============================================================================
 
-export const WS_URL = 'wss://de.raze.sh/ws/sol';
 export const RECONNECT_DELAY = 3000; // 3 seconds
 export const MAX_RECONNECT_ATTEMPTS = 10;
 
@@ -46,13 +45,38 @@ export const MAX_RECONNECT_ATTEMPTS = 10;
 // Shared Utility Functions
 // ============================================================================
 
-export function buildWebSocketUrl(apiKey?: string): string {
-  if (!apiKey) {
-    return WS_URL;
+/**
+ * Gets the WebSocket URL based on the current trading server URL
+ * Converts HTTPS URL to WSS URL and appends /ws/sol path
+ */
+function getWebSocketUrl(): string {
+  // Get the trading server URL from window (set in index.tsx)
+  const tradingServerUrl = (window as { tradingServerUrl?: string }).tradingServerUrl;
+  
+  if (tradingServerUrl) {
+    try {
+      // Convert HTTPS URL to WSS URL
+      const url = new URL(tradingServerUrl);
+      const wsUrl = `wss://${url.hostname}/ws/sol`;
+      return wsUrl;
+    } catch (error) {
+      console.warn('[WebSocket] Failed to parse trading server URL, using default:', error);
+    }
   }
   
-  const separator = WS_URL.includes('?') ? '&' : '?';
-  return `${WS_URL}${separator}apiKey=${encodeURIComponent(apiKey)}`;
+  // Fallback to default if trading server URL is not available
+  return 'wss://de.raze.sh/ws/sol';
+}
+
+export function buildWebSocketUrl(apiKey?: string): string {
+  const wsUrl = getWebSocketUrl();
+  
+  if (!apiKey) {
+    return wsUrl;
+  }
+  
+  const separator = wsUrl.includes('?') ? '&' : '?';
+  return `${wsUrl}${separator}apiKey=${encodeURIComponent(apiKey)}`;
 }
 
 export function isAuthenticationError(event: CloseEvent): boolean {
