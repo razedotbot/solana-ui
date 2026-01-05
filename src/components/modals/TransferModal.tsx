@@ -87,10 +87,14 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   useEffect(() => {
     if (transferType === 'TOKEN' && tokenAddressInput) {
       setSelectedToken(tokenAddressInput);
+      // Force amount mode for custom tokens without balance data
+      if (tokenAddressInput !== tokenAddress && distributionMode === 'percentage') {
+        setDistributionMode('amount');
+      }
     } else if (transferType === 'SOL') {
       setSelectedToken('');
     }
-  }, [transferType, tokenAddressInput]);
+  }, [transferType, tokenAddressInput, tokenAddress, distributionMode]);
 
   // Get wallet SOL balance by address
   const getWalletBalance = (address: string): number => {
@@ -331,6 +335,12 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       if (transferType === 'SOL') {
         return (getWalletBalance(wallet.address) || 0) > 0;
       } else {
+        // If user entered a custom token address that differs from the prop,
+        // we don't have balance data, so show all wallets
+        const isCustomToken = tokenAddressInput && tokenAddressInput !== tokenAddress;
+        if (isCustomToken) {
+          return true; // Show all wallets for custom tokens
+        }
         return (getWalletTokenBalance(wallet.address) || 0) > 0;
       }
     });
@@ -342,8 +352,9 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       );
     }
     
-    // Then apply additional balance filter
-    if (balanceFilter !== 'all') {
+    // Then apply additional balance filter (skip for custom tokens without balance data)
+    const isCustomToken = tokenAddressInput && tokenAddressInput !== tokenAddress;
+    if (balanceFilter !== 'all' && !(transferType === 'TOKEN' && isCustomToken)) {
       if (balanceFilter === 'highBalance') {
         if (transferType === 'SOL') {
           filtered = filtered.filter(wallet => (getWalletBalance(wallet.address) || 0) >= 0.1);
@@ -366,6 +377,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           ? a.address.localeCompare(b.address)
           : b.address.localeCompare(a.address);
       } else if (sortOption === 'balance') {
+        // Skip balance sorting for custom tokens without balance data
+        if (transferType === 'TOKEN' && isCustomToken) {
+          return a.address.localeCompare(b.address); // Fall back to address sorting
+        }
         const balanceA = transferType === 'SOL' 
           ? (getWalletBalance(a.address) || 0)
           : (getWalletTokenBalance(a.address) || 0);
@@ -607,6 +622,12 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                             <span className="text-app-secondary">TOKEN:</span> {formatAddress(tokenAddressInput)}
                           </div>
                         )}
+                        {tokenAddressInput && tokenAddressInput !== tokenAddress && (
+                          <div className="mt-1.5 text-xs text-app-secondary font-mono flex items-center">
+                            <Info size={12} className="inline mr-1" />
+                            Balance data not available for custom token
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -677,7 +698,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                                 ) : (
                                   <>
                                     <Coins size={12} className="text-app-secondary mr-1" />
-                                    <span className="text-xs text-app-secondary font-mono">{formatTokenBalance(getWalletTokenBalance(wallet.address) || 0)} TKN</span>
+                                    {tokenAddressInput && tokenAddressInput !== tokenAddress ? (
+                                      <span className="text-xs text-app-secondary font-mono">Balance: N/A</span>
+                                    ) : (
+                                      <span className="text-xs text-app-secondary font-mono">{formatTokenBalance(getWalletTokenBalance(wallet.address) || 0)} TKN</span>
+                                    )}
                                   </>
                                 )}
                               </div>
@@ -687,8 +712,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       ) : (
                         <div className="p-3 text-sm text-app-secondary text-center font-mono">
                           {sourceSearchTerm 
-                            ? `NO WALLETS FOUND WITH ${transferType} BALANCE > 0` 
-                            : `NO WALLETS AVAILABLE WITH ${transferType} BALANCE > 0`}
+                            ? `NO WALLETS FOUND` 
+                            : transferType === 'TOKEN' && tokenAddressInput && tokenAddressInput !== tokenAddress
+                              ? `NO WALLETS AVAILABLE (Custom token - balance data not loaded)`
+                              : `NO WALLETS AVAILABLE WITH ${transferType} BALANCE > 0`}
                         </div>
                       )}
                     </div>
@@ -795,14 +822,21 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setDistributionMode('percentage')}
+                        disabled={!!(transferType === 'TOKEN' && tokenAddressInput && tokenAddressInput !== tokenAddress)}
                         className={`w-full p-3 rounded-lg border transition-all duration-200 font-mono text-sm ${
                           distributionMode === 'percentage'
                             ? 'bg-primary-10 border-app-primary color-primary'
-                            : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
+                            : transferType === 'TOKEN' && tokenAddressInput && tokenAddressInput !== tokenAddress
+                              ? 'bg-app-tertiary border-app-primary-20 text-app-secondary-40 cursor-not-allowed'
+                              : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
                         }`}
                       >
                         <div className="font-semibold mb-1">PERCENTAGE</div>
-                        <div className="text-xs opacity-80">Transfer % of each wallet's balance</div>
+                        <div className="text-xs opacity-80">
+                          {transferType === 'TOKEN' && tokenAddressInput && tokenAddressInput !== tokenAddress
+                            ? 'Not available for custom tokens'
+                            : 'Transfer % of each wallet\'s balance'}
+                        </div>
                       </button>
                     </div>
                   </div>
@@ -833,6 +867,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                           if (distributionMode === 'percentage') {
                             setAmount('100');
                           } else {
+                            // Can't calculate max for custom tokens without balance data
+                            if (transferType === 'TOKEN' && tokenAddressInput && tokenAddressInput !== tokenAddress) {
+                              showToast('Cannot calculate MAX for custom token without balance data', 'error');
+                              return;
+                            }
                             const maxBalance = Math.min(...sourceWallets.map(privateKey => {
                               const wallet = getWalletByPrivateKey(privateKey);
                               if (!wallet) return 0;
@@ -888,10 +927,20 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       </div>
 
                       {transferType === 'TOKEN' && selectedToken && (
-                        <div className="p-2 bg-app-primary rounded border border-app-primary-20">
-                          <p className="text-xs text-app-secondary font-mono mb-1">TOKEN:</p>
-                          <p className="text-xs text-app-primary font-mono break-all">{selectedToken}</p>
-                        </div>
+                        <>
+                          <div className="p-2 bg-app-primary rounded border border-app-primary-20">
+                            <p className="text-xs text-app-secondary font-mono mb-1">TOKEN:</p>
+                            <p className="text-xs text-app-primary font-mono break-all">{selectedToken}</p>
+                          </div>
+                          {tokenAddressInput && tokenAddressInput !== tokenAddress && (
+                            <div className="p-2 bg-warning-20 rounded border border-warning-40 flex items-start">
+                              <Info size={12} className="text-warning mr-1.5 mt-0.5 flex-shrink-0" />
+                              <p className="text-xs text-app-secondary font-mono">
+                                Custom token: Balance will be validated during transfer execution
+                              </p>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
