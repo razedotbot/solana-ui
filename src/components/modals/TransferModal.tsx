@@ -49,6 +49,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const [receiverAddresses, setReceiverAddresses] = useState<string[]>([]); // Multiple recipients
   const [newRecipientAddress, setNewRecipientAddress] = useState(''); // Input for new recipient
   const [selectedToken, setSelectedToken] = useState('');
+  const [tokenAddressInput, setTokenAddressInput] = useState(''); // Local token address input
   const [amount, setAmount] = useState('');
   const [transferType, setTransferType] = useState<'SOL' | 'TOKEN'>('SOL');
   const [distributionMode, setDistributionMode] = useState<'percentage' | 'amount'>('amount'); // How to distribute amounts
@@ -75,17 +76,21 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       resetForm();
+      // Initialize token address input with prop value if available
+      if (tokenAddress) {
+        setTokenAddressInput(tokenAddress);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, tokenAddress]);
 
   // Update selectedToken when transferType changes to TOKEN
   useEffect(() => {
-    if (transferType === 'TOKEN' && tokenAddress) {
-      setSelectedToken(tokenAddress);
+    if (transferType === 'TOKEN' && tokenAddressInput) {
+      setSelectedToken(tokenAddressInput);
     } else if (transferType === 'SOL') {
       setSelectedToken('');
     }
-  }, [transferType, tokenAddress]);
+  }, [transferType, tokenAddressInput]);
 
   // Get wallet SOL balance by address
   const getWalletBalance = (address: string): number => {
@@ -183,6 +188,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     setReceiverAddresses([]);
     setNewRecipientAddress('');
     setSelectedToken('');
+    setTokenAddressInput('');
     setAmount('');
     setTransferType('SOL');
     setDistributionMode('amount');
@@ -572,28 +578,35 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setTransferType('TOKEN')}
-                        disabled={!tokenAddress}
                         className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn- ${
                           transferType === 'TOKEN'
                             ? 'bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40'
-                            : tokenAddress
-                              ? 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
-                              : 'bg-app-tertiary border-app-primary-20 text-app-secondary-40 cursor-not-allowed'
+                            : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
                         }`}
                       >
                         <Coins size={16} className="mr-2" />
                         TOKEN
                       </button>
                     </div>
-                    {!tokenAddress && (
-                      <div className="mt-2 text-xs text-app-secondary font-mono">
-                        <Info size={12} className="inline mr-1" />
-                        Set a token address in the main app to enable token transfers
-                      </div>
-                    )}
-                    {tokenAddress && transferType === 'TOKEN' && (
-                      <div className="mt-2 text-xs color-primary font-mono">
-                        <span className="text-app-secondary">TOKEN:</span> {formatAddress(tokenAddress)}
+                    
+                    {/* Token Address Input - shown when TOKEN is selected */}
+                    {transferType === 'TOKEN' && (
+                      <div className="mt-3">
+                        <label className="block text-xs font-medium text-app-secondary mb-1.5 font-mono uppercase tracking-wider">
+                          <span className="color-primary">&#62;</span> Token Address <span className="color-primary">&#60;</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={tokenAddressInput}
+                          onChange={(e) => setTokenAddressInput(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-app-tertiary border border-app-primary-30 rounded-lg text-sm text-app-primary shadow-inner focus-border-primary focus:ring-1 ring-primary-50 focus:outline-none transition-all duration-200 modal-input- font-mono"
+                          placeholder="ENTER TOKEN ADDRESS"
+                        />
+                        {tokenAddressInput && (
+                          <div className="mt-1.5 text-xs color-primary font-mono">
+                            <span className="text-app-secondary">TOKEN:</span> {formatAddress(tokenAddressInput)}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
