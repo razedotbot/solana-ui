@@ -9,15 +9,13 @@ import {
 import { getWalletDisplayName } from '../Utils';
 import type { WalletType } from '../utils/types';
 import { useToast } from "../utils/useToast";
-import { executeCreate, createDeployConfig, type WalletForCreate, type MeteoraConfig, METEORA_CONFIGS } from '../utils/create';
+import { executeCreate, createDeployConfig, type WalletForCreate, type MeteoraDBCConfig, METEORA_DBC_CONFIGS, type MeteoraCPAMMConfig, METEORA_CPAMM_CONFIGS, type BonkConfig, type PlatformType } from '../utils/create';
 import { loadConfigFromCookies } from '../Utils';
 
 const STEPS_DEPLOY = ["Platform & Token", "Select Wallets", "Review"];
 const MIN_WALLETS = 1;
 const MAX_WALLETS_STANDARD = 5;
-const MAX_WALLETS_METEORA = 20;
-
-type PlatformType = 'pumpfun' | 'bonk' | 'meteora';
+const MAX_WALLETS_ADVANCED = 20;
 
 interface TokenMetadata {
   name: string;
@@ -45,11 +43,18 @@ export const DeployPage: React.FC = () => {
 
   // Platform-specific options
   const [pumpType, setPumpType] = useState<boolean>(false); // Mayhem mode
+  const [pumpMode, setPumpMode] = useState<'simple' | 'advanced'>('simple'); // Simple (5) or Advanced (20)
   const [bonkType, setBonkType] = useState<'meme' | 'tech'>('meme');
-  const [meteoraMode, setMeteoraMode] = useState<'simple' | 'advanced'>('simple'); // Simple (5) or Advanced (20)
+  const [bonkMode, setBonkMode] = useState<'simple' | 'advanced'>('simple'); // Simple (5) or Advanced (20)
+  const [meteoraDBCMode, setMeteoraDBCMode] = useState<'simple' | 'advanced'>('simple'); // Simple (5) or Advanced (20)
 
-  // Meteora-specific options
-  const [meteoraConfigAddress, setMeteoraConfigAddress] = useState<string>(METEORA_CONFIGS.standard);
+  // MeteoraDBC-specific options
+  const [meteoraDBCConfigAddress, setMeteoraDBCConfigAddress] = useState<string>(METEORA_DBC_CONFIGS.standard);
+
+  // MeteoraCPAMM-specific options
+  const [meteoraCPAMMConfigAddress, setMeteoraCPAMMConfigAddress] = useState<string>(METEORA_CPAMM_CONFIGS.standard);
+  const [meteoraCPAMMInitialLiquidity, setMeteoraCPAMMInitialLiquidity] = useState<string>('1');
+  const [meteoraCPAMMInitialTokenPercent, setMeteoraCPAMMInitialTokenPercent] = useState<string>('80');
 
   // Get Jito tip from cookies settings (transactionFee is in lamports)
   const getJitoTipFromSettings = (): number => {
@@ -62,13 +67,31 @@ export const DeployPage: React.FC = () => {
   };
 
   // MAX_WALLETS depends on platform and mode:
-  // - Pump.fun & Bonk.fun: 5 wallets max
-  // - Meteora Simple: 5 wallets max (single bundle)
-  // - Meteora Advanced: 20 wallets max (multi-stage with LUT)
-  const MAX_WALLETS = selectedPlatform === 'meteora'
-    ? (meteoraMode === 'advanced' ? MAX_WALLETS_METEORA : MAX_WALLETS_STANDARD)
-    : MAX_WALLETS_STANDARD;
-  const isMeteoraAdvancedMode = selectedPlatform === 'meteora' && meteoraMode === 'advanced';
+  // - Pump.fun Simple: 5 wallets max, Pump.fun Advanced: 20 wallets max
+  // - Bonk.fun Simple: 5 wallets max, Bonk.fun Advanced: 20 wallets max
+  // - MeteoraDBC Simple: 5 wallets max (single bundle)
+  // - MeteoraDBC Advanced: 20 wallets max (multi-stage with LUT)
+  // - MeteoraCPAMM: 20 wallets max (can use multi-stage with LUT)
+  const MAX_WALLETS = (() => {
+    if (selectedPlatform === 'pumpfun') {
+      return pumpMode === 'advanced' ? MAX_WALLETS_ADVANCED : MAX_WALLETS_STANDARD;
+    }
+    if (selectedPlatform === 'bonk') {
+      return bonkMode === 'advanced' ? MAX_WALLETS_ADVANCED : MAX_WALLETS_STANDARD;
+    }
+    if (selectedPlatform === 'meteoraDBC') {
+      return meteoraDBCMode === 'advanced' ? MAX_WALLETS_ADVANCED : MAX_WALLETS_STANDARD;
+    }
+    if (selectedPlatform === 'meteoraCPAMM') {
+      return MAX_WALLETS_ADVANCED;
+    }
+    return MAX_WALLETS_STANDARD;
+  })();
+  const isPumpAdvancedMode = selectedPlatform === 'pumpfun' && pumpMode === 'advanced';
+  const isBonkAdvancedMode = selectedPlatform === 'bonk' && bonkMode === 'advanced';
+  const isMeteoraDBCAdvancedMode = selectedPlatform === 'meteoraDBC' && meteoraDBCMode === 'advanced';
+  const isMeteoraCPAMMMode = selectedPlatform === 'meteoraCPAMM';
+  const isAdvancedMode = isPumpAdvancedMode || isBonkAdvancedMode || isMeteoraDBCAdvancedMode || (isMeteoraCPAMMMode && selectedWallets.length > MAX_WALLETS_STANDARD);
 
   // Success state
   const [deployedMintAddress, setDeployedMintAddress] = useState<string | null>(null);
@@ -291,8 +314,19 @@ export const DeployPage: React.FC = () => {
       });
 
       // Build create config
-      const meteoraConfigObj: MeteoraConfig | undefined = selectedPlatform === 'meteora' ? {
-        configAddress: meteoraConfigAddress || METEORA_CONFIGS.standard,
+      const meteoraDBCConfigObj: MeteoraDBCConfig | undefined = selectedPlatform === 'meteoraDBC' ? {
+        configAddress: meteoraDBCConfigAddress || METEORA_DBC_CONFIGS.standard,
+        jitoTipAmountSOL: getJitoTipFromSettings()
+      } : undefined;
+
+      const meteoraCPAMMConfigObj: MeteoraCPAMMConfig | undefined = selectedPlatform === 'meteoraCPAMM' ? {
+        configAddress: meteoraCPAMMConfigAddress || METEORA_CPAMM_CONFIGS.standard,
+        jitoTipAmountSOL: getJitoTipFromSettings(),
+        initialLiquiditySOL: parseFloat(meteoraCPAMMInitialLiquidity) || 1,
+        initialTokenPercent: parseFloat(meteoraCPAMMInitialTokenPercent) || 80
+      } : undefined;
+
+      const bonkConfigObj: BonkConfig | undefined = selectedPlatform === 'bonk' ? {
         jitoTipAmountSOL: getJitoTipFromSettings()
       } : undefined;
 
@@ -308,8 +342,12 @@ export const DeployPage: React.FC = () => {
           website: tokenData.website || undefined
         },
         pumpType: selectedPlatform === 'pumpfun' ? pumpType : undefined,
+        pumpAdvanced: selectedPlatform === 'pumpfun' ? isPumpAdvancedMode : undefined,
         bonkType: selectedPlatform === 'bonk' ? bonkType : undefined,
-        meteoraConfig: meteoraConfigObj
+        bonkAdvanced: selectedPlatform === 'bonk' ? isBonkAdvancedMode : undefined,
+        bonkConfig: bonkConfigObj,
+        meteoraDBCConfig: meteoraDBCConfigObj,
+        meteoraCPAMMConfig: meteoraCPAMMConfigObj
       });
 
       console.info('Executing create with config:', config);
@@ -540,14 +578,15 @@ export const DeployPage: React.FC = () => {
               <label className="text-sm font-medium text-app-secondary flex items-center gap-1 font-mono uppercase tracking-wider">
                 <span className="color-primary">&#62;</span> Platform <span className="color-primary">*</span> <span className="color-primary">&#60;</span>
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedPlatform('pumpfun');
-                    // Reset wallets if more than 5 selected
-                    if (selectedWallets.length > MAX_WALLETS_STANDARD) {
-                      setSelectedWallets(selectedWallets.slice(0, MAX_WALLETS_STANDARD));
+                    // Reset wallets if more than allowed in current mode
+                    const maxAllowed = pumpMode === 'advanced' ? MAX_WALLETS_ADVANCED : MAX_WALLETS_STANDARD;
+                    if (selectedWallets.length > maxAllowed) {
+                      setSelectedWallets(selectedWallets.slice(0, maxAllowed));
                     }
                   }}
                   className={`p-4 rounded-lg border transition-all text-left ${selectedPlatform === 'pumpfun'
@@ -620,8 +659,8 @@ export const DeployPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedPlatform('meteora')}
-                  className={`p-4 rounded-lg border transition-all text-left ${selectedPlatform === 'meteora'
+                  onClick={() => setSelectedPlatform('meteoraDBC')}
+                  className={`p-4 rounded-lg border transition-all text-left ${selectedPlatform === 'meteoraDBC'
                     ? 'border-app-primary-color bg-primary-10 shadow-lg'
                     : 'border-app-primary-30 hover:border-app-primary-60'
                     }`}
@@ -629,9 +668,9 @@ export const DeployPage: React.FC = () => {
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 flex-shrink-0">
                       <svg width="32" height="32" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                        <path d="M185.89 66.887c3.313-3.314 8.445-3.119 10.567.39 2.296 3.767 4.029 7.839 5.263 12.105.693 2.425-.109 5.261-2.122 7.275l-64.902 64.902c-3.919 3.92-8.792 6.626-13.967 7.731l-5.393 1.147c-5.154 1.126-10.07 3.834-13.968 7.732l-49.829 49.829c-2.122-8.186-3.053-13.708 3.595-20.357zm14.055 27.96c2.166-2.165 5.501-.909 5.285 1.95-1.343 17.497-9.68 35.926-24.535 50.782-11.326 12.409-43.29 31.379-66.136 44.091-4.678 2.598-8.49-2.945-4.656-6.779l90.021-90.021zm-29.864-54.204c2.057-2.058 5.089-2.49 7.168-1.061 4.331 2.945 8.381 7.211 10.46 12.365.78 1.992.108 4.44-1.602 6.15l-69.905 69.904c-3.919 3.919-8.792 6.627-13.967 7.731l-5.392 1.148c-5.154 1.126-10.07 3.833-13.968 7.73L39.76 187.726c-2.122-8.185-1.104-15.656 5.544-22.304l25.163-25.164zm-29.626-12.427c3.898-3.898 9.485-5.414 14.076-3.682a52 52 0 0 1 8.273 4.028c3.465 2.08 3.638 7.147.39 10.395l-63.927 63.927c-3.66 3.659-8.641 5.609-13.405 5.262-5.003-.368-10.265 1.69-14.141 5.566l-35.017 35.016c-2.122-8.185.628-17.389 7.277-24.038zm-10.24-6.217c3.075-.043 4.266 3.617 1.927 5.956L98.945 61.152l-27.72 27.72-7.037 7.037-10.785 10.785c-2.253 2.252-5.587.216-4.331-2.642l10.48-23.82a77 77 0 0 1 1.95-4.419l.065-.151c6.041-12.798 15.765-26.377 24.904-35.516 14.661-14.66 27.827-17.995 43.744-18.147" fill="url(#meteora-gradient)" />
+                        <path d="M185.89 66.887c3.313-3.314 8.445-3.119 10.567.39 2.296 3.767 4.029 7.839 5.263 12.105.693 2.425-.109 5.261-2.122 7.275l-64.902 64.902c-3.919 3.92-8.792 6.626-13.967 7.731l-5.393 1.147c-5.154 1.126-10.07 3.834-13.968 7.732l-49.829 49.829c-2.122-8.186-3.053-13.708 3.595-20.357zm14.055 27.96c2.166-2.165 5.501-.909 5.285 1.95-1.343 17.497-9.68 35.926-24.535 50.782-11.326 12.409-43.29 31.379-66.136 44.091-4.678 2.598-8.49-2.945-4.656-6.779l90.021-90.021zm-29.864-54.204c2.057-2.058 5.089-2.49 7.168-1.061 4.331 2.945 8.381 7.211 10.46 12.365.78 1.992.108 4.44-1.602 6.15l-69.905 69.904c-3.919 3.919-8.792 6.627-13.967 7.731l-5.392 1.148c-5.154 1.126-10.07 3.833-13.968 7.73L39.76 187.726c-2.122-8.185-1.104-15.656 5.544-22.304l25.163-25.164zm-29.626-12.427c3.898-3.898 9.485-5.414 14.076-3.682a52 52 0 0 1 8.273 4.028c3.465 2.08 3.638 7.147.39 10.395l-63.927 63.927c-3.66 3.659-8.641 5.609-13.405 5.262-5.003-.368-10.265 1.69-14.141 5.566l-35.017 35.016c-2.122-8.185.628-17.389 7.277-24.038zm-10.24-6.217c3.075-.043 4.266 3.617 1.927 5.956L98.945 61.152l-27.72 27.72-7.037 7.037-10.785 10.785c-2.253 2.252-5.587.216-4.331-2.642l10.48-23.82a77 77 0 0 1 1.95-4.419l.065-.151c6.041-12.798 15.765-26.377 24.904-35.516 14.661-14.66 27.827-17.995 43.744-18.147" fill="url(#meteoraDBC-gradient)" />
                         <defs>
-                          <linearGradient id="meteora-gradient" x1="236.796" y1="22.232" x2="67.909" y2="217.509" gradientUnits="userSpaceOnUse">
+                          <linearGradient id="meteoraDBC-gradient" x1="236.796" y1="22.232" x2="67.909" y2="217.509" gradientUnits="userSpaceOnUse">
                             <stop stopColor="#f5bd00" />
                             <stop offset=".365" stopColor="#f54b00" />
                             <stop offset="1" stopColor="#6e45ff" />
@@ -640,8 +679,35 @@ export const DeployPage: React.FC = () => {
                       </svg>
                     </div>
                     <div className="flex-1">
-                      <div className="font-mono text-sm font-bold color-primary">METEORA</div>
+                      <div className="font-mono text-sm font-bold color-primary">METEORA DBC</div>
                       <div className="text-xs text-app-secondary mt-1">Dynamic bonding curve</div>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlatform('meteoraCPAMM')}
+                  className={`p-4 rounded-lg border transition-all text-left ${selectedPlatform === 'meteoraCPAMM'
+                    ? 'border-app-primary-color bg-primary-10 shadow-lg'
+                    : 'border-app-primary-30 hover:border-app-primary-60'
+                    }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 flex-shrink-0">
+                      <svg width="32" height="32" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                        <path d="M185.89 66.887c3.313-3.314 8.445-3.119 10.567.39 2.296 3.767 4.029 7.839 5.263 12.105.693 2.425-.109 5.261-2.122 7.275l-64.902 64.902c-3.919 3.92-8.792 6.626-13.967 7.731l-5.393 1.147c-5.154 1.126-10.07 3.834-13.968 7.732l-49.829 49.829c-2.122-8.186-3.053-13.708 3.595-20.357zm14.055 27.96c2.166-2.165 5.501-.909 5.285 1.95-1.343 17.497-9.68 35.926-24.535 50.782-11.326 12.409-43.29 31.379-66.136 44.091-4.678 2.598-8.49-2.945-4.656-6.779l90.021-90.021zm-29.864-54.204c2.057-2.058 5.089-2.49 7.168-1.061 4.331 2.945 8.381 7.211 10.46 12.365.78 1.992.108 4.44-1.602 6.15l-69.905 69.904c-3.919 3.919-8.792 6.627-13.967 7.731l-5.392 1.148c-5.154 1.126-10.07 3.833-13.968 7.73L39.76 187.726c-2.122-8.185-1.104-15.656 5.544-22.304l25.163-25.164zm-29.626-12.427c3.898-3.898 9.485-5.414 14.076-3.682a52 52 0 0 1 8.273 4.028c3.465 2.08 3.638 7.147.39 10.395l-63.927 63.927c-3.66 3.659-8.641 5.609-13.405 5.262-5.003-.368-10.265 1.69-14.141 5.566l-35.017 35.016c-2.122-8.185.628-17.389 7.277-24.038zm-10.24-6.217c3.075-.043 4.266 3.617 1.927 5.956L98.945 61.152l-27.72 27.72-7.037 7.037-10.785 10.785c-2.253 2.252-5.587.216-4.331-2.642l10.48-23.82a77 77 0 0 1 1.95-4.419l.065-.151c6.041-12.798 15.765-26.377 24.904-35.516 14.661-14.66 27.827-17.995 43.744-18.147" fill="url(#meteoraCPAMM-gradient)" />
+                        <defs>
+                          <linearGradient id="meteoraCPAMM-gradient" x1="236.796" y1="22.232" x2="67.909" y2="217.509" gradientUnits="userSpaceOnUse">
+                            <stop stopColor="#00d4ff" />
+                            <stop offset=".365" stopColor="#0099ff" />
+                            <stop offset="1" stopColor="#0055ff" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-mono text-sm font-bold color-primary">METEORA CP-AMM</div>
+                      <div className="text-xs text-app-secondary mt-1">Constant product AMM</div>
                     </div>
                   </div>
                 </button>
@@ -650,66 +716,6 @@ export const DeployPage: React.FC = () => {
 
             {/* Platform-specific options */}
             {selectedPlatform === 'pumpfun' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
-                  <span className="color-primary">&#62;</span> Mayhem Mode <span className="color-primary">&#60;</span>
-                </label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPumpType(false)}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${!pumpType
-                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                      }`}
-                  >
-                    NORMAL
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPumpType(true)}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${pumpType
-                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                      }`}
-                  >
-                    MAYHEM
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {selectedPlatform === 'bonk' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
-                  <span className="color-primary">&#62;</span> Token Type <span className="color-primary">&#60;</span>
-                </label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setBonkType('meme')}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${bonkType === 'meme'
-                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                      }`}
-                  >
-                    MEME
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBonkType('tech')}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${bonkType === 'tech'
-                      ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
-                      : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
-                      }`}
-                  >
-                    TECH
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {selectedPlatform === 'meteora' && (
               <div className="space-y-4">
                 {/* Mode Selection */}
                 <div className="space-y-2">
@@ -720,13 +726,13 @@ export const DeployPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setMeteoraMode('simple');
+                        setPumpMode('simple');
                         // Clear wallets if more than 5 selected
                         if (selectedWallets.length > MAX_WALLETS_STANDARD) {
                           setSelectedWallets(selectedWallets.slice(0, MAX_WALLETS_STANDARD));
                         }
                       }}
-                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${meteoraMode === 'simple'
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${pumpMode === 'simple'
                         ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
                         : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
                         }`}
@@ -736,8 +742,206 @@ export const DeployPage: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMeteoraMode('advanced')}
-                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${meteoraMode === 'advanced'
+                      onClick={() => setPumpMode('advanced')}
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${pumpMode === 'advanced'
+                        ? 'bg-emerald-500 text-black border border-emerald-400 shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-emerald-500/50'
+                        }`}
+                    >
+                      <div className="text-sm font-bold">ADVANCED</div>
+                      <div className="text-xs opacity-70 mt-1">Up to 20 wallets</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Info Banner */}
+                <div className={`border rounded-lg p-3 ${pumpMode === 'advanced'
+                  ? 'bg-emerald-500/10 border-emerald-500/30'
+                  : 'bg-app-tertiary border-app-primary-30'
+                  }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info size={14} className={pumpMode === 'advanced' ? 'text-emerald-500' : 'color-primary'} />
+                    <span className={`text-xs font-mono font-bold ${pumpMode === 'advanced' ? 'text-emerald-400' : 'text-app-primary'}`}>
+                      {pumpMode === 'advanced' ? 'ADVANCED MODE' : 'SIMPLE MODE'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-app-secondary font-mono">
+                    {pumpMode === 'advanced' ? (
+                      <>
+                        Multi-bundle deployment. Supports up to 20 wallets.
+                        Sends multiple bundles in sequence for larger deployments.
+                      </>
+                    ) : (
+                      <>
+                        Single bundle deployment. Fast and simple for up to 5 wallets.
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mayhem Mode */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                    <span className="color-primary">&#62;</span> Token Type <span className="color-primary">&#60;</span>
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPumpType(false)}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${!pumpType
+                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                        }`}
+                    >
+                      NORMAL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPumpType(true)}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${pumpType
+                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                        }`}
+                    >
+                      MAYHEM
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedPlatform === 'bonk' && (
+              <div className="space-y-4">
+                {/* Mode Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                    <span className="color-primary">&#62;</span> Deployment Mode <span className="color-primary">&#60;</span>
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBonkMode('simple');
+                        // Clear wallets if more than 5 selected
+                        if (selectedWallets.length > MAX_WALLETS_STANDARD) {
+                          setSelectedWallets(selectedWallets.slice(0, MAX_WALLETS_STANDARD));
+                        }
+                      }}
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${bonkMode === 'simple'
+                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                        }`}
+                    >
+                      <div className="text-sm font-bold">SIMPLE</div>
+                      <div className="text-xs opacity-70 mt-1">Up to 5 wallets</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBonkMode('advanced')}
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${bonkMode === 'advanced'
+                        ? 'bg-orange-500 text-black border border-orange-400 shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-orange-500/50'
+                        }`}
+                    >
+                      <div className="text-sm font-bold">ADVANCED</div>
+                      <div className="text-xs opacity-70 mt-1">Up to 20 wallets</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Info Banner */}
+                <div className={`border rounded-lg p-3 ${bonkMode === 'advanced'
+                  ? 'bg-orange-500/10 border-orange-500/30'
+                  : 'bg-app-tertiary border-app-primary-30'
+                  }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info size={14} className={bonkMode === 'advanced' ? 'text-orange-500' : 'color-primary'} />
+                    <span className={`text-xs font-mono font-bold ${bonkMode === 'advanced' ? 'text-orange-400' : 'text-app-primary'}`}>
+                      {bonkMode === 'advanced' ? 'ADVANCED MODE' : 'SIMPLE MODE'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-app-secondary font-mono">
+                    {bonkMode === 'advanced' ? (
+                      <>
+                        Multi-bundle deployment with Lookup Tables. Supports up to 20 wallets.
+                        Sends multiple bundles in sequence (LUT setup → WSOL ATAs → Buy Transactions).
+                      </>
+                    ) : (
+                      <>
+                        Single bundle deployment. Fast and simple for up to 5 wallets.
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Token Type */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                    <span className="color-primary">&#62;</span> Token Type <span className="color-primary">&#60;</span>
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setBonkType('meme')}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${bonkType === 'meme'
+                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                        }`}
+                    >
+                      MEME
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBonkType('tech')}
+                      className={`flex-1 px-4 py-2.5 rounded-lg font-mono tracking-wider transition-all ${bonkType === 'tech'
+                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                        }`}
+                    >
+                      TECH
+                    </button>
+                  </div>
+                </div>
+
+                {/* Info about Jito Tip */}
+                <div className="bg-app-tertiary border border-app-primary-30 rounded-lg p-3 flex items-center gap-2">
+                  <Info size={14} className="color-primary" />
+                  <span className="text-xs text-app-secondary font-mono">
+                    JITO TIP: {getJitoTipFromSettings().toFixed(4)} SOL (from Settings → Transaction Fee)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {selectedPlatform === 'meteoraDBC' && (
+              <div className="space-y-4">
+                {/* Mode Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                    <span className="color-primary">&#62;</span> Deployment Mode <span className="color-primary">&#60;</span>
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMeteoraDBCMode('simple');
+                        // Clear wallets if more than 5 selected
+                        if (selectedWallets.length > MAX_WALLETS_STANDARD) {
+                          setSelectedWallets(selectedWallets.slice(0, MAX_WALLETS_STANDARD));
+                        }
+                      }}
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${meteoraDBCMode === 'simple'
+                        ? 'bg-app-primary-color text-app-quaternary border border-app-primary shadow-lg'
+                        : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-app-primary'
+                        }`}
+                    >
+                      <div className="text-sm font-bold">SIMPLE</div>
+                      <div className="text-xs opacity-70 mt-1">Up to 5 wallets</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMeteoraDBCMode('advanced')}
+                      className={`flex-1 px-4 py-3 rounded-lg font-mono tracking-wider transition-all ${meteoraDBCMode === 'advanced'
                         ? 'bg-amber-500 text-black border border-amber-400 shadow-lg'
                         : 'bg-app-tertiary text-app-primary border border-app-primary-40 hover:border-amber-500/50'
                         }`}
@@ -749,18 +953,18 @@ export const DeployPage: React.FC = () => {
                 </div>
 
                 {/* Info Banner */}
-                <div className={`border rounded-lg p-3 ${meteoraMode === 'advanced'
+                <div className={`border rounded-lg p-3 ${meteoraDBCMode === 'advanced'
                   ? 'bg-amber-500/10 border-amber-500/30'
                   : 'bg-app-tertiary border-app-primary-30'
                   }`}>
                   <div className="flex items-center gap-2 mb-2">
-                    <Info size={14} className={meteoraMode === 'advanced' ? 'text-amber-500' : 'color-primary'} />
-                    <span className={`text-xs font-mono font-bold ${meteoraMode === 'advanced' ? 'text-amber-400' : 'text-app-primary'}`}>
-                      {meteoraMode === 'advanced' ? 'ADVANCED MODE' : 'SIMPLE MODE'}
+                    <Info size={14} className={meteoraDBCMode === 'advanced' ? 'text-amber-500' : 'color-primary'} />
+                    <span className={`text-xs font-mono font-bold ${meteoraDBCMode === 'advanced' ? 'text-amber-400' : 'text-app-primary'}`}>
+                      {meteoraDBCMode === 'advanced' ? 'ADVANCED MODE' : 'SIMPLE MODE'}
                     </span>
                   </div>
                   <div className="text-xs text-app-secondary font-mono">
-                    {meteoraMode === 'advanced' ? (
+                    {meteoraDBCMode === 'advanced' ? (
                       <>
                         Multi-stage deployment with Lookup Tables. Supports up to 20 wallets.
                         Sends multiple bundles in sequence (LUT setup → WSOL ATAs → Deployment → Cleanup).
@@ -780,10 +984,10 @@ export const DeployPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    value={meteoraConfigAddress}
-                    onChange={(e) => setMeteoraConfigAddress(e.target.value)}
+                    value={meteoraDBCConfigAddress}
+                    onChange={(e) => setMeteoraDBCConfigAddress(e.target.value)}
                     className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all font-mono text-xs"
-                    placeholder={METEORA_CONFIGS.standard}
+                    placeholder={METEORA_DBC_CONFIGS.standard}
                   />
                   <div className="text-xs text-app-secondary font-mono">
                     Leave default unless you have a custom pool config
@@ -796,6 +1000,95 @@ export const DeployPage: React.FC = () => {
                   <span className="text-xs text-app-secondary font-mono">
                     JITO TIP: {getJitoTipFromSettings().toFixed(4)} SOL (from Settings → Transaction Fee)
                   </span>
+                </div>
+              </div>
+            )}
+
+            {selectedPlatform === 'meteoraCPAMM' && (
+              <div className="space-y-4">
+                {/* Config Address */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                    <span className="color-primary">&#62;</span> Pool Config Address <span className="color-primary">&#60;</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={meteoraCPAMMConfigAddress}
+                    onChange={(e) => setMeteoraCPAMMConfigAddress(e.target.value)}
+                    className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all font-mono text-xs"
+                    placeholder={METEORA_CPAMM_CONFIGS.standard}
+                  />
+                  <div className="text-xs text-app-secondary font-mono">
+                    Leave default unless you have a custom pool config
+                  </div>
+                </div>
+
+                {/* Initial Liquidity Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                      <span className="color-primary">&#62;</span> Initial Liquidity (SOL) <span className="color-primary">&#60;</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={meteoraCPAMMInitialLiquidity}
+                      onChange={(e) => {
+                        if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) {
+                          setMeteoraCPAMMInitialLiquidity(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all font-mono"
+                      placeholder="1"
+                    />
+                    <div className="text-xs text-app-secondary font-mono">
+                      Amount of SOL for initial pool liquidity
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                      <span className="color-primary">&#62;</span> Initial Token % <span className="color-primary">&#60;</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={meteoraCPAMMInitialTokenPercent}
+                      onChange={(e) => {
+                        if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) {
+                          const val = parseFloat(e.target.value);
+                          if (isNaN(val) || (val >= 0 && val <= 100)) {
+                            setMeteoraCPAMMInitialTokenPercent(e.target.value);
+                          }
+                        }
+                      }}
+                      className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2.5 text-app-primary placeholder-app-secondary-60 focus:outline-none focus:ring-1 focus:ring-primary-50 focus:border-app-primary transition-all font-mono"
+                      placeholder="80"
+                    />
+                    <div className="text-xs text-app-secondary font-mono">
+                      % of token supply for pool (1-100)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info about Jito Tip */}
+                <div className="bg-app-tertiary border border-app-primary-30 rounded-lg p-3 flex items-center gap-2">
+                  <Info size={14} className="color-primary" />
+                  <span className="text-xs text-app-secondary font-mono">
+                    JITO TIP: {getJitoTipFromSettings().toFixed(4)} SOL (from Settings → Transaction Fee)
+                  </span>
+                </div>
+
+                {/* Info Banner */}
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info size={14} className="text-blue-500" />
+                    <span className="text-xs font-mono font-bold text-blue-400">
+                      METEORA CP-AMM (DAMM v2)
+                    </span>
+                  </div>
+                  <div className="text-xs text-app-secondary font-mono">
+                    Constant Product AMM with dynamic fees. Supports up to 20 wallets.
+                    Creates liquidity pool with configurable initial liquidity and token allocation.
+                  </div>
                 </div>
               </div>
             )}
@@ -871,14 +1164,18 @@ export const DeployPage: React.FC = () => {
             </div>
 
             {/* Info */}
-            <div className={`border rounded-lg p-3 flex items-center gap-2 ${isMeteoraAdvancedMode
-              ? 'bg-amber-500/10 border-amber-500/30'
+            <div className={`border rounded-lg p-3 flex items-center gap-2 ${isAdvancedMode
+              ? isPumpAdvancedMode 
+                ? 'bg-emerald-500/10 border-emerald-500/30'
+                : isBonkAdvancedMode
+                  ? 'bg-orange-500/10 border-orange-500/30'
+                  : 'bg-amber-500/10 border-amber-500/30'
               : 'bg-app-tertiary border-app-primary-30'
               }`}>
-              <Info size={14} className={isMeteoraAdvancedMode ? 'text-amber-500' : 'color-primary'} />
-              <span className={`text-xs font-mono ${isMeteoraAdvancedMode ? 'text-amber-400' : 'text-app-secondary'}`}>
-                {isMeteoraAdvancedMode
-                  ? `ADVANCED MODE: SELECT UP TO ${MAX_WALLETS} WALLETS. MULTI-STAGE DEPLOYMENT.`
+              <Info size={14} className={isAdvancedMode ? (isPumpAdvancedMode ? 'text-emerald-500' : isBonkAdvancedMode ? 'text-orange-500' : 'text-amber-500') : 'color-primary'} />
+              <span className={`text-xs font-mono ${isAdvancedMode ? (isPumpAdvancedMode ? 'text-emerald-400' : isBonkAdvancedMode ? 'text-orange-400' : 'text-amber-400') : 'text-app-secondary'}`}>
+                {isAdvancedMode
+                  ? `ADVANCED MODE: SELECT UP TO ${MAX_WALLETS} WALLETS. MULTI-BUNDLE DEPLOYMENT.`
                   : `SELECT UP TO ${MAX_WALLETS} WALLETS. FIRST WALLET IS THE CREATOR.`
                 }
               </span>
@@ -1053,31 +1350,79 @@ export const DeployPage: React.FC = () => {
                     <span className="color-primary font-mono font-bold">{selectedPlatform.toUpperCase()}</span>
                   </div>
                   {selectedPlatform === 'pumpfun' && (
-                    <div className="flex justify-between">
-                      <span className="text-app-secondary font-mono">MODE:</span>
-                      <span className="text-app-primary font-mono">{pumpType ? 'MAYHEM' : 'NORMAL'}</span>
-                    </div>
-                  )}
-                  {selectedPlatform === 'bonk' && (
-                    <div className="flex justify-between">
-                      <span className="text-app-secondary font-mono">TYPE:</span>
-                      <span className="text-app-primary font-mono">{bonkType.toUpperCase()}</span>
-                    </div>
-                  )}
-                  {selectedPlatform === 'meteora' && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-app-secondary font-mono">MODE:</span>
-                        <span className={`font-mono font-bold ${isMeteoraAdvancedMode ? 'text-amber-400' : 'text-app-primary'}`}>
-                          {isMeteoraAdvancedMode ? 'ADVANCED' : 'SIMPLE'}
+                        <span className={`font-mono font-bold ${isPumpAdvancedMode ? 'text-emerald-400' : 'text-app-primary'}`}>
+                          {isPumpAdvancedMode ? 'ADVANCED' : 'SIMPLE'}
                         </span>
                       </div>
-                      {isMeteoraAdvancedMode && (
+                      {isPumpAdvancedMode && (
+                        <div className="flex justify-between">
+                          <span className="text-app-secondary font-mono">BUNDLES:</span>
+                          <span className="text-emerald-400 font-mono">MULTI-BUNDLE</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">TYPE:</span>
+                        <span className="text-app-primary font-mono">{pumpType ? 'MAYHEM' : 'NORMAL'}</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedPlatform === 'bonk' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">MODE:</span>
+                        <span className={`font-mono font-bold ${isBonkAdvancedMode ? 'text-orange-400' : 'text-app-primary'}`}>
+                          {isBonkAdvancedMode ? 'ADVANCED' : 'SIMPLE'}
+                        </span>
+                      </div>
+                      {isBonkAdvancedMode && (
+                        <div className="flex justify-between">
+                          <span className="text-app-secondary font-mono">STAGES:</span>
+                          <span className="text-orange-400 font-mono">MULTI-BUNDLE</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">TYPE:</span>
+                        <span className="text-app-primary font-mono">{bonkType.toUpperCase()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">JITO TIP:</span>
+                        <span className="text-app-primary font-mono">{getJitoTipFromSettings().toFixed(4)} SOL</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedPlatform === 'meteoraDBC' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">MODE:</span>
+                        <span className={`font-mono font-bold ${isMeteoraDBCAdvancedMode ? 'text-amber-400' : 'text-app-primary'}`}>
+                          {isMeteoraDBCAdvancedMode ? 'ADVANCED' : 'SIMPLE'}
+                        </span>
+                      </div>
+                      {isMeteoraDBCAdvancedMode && (
                         <div className="flex justify-between">
                           <span className="text-app-secondary font-mono">STAGES:</span>
                           <span className="text-amber-400 font-mono">MULTI-BUNDLE</span>
                         </div>
                       )}
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">JITO TIP:</span>
+                        <span className="text-app-primary font-mono">{getJitoTipFromSettings().toFixed(4)} SOL</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedPlatform === 'meteoraCPAMM' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">INIT LIQUIDITY:</span>
+                        <span className="text-app-primary font-mono">{meteoraCPAMMInitialLiquidity} SOL</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-app-secondary font-mono">TOKEN %:</span>
+                        <span className="text-app-primary font-mono">{meteoraCPAMMInitialTokenPercent}%</span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-app-secondary font-mono">JITO TIP:</span>
                         <span className="text-app-primary font-mono">{getJitoTipFromSettings().toFixed(4)} SOL</span>
@@ -1180,8 +1525,8 @@ export const DeployPage: React.FC = () => {
                   className="text-xs text-app-primary cursor-pointer select-none font-mono"
                 >
                   I CONFIRM DEPLOYMENT OF THIS TOKEN ON {selectedPlatform.toUpperCase()}
-                  {isMeteoraAdvancedMode && ' (ADVANCED MODE)'} USING {selectedWallets.length} WALLET{selectedWallets.length !== 1 ? 'S' : ''}.
-                  {isMeteoraAdvancedMode && ' THIS WILL SEND MULTIPLE BUNDLES IN SEQUENCE.'} THIS ACTION CANNOT BE UNDONE.
+                  {isAdvancedMode && ' (ADVANCED MODE)'} USING {selectedWallets.length} WALLET{selectedWallets.length !== 1 ? 'S' : ''}.
+                  {isAdvancedMode && ' THIS WILL SEND MULTIPLE BUNDLES IN SEQUENCE.'} THIS ACTION CANNOT BE UNDONE.
                 </label>
               </div>
             </div>
@@ -1288,7 +1633,7 @@ export const DeployPage: React.FC = () => {
             <div className="flex items-center gap-3">
               <div>
                 <h1 className="text-xl font-bold text-app-primary font-mono tracking-wide">TOKEN DEPLOYMENT</h1>
-                <p className="text-xs text-app-secondary-80 font-mono">Deploy your token on Pump.fun, Bonk.fun, or Meteora</p>
+                <p className="text-xs text-app-secondary-80 font-mono">Deploy your token on Pump.fun, Bonk.fun, MeteoraDBC, or MeteoraCPAMM</p>
               </div>
             </div>
           </div>
@@ -1355,12 +1700,12 @@ export const DeployPage: React.FC = () => {
                   isSubmitting ? (
                     <>
                       <RefreshCw size={16} className="animate-spin" />
-                      {isMeteoraAdvancedMode ? 'DEPLOYING (MULTI-STAGE)...' : 'DEPLOYING...'}
+                      {isAdvancedMode ? 'DEPLOYING (MULTI-BUNDLE)...' : 'DEPLOYING...'}
                     </>
                   ) : (
                     <>
                       <CheckCircle size={16} />
-                      {isMeteoraAdvancedMode ? 'DEPLOY (ADVANCED)' : 'DEPLOY'}
+                      {isAdvancedMode ? 'DEPLOY (ADVANCED)' : 'DEPLOY'}
                     </>
                   )
                 ) : (

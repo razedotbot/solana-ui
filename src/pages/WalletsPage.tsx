@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   ArrowUpDown,
   ArrowUp,
@@ -23,12 +23,17 @@ import {
   Settings,
   Flame,
   GripVertical,
-  RefreshCw
-} from 'lucide-react';
-import { HorizontalHeader } from '../components/HorizontalHeader';
-import bs58 from 'bs58';
-import { WalletTooltip } from '../components/Styles';
-import type { WalletType, WalletCategory, MasterWallet, CustomQuickTradeSettings } from '../utils/types';
+  RefreshCw,
+} from "lucide-react";
+import { HorizontalHeader } from "../components/HorizontalHeader";
+import bs58 from "bs58";
+import { WalletTooltip } from "../components/Styles";
+import type {
+  WalletType,
+  WalletCategory,
+  MasterWallet,
+  CustomQuickTradeSettings,
+} from "../utils/types";
 import {
   formatAddress,
   copyToClipboard,
@@ -46,26 +51,30 @@ import {
   createHDWalletFromMaster,
   deleteMasterWallet as deleteMasterWalletUtil,
   getMasterWalletMnemonic,
-  updateMasterWalletAccountCount
-} from '../Utils';
-import CreateMasterWalletModal from '../components/modals/CreateMasterWalletModal';
-import CreateWalletModal from '../components/modals/CreateWalletModal';
-import ImportWalletModal from '../components/modals/ImportWalletModal';
-import ExportSeedPhraseModal from '../components/modals/ExportSeedPhraseModal';
-import { FundModal } from '../components/modals/FundModal';
-import { ConsolidateModal } from '../components/modals/ConsolidateModal';
-import { TransferModal } from '../components/modals/TransferModal';
-import { DepositModal } from '../components/modals/DepositModal';
-import { QuickTradeModal } from '../components/modals/QuickTradeModal';
-import type { CategoryQuickTradeSettings } from '../utils/types';
-import { WalletQuickTradeModal } from '../components/modals/WalletQuickTradeModal';
-import { BurnModal } from '../components/modals/BurnModal';
-import { deriveMultipleWallets, validateMnemonic, getMnemonicWordCount } from '../utils/hdWallet';
-import { useAppContext } from '../contexts/useAppContext';
-import { useToast } from '../utils/useToast';
+  updateMasterWalletAccountCount,
+} from "../Utils";
+import CreateMasterWalletModal from "../components/modals/CreateMasterWalletModal";
+import CreateWalletModal from "../components/modals/CreateWalletModal";
+import ImportWalletModal from "../components/modals/ImportWalletModal";
+import ExportSeedPhraseModal from "../components/modals/ExportSeedPhraseModal";
+import { FundModal } from "../components/modals/FundModal";
+import { ConsolidateModal } from "../components/modals/ConsolidateModal";
+import { TransferModal } from "../components/modals/TransferModal";
+import { DepositModal } from "../components/modals/DepositModal";
+import { QuickTradeModal } from "../components/modals/QuickTradeModal";
+import type { CategoryQuickTradeSettings } from "../utils/types";
+import { WalletQuickTradeModal } from "../components/modals/WalletQuickTradeModal";
+import { BurnModal } from "../components/modals/BurnModal";
+import {
+  deriveMultipleWallets,
+  validateMnemonic,
+  getMnemonicWordCount,
+} from "../utils/hdWallet";
+import { useAppContext } from "../contexts/useAppContext";
+import { useToast } from "../utils/useToast";
 
-type SortField = 'solBalance';
-type SortDirection = 'asc' | 'desc';
+type SortField = "solBalance";
+type SortDirection = "asc" | "desc";
 
 export const WalletsPage: React.FC = () => {
   const { showToast } = useToast();
@@ -77,18 +86,20 @@ export const WalletsPage: React.FC = () => {
     setSolBalances,
     connection,
     refreshBalances,
-    isRefreshing
+    isRefreshing,
   } = useAppContext();
 
   const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [searchTerm, setSearchTerm] = useState("");
   const [showAddressSearch, setShowAddressSearch] = useState(false);
-  const [labelSearchTerm, setLabelSearchTerm] = useState('');
+  const [labelSearchTerm, setLabelSearchTerm] = useState("");
   const [showLabelSearch, setShowLabelSearch] = useState(false);
-  const [selectedWallets, setSelectedWallets] = useState<Set<number>>(new Set());
+  const [selectedWallets, setSelectedWallets] = useState<Set<number>>(
+    new Set(),
+  );
   const [editingLabel, setEditingLabel] = useState<number | null>(null);
-  const [editLabelValue, setEditLabelValue] = useState<string>('');
+  const [editLabelValue, setEditLabelValue] = useState<string>("");
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -96,33 +107,54 @@ export const WalletsPage: React.FC = () => {
 
   // Master Wallet State
   const [masterWallets, setMasterWallets] = useState<MasterWallet[]>([]);
-  const [expandedMasterWallets, setExpandedMasterWallets] = useState<Set<string>>(new Set());
-  const [isCreateMasterWalletModalOpen, setIsCreateMasterWalletModalOpen] = useState(false);
-  const [isImportMasterWalletModalOpen, setIsImportMasterWalletModalOpen] = useState(false);
-  const [exportSeedPhraseMasterWallet, setExportSeedPhraseMasterWallet] = useState<MasterWallet | null>(null);
-  const [viewMode, setViewMode] = useState<'all' | 'hd' | 'imported'>('all');
+  const [expandedMasterWallets, setExpandedMasterWallets] = useState<
+    Set<string>
+  >(new Set());
+  const [isCreateMasterWalletModalOpen, setIsCreateMasterWalletModalOpen] =
+    useState(false);
+  const [isImportMasterWalletModalOpen, setIsImportMasterWalletModalOpen] =
+    useState(false);
+  const [exportSeedPhraseMasterWallet, setExportSeedPhraseMasterWallet] =
+    useState<MasterWallet | null>(null);
+  const [viewMode, setViewMode] = useState<"all" | "hd" | "imported">("all");
   const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
   const viewModeDropdownRef = useRef<HTMLDivElement>(null);
 
   // Modal states
-  const [activeModal, setActiveModal] = useState<'distribute' | 'consolidate' | 'transfer' | 'deposit' | 'mixer' | 'burn' | null>(null);
+  const [activeModal, setActiveModal] = useState<
+    | "distribute"
+    | "consolidate"
+    | "transfer"
+    | "deposit"
+    | "mixer"
+    | "burn"
+    | null
+  >(null);
   const [isQuickTradeModalOpen, setIsQuickTradeModalOpen] = useState(false);
-  const [editingWalletQuickTrade, setEditingWalletQuickTrade] = useState<WalletType | null>(null);
-  const [burnTokenAddress, setBurnTokenAddress] = useState<string>('');
-  const [burnTokenBalances, setBurnTokenBalances] = useState<Map<string, number>>(new Map());
+  const [editingWalletQuickTrade, setEditingWalletQuickTrade] =
+    useState<WalletType | null>(null);
+  const [burnTokenAddress, setBurnTokenAddress] = useState<string>("");
+  const [burnTokenBalances, setBurnTokenBalances] = useState<
+    Map<string, number>
+  >(new Map());
 
   // Drag and drop state
   const [draggedWalletId, setDraggedWalletId] = useState<number | null>(null);
   const [dragOverWalletId, setDragOverWalletId] = useState<number | null>(null);
 
   // Category settings for quick trade (loaded from localStorage)
-  const [categorySettings, setCategorySettings] = useState<Record<WalletCategory, CategoryQuickTradeSettings>>(() => {
-    const saved = localStorage.getItem('categoryQuickTradeSettings');
+  const [categorySettings, setCategorySettings] = useState<
+    Record<WalletCategory, CategoryQuickTradeSettings>
+  >(() => {
+    const saved = localStorage.getItem("categoryQuickTradeSettings");
     if (saved) {
       try {
-        return JSON.parse(saved) as Record<WalletCategory, CategoryQuickTradeSettings>;
+        return JSON.parse(saved) as Record<
+          WalletCategory,
+          CategoryQuickTradeSettings
+        >;
       } catch (error) {
-        console.error('Error loading category settings:', error);
+        console.error("Error loading category settings:", error);
       }
     }
     // Default settings
@@ -136,7 +168,7 @@ export const WalletsPage: React.FC = () => {
         sellPercentage: 100,
         sellMinPercentage: 50,
         sellMaxPercentage: 100,
-        useSellRange: false
+        useSellRange: false,
       },
       Medium: {
         enabled: true,
@@ -147,7 +179,7 @@ export const WalletsPage: React.FC = () => {
         sellPercentage: 100,
         sellMinPercentage: 50,
         sellMaxPercentage: 100,
-        useSellRange: false
+        useSellRange: false,
       },
       Hard: {
         enabled: true,
@@ -158,8 +190,8 @@ export const WalletsPage: React.FC = () => {
         sellPercentage: 100,
         sellMinPercentage: 50,
         sellMaxPercentage: 100,
-        useSellRange: false
-      }
+        useSellRange: false,
+      },
     };
   });
 
@@ -176,8 +208,10 @@ export const WalletsPage: React.FC = () => {
           setWallets(savedWallets);
         } else {
           // Context has wallets, check if storage has any additional ones
-          const contextAddresses = new Set(wallets.map(w => w.address));
-          const missingWallets = savedWallets.filter(w => !contextAddresses.has(w.address));
+          const contextAddresses = new Set(wallets.map((w) => w.address));
+          const missingWallets = savedWallets.filter(
+            (w) => !contextAddresses.has(w.address),
+          );
           if (missingWallets.length > 0) {
             // Add any wallets from storage that aren't in context
             setWallets([...wallets, ...missingWallets]);
@@ -185,7 +219,7 @@ export const WalletsPage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Error loading wallets from storage:', error);
+      console.error("Error loading wallets from storage:", error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
@@ -204,7 +238,7 @@ export const WalletsPage: React.FC = () => {
             setWallets(savedWallets);
           }
         } catch (error) {
-          console.error('Error loading wallets from storage (delayed):', error);
+          console.error("Error loading wallets from storage (delayed):", error);
         }
       }, 500); // Wait 500ms for AppContext to load wallets
       return () => clearTimeout(timeoutId);
@@ -223,13 +257,17 @@ export const WalletsPage: React.FC = () => {
   }, []);
 
   // Create a stable wallet identifier that only changes when wallet addresses change (not selection)
-  const walletAddresses = useMemo(() =>
-    wallets.map(w => w.address).sort().join(','),
-    [wallets]
+  const walletAddresses = useMemo(
+    () =>
+      wallets
+        .map((w) => w.address)
+        .sort()
+        .join(","),
+    [wallets],
   );
 
   // Track the last wallet addresses we refreshed for to prevent unnecessary refreshes
-  const lastRefreshedAddressesRef = useRef<string>('');
+  const lastRefreshedAddressesRef = useRef<string>("");
   const lastConnectionRef = useRef<typeof connection>(null);
 
   // Refresh balances when component mounts or when wallets/connection changes
@@ -237,7 +275,7 @@ export const WalletsPage: React.FC = () => {
     // Reset tracking refs if connection changed (new connection means we need fresh balances)
     if (connection !== lastConnectionRef.current) {
       lastConnectionRef.current = connection;
-      lastRefreshedAddressesRef.current = '';
+      lastRefreshedAddressesRef.current = "";
     }
 
     if (connection && wallets.length > 0) {
@@ -260,14 +298,14 @@ export const WalletsPage: React.FC = () => {
       const { wallet, error } = importWallet(privateKey.trim());
 
       if (error) {
-        showToast(error, 'error');
+        showToast(error, "error");
         return;
       }
 
       if (wallet) {
-        const exists = wallets.some(w => w.address === wallet.address);
+        const exists = wallets.some((w) => w.address === wallet.address);
         if (exists) {
-          showToast('Wallet already exists', 'error');
+          showToast("Wallet already exists", "error");
           return;
         }
 
@@ -279,19 +317,19 @@ export const WalletsPage: React.FC = () => {
         newSolBalances.set(wallet.address, solBalance);
         setSolBalances(newSolBalances);
 
-        showToast('Wallet imported successfully', 'success');
+        showToast("Wallet imported successfully", "success");
       } else {
-        showToast('Failed to import wallet', 'error');
+        showToast("Failed to import wallet", "error");
       }
     } catch (error) {
-      console.error('Error importing wallet:', error);
-      showToast('Failed to import wallet', 'error');
+      console.error("Error importing wallet:", error);
+      showToast("Failed to import wallet", "error");
     }
   };
 
   const handleCreateWallet = async (wallet: WalletType): Promise<void> => {
     if (!connection) {
-      throw new Error('Connection not available');
+      throw new Error("Connection not available");
     }
 
     try {
@@ -300,7 +338,7 @@ export const WalletsPage: React.FC = () => {
 
       // Use functional updates to ensure we're working with the latest state
       // This is critical when creating multiple wallets in sequence
-      setSolBalances(prevBalances => {
+      setSolBalances((prevBalances) => {
         const newSolBalances = new Map(prevBalances);
         newSolBalances.set(wallet.address, solBalance);
         return newSolBalances;
@@ -308,9 +346,11 @@ export const WalletsPage: React.FC = () => {
 
       // Add wallet to list using functional update to handle concurrent additions
       // This ensures each wallet is added to the latest state, not a stale closure
-      setWallets(prevWallets => {
+      setWallets((prevWallets) => {
         // Check if wallet already exists in the current state (race condition protection)
-        const alreadyExists = prevWallets.some(w => w.address === wallet.address);
+        const alreadyExists = prevWallets.some(
+          (w) => w.address === wallet.address,
+        );
         if (alreadyExists) {
           // Wallet already exists, don't add it again
           return prevWallets;
@@ -322,37 +362,41 @@ export const WalletsPage: React.FC = () => {
       });
 
       // If it's an HD wallet, update master wallet account count
-      if (wallet.source === 'hd-derived' && wallet.masterWalletId && wallet.derivationIndex !== undefined) {
-        setMasterWallets(prevMasterWallets => {
+      if (
+        wallet.source === "hd-derived" &&
+        wallet.masterWalletId &&
+        wallet.derivationIndex !== undefined
+      ) {
+        setMasterWallets((prevMasterWallets) => {
           const updatedMasterWallets = updateMasterWalletAccountCount(
             prevMasterWallets,
             wallet.masterWalletId!,
-            wallet.derivationIndex! + 1
+            wallet.derivationIndex! + 1,
           );
           saveMasterWallets(updatedMasterWallets);
           return updatedMasterWallets;
         });
       }
 
-      showToast('Wallet created successfully', 'success');
+      showToast("Wallet created successfully", "success");
     } catch (error) {
-      console.error('Error creating wallet:', error);
+      console.error("Error creating wallet:", error);
       throw error;
     }
   };
 
   const handleImportFromFile = async (file: File): Promise<void> => {
     if (!connection) {
-      throw new Error('Connection not available');
+      throw new Error("Connection not available");
     }
 
     const text = await file.text();
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
     const base58Pattern = /^[1-9A-HJ-NP-Za-km-z]{64,88}$/;
     let foundKeys: string[] = [];
     let foundMnemonics: string[] = [];
 
-    if (fileExtension === 'key') {
+    if (fileExtension === "key") {
       const trimmedText = text.trim();
       if (base58Pattern.test(trimmedText)) {
         foundKeys = [trimmedText];
@@ -363,7 +407,7 @@ export const WalletsPage: React.FC = () => {
           foundMnemonics = [trimmedText];
         }
       }
-    } else if (fileExtension === 'json') {
+    } else if (fileExtension === "json") {
       try {
         const jsonData: unknown = JSON.parse(text);
 
@@ -377,7 +421,7 @@ export const WalletsPage: React.FC = () => {
               const secretKey = new Uint8Array(item as number[]);
               const privateKey = bs58.encode(secretKey);
               foundKeys.push(privateKey);
-            } else if (typeof item === 'string') {
+            } else if (typeof item === "string") {
               // Could be a private key or seed phrase
               if (base58Pattern.test(item.trim())) {
                 foundKeys.push(item.trim());
@@ -389,13 +433,20 @@ export const WalletsPage: React.FC = () => {
               }
             }
           }
-        } else if (typeof jsonData === 'object' && jsonData !== null && 'secretKey' in jsonData && Array.isArray((jsonData as { secretKey: unknown }).secretKey)) {
-          const secretKey = new Uint8Array((jsonData as { secretKey: number[] }).secretKey);
+        } else if (
+          typeof jsonData === "object" &&
+          jsonData !== null &&
+          "secretKey" in jsonData &&
+          Array.isArray((jsonData as { secretKey: unknown }).secretKey)
+        ) {
+          const secretKey = new Uint8Array(
+            (jsonData as { secretKey: number[] }).secretKey,
+          );
           const privateKey = bs58.encode(secretKey);
           foundKeys = [privateKey];
         }
       } catch {
-        throw new Error('Invalid JSON format');
+        throw new Error("Invalid JSON format");
       }
     } else {
       // .txt file - parse line by line
@@ -418,7 +469,7 @@ export const WalletsPage: React.FC = () => {
     }
 
     if (foundKeys.length === 0 && foundMnemonics.length === 0) {
-      throw new Error('No valid private keys or seed phrases found in file');
+      throw new Error("No valid private keys or seed phrases found in file");
     }
 
     const importedWallets: WalletType[] = [];
@@ -431,7 +482,7 @@ export const WalletsPage: React.FC = () => {
 
         if (error || !wallet) continue;
 
-        const exists = wallets.some(w => w.address === wallet.address);
+        const exists = wallets.some((w) => w.address === wallet.address);
         if (exists) continue;
 
         importedWallets.push(wallet);
@@ -439,9 +490,9 @@ export const WalletsPage: React.FC = () => {
         const solBalance = await fetchSolBalance(connection, wallet.address);
         newSolBalances.set(wallet.address, solBalance);
 
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       } catch (error) {
-        console.error('Error importing wallet:', error);
+        console.error("Error importing wallet:", error);
       }
     }
 
@@ -450,16 +501,16 @@ export const WalletsPage: React.FC = () => {
       try {
         const masterWalletName = `Imported Master ${Date.now()}`;
         await handleImportMasterWallet(masterWalletName, mnemonic, 0);
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       } catch (error) {
-        console.error('Error importing master wallet:', error);
+        console.error("Error importing master wallet:", error);
       }
     }
 
     setSolBalances(newSolBalances);
 
     if (importedWallets.length === 0 && foundMnemonics.length === 0) {
-      throw new Error('No new wallets could be imported');
+      throw new Error("No new wallets could be imported");
     }
 
     if (importedWallets.length > 0) {
@@ -468,11 +519,17 @@ export const WalletsPage: React.FC = () => {
     }
 
     const totalImported = importedWallets.length + foundMnemonics.length;
-    showToast(`Successfully imported ${totalImported} wallet${totalImported > 1 ? 's' : ''}`, 'success');
+    showToast(
+      `Successfully imported ${totalImported} wallet${totalImported > 1 ? "s" : ""}`,
+      "success",
+    );
   };
 
   // Master Wallet Handlers
-  const handleCreateMasterWallet = async (name: string, mnemonic: string): Promise<void> => {
+  const handleCreateMasterWallet = async (
+    name: string,
+    mnemonic: string,
+  ): Promise<void> => {
     if (!connection) return;
 
     try {
@@ -482,7 +539,10 @@ export const WalletsPage: React.FC = () => {
       const newWallets: WalletType[] = [masterWallet];
       const newSolBalances = new Map(solBalances);
 
-      const solBalance = await fetchSolBalance(connection, masterWallet.address);
+      const solBalance = await fetchSolBalance(
+        connection,
+        masterWallet.address,
+      );
       newSolBalances.set(masterWallet.address, solBalance);
 
       newMasterWallet.accountCount = 1;
@@ -495,14 +555,18 @@ export const WalletsPage: React.FC = () => {
       setWallets(allWallets);
       setSolBalances(newSolBalances);
 
-      showToast('Master wallet created with primary wallet', 'success');
+      showToast("Master wallet created with primary wallet", "success");
     } catch (error) {
-      console.error('Error creating master wallet:', error);
-      showToast('Failed to create master wallet', 'error');
+      console.error("Error creating master wallet:", error);
+      showToast("Failed to create master wallet", "error");
     }
   };
 
-  const handleImportMasterWallet = async (name: string, mnemonic: string, initialWalletCount: number): Promise<void> => {
+  const handleImportMasterWallet = async (
+    name: string,
+    mnemonic: string,
+    initialWalletCount: number,
+  ): Promise<void> => {
     if (!connection) return;
 
     try {
@@ -512,24 +576,32 @@ export const WalletsPage: React.FC = () => {
       const newWallets: WalletType[] = [masterWallet];
       const newSolBalances = new Map(solBalances);
 
-      const solBalance = await fetchSolBalance(connection, masterWallet.address);
+      const solBalance = await fetchSolBalance(
+        connection,
+        masterWallet.address,
+      );
       newSolBalances.set(masterWallet.address, solBalance);
 
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       if (initialWalletCount > 0) {
-        const derivedWallets = deriveMultipleWallets(mnemonic, initialWalletCount, 1);
+        const derivedWallets = deriveMultipleWallets(
+          mnemonic,
+          initialWalletCount,
+          1,
+        );
 
         for (let i = 0; i < derivedWallets.length; i++) {
           const derived = derivedWallets[i];
-          const uniqueId = Date.now() * 1000 + Math.floor(Math.random() * 1000) + i + 1;
+          const uniqueId =
+            Date.now() * 1000 + Math.floor(Math.random() * 1000) + i + 1;
           const wallet: WalletType = {
             id: uniqueId,
             address: derived.address,
             privateKey: derived.privateKey,
             isActive: false,
-            category: 'Medium',
-            source: 'hd-derived',
+            category: "Medium",
+            source: "hd-derived",
             masterWalletId: newMasterWallet.id,
             derivationIndex: derived.accountIndex,
           };
@@ -538,7 +610,7 @@ export const WalletsPage: React.FC = () => {
           const solBalance = await fetchSolBalance(connection, wallet.address);
           newSolBalances.set(wallet.address, solBalance);
 
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
         }
 
         newMasterWallet.accountCount = initialWalletCount + 1;
@@ -555,28 +627,35 @@ export const WalletsPage: React.FC = () => {
       setSolBalances(newSolBalances);
 
       const totalWallets = initialWalletCount + 1;
-      showToast(`Master wallet imported with ${totalWallets} wallet${totalWallets > 1 ? 's' : ''}`, 'success');
+      showToast(
+        `Master wallet imported with ${totalWallets} wallet${totalWallets > 1 ? "s" : ""}`,
+        "success",
+      );
     } catch (error) {
-      console.error('Error importing master wallet:', error);
-      showToast('Failed to import master wallet', 'error');
+      console.error("Error importing master wallet:", error);
+      showToast("Failed to import master wallet", "error");
     }
   };
 
-
   const handleDeleteMasterWallet = (masterWalletId: string): void => {
-    const derivedWallets = wallets.filter(w => w.masterWalletId === masterWalletId);
+    const derivedWallets = wallets.filter(
+      (w) => w.masterWalletId === masterWalletId,
+    );
     if (derivedWallets.length > 0) {
       const confirmed = window.confirm(
         `This master wallet has ${derivedWallets.length} derived wallet(s). ` +
-        `The wallets will remain but you won't be able to generate new ones. Continue?`
+          `The wallets will remain but you won't be able to generate new ones. Continue?`,
       );
       if (!confirmed) return;
     }
 
-    const updatedMasterWallets = deleteMasterWalletUtil(masterWallets, masterWalletId);
+    const updatedMasterWallets = deleteMasterWalletUtil(
+      masterWallets,
+      masterWalletId,
+    );
     setMasterWallets(updatedMasterWallets);
     saveMasterWallets(updatedMasterWallets);
-    showToast('Master wallet deleted', 'success');
+    showToast("Master wallet deleted", "success");
   };
 
   const toggleMasterWalletExpansion = (masterWalletId: string): void => {
@@ -590,39 +669,65 @@ export const WalletsPage: React.FC = () => {
   };
 
   // Handle category settings save
-  const handleSaveCategorySettings = (settings: Record<WalletCategory, CategoryQuickTradeSettings>): void => {
+  const handleSaveCategorySettings = (
+    settings: Record<WalletCategory, CategoryQuickTradeSettings>,
+  ): void => {
     setCategorySettings(settings);
-    localStorage.setItem('categoryQuickTradeSettings', JSON.stringify(settings));
-    showToast('Quick trade settings saved', 'success');
+    localStorage.setItem(
+      "categoryQuickTradeSettings",
+      JSON.stringify(settings),
+    );
+    showToast("Quick trade settings saved", "success");
   };
 
   // Handle custom wallet quick trade settings
-  const handleSaveWalletCustomSettings = (walletId: number, settings: CustomQuickTradeSettings | null): void => {
-    const updatedWallets = wallets.map(w =>
+  const handleSaveWalletCustomSettings = (
+    walletId: number,
+    settings: CustomQuickTradeSettings | null,
+  ): void => {
+    const updatedWallets = wallets.map((w) =>
       w.id === walletId
         ? { ...w, customQuickTradeSettings: settings || undefined }
-        : w
+        : w,
     );
     setWallets(updatedWallets);
     saveWalletsToCookies(updatedWallets);
-    showToast(settings ? 'Custom quick trade settings saved' : 'Custom settings removed', 'success');
+    showToast(
+      settings
+        ? "Custom quick trade settings saved"
+        : "Custom settings removed",
+      "success",
+    );
   };
-
 
   // Filter and sort wallets
   const filteredAndSortedWallets = useMemo(() => {
-    const filtered = wallets.filter(wallet => {
-      const matchesArchivedFilter = showArchived ? wallet.isArchived === true : !wallet.isArchived;
-      const matchesAddressSearch = wallet.address.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesLabelSearch = labelSearchTerm.trim() === '' ||
-        (wallet.label && wallet.label.toLowerCase().includes(labelSearchTerm.toLowerCase()));
+    const filtered = wallets.filter((wallet) => {
+      const matchesArchivedFilter = showArchived
+        ? wallet.isArchived === true
+        : !wallet.isArchived;
+      const matchesAddressSearch = wallet.address
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      const matchesLabelSearch =
+        labelSearchTerm.trim() === "" ||
+        (wallet.label &&
+          wallet.label.toLowerCase().includes(labelSearchTerm.toLowerCase()));
       const matchesViewMode =
-        viewMode === 'all' ? true :
-          viewMode === 'hd' ? wallet.source === 'hd-derived' :
-            viewMode === 'imported' ? (wallet.source === 'imported' || !wallet.source) :
-              true;
+        viewMode === "all"
+          ? true
+          : viewMode === "hd"
+            ? wallet.source === "hd-derived"
+            : viewMode === "imported"
+              ? wallet.source === "imported" || !wallet.source
+              : true;
 
-      return matchesArchivedFilter && matchesAddressSearch && matchesLabelSearch && matchesViewMode;
+      return (
+        matchesArchivedFilter &&
+        matchesAddressSearch &&
+        matchesLabelSearch &&
+        matchesViewMode
+      );
     });
 
     // If no sort field is set, preserve manual order
@@ -635,7 +740,7 @@ export const WalletsPage: React.FC = () => {
       let bValue: number;
 
       switch (sortField) {
-        case 'solBalance':
+        case "solBalance":
           aValue = solBalances.get(a.address) || 0;
           bValue = solBalances.get(b.address) || 0;
           break;
@@ -644,11 +749,18 @@ export const WalletsPage: React.FC = () => {
           bValue = solBalances.get(b.address) || 0;
       }
 
-      return sortDirection === 'asc'
-        ? aValue - bValue
-        : bValue - aValue;
+      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
     });
-  }, [wallets, sortField, sortDirection, searchTerm, labelSearchTerm, solBalances, showArchived, viewMode]);
+  }, [
+    wallets,
+    sortField,
+    sortDirection,
+    searchTerm,
+    labelSearchTerm,
+    solBalances,
+    showArchived,
+    viewMode,
+  ]);
 
   // Keep search inputs visible when there's a search term
   useEffect(() => {
@@ -666,33 +778,37 @@ export const WalletsPage: React.FC = () => {
   // Close view mode dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent): void => {
-      if (viewModeDropdownRef.current && !viewModeDropdownRef.current.contains(event.target as Node)) {
+      if (
+        viewModeDropdownRef.current &&
+        !viewModeDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowViewModeDropdown(false);
       }
     };
 
     if (showViewModeDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
       return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener("mousedown", handleClickOutside);
       };
     }
     return undefined;
   }, [showViewModeDropdown]);
 
-  // Sorting function - now persists to storage
+  // Sorting function - visual only, does not persist to storage
   const handleSort = (field: SortField): void => {
-    const newDirection = sortField === field && sortDirection === 'asc' ? 'desc' : 'asc';
+    const newDirection =
+      sortField === field && sortDirection === "asc" ? "desc" : "asc";
     setSortField(field);
     setSortDirection(newDirection);
 
-    // Sort the actual wallets array and save to storage
+    // Sort the actual wallets array (visual only - not saved to storage)
     const sortedWallets = [...wallets].sort((a, b) => {
       let aValue: number;
       let bValue: number;
 
       switch (field) {
-        case 'solBalance':
+        case "solBalance":
           aValue = solBalances.get(a.address) || 0;
           bValue = solBalances.get(b.address) || 0;
           break;
@@ -701,14 +817,14 @@ export const WalletsPage: React.FC = () => {
           bValue = solBalances.get(b.address) || 0;
       }
 
-      return newDirection === 'asc'
-        ? aValue - bValue
-        : bValue - aValue;
+      return newDirection === "asc" ? aValue - bValue : bValue - aValue;
     });
 
     setWallets(sortedWallets);
-    saveWalletsToCookies(sortedWallets);
-    showToast(`Sorted by ${field} (${newDirection === 'asc' ? 'ascending' : 'descending'})`, 'success');
+    showToast(
+      `Sorted by ${field} (${newDirection === "asc" ? "ascending" : "descending"})`,
+      "success",
+    );
   };
 
   // Selection functions
@@ -723,7 +839,7 @@ export const WalletsPage: React.FC = () => {
   };
 
   const selectAllVisible = (): void => {
-    const newSelected = new Set(filteredAndSortedWallets.map(w => w.id));
+    const newSelected = new Set(filteredAndSortedWallets.map((w) => w.id));
     setSelectedWallets(newSelected);
   };
 
@@ -734,54 +850,55 @@ export const WalletsPage: React.FC = () => {
   // Label editing functions
   const startEditingLabel = (wallet: WalletType): void => {
     setEditingLabel(wallet.id);
-    setEditLabelValue(wallet.label || '');
+    setEditLabelValue(wallet.label || "");
   };
 
   const saveLabel = (walletId: number): void => {
-    const updatedWallets = wallets.map(wallet =>
+    const updatedWallets = wallets.map((wallet) =>
       wallet.id === walletId
         ? { ...wallet, label: editLabelValue.trim() || undefined }
-        : wallet
+        : wallet,
     );
     saveWalletsToCookies(updatedWallets);
     setWallets(updatedWallets);
     setEditingLabel(null);
-    setEditLabelValue('');
-    showToast('Label updated', 'success');
+    setEditLabelValue("");
+    showToast("Label updated", "success");
   };
 
   const cancelEditingLabel = (): void => {
     setEditingLabel(null);
-    setEditLabelValue('');
+    setEditLabelValue("");
   };
 
-  const handleLabelKeyPress = (e: React.KeyboardEvent, walletId: number): void => {
-    if (e.key === 'Enter') {
+  const handleLabelKeyPress = (
+    e: React.KeyboardEvent,
+    walletId: number,
+  ): void => {
+    if (e.key === "Enter") {
       saveLabel(walletId);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       cancelEditingLabel();
     }
   };
 
   // Category editing functions
   const saveCategory = (walletId: number, category: WalletCategory): void => {
-    const updatedWallets = wallets.map(wallet =>
-      wallet.id === walletId
-        ? { ...wallet, category }
-        : wallet
+    const updatedWallets = wallets.map((wallet) =>
+      wallet.id === walletId ? { ...wallet, category } : wallet,
     );
     saveWalletsToCookies(updatedWallets);
     setWallets(updatedWallets);
     setEditingCategory(null);
-    showToast('Category updated', 'success');
+    showToast("Category updated", "success");
   };
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, walletId: number): void => {
     e.stopPropagation();
     setDraggedWalletId(walletId);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', walletId.toString());
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", walletId.toString());
   };
 
   const handleDragOver = (e: React.DragEvent, walletId: number): void => {
@@ -789,7 +906,7 @@ export const WalletsPage: React.FC = () => {
 
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = "move";
 
     if (draggedWalletId !== walletId) {
       setDragOverWalletId(walletId);
@@ -812,8 +929,8 @@ export const WalletsPage: React.FC = () => {
     }
 
     // Find indices in the full wallets array
-    const draggedIndex = wallets.findIndex(w => w.id === draggedWalletId);
-    const targetIndex = wallets.findIndex(w => w.id === targetWalletId);
+    const draggedIndex = wallets.findIndex((w) => w.id === draggedWalletId);
+    const targetIndex = wallets.findIndex((w) => w.id === targetWalletId);
 
     if (draggedIndex === -1 || targetIndex === -1) {
       setDraggedWalletId(null);
@@ -837,9 +954,9 @@ export const WalletsPage: React.FC = () => {
     // Clear sorting so manual order is visible
     if (sortField !== null) {
       setSortField(null);
-      showToast('Wallet order updated', 'success');
+      showToast("Wallet order updated", "success");
     } else {
-      showToast('Wallet order updated', 'success');
+      showToast("Wallet order updated", "success");
     }
   };
 
@@ -852,11 +969,14 @@ export const WalletsPage: React.FC = () => {
   const deleteSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
 
-    const newWallets = wallets.filter(w => !selectedWallets.has(w.id));
+    const newWallets = wallets.filter((w) => !selectedWallets.has(w.id));
     saveWalletsToCookies(newWallets);
     setWallets(newWallets);
 
-    showToast(`Deleted ${selectedWallets.size} wallet${selectedWallets.size > 1 ? 's' : ''}`, 'success');
+    showToast(
+      `Deleted ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      "success",
+    );
     setSelectedWallets(new Set());
   };
 
@@ -864,13 +984,13 @@ export const WalletsPage: React.FC = () => {
     if (selectedWallets.size === 0) return;
 
     const selectedWalletData = wallets
-      .filter(w => selectedWallets.has(w.id))
-      .map(w => w.privateKey)
-      .join('\n');
+      .filter((w) => selectedWallets.has(w.id))
+      .map((w) => w.privateKey)
+      .join("\n");
 
-    const blob = new Blob([selectedWalletData], { type: 'text/plain' });
+    const blob = new Blob([selectedWalletData], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `selected_wallets_${Date.now()}.txt`;
     document.body.appendChild(a);
@@ -878,65 +998,84 @@ export const WalletsPage: React.FC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showToast(`Downloaded ${selectedWallets.size} wallet${selectedWallets.size > 1 ? 's' : ''}`, 'success');
+    showToast(
+      `Downloaded ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      "success",
+    );
   };
 
   const archiveSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
 
-    const newWallets = wallets.map(w =>
-      selectedWallets.has(w.id) ? { ...w, isArchived: true, isActive: false } : w
+    const newWallets = wallets.map((w) =>
+      selectedWallets.has(w.id)
+        ? { ...w, isArchived: true, isActive: false }
+        : w,
     );
     saveWalletsToCookies(newWallets);
     setWallets(newWallets);
 
-    showToast(`Archived ${selectedWallets.size} wallet${selectedWallets.size > 1 ? 's' : ''}`, 'success');
+    showToast(
+      `Archived ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      "success",
+    );
     setSelectedWallets(new Set());
   };
 
   const unarchiveSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
 
-    const newWallets = wallets.map(w =>
-      selectedWallets.has(w.id) ? { ...w, isArchived: false } : w
+    const newWallets = wallets.map((w) =>
+      selectedWallets.has(w.id) ? { ...w, isArchived: false } : w,
     );
     saveWalletsToCookies(newWallets);
     setWallets(newWallets);
 
-    showToast(`Unarchived ${selectedWallets.size} wallet${selectedWallets.size > 1 ? 's' : ''}`, 'success');
+    showToast(
+      `Unarchived ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      "success",
+    );
     setSelectedWallets(new Set());
   };
 
   const archiveWallet = (walletId: number): void => {
-    const newWallets = wallets.map(w =>
-      w.id === walletId ? { ...w, isArchived: true, isActive: false } : w
+    const newWallets = wallets.map((w) =>
+      w.id === walletId ? { ...w, isArchived: true, isActive: false } : w,
     );
     saveWalletsToCookies(newWallets);
     setWallets(newWallets);
-    showToast('Wallet archived', 'success');
+    showToast("Wallet archived", "success");
   };
 
   const unarchiveWallet = (walletId: number): void => {
-    const newWallets = wallets.map(w =>
-      w.id === walletId ? { ...w, isArchived: false } : w
+    const newWallets = wallets.map((w) =>
+      w.id === walletId ? { ...w, isArchived: false } : w,
     );
     saveWalletsToCookies(newWallets);
     setWallets(newWallets);
-    showToast('Wallet unarchived', 'success');
+    showToast("Wallet unarchived", "success");
   };
 
   const SortIcon = ({ field }: { field: SortField }): JSX.Element => {
-    if (sortField !== field) return <ArrowUpDown size={14} className="text-app-secondary-80" />;
-    return sortDirection === 'asc'
-      ? <ArrowUp size={14} className="color-primary" />
-      : <ArrowDown size={14} className="color-primary" />;
+    if (sortField !== field)
+      return <ArrowUpDown size={14} className="text-app-secondary-80" />;
+    return sortDirection === "asc" ? (
+      <ArrowUp size={14} className="color-primary" />
+    ) : (
+      <ArrowDown size={14} className="color-primary" />
+    );
   };
 
   // Calculate totals excluding archived wallets
-  const nonArchivedWallets = wallets.filter(w => !w.isArchived);
-  const totalSOL = nonArchivedWallets.reduce((sum, wallet) => sum + (solBalances.get(wallet.address) || 0), 0);
-  const activeWallets = nonArchivedWallets.filter(w => (solBalances.get(w.address) || 0) > 0).length;
-  const archivedCount = wallets.filter(w => w.isArchived).length;
+  const nonArchivedWallets = wallets.filter((w) => !w.isArchived);
+  const totalSOL = nonArchivedWallets.reduce(
+    (sum, wallet) => sum + (solBalances.get(wallet.address) || 0),
+    0,
+  );
+  const activeWallets = nonArchivedWallets.filter(
+    (w) => (solBalances.get(w.address) || 0) > 0,
+  ).length;
+  const archivedCount = wallets.filter((w) => w.isArchived).length;
 
   return (
     <div className="h-screen bg-app-primary text-app-tertiary flex flex-col overflow-hidden">
@@ -956,7 +1095,7 @@ export const WalletsPage: React.FC = () => {
                   linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
                   linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
                 `,
-                backgroundSize: '20px 20px',
+                backgroundSize: "20px 20px",
               }}
             ></div>
           </div>
@@ -1000,19 +1139,22 @@ export const WalletsPage: React.FC = () => {
                 {/* Master Wallet Cards */}
                 {masterWallets.map((masterWallet) => {
                   const derivedWallets = wallets.filter(
-                    (w) => w.masterWalletId === masterWallet.id
+                    (w) => w.masterWalletId === masterWallet.id,
                   );
                   const isExpanded = expandedMasterWallets.has(masterWallet.id);
 
                   return (
                     <button
                       key={masterWallet.id}
-                      onClick={() => toggleMasterWalletExpansion(masterWallet.id)}
+                      onClick={() =>
+                        toggleMasterWalletExpansion(masterWallet.id)
+                      }
                       className={`text-center px-3 py-1 border rounded text-xs font-mono transition-colors
-                              ${isExpanded
-                          ? "border-app-primary-color bg-app-primary-color/10 color-primary"
-                          : "border-app-primary-30 hover:border-app-primary-40 color-primary hover-color-primary-light"
-                        }`}
+                              ${
+                                isExpanded
+                                  ? "border-app-primary-color bg-app-primary-color/10 color-primary"
+                                  : "border-app-primary-30 hover:border-app-primary-40 color-primary hover-color-primary-light"
+                              }`}
                     >
                       <div className="font-bold">{masterWallet.name}</div>
                       <div className="text-app-secondary-80 text-[10px]">
@@ -1026,14 +1168,14 @@ export const WalletsPage: React.FC = () => {
                 {/* Action Buttons */}
                 <button
                   onClick={() => setIsCreateMasterWalletModalOpen(true)}
-                  className="px-2 sm:px-3 py-1 sm:py-1.5 color-primary hover-color-primary-light 
+                  className="px-2 sm:px-3 py-1 sm:py-1.5 color-primary hover-color-primary-light
                           border border-app-primary-30 rounded text-xs sm:text-sm font-mono"
                 >
                   + NEW
                 </button>
                 <button
                   onClick={() => setIsImportMasterWalletModalOpen(true)}
-                  className="px-2 sm:px-3 py-1 sm:py-1.5 color-primary hover-color-primary-light 
+                  className="px-2 sm:px-3 py-1 sm:py-1.5 color-primary hover-color-primary-light
                           border border-app-primary-30 rounded text-xs sm:text-sm font-mono"
                 >
                   IMPORT
@@ -1044,21 +1186,28 @@ export const WalletsPage: React.FC = () => {
                     try {
                       await refreshBalances();
                       // Force a re-render by creating a new Map reference
-                      setSolBalances(prev => new Map(prev));
-                      showToast('Balances refreshed', 'success');
+                      setSolBalances((prev) => new Map(prev));
+                      showToast("Balances refreshed", "success");
                     } catch (error) {
-                      console.error('Error refreshing balances:', error);
-                      showToast('Failed to refresh balances', 'error');
+                      console.error("Error refreshing balances:", error);
+                      showToast("Failed to refresh balances", "error");
                     }
                   }}
                   disabled={!connection || isRefreshing}
-                  className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${!connection || isRefreshing
-                    ? 'bg-primary-20 cursor-not-allowed text-app-secondary-80'
-                    : 'bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn'
-                    }`}
+                  className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
+                    !connection || isRefreshing
+                      ? "bg-primary-20 cursor-not-allowed text-app-secondary-80"
+                      : "bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn"
+                  }`}
                 >
-                  <RefreshCw size={12} className={`sm:hidden ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <RefreshCw size={14} className={`hidden sm:block ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw
+                    size={12}
+                    className={`sm:hidden ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                  <RefreshCw
+                    size={14}
+                    className={`hidden sm:block ${isRefreshing ? "animate-spin" : ""}`}
+                  />
                   <span className="hidden sm:inline ml-0.5">REFRESH</span>
                 </button>
               </div>
@@ -1068,7 +1217,7 @@ export const WalletsPage: React.FC = () => {
           {/* Expanded Master Wallet Details */}
           {masterWallets.map((masterWallet) => {
             const derivedWallets = wallets.filter(
-              (w) => w.masterWalletId === masterWallet.id
+              (w) => w.masterWalletId === masterWallet.id,
             );
             const isExpanded = expandedMasterWallets.has(masterWallet.id);
 
@@ -1087,7 +1236,7 @@ export const WalletsPage: React.FC = () => {
                     </div>
                     {(() => {
                       const masterWalletAccount = derivedWallets.find(
-                        (w) => w.derivationIndex === 0
+                        (w) => w.derivationIndex === 0,
                       );
                       return masterWalletAccount ? (
                         <div className="text-xs text-app-secondary-80 mt-1 flex items-center gap-2">
@@ -1100,7 +1249,7 @@ export const WalletsPage: React.FC = () => {
                               onClick={() =>
                                 copyToClipboard(
                                   masterWalletAccount.address,
-                                  showToast
+                                  showToast,
                                 )
                               }
                               className="color-primary hover-color-primary-light transition-colors"
@@ -1123,18 +1272,25 @@ export const WalletsPage: React.FC = () => {
                   <div className="flex gap-2">
                     <WalletTooltip content="Export Seed Phrase" position="top">
                       <button
-                        onClick={() => setExportSeedPhraseMasterWallet(masterWallet)}
-                        className="px-2 py-1 text-[10px] font-mono color-primary 
+                        onClick={() =>
+                          setExportSeedPhraseMasterWallet(masterWallet)
+                        }
+                        className="px-2 py-1 text-[10px] font-mono color-primary
                                 hover-color-primary-light border border-app-primary-20 rounded"
                       >
                         EXPORT
                       </button>
                     </WalletTooltip>
 
-                    <WalletTooltip content="Delete Master Wallet" position="top">
+                    <WalletTooltip
+                      content="Delete Master Wallet"
+                      position="top"
+                    >
                       <button
-                        onClick={() => handleDeleteMasterWallet(masterWallet.id)}
-                        className="px-2 py-1 text-[10px] font-mono text-red-500 
+                        onClick={() =>
+                          handleDeleteMasterWallet(masterWallet.id)
+                        }
+                        className="px-2 py-1 text-[10px] font-mono text-red-500
                                 hover:text-red-400 border border-red-500/30 rounded"
                       >
                         DELETE
@@ -1149,7 +1305,7 @@ export const WalletsPage: React.FC = () => {
                     {derivedWallets
                       .sort(
                         (a, b) =>
-                          (a.derivationIndex || 0) - (b.derivationIndex || 0)
+                          (a.derivationIndex || 0) - (b.derivationIndex || 0),
                       )
                       .map((wallet) => {
                         const isMasterWallet = wallet.derivationIndex === 0;
@@ -1173,7 +1329,10 @@ export const WalletsPage: React.FC = () => {
                               {formatAddress(wallet.address)}
                             </span>
                             <span className="text-app-secondary-80">
-                              {(solBalances.get(wallet.address) || 0).toFixed(3)} SOL
+                              {(solBalances.get(wallet.address) || 0).toFixed(
+                                3,
+                              )}{" "}
+                              SOL
                             </span>
                           </div>
                         );
@@ -1184,7 +1343,6 @@ export const WalletsPage: React.FC = () => {
             );
           })}
 
-
           {/* Controls */}
           <div className="mb-4 flex-shrink-0">
             <div className="flex flex-row flex-wrap items-center gap-0.5 sm:gap-1">
@@ -1192,33 +1350,50 @@ export const WalletsPage: React.FC = () => {
               <div className="relative" ref={viewModeDropdownRef}>
                 <button
                   onClick={() => setShowViewModeDropdown(!showViewModeDropdown)}
-                  className="flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 
-                          bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 
+                  className="flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300
+                          bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60
                           text-app-primary whitespace-nowrap"
                 >
-                  <span className="hidden sm:inline text-xs sm:text-sm text-app-secondary-80">VIEW:</span>
-                  <span className="font-bold">
-                    {viewMode === 'all' ? 'ALL' : viewMode === 'hd' ? 'HD' : 'IMP'}
+                  <span className="hidden sm:inline text-xs sm:text-sm text-app-secondary-80">
+                    VIEW:
                   </span>
-                  <ChevronDown size={12} className={`sm:hidden transition-transform duration-200 ${showViewModeDropdown ? 'rotate-180' : ''}`} />
-                  <ChevronDown size={14} className={`hidden sm:block transition-transform duration-200 ${showViewModeDropdown ? 'rotate-180' : ''}`} />
+                  <span className="font-bold">
+                    {viewMode === "all"
+                      ? "ALL"
+                      : viewMode === "hd"
+                        ? "HD"
+                        : "IMP"}
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    className={`sm:hidden transition-transform duration-200 ${showViewModeDropdown ? "rotate-180" : ""}`}
+                  />
+                  <ChevronDown
+                    size={14}
+                    className={`hidden sm:block transition-transform duration-200 ${showViewModeDropdown ? "rotate-180" : ""}`}
+                  />
                 </button>
 
                 {showViewModeDropdown && (
                   <div className="absolute top-full left-0 mt-1 bg-app-primary border border-app-primary-30 rounded-lg shadow-lg z-20 min-w-full">
-                    {(['all', 'hd', 'imported'] as const).map((mode) => (
+                    {(["all", "hd", "imported"] as const).map((mode) => (
                       <button
                         key={mode}
                         onClick={() => {
                           setViewMode(mode);
                           setShowViewModeDropdown(false);
                         }}
-                        className={`w-full text-left px-4 py-2 text-xs font-mono transition-colors ${viewMode === mode
-                          ? 'bg-app-primary-color text-black font-bold'
-                          : 'text-app-primary hover:bg-app-quaternary'
-                          } ${mode === 'all' ? 'rounded-t-lg' : mode === 'imported' ? 'rounded-b-lg' : ''}`}
+                        className={`w-full text-left px-4 py-2 text-xs font-mono transition-colors ${
+                          viewMode === mode
+                            ? "bg-app-primary-color text-black font-bold"
+                            : "text-app-primary hover:bg-app-quaternary"
+                        } ${mode === "all" ? "rounded-t-lg" : mode === "imported" ? "rounded-b-lg" : ""}`}
                       >
-                        {mode === 'all' ? 'ALL' : mode === 'hd' ? 'HD WALLETS' : 'IMPORTED'}
+                        {mode === "all"
+                          ? "ALL"
+                          : mode === "hd"
+                            ? "HD WALLETS"
+                            : "IMPORTED"}
                       </button>
                     ))}
                   </div>
@@ -1229,10 +1404,11 @@ export const WalletsPage: React.FC = () => {
               <button
                 onClick={() => setIsCreateWalletModalOpen(true)}
                 disabled={!connection}
-                className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${!connection
-                  ? 'bg-primary-20 cursor-not-allowed text-app-secondary-80'
-                  : 'bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn'
-                  }`}
+                className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
+                  !connection
+                    ? "bg-primary-20 cursor-not-allowed text-app-secondary-80"
+                    : "bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn"
+                }`}
               >
                 <Plus size={12} className="sm:hidden" />
                 <Plus size={14} className="hidden sm:block" />
@@ -1263,7 +1439,15 @@ export const WalletsPage: React.FC = () => {
 
               <WalletTooltip content="Remove empty wallets" position="bottom">
                 <button
-                  onClick={() => handleCleanupWallets(wallets, solBalances, new Map<string, number>(), setWallets, showToast)}
+                  onClick={() =>
+                    handleCleanupWallets(
+                      wallets,
+                      solBalances,
+                      new Map<string, number>(),
+                      setWallets,
+                      showToast,
+                    )
+                  }
                   className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary border border-error-alt-40 hover:border-error-alt text-error-alt hover:bg-app-tertiary whitespace-nowrap"
                 >
                   <Trash2 size={12} className="sm:hidden" />
@@ -1273,20 +1457,28 @@ export const WalletsPage: React.FC = () => {
               </WalletTooltip>
 
               {/* Archive View Toggle */}
-              <WalletTooltip content={showArchived ? "Show active wallets" : "Show archived wallets"} position="bottom">
+              <WalletTooltip
+                content={
+                  showArchived ? "Show active wallets" : "Show archived wallets"
+                }
+                position="bottom"
+              >
                 <button
                   onClick={() => {
                     setShowArchived(!showArchived);
                     setSelectedWallets(new Set());
                   }}
-                  className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${showArchived
-                    ? 'bg-app-primary-color text-black border border-app-primary-60 font-bold'
-                    : 'bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary'
-                    }`}
+                  className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
+                    showArchived
+                      ? "bg-app-primary-color text-black border border-app-primary-60 font-bold"
+                      : "bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary"
+                  }`}
                 >
                   <Archive size={12} className="sm:hidden" />
                   <Archive size={14} className="hidden sm:block" />
-                  <span className="hidden sm:inline ml-0.5">{showArchived ? 'ARCHIVED' : 'ARCHIVE'}</span>
+                  <span className="hidden sm:inline ml-0.5">
+                    {showArchived ? "ARCHIVED" : "ARCHIVE"}
+                  </span>
                 </button>
               </WalletTooltip>
 
@@ -1294,7 +1486,7 @@ export const WalletsPage: React.FC = () => {
               <div className="flex items-center gap-0.5 sm:gap-1 ml-auto">
                 <WalletTooltip content="Fund Wallets" position="bottom">
                   <button
-                    onClick={() => setActiveModal('distribute')}
+                    onClick={() => setActiveModal("distribute")}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
                     <HandCoins size={12} className="sm:hidden" />
@@ -1305,7 +1497,7 @@ export const WalletsPage: React.FC = () => {
 
                 <WalletTooltip content="Consolidate SOL" position="bottom">
                   <button
-                    onClick={() => setActiveModal('consolidate')}
+                    onClick={() => setActiveModal("consolidate")}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
                     <Share size={12} className="sm:hidden" />
@@ -1316,7 +1508,7 @@ export const WalletsPage: React.FC = () => {
 
                 <WalletTooltip content="Transfer Assets" position="bottom">
                   <button
-                    onClick={() => setActiveModal('transfer')}
+                    onClick={() => setActiveModal("transfer")}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
                     <Network size={12} className="sm:hidden" />
@@ -1328,8 +1520,8 @@ export const WalletsPage: React.FC = () => {
                 <WalletTooltip content="Burn Tokens" position="bottom">
                   <button
                     onClick={() => {
-                      setBurnTokenAddress('');
-                      setActiveModal('burn');
+                      setBurnTokenAddress("");
+                      setActiveModal("burn");
                     }}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
@@ -1341,7 +1533,7 @@ export const WalletsPage: React.FC = () => {
 
                 <WalletTooltip content="Deposit SOL" position="bottom">
                   <button
-                    onClick={() => setActiveModal('deposit')}
+                    onClick={() => setActiveModal("deposit")}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
                   >
                     <Send size={12} className="sm:hidden" />
@@ -1367,12 +1559,21 @@ export const WalletsPage: React.FC = () => {
                           className="text-app-secondary-60 opacity-40"
                         />
                         <button
-                          onClick={selectedWallets.size === filteredAndSortedWallets.length ? clearSelection : selectAllVisible}
+                          onClick={
+                            selectedWallets.size ===
+                            filteredAndSortedWallets.length
+                              ? clearSelection
+                              : selectAllVisible
+                          }
                           className="color-primary hover-text-app-primary transition-colors touch-manipulation"
                         >
-                          {selectedWallets.size === filteredAndSortedWallets.length && filteredAndSortedWallets.length > 0 ?
-                            <CheckSquare size={14} className="sm:w-4 sm:h-4" /> : <Square size={14} className="sm:w-4 sm:h-4" />
-                          }
+                          {selectedWallets.size ===
+                            filteredAndSortedWallets.length &&
+                          filteredAndSortedWallets.length > 0 ? (
+                            <CheckSquare size={14} className="sm:w-4 sm:h-4" />
+                          ) : (
+                            <Square size={14} className="sm:w-4 sm:h-4" />
+                          )}
                         </button>
                       </div>
                     </th>
@@ -1394,12 +1595,15 @@ export const WalletsPage: React.FC = () => {
                           />
                           <button
                             onClick={() => {
-                              setLabelSearchTerm('');
+                              setLabelSearchTerm("");
                               setShowLabelSearch(false);
                             }}
                             className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
                           >
-                            <XCircle size={12} className="text-app-secondary-80 hover:text-app-primary" />
+                            <XCircle
+                              size={12}
+                              className="text-app-secondary-80 hover:text-app-primary"
+                            />
                           </button>
                         </div>
                       ) : (
@@ -1409,7 +1613,10 @@ export const WalletsPage: React.FC = () => {
                             onClick={() => setShowLabelSearch(true)}
                             className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
                           >
-                            <Search size={14} className="text-app-secondary-80 hover:color-primary" />
+                            <Search
+                              size={14}
+                              className="text-app-secondary-80 hover:color-primary"
+                            />
                           </button>
                         </div>
                       )}
@@ -1417,7 +1624,10 @@ export const WalletsPage: React.FC = () => {
                     <th className="p-2 sm:p-3 text-left bg-app-primary">
                       <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
                         <span className="text-app-secondary-80">QUICKMODE</span>
-                        <WalletTooltip content="Configure Quick Trade Category Settings" position="bottom">
+                        <WalletTooltip
+                          content="Configure Quick Trade Category Settings"
+                          position="bottom"
+                        >
                           <button
                             onClick={() => {
                               setEditingWalletQuickTrade(null);
@@ -1425,7 +1635,10 @@ export const WalletsPage: React.FC = () => {
                             }}
                             className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
                           >
-                            <Settings size={12} className="text-app-secondary-80 hover:text-app-primary" />
+                            <Settings
+                              size={12}
+                              className="text-app-secondary-80 hover:text-app-primary"
+                            />
                           </button>
                         </WalletTooltip>
                       </div>
@@ -1453,12 +1666,15 @@ export const WalletsPage: React.FC = () => {
                           />
                           <button
                             onClick={() => {
-                              setSearchTerm('');
+                              setSearchTerm("");
                               setShowAddressSearch(false);
                             }}
                             className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
                           >
-                            <XCircle size={12} className="text-app-secondary-80 hover:text-app-primary" />
+                            <XCircle
+                              size={12}
+                              className="text-app-secondary-80 hover:text-app-primary"
+                            />
                           </button>
                         </div>
                       ) : (
@@ -1468,22 +1684,29 @@ export const WalletsPage: React.FC = () => {
                             onClick={() => setShowAddressSearch(true)}
                             className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
                           >
-                            <Search size={14} className="text-app-secondary-80 hover:color-primary" />
+                            <Search
+                              size={14}
+                              className="text-app-secondary-80 hover:color-primary"
+                            />
                           </button>
                         </div>
                       )}
                     </th>
                     <th className="p-2 sm:p-3 text-left bg-app-primary">
                       <button
-                        onClick={() => handleSort('solBalance')}
+                        onClick={() => handleSort("solBalance")}
                         className="flex items-center gap-1 sm:gap-2 text-app-secondary-80 hover:color-primary transition-colors touch-manipulation text-[10px] sm:text-xs"
                       >
                         SOL BALANCE
                         <SortIcon field="solBalance" />
                       </button>
                     </th>
-                    <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">PRIVATE KEY</th>
-                    <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">ACTIONS</th>
+                    <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">
+                      PRIVATE KEY
+                    </th>
+                    <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">
+                      ACTIONS
+                    </th>
                   </tr>
                 </thead>
 
@@ -1501,10 +1724,15 @@ export const WalletsPage: React.FC = () => {
                         onDragOver={(e) => handleDragOver(e, wallet.id)}
                         onDragLeave={(e) => handleDragLeave(e)}
                         onDrop={(e) => handleDrop(e, wallet.id)}
-                        className={`border-b border-app-primary-20 hover:bg-app-quaternary transition-all ${isSelected ? 'bg-app-quaternary' : ''
-                          } ${isDragging ? 'opacity-40 bg-app-primary-color/5' : ''
-                          } ${isDragOver ? 'border-t-2 border-t-app-primary-color bg-app-primary-color/10' : ''
-                          }`}
+                        className={`border-b border-app-primary-20 hover:bg-app-quaternary transition-all ${
+                          isSelected ? "bg-app-quaternary" : ""
+                        } ${
+                          isDragging ? "opacity-40 bg-app-primary-color/5" : ""
+                        } ${
+                          isDragOver
+                            ? "border-t-2 border-t-app-primary-color bg-app-primary-color/10"
+                            : ""
+                        }`}
                       >
                         <td className="p-2 sm:p-3">
                           <div className="flex items-center gap-2">
@@ -1524,7 +1752,14 @@ export const WalletsPage: React.FC = () => {
                               onClick={() => toggleWalletSelection(wallet.id)}
                               className="color-primary hover-text-app-primary transition-colors touch-manipulation"
                             >
-                              {isSelected ? <CheckSquare size={14} className="sm:w-4 sm:h-4" /> : <Square size={14} className="sm:w-4 sm:h-4" />}
+                              {isSelected ? (
+                                <CheckSquare
+                                  size={14}
+                                  className="sm:w-4 sm:h-4"
+                                />
+                              ) : (
+                                <Square size={14} className="sm:w-4 sm:h-4" />
+                              )}
                             </button>
                           </div>
                         </td>
@@ -1534,8 +1769,12 @@ export const WalletsPage: React.FC = () => {
                               <input
                                 type="text"
                                 value={editLabelValue}
-                                onChange={(e) => setEditLabelValue(e.target.value)}
-                                onKeyDown={(e) => handleLabelKeyPress(e, wallet.id)}
+                                onChange={(e) =>
+                                  setEditLabelValue(e.target.value)
+                                }
+                                onKeyDown={(e) =>
+                                  handleLabelKeyPress(e, wallet.id)
+                                }
                                 className="bg-app-quaternary border border-app-primary-20 rounded-lg px-2 py-1.5 sm:py-1 text-xs sm:text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono flex-1"
                                 placeholder="Enter label..."
                                 autoFocus
@@ -1556,7 +1795,7 @@ export const WalletsPage: React.FC = () => {
                           ) : (
                             <div className="flex items-center gap-2">
                               <span className="text-app-primary font-mono text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">
-                                {wallet.label || 'No label'}
+                                {wallet.label || "No label"}
                               </span>
                               <button
                                 onClick={() => startEditingLabel(wallet)}
@@ -1571,9 +1810,10 @@ export const WalletsPage: React.FC = () => {
                           {editingCategory === wallet.id ? (
                             <div className="flex items-center gap-2">
                               <select
-                                value={wallet.category || 'Medium'}
+                                value={wallet.category || "Medium"}
                                 onChange={(e) => {
-                                  const value = e.target.value as WalletCategory;
+                                  const value = e.target
+                                    .value as WalletCategory;
                                   saveCategory(wallet.id, value);
                                 }}
                                 onBlur={() => setEditingCategory(null)}
@@ -1594,9 +1834,10 @@ export const WalletsPage: React.FC = () => {
                           ) : (
                             <div className="flex items-center gap-2">
                               <WalletTooltip
-                                content={wallet.customQuickTradeSettings
-                                  ? "Using custom quick trade settings (click to configure)"
-                                  : `Using ${wallet.category || 'Medium'} category settings (click to configure)`
+                                content={
+                                  wallet.customQuickTradeSettings
+                                    ? "Using custom quick trade settings (click to configure)"
+                                    : `Using ${wallet.category || "Medium"} category settings (click to configure)`
                                 }
                                 position="top"
                               >
@@ -1606,21 +1847,21 @@ export const WalletsPage: React.FC = () => {
                                     setEditingWalletQuickTrade(wallet);
                                     setIsQuickTradeModalOpen(true);
                                   }}
-                                  className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded transition-all hover:opacity-80 ${wallet.customQuickTradeSettings
-                                    ? 'bg-blue-500/30 text-blue-300 border border-blue-500/50'
-                                    : wallet.category === 'Soft'
-                                      ? 'bg-green-500/20 text-green-400'
-                                      : wallet.category === 'Medium'
-                                        ? 'bg-yellow-500/20 text-yellow-400'
-                                        : wallet.category === 'Hard'
-                                          ? 'bg-red-500/20 text-red-400'
-                                          : 'bg-yellow-500/20 text-yellow-400'
-                                    }`}
+                                  className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded transition-all hover:opacity-80 ${
+                                    wallet.customQuickTradeSettings
+                                      ? "bg-blue-500/30 text-blue-300 border border-blue-500/50"
+                                      : wallet.category === "Soft"
+                                        ? "bg-green-500/20 text-green-400"
+                                        : wallet.category === "Medium"
+                                          ? "bg-yellow-500/20 text-yellow-400"
+                                          : wallet.category === "Hard"
+                                            ? "bg-red-500/20 text-red-400"
+                                            : "bg-yellow-500/20 text-yellow-400"
+                                  }`}
                                 >
                                   {wallet.customQuickTradeSettings
-                                    ? 'Custom'
-                                    : (wallet.category || 'Medium')
-                                  }
+                                    ? "Custom"
+                                    : wallet.category || "Medium"}
                                 </button>
                               </WalletTooltip>
                               <button
@@ -1633,17 +1874,25 @@ export const WalletsPage: React.FC = () => {
                           )}
                         </td>
                         <td className="p-2 sm:p-3">
-                          <span className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded ${wallet.source === 'hd-derived'
-                            ? 'bg-blue-500/20 text-blue-400'
-                            : 'bg-purple-500/20 text-purple-400'
-                            }`}>
-                            {wallet.source === 'hd-derived' ? 'HD' : 'IM'}
+                          <span
+                            className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded ${
+                              wallet.source === "hd-derived"
+                                ? "bg-blue-500/20 text-blue-400"
+                                : "bg-purple-500/20 text-purple-400"
+                            }`}
+                          >
+                            {wallet.source === "hd-derived" ? "HD" : "IM"}
                           </span>
                         </td>
                         <td className="p-2 sm:p-3">
-                          <WalletTooltip content="Click to copy address" position="top">
+                          <WalletTooltip
+                            content="Click to copy address"
+                            position="top"
+                          >
                             <button
-                              onClick={() => copyToClipboard(wallet.address, showToast)}
+                              onClick={() =>
+                                copyToClipboard(wallet.address, showToast)
+                              }
                               className="text-app-primary hover:color-primary transition-colors font-mono text-[10px] sm:text-xs touch-manipulation"
                             >
                               {formatAddress(wallet.address)}
@@ -1651,14 +1900,21 @@ export const WalletsPage: React.FC = () => {
                           </WalletTooltip>
                         </td>
                         <td className="p-2 sm:p-3">
-                          <span className={`${solBalance > 0 ? 'color-primary' : 'text-app-secondary-80'} font-bold text-xs sm:text-sm`}>
+                          <span
+                            className={`${solBalance > 0 ? "color-primary" : "text-app-secondary-80"} font-bold text-xs sm:text-sm`}
+                          >
                             {solBalance.toFixed(4)}
                           </span>
                         </td>
                         <td className="p-2 sm:p-3">
-                          <WalletTooltip content="Click to copy private key" position="top">
+                          <WalletTooltip
+                            content="Click to copy private key"
+                            position="top"
+                          >
                             <button
-                              onClick={() => copyToClipboard(wallet.privateKey, showToast)}
+                              onClick={() =>
+                                copyToClipboard(wallet.privateKey, showToast)
+                              }
                               className="text-app-secondary-80 hover:color-primary transition-colors font-mono text-[10px] sm:text-xs touch-manipulation"
                             >
                               {wallet.privateKey.substring(0, 12)}...
@@ -1668,26 +1924,41 @@ export const WalletsPage: React.FC = () => {
                         <td className="p-2 sm:p-3">
                           <div className="flex gap-1">
                             {wallet.isArchived ? (
-                              <WalletTooltip content="Unarchive Wallet" position="top">
+                              <WalletTooltip
+                                content="Unarchive Wallet"
+                                position="top"
+                              >
                                 <button
                                   onClick={() => unarchiveWallet(wallet.id)}
                                   className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
                                 >
-                                  <Archive size={14} className="text-app-primary-color" />
+                                  <Archive
+                                    size={14}
+                                    className="text-app-primary-color"
+                                  />
                                 </button>
                               </WalletTooltip>
                             ) : (
-                              <WalletTooltip content="Archive Wallet" position="top">
+                              <WalletTooltip
+                                content="Archive Wallet"
+                                position="top"
+                              >
                                 <button
                                   onClick={() => archiveWallet(wallet.id)}
                                   className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
                                 >
-                                  <Archive size={14} className="color-primary" />
+                                  <Archive
+                                    size={14}
+                                    className="color-primary"
+                                  />
                                 </button>
                               </WalletTooltip>
                             )}
 
-                            <WalletTooltip content="Download Private Key" position="top">
+                            <WalletTooltip
+                              content="Download Private Key"
+                              position="top"
+                            >
                               <button
                                 onClick={() => downloadPrivateKey(wallet)}
                                 className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
@@ -1696,13 +1967,19 @@ export const WalletsPage: React.FC = () => {
                               </button>
                             </WalletTooltip>
 
-                            <WalletTooltip content="Delete Wallet" position="top">
+                            <WalletTooltip
+                              content="Delete Wallet"
+                              position="top"
+                            >
                               <button
                                 onClick={() => {
-                                  const newWallets = deleteWallet(wallets, wallet.id);
+                                  const newWallets = deleteWallet(
+                                    wallets,
+                                    wallet.id,
+                                  );
                                   saveWalletsToCookies(newWallets);
                                   setWallets(newWallets);
-                                  showToast('Wallet deleted', 'success');
+                                  showToast("Wallet deleted", "success");
                                 }}
                                 className="p-1.5 sm:p-1 hover:bg-app-quaternary rounded-lg transition-all duration-300 touch-manipulation"
                               >
@@ -1720,12 +1997,14 @@ export const WalletsPage: React.FC = () => {
               {/* Empty State */}
               {filteredAndSortedWallets.length === 0 && (
                 <div className="p-6 sm:p-8 text-center text-app-secondary-80">
-                  <Wallet size={40} className="sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
+                  <Wallet
+                    size={40}
+                    className="sm:w-12 sm:h-12 mx-auto mb-4 opacity-50"
+                  />
                   <div className="font-mono text-xs sm:text-sm">
                     {searchTerm || labelSearchTerm
-                      ? 'No wallets match your search'
-                      : 'No wallets found'
-                    }
+                      ? "No wallets match your search"
+                      : "No wallets found"}
                   </div>
                 </div>
               )}
@@ -1791,16 +2070,16 @@ export const WalletsPage: React.FC = () => {
         {connection && (
           <>
             <FundModal
-              isOpen={activeModal === 'distribute' || activeModal === 'mixer'}
+              isOpen={activeModal === "distribute" || activeModal === "mixer"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
               solBalances={solBalances}
               connection={connection}
-              initialMode={activeModal === 'mixer' ? 'mixer' : 'distribute'}
+              initialMode={activeModal === "mixer" ? "mixer" : "distribute"}
             />
 
             <ConsolidateModal
-              isOpen={activeModal === 'consolidate'}
+              isOpen={activeModal === "consolidate"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
               solBalances={solBalances}
@@ -1808,7 +2087,7 @@ export const WalletsPage: React.FC = () => {
             />
 
             <TransferModal
-              isOpen={activeModal === 'transfer'}
+              isOpen={activeModal === "transfer"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
               solBalances={solBalances}
@@ -1816,7 +2095,7 @@ export const WalletsPage: React.FC = () => {
             />
 
             <DepositModal
-              isOpen={activeModal === 'deposit'}
+              isOpen={activeModal === "deposit"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
               solBalances={solBalances}
@@ -1825,7 +2104,7 @@ export const WalletsPage: React.FC = () => {
             />
 
             <BurnModal
-              isOpen={activeModal === 'burn'}
+              isOpen={activeModal === "burn"}
               onClose={() => {
                 setActiveModal(null);
                 setBurnTokenBalances(new Map());
@@ -1913,4 +2192,3 @@ export const WalletsPage: React.FC = () => {
     </div>
   );
 };
-

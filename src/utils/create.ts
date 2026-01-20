@@ -11,9 +11,6 @@ const MAX_RETRY_ATTEMPTS = 50;
 const MAX_CONSECUTIVE_ERRORS = 3;
 const BASE_RETRY_DELAY = 200;
 const MAX_TRANSACTIONS_PER_BUNDLE = 5;
-const BUNDLE_CONFIRMATION_TIMEOUT = 120000; // 2 minutes
-const BUNDLE_CHECK_INTERVAL = 2000; // 2 seconds
-const LUT_ACTIVATION_TIMEOUT = 60000; // 1 minute
 
 // ============================================================================
 // Types
@@ -25,7 +22,7 @@ interface WindowWithConfig {
 
 type BundleResult = SharedBundleResult;
 
-export type PlatformType = 'pumpfun' | 'bonk' | 'meteora';
+export type PlatformType = 'pumpfun' | 'bonk' | 'meteoraDBC' | 'meteoraCPAMM';
 
 export interface WalletForCreate {
   address: string;
@@ -43,8 +40,19 @@ export interface TokenMetadata {
   website?: string;
 }
 
-export interface MeteoraConfig {
+export interface MeteoraDBCConfig {
   configAddress?: string;
+  jitoTipAmountSOL?: number;
+}
+
+export interface MeteoraCPAMMConfig {
+  configAddress?: string;
+  jitoTipAmountSOL?: number;
+  initialLiquiditySOL?: number;
+  initialTokenPercent?: number;
+}
+
+export interface BonkConfig {
   jitoTipAmountSOL?: number;
 }
 
@@ -52,12 +60,16 @@ export interface CreateConfig {
   platform: PlatformType;
   token: TokenMetadata;
   pumpType?: boolean;
+  pumpAdvanced?: boolean;
   bonkType?: 'meme' | 'tech';
-  meteoraConfig?: MeteoraConfig;
+  bonkAdvanced?: boolean;
+  bonkConfig?: BonkConfig;
+  meteoraDBCConfig?: MeteoraDBCConfig;
+  meteoraCPAMMConfig?: MeteoraCPAMMConfig;
 }
 
-// Stage information for multi-bundle Meteora deployment
-export interface MeteoraStage {
+// Stage information for multi-bundle MeteoraDBC deployment
+export interface MeteoraDBCStage {
   name: string;
   description: string;
   transactions: string[];
@@ -103,12 +115,6 @@ interface SendBundleResult {
   error?: string;
 }
 
-interface BundleStatusResponse {
-  status?: 'confirmed' | 'landed' | 'failed' | 'pending';
-  confirmed?: boolean;
-  error?: string;
-}
-
 interface BundleResultWithId extends BundleResult {
   jito?: string;
   bundleId?: string;
@@ -120,7 +126,7 @@ interface PartiallyPreparedResponse {
   data?: {
     bundles?: Array<CreateBundle | string[]>;
     transactions?: string[];
-    stages?: MeteoraStage[];
+    stages?: MeteoraDBCStage[];
     mint?: string;
     poolId?: string;
     lookupTableAddress?: string;
@@ -131,7 +137,7 @@ interface PartiallyPreparedResponse {
   };
   bundles?: Array<CreateBundle | string[]>;
   transactions?: string[];
-  stages?: MeteoraStage[];
+  stages?: MeteoraDBCStage[];
   mint?: string;
   poolId?: string;
   lookupTableAddress?: string;
@@ -202,62 +208,13 @@ const sendBundle = async (encodedBundle: string[]): Promise<SendBundleResult> =>
 };
 
 /**
- * Wait for bundle confirmation with polling
- */
-const waitForBundleConfirmation = async (
-  bundleId: string,
-  timeoutMs: number = BUNDLE_CONFIRMATION_TIMEOUT,
-  checkIntervalMs: number = BUNDLE_CHECK_INTERVAL
-): Promise<boolean> => {
-  const startTime = Date.now();
-  const baseUrl = getBaseUrl();
-  
-  while (Date.now() - startTime < timeoutMs) {
-    try {
-      const response = await fetch(`${baseUrl}/v2/sol/bundle-status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bundleId }),
-      });
-
-      if (response.ok) {
-        const data = await response.json() as BundleStatusResponse;
-        
-        // Check if bundle is confirmed/landed
-        if (data.status === 'confirmed' || data.status === 'landed' || data.confirmed) {
-          return true;
-        }
-        
-        // Check if bundle failed
-        if (data.status === 'failed' || data.error) {
-          console.warn(`Bundle ${bundleId} failed:`, data.error || data.status);
-          return false;
-        }
-      }
-    } catch {
-      // Ignore polling errors, just continue
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
-  }
-  
-  // Timeout - assume it landed if no error
-  console.warn(`Bundle ${bundleId} confirmation timeout, assuming landed`);
-  return true;
-};
-
-/**
  * Wait for LUT activation
  */
-const waitForLutActivation = async (
-  timeoutMs: number = LUT_ACTIVATION_TIMEOUT
-): Promise<void> => {
+const waitForLutActivation = async (): Promise<void> => {
   console.info('⏳ Waiting for Lookup Table activation...');
   
-  // LUT needs ~1 slot to activate after creation
-  // Wait a fixed time as we can't easily check LUT status from frontend
-  const waitTime = Math.min(timeoutMs, 30000); // Max 30 seconds
-  await new Promise(resolve => setTimeout(resolve, waitTime));
+  // Always wait exactly 5 seconds instead of using bundle-status to confirm LUT transaction
+  await new Promise(resolve => setTimeout(resolve, 5000));
   
   console.info('✅ Lookup Table should be activated');
 };
@@ -301,7 +258,7 @@ const getPartiallyPreparedTransactions = async (
   config: CreateConfig
 ): Promise<{ 
   bundles: CreateBundle[]; 
-  stages?: MeteoraStage[];
+  stages?: MeteoraDBCStage[];
   mint?: string; 
   poolId?: string;
   lookupTableAddress?: string;
@@ -329,14 +286,30 @@ const getPartiallyPreparedTransactions = async (
       }));
     }
     
-    if (config.platform === 'pumpfun' && config.pumpType !== undefined) {
-      requestBody['pumpType'] = config.pumpType;
+    if (config.platform === 'pumpfun') {
+      if (config.pumpType !== undefined) {
+        requestBody['pumpType'] = config.pumpType;
+      }
+      if (config.pumpAdvanced !== undefined) {
+        requestBody['pumpAdvanced'] = config.pumpAdvanced;
+      }
     }
-    if (config.platform === 'bonk' && config.bonkType) {
-      requestBody['bonkType'] = config.bonkType;
+    if (config.platform === 'bonk') {
+      if (config.bonkType) {
+        requestBody['bonkType'] = config.bonkType;
+      }
+      if (config.bonkAdvanced !== undefined) {
+        requestBody['bonkAdvanced'] = config.bonkAdvanced;
+      }
+      if (config.bonkConfig) {
+        requestBody['bonkConfig'] = config.bonkConfig;
+      }
     }
-    if (config.platform === 'meteora' && config.meteoraConfig) {
-      requestBody['meteoraConfig'] = config.meteoraConfig;
+    if (config.platform === 'meteoraDBC' && config.meteoraDBCConfig) {
+      requestBody['meteoraDBCConfig'] = config.meteoraDBCConfig;
+    }
+    if (config.platform === 'meteoraCPAMM' && config.meteoraCPAMMConfig) {
+      requestBody['meteoraCPAMMConfig'] = config.meteoraCPAMMConfig;
     }
     
     const response = await fetch(`${baseUrl}/v2/sol/create`, {
@@ -377,7 +350,7 @@ const getPartiallyPreparedTransactions = async (
       };
     }
     
-    // Handle advanced mode with stages (Meteora 6-20 wallets)
+    // Handle advanced mode with stages (MeteoraDBC 6-20 wallets)
     if (stages && Array.isArray(stages) && stages.length > 0) {
       console.info(`Advanced mode detected: ${stages.length} stages`);
       return {
@@ -391,7 +364,7 @@ const getPartiallyPreparedTransactions = async (
       };
     }
     
-    // Handle simple mode bundles
+    // Handle bundles (both simple and advanced mode for pumpfun)
     let bundles: CreateBundle[] = [];
     
     if (data.data?.bundles && Array.isArray(data.data.bundles)) {
@@ -410,7 +383,10 @@ const getPartiallyPreparedTransactions = async (
       throw new Error('No transactions returned from backend');
     }
     
-    return { bundles, mint, poolId, lookupTableAddress, mintPrivateKey, isAdvancedMode: false };
+    // isAdvancedMode can be true for pumpfun with multiple bundles
+    const finalIsAdvancedMode = isAdvancedMode || bundles.length > 1;
+    
+    return { bundles, mint, poolId, lookupTableAddress, mintPrivateKey, isAdvancedMode: finalIsAdvancedMode };
   } catch (error) {
     console.error('Error getting partially prepared transactions:', error);
     throw error;
@@ -543,10 +519,10 @@ const splitLargeBundles = (bundles: CreateBundle[]): CreateBundle[] => {
 };
 
 /**
- * Execute advanced mode Meteora deployment with multi-stage bundles
+ * Execute advanced mode MeteoraDBC deployment with multi-stage bundles
  */
 const executeAdvancedModeCreate = async (
-  stages: MeteoraStage[],
+  stages: MeteoraDBCStage[],
   walletKeypairs: Keypair[],
   mintKeypair: Keypair | null,
   mint?: string,
@@ -615,19 +591,12 @@ const executeAdvancedModeCreate = async (
     });
     
     // Wait for confirmation if required
-    if (stage.requiresConfirmation && sendResult.bundleId) {
-      console.info(`⏳ Waiting for ${stage.name} confirmation...`);
-      const confirmed = await waitForBundleConfirmation(sendResult.bundleId);
-      
-      if (!confirmed) {
-        console.warn(`⚠️ ${stage.name} confirmation uncertain, continuing...`);
-      } else {
-        console.info(`✅ ${stage.name} confirmed!`);
-      }
-      
-      // Wait for LUT activation if needed
+    if (stage.requiresConfirmation) {
+      // For LUT stages, wait for activation
       if (stage.waitForActivation) {
+        console.info(`⏳ Waiting for ${stage.name} to land and activate...`);
         await waitForLutActivation();
+        console.info(`✅ ${stage.name} should be active now`);
       }
     }
     
@@ -716,7 +685,7 @@ export const executeCreate = async (
       }
     }
     
-    // Handle advanced mode (Meteora with 6-20 wallets)
+    // Handle advanced mode (MeteoraDBC with 6-20 wallets)
     if (isAdvancedMode && stages && stages.length > 0) {
       console.info(`🚀 Advanced mode: ${stages.length} stages to execute`);
       return await executeAdvancedModeCreate(
@@ -820,7 +789,7 @@ export const validateCreateInputs = (
   config: CreateConfig,
   walletBalances: Map<string, number>
 ): { valid: boolean; error?: string } => {
-  if (!['pumpfun', 'bonk', 'meteora'].includes(config.platform)) {
+  if (!['pumpfun', 'bonk', 'meteoraDBC', 'meteoraCPAMM'].includes(config.platform)) {
     return { valid: false, error: 'Invalid platform' };
   }
   
@@ -832,10 +801,19 @@ export const validateCreateInputs = (
     return { valid: false, error: 'At least one wallet is required' };
   }
   
-  // Meteora supports up to 20 wallets in advanced mode
-  const maxWallets = config.platform === 'meteora' ? 20 : 5;
+  // Pump.fun and MeteoraDBC support up to 20 wallets in advanced mode
+  // MeteoraCPAMM supports up to 20 wallets
+  // Bonk supports up to 20 wallets in advanced mode
+  const maxWallets = (() => {
+    if (config.platform === 'pumpfun' && config.pumpAdvanced) return 20;
+    if (config.platform === 'bonk' && config.bonkAdvanced) return 20;
+    if (config.platform === 'bonk') return 5;
+    if (config.platform === 'meteoraDBC') return 20;
+    if (config.platform === 'meteoraCPAMM') return 20;
+    return 5;
+  })();
   if (wallets.length > maxWallets) {
-    return { valid: false, error: `Maximum ${maxWallets} wallets allowed for ${config.platform}` };
+    return { valid: false, error: `Maximum ${maxWallets} wallets allowed for ${config.platform}${config.pumpAdvanced ? ' (advanced mode)' : ''}` };
   }
   
   for (const wallet of wallets) {
@@ -863,19 +841,32 @@ export const createDeployConfig = (params: {
   platform: PlatformType;
   token: TokenMetadata;
   pumpType?: boolean;
+  pumpAdvanced?: boolean;
   bonkType?: 'meme' | 'tech';
-  meteoraConfig?: MeteoraConfig;
+  meteoraDBCConfig?: MeteoraDBCConfig;
+  meteoraCPAMMConfig?: MeteoraCPAMMConfig;
+  bonkAdvanced?: boolean;
+  bonkConfig?: BonkConfig;
 }): CreateConfig => {
   return {
     platform: params.platform,
     token: params.token,
     pumpType: params.pumpType,
+    pumpAdvanced: params.pumpAdvanced,
     bonkType: params.bonkType,
-    meteoraConfig: params.meteoraConfig
+    bonkAdvanced: params.bonkAdvanced,
+    bonkConfig: params.bonkConfig,
+    meteoraDBCConfig: params.meteoraDBCConfig,
+    meteoraCPAMMConfig: params.meteoraCPAMMConfig
   };
 };
 
-// Default Meteora pool config addresses
-export const METEORA_CONFIGS = {
+// Default MeteoraDBC pool config addresses
+export const METEORA_DBC_CONFIGS = {
   standard: 'FiENCCbPi3rFh5pW2AJ59HC53yM32qRTLqNKBFbgevo1',
+};
+
+// Default MeteoraCPAMM pool config addresses
+export const METEORA_CPAMM_CONFIGS = {
+  standard: 'FzvMYBQ29z2J21QPsABpJYYxQBEKGsxA6w6J2HYceFj8',
 };

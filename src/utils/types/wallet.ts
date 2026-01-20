@@ -1,6 +1,6 @@
 /**
  * Wallet Type Definitions
- * 
+ *
  * This module contains all wallet-related type definitions
  * for the Solana trading application, including wallet structures,
  * configuration types, and user preferences.
@@ -15,13 +15,13 @@
  * Used to group wallets by risk tolerance and trading behavior
  * @example 'Soft' for conservative trading, 'Hard' for aggressive trading
  */
-export type WalletCategory = 'Soft' | 'Medium' | 'Hard';
+export type WalletCategory = "Soft" | "Medium" | "Hard";
 
 /**
  * Origin of the wallet - how it was created or imported
  * @example 'hd-derived' for wallets generated from a master seed phrase
  */
-export type WalletSource = 'hd-derived' | 'imported';
+export type WalletSource = "hd-derived" | "imported";
 
 // ============================================================================
 // Master Wallet Types
@@ -123,7 +123,7 @@ export interface WalletType {
   category?: WalletCategory;
   /** Whether the wallet is archived (hidden from main view) */
   isArchived?: boolean;
-  
+
   // HD Wallet fields
   /** Origin of the wallet - 'hd-derived' or 'imported' */
   source?: WalletSource;
@@ -131,10 +131,10 @@ export interface WalletType {
   masterWalletId?: string;
   /** Account index in BIP44 derivation path */
   derivationIndex?: number;
-  
+
   /** Custom quick trade settings (overrides category settings) */
   customQuickTradeSettings?: CustomQuickTradeSettings;
-  
+
   /** Allow additional properties for extensibility */
   [key: string]: unknown;
 }
@@ -174,6 +174,12 @@ export interface ConfigType {
   tradingServerUrl: string;
   /** API key for WebSocket stream authentication */
   streamApiKey: string;
+  /** Balance refresh strategy ('sequential', 'batch', 'parallel') */
+  balanceRefreshStrategy: string;
+  /** Number of wallets to process per batch in batch mode */
+  balanceRefreshBatchSize: string;
+  /** Delay between balance refresh operations (milliseconds) */
+  balanceRefreshDelay: string;
 }
 
 // ============================================================================
@@ -297,12 +303,12 @@ export interface WalletSelectionState {
 /**
  * Sort direction for wallet list
  */
-export type WalletSortDirection = 'asc' | 'desc';
+export type WalletSortDirection = "asc" | "desc";
 
 /**
  * Sort field for wallet list
  */
-export type WalletSortField = 'balance' | 'label' | 'category' | 'address';
+export type WalletSortField = "balance" | "label" | "category" | "address";
 
 /**
  * Wallet filter options
