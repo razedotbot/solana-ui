@@ -20,7 +20,6 @@ import type {
 } from "./utils/types";
 import { formatTokenBalance } from "./utils/formatting";
 import { useToast } from "./utils/useToast";
-import type { Connection } from "@solana/web3.js";
 import { executeBuy, createBuyConfig, validateBuyInputs } from "./utils/buy";
 import {
   executeSell,
@@ -32,19 +31,11 @@ import { Tooltip } from "./components/Tooltip";
 interface WalletsPageProps {
   wallets: WalletType[];
   setWallets: (wallets: WalletType[]) => void;
-  handleRefresh: () => void;
-  isRefreshing: boolean;
-  setIsModalOpen: (open: boolean) => void;
   tokenAddress: string;
-  sortDirection: string;
-  handleSortWallets: () => void;
-  connection: Connection;
 
   // Balance props
   solBalances?: Map<string, number>;
-  setSolBalances?: (balances: Map<string, number>) => void;
   tokenBalances?: Map<string, number>;
-  setTokenBalances?: (balances: Map<string, number>) => void;
   totalSol?: number;
   setTotalSol?: (total: number) => void;
   activeSol?: number;
@@ -53,41 +44,27 @@ interface WalletsPageProps {
   setTotalTokens?: (total: number) => void;
   activeTokens?: number;
   setActiveTokens?: (active: number) => void;
+
+  // Quick trade settings
   quickBuyEnabled?: boolean;
-  setQuickBuyEnabled?: (enabled: boolean) => void;
   quickBuyAmount?: number;
-  setQuickBuyAmount?: (amount: number) => void;
   quickBuyMinAmount?: number;
-  setQuickBuyMinAmount?: (amount: number) => void;
   quickBuyMaxAmount?: number;
-  setQuickBuyMaxAmount?: (amount: number) => void;
   useQuickBuyRange?: boolean;
-  setUseQuickBuyRange?: (enabled: boolean) => void;
   quickSellPercentage?: number;
-  setQuickSellPercentage?: (percentage: number) => void;
   quickSellMinPercentage?: number;
-  setQuickSellMinPercentage?: (percentage: number) => void;
   quickSellMaxPercentage?: number;
-  setQuickSellMaxPercentage?: (percentage: number) => void;
   useQuickSellRange?: boolean;
-  setUseQuickSellRange?: (useRange: boolean) => void;
   categorySettings?: Record<WalletCategory, CategoryQuickTradeSettings>;
 }
 
 export const WalletsPage: React.FC<WalletsPageProps> = ({
   wallets,
   setWallets,
-  handleRefresh: _handleRefresh,
-  isRefreshing: _isRefreshing,
-  setIsModalOpen: _setIsModalOpen,
   tokenAddress,
-  sortDirection: _sortDirection,
-  handleSortWallets: _handleSortWallets,
-  connection: _connection,
 
   // Balance props with defaults
   solBalances: externalSolBalances,
-  setSolBalances: _setExternalSolBalances,
   tokenBalances: externalTokenBalances,
   totalSol: externalTotalSol,
   setTotalSol: setExternalTotalSol,
@@ -97,24 +74,17 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   setTotalTokens: setExternalTotalTokens,
   activeTokens: externalActiveTokens,
   setActiveTokens: setExternalActiveTokens,
+
+  // Quick trade settings with defaults
   quickBuyEnabled = true,
-  setQuickBuyEnabled: _setQuickBuyEnabled,
   quickBuyAmount = 0.01,
-  setQuickBuyAmount: _setQuickBuyAmount,
   quickBuyMinAmount = 0.01,
-  setQuickBuyMinAmount: _setQuickBuyMinAmount,
   quickBuyMaxAmount = 0.05,
-  setQuickBuyMaxAmount: _setQuickBuyMaxAmount,
   useQuickBuyRange = false,
-  setUseQuickBuyRange: _setUseQuickBuyRange,
   quickSellPercentage = 100,
-  setQuickSellPercentage: _setQuickSellPercentage,
   quickSellMinPercentage = 25,
-  setQuickSellMinPercentage: _setQuickSellMinPercentage,
   quickSellMaxPercentage = 100,
-  setQuickSellMaxPercentage: _setQuickSellMaxPercentage,
   useQuickSellRange = false,
-  setUseQuickSellRange: _setUseQuickSellRange,
   categorySettings,
 }) => {
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);

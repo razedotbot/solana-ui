@@ -1,416 +1,376 @@
 /**
- * Automation Type Definitions
- * 
- * This module contains all automation-related type definitions
- * for the Solana trading application, including trading strategies,
- * copy trading profiles, conditions, and actions.
+ * Unified Automation Type Definitions
+ *
+ * Single source of truth for all automation-related types including:
+ * - Sniper Bot
+ * - Copy Trade
+ * - Automate (Strategy)
+ *
+ * All automation components should import from this file via the types index.
  */
 
 // ============================================================================
-// Trading Strategy Condition Types
+// Tool Types
 // ============================================================================
 
-/**
- * Types of conditions that can trigger a trading strategy
- */
-export type TradingConditionType = 
-  | 'marketCap' 
-  | 'buyVolume' 
-  | 'sellVolume' 
-  | 'netVolume' 
-  | 'lastTradeType' 
-  | 'lastTradeAmount' 
-  | 'priceChange' 
-  | 'whitelistActivity';
-
-/**
- * Comparison operators for conditions
- */
-export type ConditionOperator = 
-  | 'greater' 
-  | 'less' 
-  | 'equal' 
-  | 'greaterEqual' 
-  | 'lessEqual';
-
-/**
- * Trading condition for strategy execution
- * Defines when a strategy should be triggered
- */
-export interface TradingCondition {
-  /** Unique identifier for the condition */
-  id: string;
-  /** Type of condition to evaluate */
-  type: TradingConditionType;
-  /** Comparison operator */
-  operator: ConditionOperator;
-  /** Value to compare against */
-  value: number;
-  /** Timeframe in minutes for volume-based conditions */
-  timeframe?: number;
-  /** Specific address to monitor for whitelist conditions */
-  whitelistAddress?: string;
-  /** Type of activity to monitor for whitelist address */
-  whitelistActivityType?: 'buyVolume' | 'sellVolume' | 'netVolume' | 'lastTradeAmount' | 'lastTradeType';
-}
+export type ToolType = "sniper" | "copytrade" | "automate";
 
 // ============================================================================
-// Trading Strategy Action Types
+// Common Types
 // ============================================================================
 
-/**
- * Types of amounts for trading actions
- */
-export type ActionAmountType = 
-  | 'sol' 
-  | 'percentage' 
-  | 'lastTrade' 
-  | 'volume' 
-  | 'whitelistVolume';
-
-/**
- * Volume types for volume-based amounts
- */
-export type VolumeType = 'buyVolume' | 'sellVolume' | 'netVolume';
-
-/**
- * Priority levels for trading actions
- */
-export type ActionPriority = 'low' | 'medium' | 'high';
-
-/**
- * Trading action to execute when conditions are met
- */
-export interface TradingAction {
-  /** Unique identifier for the action */
-  id: string;
-  /** Type of trade to execute */
-  type: 'buy' | 'sell';
-  /** Amount to trade */
-  amount: number;
-  /** How to interpret the amount */
-  amountType: ActionAmountType;
-  /** Which volume to use when amountType is 'volume' */
-  volumeType?: VolumeType;
-  /** Multiplier for volume-based amounts (e.g., 0.1 = 10% of volume) */
-  volumeMultiplier?: number;
-  /** Slippage tolerance percentage */
-  slippage: number;
-  /** Transaction priority */
-  priority: ActionPriority;
-  /** Specific address whose activity triggered this action */
-  whitelistAddress?: string;
-  /** Type of whitelist activity */
-  whitelistActivityType?: 'buyVolume' | 'sellVolume' | 'netVolume';
-}
+export type PriorityLevel = "low" | "medium" | "high" | "turbo";
+export type ActionPriority = "low" | "medium" | "high";
+export type CooldownUnit = "milliseconds" | "seconds" | "minutes";
+export type OperatorType =
+  | "greater"
+  | "less"
+  | "equal"
+  | "greaterEqual"
+  | "lessEqual";
+export type ConditionOperator = OperatorType;
+export type FilterMatchType = "exact" | "contains" | "regex";
+export type ConditionLogic = "and" | "or";
 
 // ============================================================================
-// Trading Strategy Types
+// Wallet Types (Automation-specific)
 // ============================================================================
 
-/**
- * Logic for combining multiple conditions
- */
-export type ConditionLogic = 'and' | 'or';
-
-/**
- * Time unit for cooldown periods
- */
-export type CooldownUnit = 'milliseconds' | 'seconds' | 'minutes';
-
-/**
- * Complete trading strategy configuration
- */
-export interface TradingStrategy {
-  /** Unique identifier for the strategy */
-  id: string;
-  /** User-friendly name */
-  name: string;
-  /** Description of what the strategy does */
-  description: string;
-  /** Whether the strategy is currently active */
-  isActive: boolean;
-  /** Conditions that must be met to trigger the strategy */
-  conditions: TradingCondition[];
-  /** How to combine multiple conditions */
-  conditionLogic: ConditionLogic;
-  /** Actions to execute when conditions are met */
-  actions: TradingAction[];
-  /** Cooldown value between executions */
-  cooldown: number;
-  /** Unit for cooldown value */
-  cooldownUnit: CooldownUnit;
-  /** Maximum times this strategy can execute */
-  maxExecutions?: number;
-  /** Number of times the strategy has executed */
-  executionCount: number;
-  /** Unix timestamp of last execution */
-  lastExecuted?: number;
-  /** Unix timestamp when strategy was created */
-  createdAt: number;
-  /** Unix timestamp when strategy was last updated */
-  updatedAt: number;
-  /** Addresses to monitor for whitelist-based strategies */
-  whitelistedAddresses?: string[];
-  /** Token addresses to monitor (if empty, uses current token) */
-  tokenAddresses?: string[];
-  /** Wallet addresses to use for this strategy's trade executions */
-  walletAddresses: string[];
-}
-
-// ============================================================================
-// CopyTrade Types
-// ============================================================================
-
-/**
- * Wallet list for storing addresses to monitor
- */
 export interface WalletList {
-  /** Unique identifier for the list */
   id: string;
-  /** User-friendly name */
   name: string;
-  /** List of wallet addresses */
   addresses: string[];
-  /** Unix timestamp when list was created */
   createdAt: number;
-  /** Unix timestamp when list was last updated */
   updatedAt: number;
 }
 
-/**
- * Copytrade profile mode
- * - 'simple': Basic copy trading with multiplier
- * - 'advanced': Full condition/action configuration
- */
-export type CopyTradeMode = 'simple' | 'advanced';
+export interface SelectedWallet {
+  privateKey: string;
+  address: string;
+  displayName: string;
+}
 
-/**
- * Token filter mode for copy trading
- * - 'all': Copy trades for all tokens
- * - 'specific': Only copy trades for specific tokens
- */
-export type TokenFilterMode = 'all' | 'specific';
+export interface AutomationWalletType {
+  address: string;
+  privateKey?: string;
+  name?: string;
+  balance?: number;
+}
 
 // ============================================================================
-// CopyTrade Condition Types
+// Sniper Bot Types
 // ============================================================================
 
-/**
- * Types of conditions for copy trading
- */
-export type CopyTradeConditionType = 
-  | 'tradeSize' 
-  | 'marketCap' 
-  | 'tokenAge' 
-  | 'tradeType' 
-  | 'signerBalance';
+export type SniperEventType = "deploy" | "migration" | "both";
+export type BuyAmountType = "fixed" | "percentage";
 
-/**
- * Condition for copy trade execution
- */
+export interface DeployEventData {
+  platform: string;
+  mint: string;
+  signer: string;
+  name: string;
+  symbol: string;
+  uri: string;
+  slot: number;
+  creator_buy_sol?: number;
+  creator_buy_tokens?: number;
+  creator_buy_price?: number;
+}
+
+export interface MigrationEventData {
+  mint: string;
+  platform: string;
+  slot: number;
+}
+
+export interface DeployEvent {
+  type: "deploy";
+  timestamp: number;
+  data: DeployEventData;
+}
+
+export interface MigrationEvent {
+  type: "migration";
+  timestamp: number;
+  data: MigrationEventData;
+}
+
+export type SniperEvent = DeployEvent | MigrationEvent;
+
+export interface SniperFilter {
+  id: string;
+  enabled: boolean;
+  platform?: string;
+  mint?: string;
+  signer?: string;
+  namePattern?: string;
+  nameMatchType?: FilterMatchType;
+  symbolPattern?: string;
+  symbolMatchType?: FilterMatchType;
+}
+
+export interface SniperProfile {
+  id: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  eventType: SniperEventType;
+  filters: SniperFilter[];
+  buyAmountType: BuyAmountType;
+  buyAmount: number;
+  slippage: number;
+  priority: PriorityLevel;
+  cooldown: number;
+  cooldownUnit: CooldownUnit;
+  maxExecutions?: number;
+  executionCount: number;
+  lastExecuted?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SniperExecutionLog {
+  id: string;
+  profileId: string;
+  profileName: string;
+  triggerEvent: SniperEvent;
+  executedAction: {
+    mint: string;
+    solAmount: number;
+    walletAddress: string;
+    txSignature?: string;
+  };
+  success: boolean;
+  error?: string;
+  timestamp: number;
+}
+
+export interface SniperBotStorage {
+  profiles: SniperProfile[];
+  executionLogs: SniperExecutionLog[];
+}
+
+export interface SniperBotWebSocketConfig {
+  apiKey?: string;
+  onDeploy: (event: DeployEvent) => void;
+  onMigration: (event: MigrationEvent) => void;
+  onError?: (error: Error) => void;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+}
+
+// ============================================================================
+// Copy Trade Types
+// ============================================================================
+
+export type CopyTradeMode = "simple" | "advanced";
+export type TokenFilterMode = "all" | "specific";
+export type CopyTradeConditionType =
+  | "tradeSize"
+  | "marketCap"
+  | "tokenAge"
+  | "tradeType"
+  | "signerBalance";
+export type CopyTradeAmountType = "multiplier" | "fixed" | "percentage";
+
 export interface CopyTradeCondition {
-  /** Unique identifier for the condition */
   id: string;
-  /** Type of condition to evaluate */
   type: CopyTradeConditionType;
-  /** Comparison operator */
-  operator: ConditionOperator;
-  /** Value to compare against */
+  operator: OperatorType;
   value: number;
-  /** Trade type for tradeType condition */
-  tradeType?: 'buy' | 'sell';
+  tradeType?: "buy" | "sell";
 }
 
-// ============================================================================
-// CopyTrade Action Types
-// ============================================================================
-
-/**
- * Types of amounts for copy trade actions
- */
-export type CopyTradeAmountType = 'multiplier' | 'fixed' | 'percentage';
-
-/**
- * Action for copy trade execution
- */
 export interface CopyTradeAction {
-  /** Unique identifier for the action */
   id: string;
-  /** Type of trade to execute (mirror = copy exact action type) */
-  type: 'buy' | 'sell' | 'mirror';
-  /** How to interpret the amount */
+  type: "buy" | "sell" | "mirror";
   amountType: CopyTradeAmountType;
-  /** Amount value (multiplier, fixed SOL, or percentage) */
   amount: number;
-  /** Slippage tolerance percentage */
   slippage: number;
-  /** Transaction priority */
   priority: ActionPriority;
 }
 
-// ============================================================================
-// Simple Mode Configuration
-// ============================================================================
-
-/**
- * Configuration for simple copy trading mode
- */
 export interface SimpleModeCopyConfig {
-  /** Multiplier for trade size (e.g., 0.5 = copy 50% of their trade) */
   amountMultiplier: number;
-  /** Slippage tolerance percentage */
   slippage: number;
-  /** Transaction priority */
   priority: ActionPriority;
-  /** Whether to mirror trade type (buy when they buy, sell when they sell) */
   mirrorTradeType: boolean;
 }
 
-// ============================================================================
-// CopyTrade Profile Types
-// ============================================================================
-
-/**
- * Complete copy trade profile configuration
- */
 export interface CopyTradeProfile {
-  /** Unique identifier for the profile */
   id: string;
-  /** User-friendly name */
   name: string;
-  /** Description of what the profile does */
   description: string;
-  /** Whether the profile is currently active */
   isActive: boolean;
-  
-  // Mode configuration
-  /** Profile mode (simple or advanced) */
   mode: CopyTradeMode;
-  /** Configuration for simple mode */
   simpleConfig?: SimpleModeCopyConfig;
-  
-  // Advanced mode - conditions and actions
-  /** Conditions for advanced mode */
   conditions: CopyTradeCondition[];
-  /** How to combine multiple conditions */
   conditionLogic: ConditionLogic;
-  /** Actions for advanced mode */
   actions: CopyTradeAction[];
-  
-  // Wallet list to monitor
-  /** ID of the wallet list to monitor */
   walletListId: string | null;
-  /** Resolved addresses from the list or manually added */
   walletAddresses: string[];
-  
-  // Token filtering
-  /** Token filter mode */
   tokenFilterMode: TokenFilterMode;
-  /** Tokens to monitor (when mode is 'specific') */
   specificTokens: string[];
-  /** Tokens to never copy */
   blacklistedTokens: string[];
-  
-  // Execution settings
-  /** Cooldown value between executions */
   cooldown: number;
-  /** Unit for cooldown value */
   cooldownUnit: CooldownUnit;
-  /** Maximum times this profile can execute */
   maxExecutions?: number;
-  /** Number of times the profile has executed */
   executionCount: number;
-  /** Unix timestamp of last execution */
   lastExecuted?: number;
-  
-  // Metadata
-  /** Unix timestamp when profile was created */
   createdAt: number;
-  /** Unix timestamp when profile was last updated */
   updatedAt: number;
 }
 
+export interface CopyTradeData {
+  type: "buy" | "sell";
+  signerAddress: string;
+  tokenMint: string;
+  tokenAmount: number;
+  solAmount: number;
+  avgPrice: number;
+  marketCap: number;
+  timestamp: number;
+  signature: string;
+}
+
+export interface CopyTradeExecutionLog {
+  id: string;
+  profileId: string;
+  profileName: string;
+  originalTrade: CopyTradeData;
+  executedAction: {
+    type: "buy" | "sell";
+    amount: number;
+    walletAddress: string;
+  };
+  success: boolean;
+  error?: string;
+  timestamp: number;
+}
+
+export interface CopyTradeProfileStorage {
+  profiles: CopyTradeProfile[];
+  executionLogs: CopyTradeExecutionLog[];
+}
+
 // ============================================================================
-// CopyTrade Data Types
+// Automate (Strategy) Types
 // ============================================================================
 
-/**
- * Trade data received from WebSocket for copy trading
- */
-export interface CopyTradeData {
-  /** Trade type (buy or sell) */
-  type: 'buy' | 'sell';
-  /** Address of the trader being copied */
-  signerAddress: string;
-  /** Token mint address */
-  tokenMint: string;
-  /** Amount of tokens traded */
-  tokenAmount: number;
-  /** Amount of SOL traded */
-  solAmount: number;
-  /** Average price per token */
-  avgPrice: number;
-  /** Market cap at time of trade */
-  marketCap: number;
-  /** Unix timestamp of the trade */
-  timestamp: number;
-  /** Transaction signature */
+export type TradingConditionType =
+  | "marketCap"
+  | "buyVolume"
+  | "sellVolume"
+  | "netVolume"
+  | "lastTradeType"
+  | "lastTradeAmount"
+  | "priceChange"
+  | "whitelistActivity";
+
+export type ActionAmountType =
+  | "sol"
+  | "percentage"
+  | "lastTrade"
+  | "volume"
+  | "whitelistVolume";
+export type VolumeType = "buyVolume" | "sellVolume" | "netVolume";
+
+export interface TradingCondition {
+  id: string;
+  type: TradingConditionType;
+  operator: ConditionOperator;
+  value: number;
+  timeframe?: number;
+  whitelistAddress?: string;
+  whitelistActivityType?:
+    | "buyVolume"
+    | "sellVolume"
+    | "netVolume"
+    | "lastTradeAmount"
+    | "lastTradeType";
+}
+
+export interface TradingAction {
+  id: string;
+  type: "buy" | "sell";
+  amount: number;
+  amountType: ActionAmountType;
+  volumeType?: VolumeType;
+  volumeMultiplier?: number;
+  slippage: number;
+  priority: ActionPriority;
+  whitelistAddress?: string;
+  whitelistActivityType?: "buyVolume" | "sellVolume" | "netVolume";
+}
+
+export interface TradingStrategy {
+  id: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  conditions: TradingCondition[];
+  conditionLogic: ConditionLogic;
+  actions: TradingAction[];
+  cooldown: number;
+  cooldownUnit: CooldownUnit;
+  maxExecutions?: number;
+  executionCount: number;
+  lastExecuted?: number;
+  createdAt: number;
+  updatedAt: number;
+  whitelistedAddresses?: string[];
+  tokenAddresses?: string[];
+  walletAddresses: string[];
+}
+
+export interface AutomateTrade {
   signature: string;
+  type: "buy" | "sell";
+  address: string;
+  tokenAmount: number;
+  solAmount: number;
+  timestamp: number;
+}
+
+export interface MarketData {
+  marketCap: number;
+  buyVolume: number;
+  sellVolume: number;
+  netVolume: number;
+  lastTrade: AutomateTrade | null;
+  tokenPrice: number;
+  priceChange24h?: number;
+}
+
+export interface TokenMonitor {
+  tokenAddress: string;
+  marketData: MarketData;
+  activeStrategyIds: string[];
+  trades: AutomateTrade[];
+  wsConnected: boolean;
+  addedAt: number;
+}
+
+export interface ActiveStrategyInstance {
+  strategyId: string;
+  tokenAddress: string;
+  executionCount: number;
+  lastExecuted?: number;
+  isActive: boolean;
 }
 
 // ============================================================================
 // Execution Log Types
 // ============================================================================
 
-/**
- * Execution log entry for copy trades
- */
-export interface CopyTradeExecutionLog {
-  /** Unique identifier for the log entry */
-  id: string;
-  /** ID of the profile that executed */
-  profileId: string;
-  /** Name of the profile that executed */
-  profileName: string;
-  /** Original trade that triggered execution */
-  originalTrade: CopyTradeData;
-  /** Action that was executed */
-  executedAction: {
-    /** Type of trade executed */
-    type: 'buy' | 'sell';
-    /** Amount traded */
-    amount: number;
-    /** Wallet address used */
-    walletAddress: string;
-  };
-  /** Whether execution was successful */
-  success: boolean;
-  /** Error message if execution failed */
-  error?: string;
-  /** Unix timestamp of execution */
-  timestamp: number;
-}
-
-/**
- * Execution log entry for trading strategies
- */
 export interface StrategyExecutionLog {
-  /** Unique identifier for the log entry */
   id: string;
-  /** ID of the strategy that executed */
   strategyId: string;
-  /** Name of the strategy that executed */
   strategyName: string;
-  /** Conditions that were met */
   triggeredConditions: TradingCondition[];
-  /** Actions that were executed */
   executedActions: TradingAction[];
-  /** Whether execution was successful */
   success: boolean;
-  /** Error message if execution failed */
   error?: string;
-  /** Unix timestamp of execution */
   timestamp: number;
 }
 
@@ -418,23 +378,8 @@ export interface StrategyExecutionLog {
 // Storage Types
 // ============================================================================
 
-/**
- * Profile storage format for cookies/localStorage
- */
-export interface CopyTradeProfileStorage {
-  /** Stored profiles */
-  profiles: CopyTradeProfile[];
-  /** Execution logs */
-  executionLogs: CopyTradeExecutionLog[];
-}
-
-/**
- * Strategy storage format for cookies/localStorage
- */
 export interface TradingStrategyStorage {
-  /** Stored strategies */
   strategies: TradingStrategy[];
-  /** Execution logs */
   executionLogs: StrategyExecutionLog[];
 }
 
@@ -442,30 +387,46 @@ export interface TradingStrategyStorage {
 // Whitelist Types
 // ============================================================================
 
-/**
- * Whitelist entry for monitoring specific addresses
- */
 export interface WhitelistEntry {
-  /** Wallet address */
   address: string;
-  /** Optional label for the address */
   label?: string;
-  /** Unix timestamp when added */
   addedAt: number;
 }
 
-/**
- * Whitelist configuration
- */
 export interface WhitelistConfig {
-  /** Unique identifier */
   id: string;
-  /** User-friendly name */
   name: string;
-  /** List of whitelisted entries */
   entries: WhitelistEntry[];
-  /** Unix timestamp when created */
   createdAt: number;
-  /** Unix timestamp when last updated */
   updatedAt: number;
+}
+
+// ============================================================================
+// Unified Profile Type
+// ============================================================================
+
+export type UnifiedProfile =
+  | { type: "sniper"; profile: SniperProfile }
+  | { type: "copytrade"; profile: CopyTradeProfile }
+  | { type: "automate"; profile: TradingStrategy };
+
+// ============================================================================
+// UI State Types
+// ============================================================================
+
+export interface ToolsUIState {
+  activeTab: ToolType;
+  isCreating: boolean;
+  isEditing: string | null;
+  selectedProfileId: string | null;
+  searchTerm: string;
+  filterActive: boolean | null;
+}
+
+export interface RecentSniperEvent {
+  id: string;
+  event: SniperEvent;
+  matchedProfiles: string[];
+  sniped: boolean;
+  timestamp: number;
 }

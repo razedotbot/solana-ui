@@ -2,60 +2,63 @@
  * UnifiedActionBuilder - Shared action builder for Copy Trade and Automate
  */
 
-import React from 'react';
-import { Trash2, AlertCircle } from 'lucide-react';
-import type { 
-  CopyTradeAction, 
+import React from "react";
+import { Trash2, AlertCircle } from "lucide-react";
+import type {
+  CopyTradeAction,
   TradingAction,
-  PriorityLevel 
-} from './types';
+  PriorityLevel,
+  ActionPriority,
+} from "./types";
 
 // Copy Trade action types
 const COPYTRADE_ACTION_TYPES = [
-  { value: 'mirror', label: 'Mirror (Same as trader)' },
-  { value: 'buy', label: 'Always Buy' },
-  { value: 'sell', label: 'Always Sell' },
+  { value: "mirror", label: "Mirror (Same as trader)" },
+  { value: "buy", label: "Always Buy" },
+  { value: "sell", label: "Always Sell" },
 ];
 
 // Automate action types
 const AUTOMATE_ACTION_TYPES = [
-  { value: 'buy', label: 'Buy' },
-  { value: 'sell', label: 'Sell' },
+  { value: "buy", label: "Buy" },
+  { value: "sell", label: "Sell" },
 ];
 
 // Copy Trade amount types
 const COPYTRADE_AMOUNT_TYPES = [
-  { value: 'multiplier', label: 'Multiplier (% of their trade)' },
-  { value: 'fixed', label: 'Fixed Amount (SOL)' },
-  { value: 'percentage', label: 'Percentage of Wallet' },
+  { value: "multiplier", label: "Multiplier (% of their trade)" },
+  { value: "fixed", label: "Fixed Amount (SOL)" },
+  { value: "percentage", label: "Percentage of Wallet" },
 ];
 
 // Automate amount types
 const AUTOMATE_AMOUNT_TYPES = [
-  { value: 'percentage', label: 'Percentage of Balance' },
-  { value: 'sol', label: 'Fixed Amount (SOL)' },
-  { value: 'lastTrade', label: 'Last Trade Amount' },
-  { value: 'volume', label: 'Volume-based Amount' },
-  { value: 'whitelistVolume', label: 'Whitelist Volume-based Amount' },
+  { value: "percentage", label: "Percentage of Balance" },
+  { value: "sol", label: "Fixed Amount (SOL)" },
+  { value: "lastTrade", label: "Last Trade Amount" },
+  { value: "volume", label: "Volume-based Amount" },
+  { value: "whitelistVolume", label: "Whitelist Volume-based Amount" },
 ];
 
 const PRIORITIES: { value: PriorityLevel; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
 ];
 
 const VOLUME_TYPES = [
-  { value: 'buyVolume', label: 'Buy Volume' },
-  { value: 'sellVolume', label: 'Sell Volume' },
-  { value: 'netVolume', label: 'Net Volume' },
+  { value: "buyVolume", label: "Buy Volume" },
+  { value: "sellVolume", label: "Sell Volume" },
+  { value: "netVolume", label: "Net Volume" },
 ];
 
 interface UnifiedActionBuilderProps {
-  toolType: 'copytrade' | 'automate';
+  toolType: "copytrade" | "automate";
   action: CopyTradeAction | TradingAction;
   index: number;
-  onUpdate: (updates: Partial<CopyTradeAction> | Partial<TradingAction>) => void;
+  onUpdate: (
+    updates: Partial<CopyTradeAction> | Partial<TradingAction>,
+  ) => void;
   onRemove: () => void;
 }
 
@@ -66,30 +69,44 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
   onUpdate,
   onRemove,
 }) => {
-  const isCopyTrade = toolType === 'copytrade';
-  const isAutomate = toolType === 'automate';
+  const isCopyTrade = toolType === "copytrade";
+  const isAutomate = toolType === "automate";
 
-  const actionTypes = isCopyTrade ? COPYTRADE_ACTION_TYPES : AUTOMATE_ACTION_TYPES;
-  const amountTypes = isCopyTrade ? COPYTRADE_AMOUNT_TYPES : AUTOMATE_AMOUNT_TYPES;
+  const actionTypes = isCopyTrade
+    ? COPYTRADE_ACTION_TYPES
+    : AUTOMATE_ACTION_TYPES;
+  const amountTypes = isCopyTrade
+    ? COPYTRADE_AMOUNT_TYPES
+    : AUTOMATE_AMOUNT_TYPES;
 
   const getAmountLabel = (): string => {
     if (isCopyTrade) {
       const ct = action as CopyTradeAction;
       switch (ct.amountType) {
-        case 'multiplier': return 'Multiplier';
-        case 'fixed': return 'SOL Amount';
-        case 'percentage': return 'Wallet %';
-        default: return 'Amount';
+        case "multiplier":
+          return "Multiplier";
+        case "fixed":
+          return "SOL Amount";
+        case "percentage":
+          return "Wallet %";
+        default:
+          return "Amount";
       }
     } else {
       const at = action as TradingAction;
       switch (at.amountType) {
-        case 'percentage': return 'Percentage (%)';
-        case 'sol': return 'Amount (SOL)';
-        case 'lastTrade': return 'Multiplier';
-        case 'volume': return 'Volume Multiplier';
-        case 'whitelistVolume': return 'Volume Multiplier';
-        default: return 'Amount';
+        case "percentage":
+          return "Percentage (%)";
+        case "sol":
+          return "Amount (SOL)";
+        case "lastTrade":
+          return "Multiplier";
+        case "volume":
+          return "Volume Multiplier";
+        case "whitelistVolume":
+          return "Volume Multiplier";
+        default:
+          return "Amount";
       }
     }
   };
@@ -98,20 +115,28 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
     if (isCopyTrade) {
       const ct = action as CopyTradeAction;
       switch (ct.amountType) {
-        case 'multiplier': return `${(ct.amount * 100).toFixed(0)}% of their trade size`;
-        case 'fixed': return `Always use ${ct.amount} SOL`;
-        case 'percentage': return `${ct.amount}% of your wallet balance`;
-        default: return '';
+        case "multiplier":
+          return `${(ct.amount * 100).toFixed(0)}% of their trade size`;
+        case "fixed":
+          return `Always use ${ct.amount} SOL`;
+        case "percentage":
+          return `${ct.amount}% of your wallet balance`;
+        default:
+          return "";
       }
     } else {
       const at = action as TradingAction;
       switch (at.amountType) {
-        case 'lastTrade': return 'Amount = Last Trade × Multiplier';
-        case 'volume': return `Amount = ${at.volumeType || 'buyVolume'} × Multiplier`;
-        case 'whitelistVolume': return `Amount = Whitelist ${at.whitelistActivityType || 'any'} Volume × Multiplier`;
-        case 'sol':
-        case 'percentage':
-        default: return '';
+        case "lastTrade":
+          return "Amount = Last Trade × Multiplier";
+        case "volume":
+          return `Amount = ${at.volumeType || "buyVolume"} × Multiplier`;
+        case "whitelistVolume":
+          return `Amount = Whitelist ${at.whitelistActivityType || "any"} Volume × Multiplier`;
+        case "sol":
+        case "percentage":
+        default:
+          return "";
       }
     }
   };
@@ -120,22 +145,32 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
     if (isCopyTrade) {
       const ct = action as CopyTradeAction;
       switch (ct.type) {
-        case 'mirror': return 'Will execute the same action (buy/sell) as the trader';
-        case 'buy': return 'Will always buy, regardless of what the trader does';
-        case 'sell': return 'Will always sell, regardless of what the trader does';
-        default: return '';
+        case "mirror":
+          return "Will execute the same action (buy/sell) as the trader";
+        case "buy":
+          return "Will always buy, regardless of what the trader does";
+        case "sell":
+          return "Will always sell, regardless of what the trader does";
+        default:
+          return "";
       }
     }
-    return '';
+    return "";
   };
 
   // Check for volume-based amount types in automate
-  const showVolumeType = isAutomate && (action as TradingAction).amountType === 'volume';
-  const showWhitelistVolume = isAutomate && (action as TradingAction).amountType === 'whitelistVolume';
-  const showVolumeMultiplier = isAutomate && (showVolumeType || showWhitelistVolume);
-  const showBasicAmount = !showVolumeType && !showWhitelistVolume && 
-    (!isAutomate || ((action as TradingAction).amountType !== 'lastTrade'));
-  const showLastTradeMultiplier = isAutomate && (action as TradingAction).amountType === 'lastTrade';
+  const showVolumeType =
+    isAutomate && (action as TradingAction).amountType === "volume";
+  const showWhitelistVolume =
+    isAutomate && (action as TradingAction).amountType === "whitelistVolume";
+  const showVolumeMultiplier =
+    isAutomate && (showVolumeType || showWhitelistVolume);
+  const showBasicAmount =
+    !showVolumeType &&
+    !showWhitelistVolume &&
+    (!isAutomate || (action as TradingAction).amountType !== "lastTrade");
+  const showLastTradeMultiplier =
+    isAutomate && (action as TradingAction).amountType === "lastTrade";
 
   return (
     <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 hover:border-zinc-700 transition-colors">
@@ -167,12 +202,20 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
           </label>
           <select
             value={action.type}
-            onChange={(e) => onUpdate({ type: e.target.value as CopyTradeAction['type'] | TradingAction['type'] })}
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+            onChange={(e) =>
+              onUpdate({
+                type: e.target.value as
+                  | CopyTradeAction["type"]
+                  | TradingAction["type"],
+              })
+            }
+            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                        focus:outline-none focus:border-emerald-500/50 transition-colors"
           >
-            {actionTypes.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
+            {actionTypes.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
             ))}
           </select>
         </div>
@@ -184,12 +227,20 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
           </label>
           <select
             value={action.amountType}
-            onChange={(e) => onUpdate({ amountType: e.target.value as CopyTradeAction['amountType'] | TradingAction['amountType'] })}
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+            onChange={(e) =>
+              onUpdate({
+                amountType: e.target.value as
+                  | CopyTradeAction["amountType"]
+                  | TradingAction["amountType"],
+              })
+            }
+            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                        focus:outline-none focus:border-emerald-500/50 transition-colors"
           >
-            {amountTypes.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
+            {amountTypes.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
             ))}
           </select>
         </div>
@@ -202,16 +253,33 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
             </label>
             <input
               type="number"
-              step={isCopyTrade && action.amountType === 'multiplier' ? '0.1' : 
-                    action.amountType === 'fixed' || (isAutomate && action.amountType === 'sol') ? '0.01' : '1'}
+              step={
+                isCopyTrade && action.amountType === "multiplier"
+                  ? "0.1"
+                  : action.amountType === "fixed" ||
+                      (isAutomate && action.amountType === "sol")
+                    ? "0.01"
+                    : "1"
+              }
               min="0"
-              max={(isCopyTrade && action.amountType === 'percentage') || 
-                   (isAutomate && action.amountType === 'percentage') ? 100 : undefined}
+              max={
+                (isCopyTrade && action.amountType === "percentage") ||
+                (isAutomate && action.amountType === "percentage")
+                  ? 100
+                  : undefined
+              }
               value={action.amount}
-              onChange={(e) => onUpdate({ amount: parseFloat(e.target.value) || 0 })}
-              placeholder={action.amountType === 'multiplier' ? '1.0' : 
-                          action.amountType === 'fixed' || action.amountType === 'sol' ? '0.1' : '10'}
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+              onChange={(e) =>
+                onUpdate({ amount: parseFloat(e.target.value) || 0 })
+              }
+              placeholder={
+                action.amountType === "multiplier"
+                  ? "1.0"
+                  : action.amountType === "fixed" || action.amountType === "sol"
+                    ? "0.1"
+                    : "10"
+              }
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                          focus:outline-none focus:border-emerald-500/50 transition-colors
                          placeholder:text-zinc-600"
             />
@@ -229,9 +297,11 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
               step="0.1"
               min="0"
               value={action.amount}
-              onChange={(e) => onUpdate({ amount: parseFloat(e.target.value) || 0 })}
+              onChange={(e) =>
+                onUpdate({ amount: parseFloat(e.target.value) || 0 })
+              }
               placeholder="1.0"
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                          focus:outline-none focus:border-emerald-500/50 transition-colors
                          placeholder:text-zinc-600"
             />
@@ -249,9 +319,11 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
             min="0.1"
             max="50"
             value={action.slippage}
-            onChange={(e) => onUpdate({ slippage: parseFloat(e.target.value) || 5 })}
+            onChange={(e) =>
+              onUpdate({ slippage: parseFloat(e.target.value) || 5 })
+            }
             placeholder="5"
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                        focus:outline-none focus:border-emerald-500/50 transition-colors
                        placeholder:text-zinc-600"
           />
@@ -266,13 +338,19 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
               Volume Type
             </label>
             <select
-              value={(action as TradingAction).volumeType || 'buyVolume'}
-              onChange={(e) => onUpdate({ volumeType: e.target.value as TradingAction['volumeType'] })}
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+              value={(action as TradingAction).volumeType || "buyVolume"}
+              onChange={(e) =>
+                onUpdate({
+                  volumeType: e.target.value as TradingAction["volumeType"],
+                })
+              }
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                          focus:outline-none focus:border-emerald-500/50 transition-colors"
             >
-              {VOLUME_TYPES.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
+              {VOLUME_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
               ))}
             </select>
           </div>
@@ -288,10 +366,10 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
             </label>
             <input
               type="text"
-              value={(action as TradingAction).whitelistAddress || ''}
+              value={(action as TradingAction).whitelistAddress || ""}
               onChange={(e) => onUpdate({ whitelistAddress: e.target.value })}
               placeholder="Enter wallet address..."
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                          focus:outline-none focus:border-emerald-500/50 transition-colors
                          placeholder:text-zinc-600"
             />
@@ -301,13 +379,22 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
               Activity Type
             </label>
             <select
-              value={(action as TradingAction).whitelistActivityType || 'buyVolume'}
-              onChange={(e) => onUpdate({ whitelistActivityType: e.target.value as TradingAction['whitelistActivityType'] })}
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+              value={
+                (action as TradingAction).whitelistActivityType || "buyVolume"
+              }
+              onChange={(e) =>
+                onUpdate({
+                  whitelistActivityType: e.target
+                    .value as TradingAction["whitelistActivityType"],
+                })
+              }
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                          focus:outline-none focus:border-emerald-500/50 transition-colors"
             >
-              {VOLUME_TYPES.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
+              {VOLUME_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
               ))}
             </select>
           </div>
@@ -326,9 +413,11 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
             min="0"
             max="1"
             value={(action as TradingAction).volumeMultiplier || 0.1}
-            onChange={(e) => onUpdate({ volumeMultiplier: parseFloat(e.target.value) || 0.1 })}
+            onChange={(e) =>
+              onUpdate({ volumeMultiplier: parseFloat(e.target.value) || 0.1 })
+            }
             placeholder="0.1"
-            className="w-full md:w-48 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+            className="w-full md:w-48 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                        focus:outline-none focus:border-emerald-500/50 transition-colors
                        placeholder:text-zinc-600"
           />
@@ -343,12 +432,16 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
           </label>
           <select
             value={action.priority}
-            onChange={(e) => onUpdate({ priority: e.target.value as PriorityLevel })}
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200 
+            onChange={(e) =>
+              onUpdate({ priority: e.target.value as ActionPriority })
+            }
+            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
                        focus:outline-none focus:border-emerald-500/50 transition-colors"
           >
-            {PRIORITIES.map(p => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+            {PRIORITIES.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
             ))}
           </select>
         </div>

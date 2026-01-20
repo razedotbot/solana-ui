@@ -1,7 +1,8 @@
 /**
  * Unified Trading Tools Storage
- * 
- * LocalStorage management for all trading profiles and execution logs
+ *
+ * LocalStorage management for all trading profiles and execution logs.
+ * Uses centralized constants from utils/constants.ts.
  */
 
 import type {
@@ -17,28 +18,14 @@ import type {
   TradingAction,
   WalletList,
   ToolType,
-} from './types';
+} from "./types";
+import {
+  STORAGE_KEYS,
+  EXECUTION_LOGS,
+  PROFILE_DEFAULTS,
+} from "../../../utils/constants";
 
-// ============================================================================
-// Storage Keys (using original keys for backwards compatibility)
-// ============================================================================
-
-const STORAGE_KEYS = {
-  // Sniper Bot
-  sniperProfiles: 'sniperBotProfiles',
-  sniperExecutionLogs: 'sniperBotExecutionLogs',
-  
-  // Copy Trade
-  copytradeProfiles: 'copytradeProfiles',
-  copytradeWalletLists: 'copytradeWalletLists',
-  copytradeExecutionLogs: 'copytradeExecutionLogs',
-  
-  // Automate
-  automateStrategies: 'automateStrategies',
-  automateWhitelistLists: 'whitelistLists',
-} as const;
-
-const MAX_EXECUTION_LOGS = 500;
+const MAX_EXECUTION_LOGS = EXECUTION_LOGS.MAX_ENTRIES;
 
 // ============================================================================
 // ID Generators
@@ -49,16 +36,16 @@ const generateId = (prefix: string): string => {
 };
 
 export const generateProfileId = (type?: ToolType): string => {
-  const prefix = type || 'profile';
+  const prefix = type || "profile";
   return `${prefix}_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
-export const generateFilterId = (): string => generateId('sniper_filter');
-export const generateConditionId = (): string => generateId('cond');
-export const generateActionId = (): string => generateId('action');
-export const generateLogId = (): string => generateId('log');
-export const generateExecutionLogId = (): string => generateId('log');
-export const generateWalletListId = (): string => generateId('wlist');
+export const generateFilterId = (): string => generateId("sniper_filter");
+export const generateConditionId = (): string => generateId("cond");
+export const generateActionId = (): string => generateId("action");
+export const generateLogId = (): string => generateId("log");
+export const generateExecutionLogId = (): string => generateId("log");
+export const generateWalletListId = (): string => generateId("wlist");
 
 // ============================================================================
 // Generic Storage Functions
@@ -69,7 +56,7 @@ const loadFromStorage = <T>(key: string, defaultValue: T): T => {
     const saved = localStorage.getItem(key);
     if (saved) return JSON.parse(saved) as T;
   } catch (error) {
-    console.error(`Error loading ${key}:`, error);
+    console.error(`[Storage] Error loading ${key}:`, error);
   }
   return defaultValue;
 };
@@ -78,7 +65,7 @@ const saveToStorage = <T>(key: string, data: T): void => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
-    console.error(`Error saving ${key}:`, error);
+    console.error(`[Storage] Error saving ${key}:`, error);
   }
 };
 
@@ -86,10 +73,10 @@ const saveToStorage = <T>(key: string, data: T): void => {
 // Sniper Bot Storage
 // ============================================================================
 
-export const loadSniperProfiles = (): SniperProfile[] => 
+export const loadSniperProfiles = (): SniperProfile[] =>
   loadFromStorage(STORAGE_KEYS.sniperProfiles, []);
 
-export const saveSniperProfiles = (profiles: SniperProfile[]): void => 
+export const saveSniperProfiles = (profiles: SniperProfile[]): void =>
   saveToStorage(STORAGE_KEYS.sniperProfiles, profiles);
 
 export const addSniperProfile = (profile: SniperProfile): SniperProfile[] => {
@@ -99,56 +86,59 @@ export const addSniperProfile = (profile: SniperProfile): SniperProfile[] => {
   return updated;
 };
 
-export const updateSniperProfile = (profile: SniperProfile): SniperProfile[] => {
+export const updateSniperProfile = (
+  profile: SniperProfile,
+): SniperProfile[] => {
   const profiles = loadSniperProfiles();
-  const updated = profiles.map(p => 
-    p.id === profile.id ? { ...profile, updatedAt: Date.now() } : p
+  const updated = profiles.map((p) =>
+    p.id === profile.id ? { ...profile, updatedAt: Date.now() } : p,
   );
   saveSniperProfiles(updated);
   return updated;
 };
 
 export const deleteSniperProfile = (id: string): SniperProfile[] => {
-  const profiles = loadSniperProfiles().filter(p => p.id !== id);
+  const profiles = loadSniperProfiles().filter((p) => p.id !== id);
   saveSniperProfiles(profiles);
   return profiles;
 };
 
-export const getSniperProfileById = (profileId: string): SniperProfile | undefined => {
+export const getSniperProfileById = (
+  profileId: string,
+): SniperProfile | undefined => {
   const profiles = loadSniperProfiles();
-  return profiles.find(profile => profile.id === profileId);
+  return profiles.find((profile) => profile.id === profileId);
 };
 
 export const toggleSniperProfile = (id: string): SniperProfile[] => {
   const profiles = loadSniperProfiles();
-  const updated = profiles.map(p =>
-    p.id === id ? { ...p, isActive: !p.isActive, updatedAt: Date.now() } : p
+  const updated = profiles.map((p) =>
+    p.id === id ? { ...p, isActive: !p.isActive, updatedAt: Date.now() } : p,
   );
   saveSniperProfiles(updated);
   return updated;
 };
 
-export const createDefaultSniperProfile = (name = 'New Sniper'): SniperProfile => ({
-  id: generateProfileId('sniper'),
+export const createDefaultSniperProfile = (
+  name = "New Sniper",
+): SniperProfile => ({
+  id: generateProfileId("sniper"),
   name,
-  description: '',
+  description: "",
   isActive: false,
-  eventType: 'deploy',
+  eventType: "deploy",
   filters: [],
-  buyAmountType: 'fixed',
-  buyAmount: 0.01,
-  slippage: 15,
-  priority: 'high',
-  cooldown: 1000,
-  cooldownUnit: 'milliseconds',
+  buyAmountType: "fixed",
+  buyAmount: PROFILE_DEFAULTS.SNIPER.BUY_AMOUNT,
+  slippage: PROFILE_DEFAULTS.SNIPER.SLIPPAGE,
+  priority: PROFILE_DEFAULTS.SNIPER.PRIORITY,
+  cooldown: PROFILE_DEFAULTS.SNIPER.COOLDOWN,
+  cooldownUnit: PROFILE_DEFAULTS.SNIPER.COOLDOWN_UNIT,
   maxExecutions: undefined,
   executionCount: 0,
   createdAt: Date.now(),
   updatedAt: Date.now(),
 });
-
-// Alias for backwards compatibility
-export const createDefaultProfile = createDefaultSniperProfile;
 
 export const createDefaultSniperFilter = (): SniperFilter => ({
   id: generateFilterId(),
@@ -157,23 +147,26 @@ export const createDefaultSniperFilter = (): SniperFilter => ({
   mint: undefined,
   signer: undefined,
   namePattern: undefined,
-  nameMatchType: 'contains',
+  nameMatchType: "contains",
   symbolPattern: undefined,
-  symbolMatchType: 'contains',
+  symbolMatchType: "contains",
 });
 
 // Alias for backwards compatibility
 export const createDefaultFilter = createDefaultSniperFilter;
 
 // Sniper Execution Logs
-export const loadSniperLogs = (): SniperExecutionLog[] => 
+export const loadSniperLogs = (): SniperExecutionLog[] =>
   loadFromStorage(STORAGE_KEYS.sniperExecutionLogs, []);
 
 // Alias for backwards compatibility
 export const loadExecutionLogs = loadSniperLogs;
 
-export const saveSniperLogs = (logs: SniperExecutionLog[]): void => 
-  saveToStorage(STORAGE_KEYS.sniperExecutionLogs, logs.slice(-MAX_EXECUTION_LOGS));
+export const saveSniperLogs = (logs: SniperExecutionLog[]): void =>
+  saveToStorage(
+    STORAGE_KEYS.sniperExecutionLogs,
+    logs.slice(-MAX_EXECUTION_LOGS),
+  );
 
 // Alias for backwards compatibility
 export const saveExecutionLogs = saveSniperLogs;
@@ -187,15 +180,17 @@ export const addSniperLog = (log: SniperExecutionLog): SniperExecutionLog[] => {
 // Alias for backwards compatibility
 export const addExecutionLog = addSniperLog;
 
-export const clearSniperLogs = (): void => 
+export const clearSniperLogs = (): void =>
   localStorage.removeItem(STORAGE_KEYS.sniperExecutionLogs);
 
 // Alias for backwards compatibility
 export const clearExecutionLogs = clearSniperLogs;
 
-export const getSniperLogsByProfileId = (profileId: string): SniperExecutionLog[] => {
+export const getSniperLogsByProfileId = (
+  profileId: string,
+): SniperExecutionLog[] => {
   const logs = loadSniperLogs();
-  return logs.filter(log => log.profileId === profileId);
+  return logs.filter((log) => log.profileId === profileId);
 };
 
 // Alias for backwards compatibility
@@ -203,77 +198,85 @@ export const getExecutionLogsByProfileId = getSniperLogsByProfileId;
 
 export const getSuccessfulSnipeCount = (): number => {
   const logs = loadSniperLogs();
-  return logs.filter(log => log.success).length;
+  return logs.filter((log) => log.success).length;
 };
 
 // ============================================================================
 // Copy Trade Storage
 // ============================================================================
 
-export const loadCopyTradeProfiles = (): CopyTradeProfile[] => 
+export const loadCopyTradeProfiles = (): CopyTradeProfile[] =>
   loadFromStorage(STORAGE_KEYS.copytradeProfiles, []);
 
-export const saveCopyTradeProfiles = (profiles: CopyTradeProfile[]): void => 
+export const saveCopyTradeProfiles = (profiles: CopyTradeProfile[]): void =>
   saveToStorage(STORAGE_KEYS.copytradeProfiles, profiles);
 
-export const addCopyTradeProfile = (profile: CopyTradeProfile): CopyTradeProfile[] => {
+export const addCopyTradeProfile = (
+  profile: CopyTradeProfile,
+): CopyTradeProfile[] => {
   const profiles = loadCopyTradeProfiles();
   const updated = [...profiles, profile];
   saveCopyTradeProfiles(updated);
   return updated;
 };
 
-export const updateCopyTradeProfile = (profile: CopyTradeProfile): CopyTradeProfile[] => {
+export const updateCopyTradeProfile = (
+  profile: CopyTradeProfile,
+): CopyTradeProfile[] => {
   const profiles = loadCopyTradeProfiles();
-  const updated = profiles.map(p => 
-    p.id === profile.id ? { ...profile, updatedAt: Date.now() } : p
+  const updated = profiles.map((p) =>
+    p.id === profile.id ? { ...profile, updatedAt: Date.now() } : p,
   );
   saveCopyTradeProfiles(updated);
   return updated;
 };
 
 export const deleteCopyTradeProfile = (id: string): CopyTradeProfile[] => {
-  const profiles = loadCopyTradeProfiles().filter(p => p.id !== id);
+  const profiles = loadCopyTradeProfiles().filter((p) => p.id !== id);
   saveCopyTradeProfiles(profiles);
   return profiles;
 };
 
-export const getCopyTradeProfileById = (profileId: string): CopyTradeProfile | undefined => {
+export const getCopyTradeProfileById = (
+  profileId: string,
+): CopyTradeProfile | undefined => {
   const profiles = loadCopyTradeProfiles();
-  return profiles.find(profile => profile.id === profileId);
+  return profiles.find((profile) => profile.id === profileId);
 };
 
 export const toggleCopyTradeProfile = (id: string): CopyTradeProfile[] => {
   const profiles = loadCopyTradeProfiles();
-  const updated = profiles.map(p =>
-    p.id === id ? { ...p, isActive: !p.isActive, updatedAt: Date.now() } : p
+  const updated = profiles.map((p) =>
+    p.id === id ? { ...p, isActive: !p.isActive, updatedAt: Date.now() } : p,
   );
   saveCopyTradeProfiles(updated);
   return updated;
 };
 
-export const createDefaultCopyTradeProfile = (name = 'New Copy Trade'): CopyTradeProfile => ({
-  id: generateProfileId('copytrade'),
+export const createDefaultCopyTradeProfile = (
+  name = "New Copy Trade",
+): CopyTradeProfile => ({
+  id: generateProfileId("copytrade"),
   name,
-  description: '',
+  description: "",
   isActive: false,
-  mode: 'simple',
+  mode: "simple",
   simpleConfig: {
-    amountMultiplier: 1.0,
-    slippage: 5,
-    priority: 'medium',
+    amountMultiplier: PROFILE_DEFAULTS.COPYTRADE.AMOUNT_MULTIPLIER,
+    slippage: PROFILE_DEFAULTS.COPYTRADE.SLIPPAGE,
+    priority: PROFILE_DEFAULTS.COPYTRADE.PRIORITY,
     mirrorTradeType: true,
   },
   conditions: [],
-  conditionLogic: 'and',
+  conditionLogic: "and",
   actions: [],
   walletListId: null,
   walletAddresses: [],
-  tokenFilterMode: 'all',
+  tokenFilterMode: "all",
   specificTokens: [],
   blacklistedTokens: [],
-  cooldown: 5,
-  cooldownUnit: 'seconds',
+  cooldown: PROFILE_DEFAULTS.COPYTRADE.COOLDOWN,
+  cooldownUnit: PROFILE_DEFAULTS.COPYTRADE.COOLDOWN_UNIT,
   maxExecutions: undefined,
   executionCount: 0,
   createdAt: Date.now(),
@@ -282,34 +285,37 @@ export const createDefaultCopyTradeProfile = (name = 'New Copy Trade'): CopyTrad
 
 export const createDefaultCopyTradeCondition = (): CopyTradeCondition => ({
   id: generateConditionId(),
-  type: 'tradeSize',
-  operator: 'greater',
+  type: "tradeSize",
+  operator: "greater",
   value: 0.1,
 });
 
 export const createDefaultCopyTradeAction = (): CopyTradeAction => ({
   id: generateActionId(),
-  type: 'mirror',
-  amountType: 'multiplier',
-  amount: 1.0,
-  slippage: 5,
-  priority: 'medium',
+  type: "mirror",
+  amountType: "multiplier",
+  amount: PROFILE_DEFAULTS.COPYTRADE.AMOUNT_MULTIPLIER,
+  slippage: PROFILE_DEFAULTS.COPYTRADE.SLIPPAGE,
+  priority: PROFILE_DEFAULTS.COPYTRADE.PRIORITY,
 });
 
 // Copy Trade Wallet Lists
-export const loadCopyTradeWalletLists = (): WalletList[] => 
+export const loadCopyTradeWalletLists = (): WalletList[] =>
   loadFromStorage(STORAGE_KEYS.copytradeWalletLists, []);
 
 // Alias for backwards compatibility
 export const loadWalletLists = loadCopyTradeWalletLists;
 
-export const saveCopyTradeWalletLists = (lists: WalletList[]): void => 
+export const saveCopyTradeWalletLists = (lists: WalletList[]): void =>
   saveToStorage(STORAGE_KEYS.copytradeWalletLists, lists);
 
 // Alias for backwards compatibility
 export const saveWalletLists = saveCopyTradeWalletLists;
 
-export const createWalletList = (name: string, addresses: string[]): WalletList => ({
+export const createWalletList = (
+  name: string,
+  addresses: string[],
+): WalletList => ({
   id: generateWalletListId(),
   name: name.trim(),
   addresses: [...addresses],
@@ -326,53 +332,60 @@ export const addWalletList = (list: WalletList): WalletList[] => {
 
 export const updateWalletList = (list: WalletList): WalletList[] => {
   const lists = loadCopyTradeWalletLists();
-  const updated = lists.map(l => 
-    l.id === list.id ? { ...list, updatedAt: Date.now() } : l
+  const updated = lists.map((l) =>
+    l.id === list.id ? { ...list, updatedAt: Date.now() } : l,
   );
   saveCopyTradeWalletLists(updated);
   return updated;
 };
 
 export const deleteWalletList = (id: string): WalletList[] => {
-  const lists = loadCopyTradeWalletLists().filter(l => l.id !== id);
+  const lists = loadCopyTradeWalletLists().filter((l) => l.id !== id);
   saveCopyTradeWalletLists(lists);
   return lists;
 };
 
 export const getWalletListById = (listId: string): WalletList | undefined => {
   const lists = loadCopyTradeWalletLists();
-  return lists.find(list => list.id === listId);
+  return lists.find((list) => list.id === listId);
 };
 
 // Copy Trade Execution Logs
-export const loadCopyTradeLogs = (): CopyTradeExecutionLog[] => 
+export const loadCopyTradeLogs = (): CopyTradeExecutionLog[] =>
   loadFromStorage(STORAGE_KEYS.copytradeExecutionLogs, []);
 
-export const saveCopyTradeLogs = (logs: CopyTradeExecutionLog[]): void => 
-  saveToStorage(STORAGE_KEYS.copytradeExecutionLogs, logs.slice(-MAX_EXECUTION_LOGS));
+export const saveCopyTradeLogs = (logs: CopyTradeExecutionLog[]): void =>
+  saveToStorage(
+    STORAGE_KEYS.copytradeExecutionLogs,
+    logs.slice(-MAX_EXECUTION_LOGS),
+  );
 
-export const addCopyTradeLog = (log: CopyTradeExecutionLog): CopyTradeExecutionLog[] => {
+export const addCopyTradeLog = (
+  log: CopyTradeExecutionLog,
+): CopyTradeExecutionLog[] => {
   const logs = [log, ...loadCopyTradeLogs()];
   saveCopyTradeLogs(logs);
   return logs;
 };
 
-export const clearCopyTradeLogs = (): void => 
+export const clearCopyTradeLogs = (): void =>
   localStorage.removeItem(STORAGE_KEYS.copytradeExecutionLogs);
 
-export const getCopyTradeLogsByProfileId = (profileId: string): CopyTradeExecutionLog[] => {
+export const getCopyTradeLogsByProfileId = (
+  profileId: string,
+): CopyTradeExecutionLog[] => {
   const logs = loadCopyTradeLogs();
-  return logs.filter(log => log.profileId === profileId);
+  return logs.filter((log) => log.profileId === profileId);
 };
 
 // ============================================================================
 // Automate (Strategy) Storage
 // ============================================================================
 
-export const loadStrategies = (): TradingStrategy[] => 
+export const loadStrategies = (): TradingStrategy[] =>
   loadFromStorage(STORAGE_KEYS.automateStrategies, []);
 
-export const saveStrategies = (strategies: TradingStrategy[]): void => 
+export const saveStrategies = (strategies: TradingStrategy[]): void =>
   saveToStorage(STORAGE_KEYS.automateStrategies, strategies);
 
 export const addStrategy = (strategy: TradingStrategy): TradingStrategy[] => {
@@ -382,40 +395,44 @@ export const addStrategy = (strategy: TradingStrategy): TradingStrategy[] => {
   return updated;
 };
 
-export const updateStrategy = (strategy: TradingStrategy): TradingStrategy[] => {
+export const updateStrategy = (
+  strategy: TradingStrategy,
+): TradingStrategy[] => {
   const strategies = loadStrategies();
-  const updated = strategies.map(s => 
-    s.id === strategy.id ? { ...strategy, updatedAt: Date.now() } : s
+  const updated = strategies.map((s) =>
+    s.id === strategy.id ? { ...strategy, updatedAt: Date.now() } : s,
   );
   saveStrategies(updated);
   return updated;
 };
 
 export const deleteStrategy = (id: string): TradingStrategy[] => {
-  const strategies = loadStrategies().filter(s => s.id !== id);
+  const strategies = loadStrategies().filter((s) => s.id !== id);
   saveStrategies(strategies);
   return strategies;
 };
 
 export const toggleStrategy = (id: string): TradingStrategy[] => {
   const strategies = loadStrategies();
-  const updated = strategies.map(s =>
-    s.id === id ? { ...s, isActive: !s.isActive, updatedAt: Date.now() } : s
+  const updated = strategies.map((s) =>
+    s.id === id ? { ...s, isActive: !s.isActive, updatedAt: Date.now() } : s,
   );
   saveStrategies(updated);
   return updated;
 };
 
-export const createDefaultStrategy = (name = 'New Strategy'): TradingStrategy => ({
-  id: generateProfileId('automate'),
+export const createDefaultStrategy = (
+  name = "New Strategy",
+): TradingStrategy => ({
+  id: generateProfileId("automate"),
   name,
-  description: '',
+  description: "",
   conditions: [],
-  conditionLogic: 'and',
+  conditionLogic: "and",
   actions: [],
   isActive: false,
-  cooldown: 5,
-  cooldownUnit: 'minutes',
+  cooldown: PROFILE_DEFAULTS.AUTOMATE.COOLDOWN,
+  cooldownUnit: PROFILE_DEFAULTS.AUTOMATE.COOLDOWN_UNIT,
   maxExecutions: undefined,
   executionCount: 0,
   createdAt: Date.now(),
@@ -427,31 +444,34 @@ export const createDefaultStrategy = (name = 'New Strategy'): TradingStrategy =>
 
 export const createDefaultTradingCondition = (): TradingCondition => ({
   id: generateConditionId(),
-  type: 'marketCap',
-  operator: 'greater',
-  value: 1000000,
-  timeframe: 5,
+  type: "marketCap",
+  operator: "greater",
+  value: PROFILE_DEFAULTS.AUTOMATE.DEFAULT_CONDITION_VALUE,
+  timeframe: PROFILE_DEFAULTS.AUTOMATE.DEFAULT_TIMEFRAME,
 });
 
 export const createDefaultTradingAction = (): TradingAction => ({
   id: generateActionId(),
-  type: 'buy',
-  amountType: 'percentage',
-  amount: 10,
-  volumeType: 'buyVolume',
-  volumeMultiplier: 0.1,
-  slippage: 5,
-  priority: 'medium',
+  type: "buy",
+  amountType: "percentage",
+  amount: PROFILE_DEFAULTS.AUTOMATE.DEFAULT_ACTION_AMOUNT,
+  volumeType: "buyVolume",
+  volumeMultiplier: PROFILE_DEFAULTS.AUTOMATE.DEFAULT_VOLUME_MULTIPLIER,
+  slippage: PROFILE_DEFAULTS.COPYTRADE.SLIPPAGE,
+  priority: PROFILE_DEFAULTS.COPYTRADE.PRIORITY,
 });
 
 // Whitelist Lists for Automate
-export const loadWhitelistLists = (): WalletList[] => 
+export const loadWhitelistLists = (): WalletList[] =>
   loadFromStorage(STORAGE_KEYS.automateWhitelistLists, []);
 
-export const saveWhitelistLists = (lists: WalletList[]): void => 
+export const saveWhitelistLists = (lists: WalletList[]): void =>
   saveToStorage(STORAGE_KEYS.automateWhitelistLists, lists);
 
-export const createWhitelistList = (name: string, addresses: string[]): WalletList => ({
+export const createWhitelistList = (
+  name: string,
+  addresses: string[],
+): WalletList => ({
   id: generateWalletListId(),
   name: name.trim(),
   addresses: [...addresses],
@@ -468,15 +488,15 @@ export const addWhitelistList = (list: WalletList): WalletList[] => {
 
 export const updateWhitelistList = (list: WalletList): WalletList[] => {
   const lists = loadWhitelistLists();
-  const updated = lists.map(l => 
-    l.id === list.id ? { ...list, updatedAt: Date.now() } : l
+  const updated = lists.map((l) =>
+    l.id === list.id ? { ...list, updatedAt: Date.now() } : l,
   );
   saveWhitelistLists(updated);
   return updated;
 };
 
 export const deleteWhitelistList = (id: string): WalletList[] => {
-  const lists = loadWhitelistLists().filter(l => l.id !== id);
+  const lists = loadWhitelistLists().filter((l) => l.id !== id);
   saveWhitelistLists(lists);
   return lists;
 };
@@ -511,30 +531,32 @@ export const exportProfileToJson = (profileId: string): string | null => {
 export const importProfilesFromJson = (jsonString: string): number => {
   try {
     const importedProfiles = JSON.parse(jsonString) as SniperProfile[];
-    
+
     if (!Array.isArray(importedProfiles)) {
-      throw new Error('Invalid format: expected an array of profiles');
+      throw new Error("Invalid format: expected an array of profiles");
     }
-    
+
     const currentProfiles = loadSniperProfiles();
-    const existingIds = new Set(currentProfiles.map(p => p.id));
-    
-    const newProfiles = importedProfiles.map(profile => ({
+    const existingIds = new Set(currentProfiles.map((p) => p.id));
+
+    const newProfiles = importedProfiles.map((profile) => ({
       ...profile,
-      id: existingIds.has(profile.id) ? generateProfileId('sniper') : profile.id,
+      id: existingIds.has(profile.id)
+        ? generateProfileId("sniper")
+        : profile.id,
       isActive: false,
       executionCount: 0,
       lastExecuted: undefined,
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     }));
-    
+
     const mergedProfiles = [...currentProfiles, ...newProfiles];
     saveSniperProfiles(mergedProfiles);
-    
+
     return newProfiles.length;
   } catch (error) {
-    console.error('Error importing profiles:', error);
+    console.error("Error importing profiles:", error);
     throw error;
   }
 };
@@ -545,10 +567,12 @@ interface ImportData {
   strategies?: TradingStrategy[];
 }
 
-export const importAllProfiles = (jsonString: string): { 
-  sniper: number; 
-  copytrade: number; 
-  automate: number 
+export const importAllProfiles = (
+  jsonString: string,
+): {
+  sniper: number;
+  copytrade: number;
+  automate: number;
 } => {
   try {
     const data = JSON.parse(jsonString) as ImportData;
@@ -556,10 +580,10 @@ export const importAllProfiles = (jsonString: string): {
 
     if (Array.isArray(data.sniperProfiles)) {
       const existing = loadSniperProfiles();
-      const existingIds = new Set(existing.map(p => p.id));
+      const existingIds = new Set(existing.map((p) => p.id));
       const newProfiles: SniperProfile[] = data.sniperProfiles.map((p) => ({
         ...p,
-        id: existingIds.has(p.id) ? generateProfileId('sniper') : p.id,
+        id: existingIds.has(p.id) ? generateProfileId("sniper") : p.id,
         isActive: false,
         executionCount: 0,
       }));
@@ -569,23 +593,25 @@ export const importAllProfiles = (jsonString: string): {
 
     if (Array.isArray(data.copytradeProfiles)) {
       const existing = loadCopyTradeProfiles();
-      const existingIds = new Set(existing.map(p => p.id));
-      const newProfiles: CopyTradeProfile[] = data.copytradeProfiles.map((p) => ({
-        ...p,
-        id: existingIds.has(p.id) ? generateProfileId('copytrade') : p.id,
-        isActive: false,
-        executionCount: 0,
-      }));
+      const existingIds = new Set(existing.map((p) => p.id));
+      const newProfiles: CopyTradeProfile[] = data.copytradeProfiles.map(
+        (p) => ({
+          ...p,
+          id: existingIds.has(p.id) ? generateProfileId("copytrade") : p.id,
+          isActive: false,
+          executionCount: 0,
+        }),
+      );
       saveCopyTradeProfiles([...existing, ...newProfiles]);
       counts.copytrade = newProfiles.length;
     }
 
     if (Array.isArray(data.strategies)) {
       const existing = loadStrategies();
-      const existingIds = new Set(existing.map(s => s.id));
+      const existingIds = new Set(existing.map((s) => s.id));
       const newStrategies: TradingStrategy[] = data.strategies.map((s) => ({
         ...s,
-        id: existingIds.has(s.id) ? generateProfileId('automate') : s.id,
+        id: existingIds.has(s.id) ? generateProfileId("automate") : s.id,
         isActive: false,
         executionCount: 0,
       }));
@@ -595,14 +621,14 @@ export const importAllProfiles = (jsonString: string): {
 
     return counts;
   } catch (error) {
-    console.error('Import error:', error);
+    console.error("Import error:", error);
     throw error;
   }
 };
 
 export const duplicateProfile = <T extends { id: string; name: string }>(
   profile: T,
-  type: ToolType
+  type: ToolType,
 ): T => ({
   ...profile,
   id: generateProfileId(type),
@@ -614,25 +640,27 @@ export const duplicateProfile = <T extends { id: string; name: string }>(
   updatedAt: Date.now(),
 });
 
-export const duplicateSniperProfile = (profileId: string): SniperProfile | null => {
+export const duplicateSniperProfile = (
+  profileId: string,
+): SniperProfile | null => {
   const profile = getSniperProfileById(profileId);
   if (!profile) return null;
-  
+
   const duplicated: SniperProfile = {
     ...profile,
-    id: generateProfileId('sniper'),
+    id: generateProfileId("sniper"),
     name: `${profile.name} (Copy)`,
     isActive: false,
     executionCount: 0,
     lastExecuted: undefined,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    filters: profile.filters.map(f => ({
+    filters: profile.filters.map((f) => ({
       ...f,
-      id: generateFilterId()
-    }))
+      id: generateFilterId(),
+    })),
   };
-  
+
   addSniperProfile(duplicated);
   return duplicated;
 };

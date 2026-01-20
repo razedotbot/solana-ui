@@ -28,7 +28,6 @@ import {
   loadQuickBuyPreferencesFromCookies,
   saveQuickBuyPreferencesToCookies,
   fetchWalletBalances,
-  handleSortWallets,
   saveSplitSizesToCookies,
   loadSplitSizesFromCookies,
   saveViewModeToCookies,
@@ -1187,56 +1186,18 @@ const WalletManager: React.FC = () => {
                     <WalletsPage
                       wallets={state.wallets}
                       setWallets={memoizedCallbacks.setWallets}
-                      handleRefresh={handleRefresh}
-                      isRefreshing={state.isRefreshing}
-                      setIsModalOpen={(): void => navigate("/wallets")}
                       tokenAddress={state.tokenAddress}
-                      sortDirection={state.sortDirection}
-                      handleSortWallets={(): void =>
-                        void handleSortWallets(
-                          state.wallets,
-                          state.sortDirection,
-                          memoizedCallbacks.setSortDirection,
-                          state.solBalances,
-                          memoizedCallbacks.setWallets,
-                        )
-                      }
-                      connection={state.connection}
                       solBalances={state.solBalances}
-                      setSolBalances={memoizedCallbacks.setSolBalances}
                       tokenBalances={state.tokenBalances}
                       quickBuyEnabled={state.quickBuyEnabled}
-                      setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
                       quickBuyAmount={state.quickBuyAmount}
-                      setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
                       quickBuyMinAmount={state.quickBuyMinAmount}
-                      setQuickBuyMinAmount={
-                        memoizedCallbacks.setQuickBuyMinAmount
-                      }
                       quickBuyMaxAmount={state.quickBuyMaxAmount}
-                      setQuickBuyMaxAmount={
-                        memoizedCallbacks.setQuickBuyMaxAmount
-                      }
                       useQuickBuyRange={state.useQuickBuyRange}
-                      setUseQuickBuyRange={
-                        memoizedCallbacks.setUseQuickBuyRange
-                      }
                       quickSellPercentage={state.quickSellPercentage}
-                      setQuickSellPercentage={
-                        memoizedCallbacks.setQuickSellPercentage
-                      }
                       quickSellMinPercentage={state.quickSellMinPercentage}
-                      setQuickSellMinPercentage={
-                        memoizedCallbacks.setQuickSellMinPercentage
-                      }
                       quickSellMaxPercentage={state.quickSellMaxPercentage}
-                      setQuickSellMaxPercentage={
-                        memoizedCallbacks.setQuickSellMaxPercentage
-                      }
                       useQuickSellRange={state.useQuickSellRange}
-                      setUseQuickSellRange={
-                        memoizedCallbacks.setUseQuickSellRange
-                      }
                       categorySettings={categorySettings}
                     />
                   )}
@@ -1348,47 +1309,18 @@ const WalletManager: React.FC = () => {
                 <WalletsPage
                   wallets={state.wallets}
                   setWallets={memoizedCallbacks.setWallets}
-                  handleRefresh={handleRefresh}
-                  isRefreshing={state.isRefreshing}
-                  setIsModalOpen={(): void => navigate("/wallets")}
                   tokenAddress={state.tokenAddress}
-                  sortDirection={state.sortDirection}
-                  handleSortWallets={(): void =>
-                    void handleSortWallets(
-                      state.wallets,
-                      state.sortDirection,
-                      memoizedCallbacks.setSortDirection,
-                      state.solBalances,
-                      memoizedCallbacks.setWallets,
-                    )
-                  }
-                  connection={state.connection}
                   solBalances={state.solBalances}
                   tokenBalances={state.tokenBalances}
                   quickBuyEnabled={state.quickBuyEnabled}
-                  setQuickBuyEnabled={memoizedCallbacks.setQuickBuyEnabled}
                   quickBuyAmount={state.quickBuyAmount}
-                  setQuickBuyAmount={memoizedCallbacks.setQuickBuyAmount}
                   quickBuyMinAmount={state.quickBuyMinAmount}
-                  setQuickBuyMinAmount={memoizedCallbacks.setQuickBuyMinAmount}
                   quickBuyMaxAmount={state.quickBuyMaxAmount}
-                  setQuickBuyMaxAmount={memoizedCallbacks.setQuickBuyMaxAmount}
                   useQuickBuyRange={state.useQuickBuyRange}
-                  setUseQuickBuyRange={memoizedCallbacks.setUseQuickBuyRange}
                   quickSellPercentage={state.quickSellPercentage}
-                  setQuickSellPercentage={
-                    memoizedCallbacks.setQuickSellPercentage
-                  }
                   quickSellMinPercentage={state.quickSellMinPercentage}
-                  setQuickSellMinPercentage={
-                    memoizedCallbacks.setQuickSellMinPercentage
-                  }
                   quickSellMaxPercentage={state.quickSellMaxPercentage}
-                  setQuickSellMaxPercentage={
-                    memoizedCallbacks.setQuickSellMaxPercentage
-                  }
                   useQuickSellRange={state.useQuickSellRange}
-                  setUseQuickSellRange={memoizedCallbacks.setUseQuickSellRange}
                   categorySettings={categorySettings}
                 />
               ) : (

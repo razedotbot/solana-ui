@@ -1,7 +1,14 @@
-import { Keypair, VersionedTransaction } from '@solana/web3.js';
-import bs58 from 'bs58';
-import { loadConfigFromCookies } from '../Utils';
-import type { ApiResponse, BundleResult as SharedBundleResult } from './types';
+/**
+ * Buy Operations
+ *
+ * Handles all buy transactions for Solana tokens.
+ */
+
+import { Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
+import { loadConfigFromCookies } from "../Utils";
+import { TRADING } from "./constants";
+import type { ApiResponse } from "./types";
 import type {
   WalletBuy,
   BundleMode,
@@ -9,323 +16,179 @@ import type {
   ServerResponse,
   BuyBundle,
   BuyResult,
-} from './types';
-import { addTradeHistory } from './trading';
+} from "./types";
+import { addTradeHistory } from "./trading";
+import {
+  checkRateLimit,
+  getServerBaseUrl,
+  isSelfHostedServer,
+  sendBundle,
+  completeBundleSigning,
+  splitLargeBundles,
+  createKeypairs,
+  getSlippageBps,
+  getFeeLamports,
+  processBatchResults,
+  createBatchErrorMessage,
+} from "./trading/shared";
 
-// Re-export types for backward compatibility
-export type { WalletBuy, BundleMode, BuyConfig, ServerResponse, BuyBundle, BuyResult };
-
-// Constants
-const MAX_BUNDLES_PER_SECOND = 2;
-const MAX_TRANSACTIONS_PER_BUNDLE = 5;
-
-// Rate limiting state
-const rateLimitState = {
-  count: 0,
-  lastReset: Date.now(),
-  maxBundlesPerSecond: MAX_BUNDLES_PER_SECOND
+export type {
+  WalletBuy,
+  BundleMode,
+  BuyConfig,
+  ServerResponse,
+  BuyBundle,
+  BuyResult,
 };
 
-// Use the shared BundleResult type from api.ts
-type BundleResult = SharedBundleResult;
-
-/**
- * Check rate limit and wait if necessary
- */
-const checkRateLimit = async (): Promise<void> => {
-  const now = Date.now();
-  
-  if (now - rateLimitState.lastReset >= 1000) {
-    rateLimitState.count = 0;
-    rateLimitState.lastReset = now;
-  }
-  
-  if (rateLimitState.count >= rateLimitState.maxBundlesPerSecond) {
-    const waitTime = 1000 - (now - rateLimitState.lastReset);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-    rateLimitState.count = 0;
-    rateLimitState.lastReset = Date.now();
-  }
-  
-  rateLimitState.count++;
-};
-
-interface WindowWithConfig {
-  tradingServerUrl?: string;
-}
-
-/**
- * Send bundle to Jito block engine through our backend proxy
- */
-const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
-  try {
-    const config = loadConfigFromCookies();
-    let baseUrl = '';
-    
-    // Check if self-hosted trading server is enabled
-    if (config?.tradingServerEnabled === 'true' && config?.tradingServerUrl) {
-      baseUrl = config.tradingServerUrl.replace(/\/+$/, '');
-    } else {
-      baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
-    }
-    
-    // Send to our backend proxy instead of directly to Jito
-    const response = await fetch(`${baseUrl}/v2/sol/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        transactions: encodedBundle
-      }),
-    });
-
-    const data = await response.json() as ApiResponse<BundleResult>;
-    
-    return data.result as BundleResult;
-  } catch (error) {
-    console.error('Error sending bundle:', error);
-    throw error;
-  }
-};
+// ============================================================================
+// Transaction Preparation
+// ============================================================================
 
 /**
  * Get partially prepared transactions from the unified buy endpoint
- * Step 1: Gather Transactions - Request transaction bundles from the API
  */
 const getPartiallyPreparedTransactions = async (
-  wallets: WalletBuy[], 
-  config: BuyConfig
+  wallets: WalletBuy[],
+  config: BuyConfig,
 ): Promise<BuyBundle[]> => {
   try {
     const appConfig = loadConfigFromCookies();
-    let baseUrl = '';
-    
-    // Check if self-hosted trading server is enabled
-    if (appConfig?.tradingServerEnabled === 'true' && appConfig?.tradingServerUrl) {
-      baseUrl = appConfig.tradingServerUrl.replace(/\/+$/, '');
-    } else {
-      baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
-    }
-    
-    // Prepare request body according to the unified endpoint specification
+    const baseUrl = getServerBaseUrl();
+    const selfHosted = isSelfHostedServer();
+
     const requestBody: Record<string, unknown> = {
       tokenAddress: config.tokenAddress,
-      solAmount: config.solAmount
+      solAmount: config.solAmount,
     };
-    
-    // If self-hosted trading server is enabled, send private keys instead of addresses
-    if (appConfig?.tradingServerEnabled === 'true') {
-      // For self-hosted server, send private keys so server can sign and send
-      requestBody['walletPrivateKeys'] = wallets.map(wallet => wallet.privateKey);
+
+    if (selfHosted) {
+      requestBody["walletPrivateKeys"] = wallets.map(
+        (wallet) => wallet.privateKey,
+      );
     } else {
-      // For regular server, send wallet addresses
-      requestBody['walletAddresses'] = wallets.map(wallet => wallet.address);
+      requestBody["walletAddresses"] = wallets.map((wallet) => wallet.address);
     }
 
-    // Add optional parameters if provided
     if (config.amounts) {
-      requestBody['amounts'] = config.amounts;
+      requestBody["amounts"] = config.amounts;
     }
-    
-    // Always include slippageBps
-    if (config.slippageBps !== undefined) {
-      requestBody['slippageBps'] = config.slippageBps;
-    } else if (appConfig?.slippageBps) {
-      // Use default slippage from app config if available
-      requestBody['slippageBps'] = parseInt(appConfig.slippageBps);
-    } else {
-      // Default slippage if not set in config
-      requestBody['slippageBps'] = 9900;
-    }
-    
-    // Use transactionsFeeLamports when wallets.length < 2, otherwise use jitoTipLamports
-    if (wallets.length < 2) {
-      // Single wallet: use transactionsFeeLamports (transaction fee / 3)
-      if (config.transactionsFeeLamports !== undefined) {
-        requestBody['transactionsFeeLamports'] = config.transactionsFeeLamports;
-      } else {
-        const feeInSol = appConfig?.transactionFee || '0.005';
-        requestBody['transactionsFeeLamports'] = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
-      }
-    } else {
-      // Multiple wallets: use jitoTipLamports
-      if (config.jitoTipLamports !== undefined) {
-        requestBody['jitoTipLamports'] = config.jitoTipLamports;
-      } else {
-        const feeInSol = appConfig?.transactionFee || '0.005';
-        requestBody['jitoTipLamports'] = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
-      }
-    }
-    
+
+    requestBody["slippageBps"] = getSlippageBps(config.slippageBps);
+
+    const fees = getFeeLamports(
+      wallets.length,
+      config.jitoTipLamports,
+      config.transactionsFeeLamports,
+    );
+    Object.assign(requestBody, fees);
+
     const response = await fetch(`${baseUrl}/v2/sol/buy`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status.toString()}`);
+      throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = await response.json() as ApiResponse<{
+    const data = (await response.json()) as ApiResponse<{
       bundles?: Array<string[] | BuyBundle>;
       transactions?: string[];
       bundlesSent?: number;
       results?: Array<Record<string, unknown>>;
     }>;
-    
+
     if (!data.success) {
-      throw new Error(data.error || 'Failed to get partially prepared transactions');
-    }
-    
-    // Handle different response formats to ensure compatibility
-    if (appConfig?.tradingServerEnabled === 'true' && data.data) {
-      // Self-hosted server response format: { success: true, data: { bundlesSent: 1, results: [...] } }
-      console.info('Self-hosted server response:', data);
-      return [{ transactions: [], serverResponse: data.data as ServerResponse }];
-    } else if (data.data?.bundles && Array.isArray(data.data.bundles)) {
-      // Wrap any bundle that is a plain array
-      return data.data.bundles.map((bundle: string[] | BuyBundle) =>
-        Array.isArray(bundle) ? { transactions: bundle } : bundle
+      throw new Error(
+        data.error || "Failed to get partially prepared transactions",
       );
-    } else if (data.data?.transactions && Array.isArray(data.data.transactions)) {
-      // If we get a flat array of transactions, create a single bundle
-      return [{ transactions: data.data.transactions }];
-    } else if (data.data && typeof data.data === 'object' && data.data !== null && 'transactions' in data.data && Array.isArray(data.data.transactions)) {
-      // Handle the documented response format: { success: true, data: { transactions: [...] } }
-      return [{ transactions: data.data.transactions }];
-    } else if ('transactions' in data && Array.isArray((data as unknown as { transactions: string[] }).transactions)) {
-      // Handle response format: { success: true, transactions: [...] } (transactions at root level)
-      return [{ transactions: (data as unknown as { transactions: string[] }).transactions }];
-    } else if (Array.isArray(data)) {
-      // Legacy format where data itself is an array
-      return [{ transactions: data as string[] }];
-    } else {
-      throw new Error('No transactions returned from backend');
     }
+
+    // Handle self-hosted server response
+    if (appConfig?.tradingServerEnabled === "true" && data.data) {
+      return [
+        { transactions: [], serverResponse: data.data as ServerResponse },
+      ];
+    }
+
+    // Handle various response formats
+    if (data.data?.bundles && Array.isArray(data.data.bundles)) {
+      return data.data.bundles.map((bundle: string[] | BuyBundle) =>
+        Array.isArray(bundle) ? { transactions: bundle } : bundle,
+      );
+    }
+
+    if (data.data?.transactions && Array.isArray(data.data.transactions)) {
+      return [{ transactions: data.data.transactions }];
+    }
+
+    if (
+      "transactions" in data &&
+      Array.isArray(
+        (data as unknown as { transactions: string[] }).transactions,
+      )
+    ) {
+      return [
+        {
+          transactions: (data as unknown as { transactions: string[] })
+            .transactions,
+        },
+      ];
+    }
+
+    if (Array.isArray(data)) {
+      return [{ transactions: data as string[] }];
+    }
+
+    throw new Error("No transactions returned from backend");
   } catch (error) {
-    console.error('Error getting partially prepared transactions:', error);
+    console.error(
+      "[Buy] Error getting partially prepared transactions:",
+      error,
+    );
     throw error;
   }
 };
 
-/**
- * Complete bundle signing
- * Step 2: Sign Transactions - Sign the transactions with your wallet keypairs
- */
-const completeBundleSigning = (
-  bundle: BuyBundle, 
-  walletKeypairs: Keypair[]
-): BuyBundle => {
-  // Check if the bundle has a valid transactions array
-  if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
-    console.error("Invalid bundle format, transactions property is missing or not an array:", bundle);
-    return { transactions: [] };
-  }
-
-  const signedTransactions = bundle.transactions.map(txBase58 => {
-    try {
-      // Decode the base64/base58 transaction
-      let txBuffer: Uint8Array;
-      try {
-        // Try base58 first (most common)
-        txBuffer = bs58.decode(txBase58);
-      } catch {
-        // If base58 fails, try base64
-        txBuffer = new Uint8Array(Buffer.from(txBase58, 'base64'));
-      }
-      
-      // Deserialize transaction
-      const transaction = VersionedTransaction.deserialize(txBuffer);
-      
-      // Extract required signers from staticAccountKeys
-      const signers: Keypair[] = [];
-      for (const accountKey of transaction.message.staticAccountKeys) {
-        const pubkeyStr = accountKey.toBase58();
-        const matchingKeypair = walletKeypairs.find(
-          kp => kp.publicKey.toBase58() === pubkeyStr
-        );
-        if (matchingKeypair && !signers.includes(matchingKeypair)) {
-          signers.push(matchingKeypair);
-        }
-      }
-      
-      // Sign the transaction
-      transaction.sign(signers);
-      
-      // Serialize and encode the fully signed transaction
-      return bs58.encode(transaction.serialize());
-    } catch (error) {
-      console.error('Error signing transaction:', error);
-      throw error;
-    }
-  });
-  
-  return { transactions: signedTransactions };
-};
+// ============================================================================
+// Execution Modes
+// ============================================================================
 
 /**
- * Split large bundles into smaller ones with maximum MAX_TRANSACTIONS_PER_BUNDLE transactions
- * Preserves the original order of transactions across the split bundles
- */
-const splitLargeBundles = (bundles: BuyBundle[]): BuyBundle[] => {
-  const result: BuyBundle[] = [];
-  
-  for (const bundle of bundles) {
-    if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
-      continue;
-    }
-    
-    // If the bundle is small enough, just add it to the result
-    if (bundle.transactions.length <= MAX_TRANSACTIONS_PER_BUNDLE) {
-      result.push(bundle);
-      continue;
-    }
-    
-    // Split the large bundle into smaller ones while preserving transaction order
-    for (let i = 0; i < bundle.transactions.length; i += MAX_TRANSACTIONS_PER_BUNDLE) {
-      const chunkTransactions = bundle.transactions.slice(i, i + MAX_TRANSACTIONS_PER_BUNDLE);
-      result.push({ transactions: chunkTransactions });
-    }
-  }
-  
-  return result;
-};
-
-/**
- * Execute buy in single mode - prepare and send each wallet separately
+ * Execute buy in single mode - process each wallet separately
  */
 const executeBuySingleMode = async (
   wallets: WalletBuy[],
-  config: BuyConfig
+  config: BuyConfig,
 ): Promise<BuyResult> => {
-  const singleDelay = config.singleDelay || 200; // Default 200ms delay between wallets
-  const results: BundleResult[] = [];
+  const singleDelay = config.singleDelay || TRADING.DEFAULT_SINGLE_DELAY_MS;
+  const results: unknown[] = [];
   let successfulWallets = 0;
   let failedWallets = 0;
 
   for (let i = 0; i < wallets.length; i++) {
     const wallet = wallets[i];
-    console.info(`Processing wallet ${(i + 1).toString()}/${wallets.length.toString()}: ${wallet.address.substring(0, 8)}...`);
 
     try {
-      // Get transactions for single wallet
-      const partiallyPreparedBundles = await getPartiallyPreparedTransactions([wallet], config);
-      
+      const partiallyPreparedBundles = await getPartiallyPreparedTransactions(
+        [wallet],
+        config,
+      );
+
       if (partiallyPreparedBundles.length === 0) {
-        console.warn(`No transactions for wallet ${wallet.address}`);
         failedWallets++;
         continue;
       }
 
-      // Create keypair for this wallet
-      const walletKeypair = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+      const walletKeypair = Keypair.fromSecretKey(
+        bs58.decode(wallet.privateKey),
+      );
 
-      // Sign and send each bundle for this wallet
       for (const bundle of partiallyPreparedBundles) {
         const signedBundle = completeBundleSigning(bundle, [walletKeypair]);
-        
+
         if (signedBundle.transactions.length > 0) {
           await checkRateLimit();
           const result = await sendBundle(signedBundle.transactions);
@@ -334,13 +197,12 @@ const executeBuySingleMode = async (
       }
 
       successfulWallets++;
-      
-      // Add configurable delay between wallets (except after the last one)
+
       if (i < wallets.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, singleDelay));
+        await new Promise((resolve) => setTimeout(resolve, singleDelay));
       }
     } catch (error) {
-      console.error(`Error processing wallet ${wallet.address}:`, error);
+      console.error(`[Buy] Error processing wallet ${wallet.address}:`, error);
       failedWallets++;
     }
   }
@@ -348,57 +210,48 @@ const executeBuySingleMode = async (
   return {
     success: successfulWallets > 0,
     result: results,
-    error: failedWallets > 0 ? `${failedWallets.toString()} wallets failed, ${successfulWallets.toString()} succeeded` : undefined
+    error: createBatchErrorMessage(successfulWallets, failedWallets),
   };
 };
 
 /**
- * Execute buy in batch mode - prepare 5 wallets per bundle and send with custom delay
+ * Execute buy in batch mode - process wallets in batches
  */
 const executeBuyBatchMode = async (
   wallets: WalletBuy[],
-  config: BuyConfig
+  config: BuyConfig,
 ): Promise<BuyResult> => {
-  const batchSize = 5;
-  const batchDelay = config.batchDelay || 1000; // Default 1 second delay
-  const results: BundleResult[] = [];
+  const batchSize = TRADING.DEFAULT_BATCH_SIZE;
+  const batchDelay = config.batchDelay || TRADING.DEFAULT_BATCH_DELAY_MS;
+  const results: unknown[] = [];
   let successfulBatches = 0;
   let failedBatches = 0;
 
-  // Split wallets into batches
   const batches: WalletBuy[][] = [];
   for (let i = 0; i < wallets.length; i += batchSize) {
     batches.push(wallets.slice(i, i + batchSize));
   }
 
-  console.info(`Processing ${batches.length.toString()} batches of up to ${batchSize.toString()} wallets each`);
-
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
-    console.info(`Processing batch ${(i + 1).toString()}/${batches.length.toString()} with ${batch.length.toString()} wallets`);
 
     try {
-      // Get transactions for this batch
-      const partiallyPreparedBundles = await getPartiallyPreparedTransactions(batch, config);
-      
+      const partiallyPreparedBundles = await getPartiallyPreparedTransactions(
+        batch,
+        config,
+      );
+
       if (partiallyPreparedBundles.length === 0) {
-        console.warn(`No transactions for batch ${(i + 1).toString()}`);
         failedBatches++;
         continue;
       }
 
-      // Create keypairs for this batch
-      const walletKeypairs = batch.map(wallet => 
-        Keypair.fromSecretKey(bs58.decode(wallet.privateKey))
-      );
-
-      // Split bundles and sign them
+      const walletKeypairs = createKeypairs(batch);
       const splitBundles = splitLargeBundles(partiallyPreparedBundles);
-      const signedBundles = splitBundles.map(bundle =>
-        completeBundleSigning(bundle, walletKeypairs)
+      const signedBundles = splitBundles.map((bundle) =>
+        completeBundleSigning(bundle, walletKeypairs),
       );
 
-      // Send all bundles for this batch
       for (const bundle of signedBundles) {
         if (bundle.transactions.length > 0) {
           await checkRateLimit();
@@ -408,13 +261,12 @@ const executeBuyBatchMode = async (
       }
 
       successfulBatches++;
-      
-      // Add delay between batches (except after the last one)
+
       if (i < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, batchDelay));
+        await new Promise((resolve) => setTimeout(resolve, batchDelay));
       }
     } catch (error) {
-      console.error(`Error processing batch ${(i + 1).toString()}:`, error);
+      console.error(`[Buy] Error processing batch ${i + 1}:`, error);
       failedBatches++;
     }
   }
@@ -422,193 +274,144 @@ const executeBuyBatchMode = async (
   return {
     success: successfulBatches > 0,
     result: results,
-    error: failedBatches > 0 ? `${failedBatches.toString()} batches failed, ${successfulBatches.toString()} succeeded` : undefined
+    error: createBatchErrorMessage(successfulBatches, failedBatches),
   };
 };
 
 /**
- * Execute buy in all-in-one mode - prepare all wallets and send all bundles simultaneously
+ * Execute buy in all-in-one mode - process all wallets simultaneously
  */
 const executeBuyAllInOneMode = async (
   wallets: WalletBuy[],
-  config: BuyConfig
+  config: BuyConfig,
 ): Promise<BuyResult> => {
-  console.info(`Preparing all ${wallets.length.toString()} wallets for simultaneous execution`);
-
   const appConfig = loadConfigFromCookies();
-  
-  // Get all transactions at once
-  const partiallyPreparedBundles = await getPartiallyPreparedTransactions(wallets, config);
-  
+  const partiallyPreparedBundles = await getPartiallyPreparedTransactions(
+    wallets,
+    config,
+  );
+
   if (partiallyPreparedBundles.length === 0) {
-    return {
-      success: false,
-      error: 'No transactions generated.'
-    };
+    return { success: false, error: "No transactions generated." };
   }
 
-  // If self-hosted trading server is enabled, the server handles everything
-  if (appConfig?.tradingServerEnabled === 'true') {
-    console.info('Self-hosted server handled signing and sending');
-    // Return the server response directly
-    if (partiallyPreparedBundles.length > 0 && partiallyPreparedBundles[0].serverResponse) {
+  // Self-hosted server handles everything
+  if (appConfig?.tradingServerEnabled === "true") {
+    if (partiallyPreparedBundles[0].serverResponse) {
       return {
         success: true,
         result: partiallyPreparedBundles[0].serverResponse,
-        error: undefined
       };
     }
-    return {
-      success: true,
-      result: partiallyPreparedBundles,
-      error: undefined
-    };
+    return { success: true, result: partiallyPreparedBundles };
   }
 
-  // Create all keypairs
-  const walletKeypairs = wallets.map(wallet => 
-    Keypair.fromSecretKey(bs58.decode(wallet.privateKey))
-  );
-
-  // Split and sign all bundles
+  const walletKeypairs = createKeypairs(wallets);
   const splitBundles = splitLargeBundles(partiallyPreparedBundles);
-  const signedBundles = splitBundles.map(bundle =>
-    completeBundleSigning(bundle, walletKeypairs)
+  const signedBundles = splitBundles.map((bundle) =>
+    completeBundleSigning(bundle, walletKeypairs),
   );
 
-  // Filter out empty bundles
-  const validSignedBundles = signedBundles.filter(bundle => bundle.transactions.length > 0);
-  
+  const validSignedBundles = signedBundles.filter(
+    (bundle) => bundle.transactions.length > 0,
+  );
+
   if (validSignedBundles.length === 0) {
-    return {
-      success: false,
-      error: 'Failed to sign any transactions'
-    };
+    return { success: false, error: "Failed to sign any transactions" };
   }
 
-  console.info(`Sending all ${validSignedBundles.length.toString()} bundles simultaneously with 100ms delays`);
-
-  // Send all bundles simultaneously with 100ms delays to avoid rate limits
   const bundlePromises = validSignedBundles.map(async (bundle, index) => {
-    // Add 100ms delay for each bundle to avoid rate limits
-    await new Promise(resolve => setTimeout(resolve, index * 100));
-    
+    await new Promise((resolve) =>
+      setTimeout(resolve, index * TRADING.DEFAULT_BUNDLE_DELAY_MS),
+    );
+
     try {
       const result = await sendBundle(bundle.transactions);
-      console.info(`Bundle ${(index + 1).toString()} sent successfully`);
       return { success: true, result };
-    } catch (error) {
-      console.error(`Error sending bundle ${(index + 1).toString()}:`, error);
-      return { success: false, error };
+    } catch {
+      return { success: false };
     }
   });
 
-  // Wait for all bundles to complete
   const bundleResults = await Promise.allSettled(bundlePromises);
-  
-  // Process results
-  const results: BundleResult[] = [];
-  let successfulBundles = 0;
-  let failedBundles = 0;
-
-  bundleResults.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      if (result.value.success) {
-        if (result.value.result) results.push(result.value.result);
-        successfulBundles++;
-      } else {
-        failedBundles++;
-      }
-    } else {
-      console.error(`Bundle ${(index + 1).toString()} promise rejected:`, result.reason);
-      failedBundles++;
-    }
-  });
+  const { success, results, successCount, failCount } =
+    processBatchResults(bundleResults);
 
   return {
-    success: successfulBundles > 0,
+    success,
     result: results,
-    error: failedBundles > 0 ? `${failedBundles.toString()} bundles failed, ${successfulBundles.toString()} succeeded` : undefined
+    error: createBatchErrorMessage(successCount, failCount),
   };
 };
 
+// ============================================================================
+// Main Export
+// ============================================================================
+
 /**
- * Execute unified buy operation for all supported protocols
- * Follows the three-step process:
- * 1. Gather Transactions - Request transaction bundles from the API
- * 2. Sign Transactions - Sign the transactions with your wallet keypairs  
- * 3. Send Bundle - Submit the signed transaction bundles to the network
+ * Execute unified buy operation
  */
 export const executeBuy = async (
   wallets: WalletBuy[],
-  config: BuyConfig
+  config: BuyConfig,
 ): Promise<BuyResult> => {
   try {
     const appConfig = loadConfigFromCookies();
-    let bundleMode = config.bundleMode || 'batch'; // Default to batch mode
-    
-    // If self-hosted trading server is enabled, force all-in-one mode
-    if (appConfig?.tradingServerEnabled === 'true') {
-      bundleMode = 'all-in-one';
-      console.info(`Self-hosted trading server enabled, forcing all-in-one mode`);
+    let bundleMode = config.bundleMode || "batch";
+
+    if (appConfig?.tradingServerEnabled === "true") {
+      bundleMode = "all-in-one";
     }
-    
-    console.info(`Preparing to buy ${config.tokenAddress} using ${wallets.length.toString()} wallets in ${bundleMode} mode`);
-    
-    // Execute based on bundle mode
+
     let result: BuyResult;
     switch (bundleMode) {
-      case 'single':
+      case "single":
         result = await executeBuySingleMode(wallets, config);
         break;
-      
-      case 'batch':
+      case "batch":
         result = await executeBuyBatchMode(wallets, config);
         break;
-      
-      case 'all-in-one':
+      case "all-in-one":
         result = await executeBuyAllInOneMode(wallets, config);
         break;
-      
       default:
-        throw new Error(`Invalid bundle mode: ${bundleMode as string}. Must be 'single', 'batch', or 'all-in-one'`);
+        throw new Error(`Invalid bundle mode: ${bundleMode as string}`);
     }
-    
-    // Save trade history
+
     addTradeHistory({
-      type: 'buy',
+      type: "buy",
       tokenAddress: config.tokenAddress,
       walletsCount: wallets.length,
       amount: config.solAmount,
-      amountType: 'sol',
+      amountType: "sol",
       success: result.success,
       error: result.error,
-      bundleMode: bundleMode
+      bundleMode,
     });
-    
+
     return result;
   } catch (error) {
-    console.error('Buy error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error executing buy';
-    
-    // Save failed trade history
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error executing buy";
+
     addTradeHistory({
-      type: 'buy',
+      type: "buy",
       tokenAddress: config.tokenAddress,
       walletsCount: wallets.length,
       amount: config.solAmount,
-      amountType: 'sol',
+      amountType: "sol",
       success: false,
       error: errorMessage,
-      bundleMode: config.bundleMode || 'batch'
+      bundleMode: config.bundleMode || "batch",
     });
-    
-    return {
-      success: false,
-      error: errorMessage
-    };
+
+    return { success: false, error: errorMessage };
   }
 };
+
+// ============================================================================
+// Validation
+// ============================================================================
 
 /**
  * Validate buy inputs
@@ -616,55 +419,63 @@ export const executeBuy = async (
 export const validateBuyInputs = (
   wallets: WalletBuy[],
   config: BuyConfig,
-  walletBalances: Map<string, number>
+  walletBalances: Map<string, number>,
 ): { valid: boolean; error?: string } => {
-  // Check if config is valid
   if (!config.tokenAddress) {
-    return { valid: false, error: 'Invalid token address' };
+    return { valid: false, error: "Invalid token address" };
   }
-  
+
   if (isNaN(config.solAmount) || config.solAmount <= 0) {
-    return { valid: false, error: 'Invalid SOL amount' };
+    return { valid: false, error: "Invalid SOL amount" };
   }
-  
-  // Validate custom amounts if provided
+
   if (config.amounts) {
     if (config.amounts.length !== wallets.length) {
-      return { valid: false, error: 'Custom amounts array length must match wallets array length' };
+      return {
+        valid: false,
+        error: "Custom amounts array length must match wallets array length",
+      };
     }
-    
+
     for (const amount of config.amounts) {
       if (isNaN(amount) || amount <= 0) {
-        return { valid: false, error: 'All custom amounts must be positive numbers' };
+        return {
+          valid: false,
+          error: "All custom amounts must be positive numbers",
+        };
       }
     }
   }
-  
-  // Validate slippage if provided
-  if (config.slippageBps !== undefined && (isNaN(config.slippageBps) || config.slippageBps < 0)) {
-    return { valid: false, error: 'Invalid slippage value' };
+
+  if (
+    config.slippageBps !== undefined &&
+    (isNaN(config.slippageBps) || config.slippageBps < 0)
+  ) {
+    return { valid: false, error: "Invalid slippage value" };
   }
-  
-  // Check if wallets are valid
+
   if (!wallets.length) {
-    return { valid: false, error: 'No wallets provided' };
+    return { valid: false, error: "No wallets provided" };
   }
-  
+
   for (const wallet of wallets) {
     if (!wallet.address || !wallet.privateKey) {
-      return { valid: false, error: 'Invalid wallet data' };
+      return { valid: false, error: "Invalid wallet data" };
     }
-    
+
     const balance = walletBalances.get(wallet.address) || 0;
-    const requiredAmount = config.amounts ? 
-      config.amounts[wallets.indexOf(wallet)] : 
-      config.solAmount;
-      
+    const requiredAmount = config.amounts
+      ? config.amounts[wallets.indexOf(wallet)]
+      : config.solAmount;
+
     if (balance < requiredAmount) {
-      return { valid: false, error: `Wallet ${wallet.address.substring(0, 6)}... has insufficient balance` };
+      return {
+        valid: false,
+        error: `Wallet ${wallet.address.substring(0, 6)}... has insufficient balance`,
+      };
     }
   }
-  
+
   return { valid: true };
 };
 
@@ -681,16 +492,14 @@ export const createBuyConfig = (config: {
   bundleMode?: BundleMode;
   batchDelay?: number;
   singleDelay?: number;
-}): BuyConfig => {
-  return {
-    tokenAddress: config.tokenAddress,
-    solAmount: config.solAmount,
-    amounts: config.amounts,
-    slippageBps: config.slippageBps,
-    jitoTipLamports: config.jitoTipLamports,
-    transactionsFeeLamports: config.transactionsFeeLamports,
-    bundleMode: config.bundleMode || 'batch',
-    batchDelay: config.batchDelay,
-    singleDelay: config.singleDelay
-  };
-};
+}): BuyConfig => ({
+  tokenAddress: config.tokenAddress,
+  solAmount: config.solAmount,
+  amounts: config.amounts,
+  slippageBps: config.slippageBps,
+  jitoTipLamports: config.jitoTipLamports,
+  transactionsFeeLamports: config.transactionsFeeLamports,
+  bundleMode: config.bundleMode || "batch",
+  batchDelay: config.batchDelay,
+  singleDelay: config.singleDelay,
+});
