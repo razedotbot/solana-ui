@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Buffer } from 'buffer';
-import Cookies from 'js-cookie';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Buffer } from "buffer";
+import Cookies from "js-cookie";
 window.Buffer = Buffer;
-import { brand } from './utils/brandConfig';
-import logoImage from './logo.png';
-import type { WindowWithToast, ServerInfo } from './utils/types';
-import { AppContextProvider } from './contexts/AppContext';
-import { IframeStateProvider } from './contexts/IframeStateContext';
+import { brand } from "./utils/brandConfig";
+import logoImage from "./logo.png";
+import type { WindowWithToast, ServerInfo } from "./utils/types";
+import { AppContextProvider } from "./contexts";
+import { IframeStateProvider } from "./contexts/IframeStateContext";
 
 // Dynamic CSS loading based on brand configuration using Vite's import
 const loadBrandCSS = async (): Promise<void> => {
@@ -16,30 +16,38 @@ const loadBrandCSS = async (): Promise<void> => {
     // Use dynamic import for CSS files in Vite based on theme name
     await import(`../${brand.theme.name}.css`);
   } catch (error) {
-    console.error('Failed to load brand CSS:', error);
+    console.error("Failed to load brand CSS:", error);
     // Fallback to globals.css
-    await import('../green.css');
+    await import("../green.css");
   }
 };
 
 // Load brand CSS immediately
 void loadBrandCSS();
 import ToastProvider from "./components/Notifications";
-import { useToast } from "./utils/useToast";
-import BeRightBack from './components/BeRightBack';
-import ErrorBoundary from './components/ErrorBoundary';
+import { useToast } from "./utils/hooks";
+import BeRightBack from "./components/BeRightBack";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Lazy load page components
-const App = lazy(() => import('./App'));
-const Homepage = lazy(() => import('./pages/HomePage'));
-const AutomatePage = lazy(() => import('./pages/AutomatePage'));
-const DeployPage = lazy(() => import('./pages/DeployPage'));
-const WalletsPage = lazy(() => import('./pages/WalletsPage').then(module => ({ default: module.WalletsPage })));
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
+const App = lazy(() => import("./App"));
+const Homepage = lazy(() => import("./pages/HomePage"));
+const AutomatePage = lazy(() => import("./pages/AutomatePage"));
+const DeployPage = lazy(() => import("./pages/DeployPage"));
+const WalletsPage = lazy(() =>
+  import("./pages/WalletsPage").then((module) => ({
+    default: module.WalletsPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
 
 // Preload function for App component (used by /holdings route)
 const preloadApp = (): void => {
-  void import('./App');
+  void import("./App");
 };
 
 declare global {
@@ -52,15 +60,27 @@ declare global {
   }
 }
 
-const SERVER_URL_COOKIE = 'trading_server_url';
-const SERVER_REGION_COOKIE = 'trading_server_region';
+const SERVER_URL_COOKIE = "trading_server_url";
+const SERVER_REGION_COOKIE = "trading_server_region";
 
 // TEMPORARY: Set to true to disable server status check
 const DISABLE_SERVER_CHECK = false;
 
 const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
-  { id: 'de', name: 'Germany', url: 'https://de.raze.sh/', region: 'DE', flag: '🇩🇪' },
-  { id: 'us', name: 'United States', url: 'https://us.raze.sh/', region: 'US', flag: '🇺🇸' },
+  {
+    id: "de",
+    name: "Germany",
+    url: "https://de.raze.sh/",
+    region: "DE",
+    flag: "🇩🇪",
+  },
+  {
+    id: "us",
+    name: "United States",
+    url: "https://us.raze.sh/",
+    region: "US",
+    flag: "🇺🇸",
+  },
 ];
 
 export const ServerCheckLoading = (): JSX.Element => {
@@ -99,16 +119,20 @@ export const Root = (): JSX.Element => {
     // Wait for CSS to load before injecting scrollbar styles
     const applyStyles = (): void => {
       // Check if CSS variables are available, if not use fallback values
-      const testEl = document.createElement('div');
+      const testEl = document.createElement("div");
       document.body.appendChild(testEl);
       const computedStyle = getComputedStyle(testEl);
-      const scrollbarThumb = computedStyle.getPropertyValue('--color-scrollbar-thumb').trim() || 'rgba(11, 82, 46, 0.5)';
-      const scrollbarTrack = computedStyle.getPropertyValue('--color-scrollbar-track').trim() || 'transparent';
+      const scrollbarThumb =
+        computedStyle.getPropertyValue("--color-scrollbar-thumb").trim() ||
+        "rgba(11, 82, 46, 0.5)";
+      const scrollbarTrack =
+        computedStyle.getPropertyValue("--color-scrollbar-track").trim() ||
+        "transparent";
       document.body.removeChild(testEl);
 
       // Add global styles to disable text selection and apply custom scrollbar
-      const style = document.createElement('style');
-      style.id = 'custom-scrollbar-styles';
+      const style = document.createElement("style");
+      style.id = "custom-scrollbar-styles";
       style.textContent = `
         * {
           -webkit-user-select: none !important;
@@ -118,7 +142,7 @@ export const Root = (): JSX.Element => {
           -webkit-touch-callout: none !important;
           -webkit-tap-highlight-color: transparent !important;
         }
-        
+
         /* Allow selection for input fields and textareas */
         input, textarea, [contenteditable="true"] {
           -webkit-user-select: text !important;
@@ -126,119 +150,119 @@ export const Root = (): JSX.Element => {
           -ms-user-select: text !important;
           user-select: text !important;
         }
-        
+
         /* Ensure custom scrollbar is applied globally - same as Wallets.tsx and green.css */
         * {
           scrollbar-width: thin !important;
           scrollbar-color: ${scrollbarThumb} ${scrollbarTrack} !important;
         }
-        
+
         *::-webkit-scrollbar {
           width: 6px !important;
           height: 6px !important;
           background-color: ${scrollbarTrack} !important;
         }
-        
+
         *::-webkit-scrollbar-track {
           background-color: ${scrollbarTrack} !important;
           border-radius: 8px !important;
         }
-        
+
         *::-webkit-scrollbar-thumb {
           background-color: ${scrollbarThumb} !important;
           border-radius: 8px !important;
           transition: background-color 0.2s !important;
         }
-        
+
         *::-webkit-scrollbar-thumb:hover {
           background-color: ${scrollbarThumb} !important;
         }
-        
+
         /* Ensure html and body also have custom scrollbar - highest priority */
         html {
           scrollbar-width: thin !important;
           scrollbar-color: ${scrollbarThumb} ${scrollbarTrack} !important;
           overflow-x: hidden !important;
         }
-        
+
         body {
           scrollbar-width: thin !important;
           scrollbar-color: ${scrollbarThumb} ${scrollbarTrack} !important;
           overflow-x: hidden !important;
         }
-        
+
         html::-webkit-scrollbar {
           width: 6px !important;
           height: 6px !important;
           background-color: ${scrollbarTrack} !important;
         }
-        
+
         html::-webkit-scrollbar-track {
           background-color: ${scrollbarTrack} !important;
           border-radius: 8px !important;
         }
-        
+
         html::-webkit-scrollbar-thumb {
           background-color: ${scrollbarThumb} !important;
           border-radius: 8px !important;
           transition: background-color 0.2s !important;
         }
-        
+
         html::-webkit-scrollbar-thumb:hover {
           background-color: ${scrollbarThumb} !important;
         }
-        
+
         body::-webkit-scrollbar {
           width: 6px !important;
           height: 6px !important;
           background-color: ${scrollbarTrack} !important;
         }
-        
+
         body::-webkit-scrollbar-track {
           background-color: ${scrollbarTrack} !important;
           border-radius: 8px !important;
         }
-        
+
         body::-webkit-scrollbar-thumb {
           background-color: ${scrollbarThumb} !important;
           border-radius: 8px !important;
           transition: background-color 0.2s !important;
         }
-        
+
         body::-webkit-scrollbar-thumb:hover {
           background-color: ${scrollbarThumb} !important;
         }
-        
+
         /* Ensure #root also has custom scrollbar */
         #root {
           scrollbar-width: thin !important;
           scrollbar-color: ${scrollbarThumb} ${scrollbarTrack} !important;
         }
-        
+
         #root::-webkit-scrollbar {
           width: 6px !important;
           height: 6px !important;
           background-color: ${scrollbarTrack} !important;
         }
-        
+
         #root::-webkit-scrollbar-track {
           background-color: ${scrollbarTrack} !important;
           border-radius: 8px !important;
         }
-        
+
         #root::-webkit-scrollbar-thumb {
           background-color: ${scrollbarThumb} !important;
           border-radius: 8px !important;
           transition: background-color 0.2s !important;
         }
-        
+
         #root::-webkit-scrollbar-thumb:hover {
           background-color: ${scrollbarThumb} !important;
         }
       `;
 
       // Remove existing style if present
-      const existingStyle = document.getElementById('custom-scrollbar-styles');
+      const existingStyle = document.getElementById("custom-scrollbar-styles");
       if (existingStyle) {
         existingStyle.remove();
       }
@@ -260,7 +284,11 @@ export const Root = (): JSX.Element => {
     const handleSelectStart = (e: Event): boolean => {
       const target = e.target as HTMLElement;
       // Allow selection in input fields and textareas
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') {
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.contentEditable === "true"
+      ) {
         return true;
       }
       e.preventDefault();
@@ -274,28 +302,28 @@ export const Root = (): JSX.Element => {
     };
 
     // Add event listeners
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('selectstart', handleSelectStart);
-    document.addEventListener('dragstart', handleDragStart);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("selectstart", handleSelectStart);
+    document.addEventListener("dragstart", handleDragStart);
 
     // Cleanup function
     return (): void => {
       clearTimeout(timeoutId);
       // Safely remove style element if it's still a child
-      const styleElement = document.getElementById('custom-scrollbar-styles');
+      const styleElement = document.getElementById("custom-scrollbar-styles");
       if (styleElement && styleElement.parentNode === document.head) {
         document.head.removeChild(styleElement);
       }
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('selectstart', handleSelectStart);
-      document.removeEventListener('dragstart', handleDragStart);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("selectstart", handleSelectStart);
+      document.removeEventListener("dragstart", handleDragStart);
     };
   }, []);
 
   const checkServerConnection = async (url: string): Promise<boolean> => {
     try {
-      const baseUrl = url.replace(/\/+$/, '');
-      const healthEndpoint = '/v2/health';
+      const baseUrl = url.replace(/\/+$/, "");
+      const healthEndpoint = "/v2/health";
       const checkUrl = `${baseUrl}${healthEndpoint}`;
 
       const controller = new AbortController();
@@ -303,9 +331,9 @@ export const Root = (): JSX.Element => {
 
       const response = await fetch(checkUrl, {
         signal: controller.signal,
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Accept': 'application/json',
+          Accept: "application/json",
         },
       });
 
@@ -315,39 +343,41 @@ export const Root = (): JSX.Element => {
         return false;
       }
 
-      const data = await response.json() as { status?: string };
-      return data.status === 'healthy';
+      const data = (await response.json()) as { status?: string };
+      return data.status === "healthy";
     } catch (ignore) {
       return false;
     }
   };
 
-  const switchToServer = useCallback(async (serverId: string): Promise<boolean> => {
-    const server = availableServers.find((s): boolean => s.id === serverId);
-    if (!server) {
+  const switchToServer = useCallback(
+    async (serverId: string): Promise<boolean> => {
+      const server = availableServers.find((s): boolean => s.id === serverId);
+      if (!server) {
+        return false;
+      }
+
+      const isConnected = await checkServerConnection(server.url);
+      if (isConnected) {
+        setServerUrl(server.url);
+        window.tradingServerUrl = server.url;
+        window.serverRegion = server.region;
+        Cookies.set(SERVER_URL_COOKIE, server.url, { expires: 30 });
+        Cookies.set(SERVER_REGION_COOKIE, server.id, { expires: 30 });
+
+        // Emit event to notify components of server change
+        const event = new CustomEvent("serverChanged", {
+          detail: { server },
+        });
+        window.dispatchEvent(event);
+
+        return true;
+      }
+
       return false;
-    }
-
-    const isConnected = await checkServerConnection(server.url);
-    if (isConnected) {
-      setServerUrl(server.url);
-      window.tradingServerUrl = server.url;
-      window.serverRegion = server.region;
-      Cookies.set(SERVER_URL_COOKIE, server.url, { expires: 30 });
-      Cookies.set(SERVER_REGION_COOKIE, server.id, { expires: 30 });
-
-      // Emit event to notify components of server change
-      const event = new CustomEvent('serverChanged', {
-        detail: { server }
-      });
-      window.dispatchEvent(event);
-
-      return true;
-    }
-
-    return false;
-  }, [availableServers]);
-
+    },
+    [availableServers],
+  );
 
   // Initialize server connection
   useEffect((): void => {
@@ -355,8 +385,8 @@ export const Root = (): JSX.Element => {
       const measurePing = async (url: string): Promise<number> => {
         const startTime = Date.now();
         try {
-          const baseUrl = url.replace(/\/+$/, '');
-          const healthEndpoint = '/v2/health';
+          const baseUrl = url.replace(/\/+$/, "");
+          const healthEndpoint = "/v2/health";
           const checkUrl = `${baseUrl}${healthEndpoint}`;
 
           const controller = new AbortController();
@@ -364,9 +394,9 @@ export const Root = (): JSX.Element => {
 
           await fetch(checkUrl, {
             signal: controller.signal,
-            method: 'GET',
+            method: "GET",
             headers: {
-              'Accept': 'application/json',
+              Accept: "application/json",
             },
           });
 
@@ -377,9 +407,12 @@ export const Root = (): JSX.Element => {
         }
       };
 
-      const measureAveragePing = async (url: string, samples: number = 3): Promise<number> => {
+      const measureAveragePing = async (
+        url: string,
+        samples: number = 3,
+      ): Promise<number> => {
         const pings: number[] = [];
-        
+
         for (let i = 0; i < samples; i++) {
           const ping = await measurePing(url);
           if (ping === Infinity) {
@@ -387,9 +420,10 @@ export const Root = (): JSX.Element => {
           }
           pings.push(ping);
         }
-        
+
         // Calculate average of all ping measurements
-        const average = pings.reduce((sum, ping) => sum + ping, 0) / pings.length;
+        const average =
+          pings.reduce((sum, ping) => sum + ping, 0) / pings.length;
         return average;
       };
 
@@ -399,7 +433,9 @@ export const Root = (): JSX.Element => {
         const savedRegion = Cookies.get(SERVER_REGION_COOKIE);
 
         if (savedUrl && savedRegion) {
-          const savedServer = DEFAULT_REGIONAL_SERVERS.find((s): boolean => s.id === savedRegion && s.url === savedUrl);
+          const savedServer = DEFAULT_REGIONAL_SERVERS.find(
+            (s): boolean => s.id === savedRegion && s.url === savedUrl,
+          );
           if (savedServer) {
             setServerUrl(savedUrl);
             window.tradingServerUrl = savedUrl;
@@ -408,8 +444,8 @@ export const Root = (): JSX.Element => {
             window.availableServers = [savedServer];
             setIsChecking(false);
 
-            const event = new CustomEvent('serverChanged', {
-              detail: { server: savedServer }
+            const event = new CustomEvent("serverChanged", {
+              detail: { server: savedServer },
             });
             window.dispatchEvent(event);
             return;
@@ -425,8 +461,8 @@ export const Root = (): JSX.Element => {
         window.availableServers = DEFAULT_REGIONAL_SERVERS;
         setIsChecking(false);
 
-        const event = new CustomEvent('serverChanged', {
-          detail: { server: defaultServer }
+        const event = new CustomEvent("serverChanged", {
+          detail: { server: defaultServer },
         });
         window.dispatchEvent(event);
         return;
@@ -442,11 +478,13 @@ export const Root = (): JSX.Element => {
 
           const ping = await measureAveragePing(server.url, 3);
           return { ...server, ping };
-        })
+        }),
       );
 
       // Filter out unreachable servers and sort by ping
-      const reachableServers = allServersWithPing.filter((server): boolean => server.ping !== Infinity);
+      const reachableServers = allServersWithPing.filter(
+        (server): boolean => server.ping !== Infinity,
+      );
       reachableServers.sort((a, b): number => a.ping! - b.ping!);
 
       // Always set available servers regardless of saved server
@@ -459,7 +497,9 @@ export const Root = (): JSX.Element => {
 
       if (savedUrl && savedRegion) {
         // Check if the saved server is in our reachable servers
-        const savedServer = reachableServers.find((s): boolean => s.id === savedRegion && s.url === savedUrl);
+        const savedServer = reachableServers.find(
+          (s): boolean => s.id === savedRegion && s.url === savedUrl,
+        );
 
         if (savedServer) {
           setServerUrl(savedUrl);
@@ -468,8 +508,8 @@ export const Root = (): JSX.Element => {
           setIsChecking(false);
 
           // Emit event to notify components
-          const event = new CustomEvent('serverChanged', {
-            detail: { server: savedServer }
+          const event = new CustomEvent("serverChanged", {
+            detail: { server: savedServer },
           });
           window.dispatchEvent(event);
 
@@ -488,8 +528,8 @@ export const Root = (): JSX.Element => {
         setIsChecking(false);
 
         // Emit event to notify components
-        const event = new CustomEvent('serverChanged', {
-          detail: { server: bestServer }
+        const event = new CustomEvent("serverChanged", {
+          detail: { server: bestServer },
         });
         window.dispatchEvent(event);
 
@@ -520,7 +560,9 @@ export const Root = (): JSX.Element => {
   }, [isChecking, serverUrl]);
 
   // Toast wrapper
-  const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({ children }): JSX.Element => {
+  const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({
+    children,
+  }): JSX.Element => {
     const { showToast } = useToast();
 
     // Expose showToast globally for modals
@@ -534,8 +576,6 @@ export const Root = (): JSX.Element => {
     return <>{children}</>;
   };
 
-
-
   if (isChecking) {
     return <ServerCheckLoading />;
   }
@@ -543,10 +583,14 @@ export const Root = (): JSX.Element => {
   return (
     <div className="h-screen w-screen">
       <ErrorBoundary>
-        <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <BrowserRouter
+          future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+        >
           <ToastProvider>
             <ToastWrapper>
-              <AppContextProvider showToast={(window as WindowWithToast).showToast || (() => { })}>
+              <AppContextProvider
+                showToast={(window as WindowWithToast).showToast || (() => {})}
+              >
                 <IframeStateProvider>
                   {serverUrl ? (
                     <Suspense fallback={<ServerCheckLoading />}>
@@ -571,9 +615,9 @@ export const Root = (): JSX.Element => {
                     </Suspense>
                   ) : (
                     <BeRightBack
-                      onOpenWallets={() => window.location.href = '/wallets'}
+                      onOpenWallets={() => (window.location.href = "/wallets")}
                       onOpenSettings={() => {
-                        window.location.href = '/settings';
+                        window.location.href = "/settings";
                       }}
                     />
                   )}
@@ -589,8 +633,8 @@ export const Root = (): JSX.Element => {
 
 // Remove the initial HTML loader once React mounts
 const removeInitialLoader = (): void => {
-  const initialLoader = document.getElementById('initial-loader');
-  const initialStyles = document.getElementById('initial-loader-styles');
+  const initialLoader = document.getElementById("initial-loader");
+  const initialStyles = document.getElementById("initial-loader-styles");
   if (initialLoader) {
     initialLoader.remove();
   }
@@ -599,7 +643,7 @@ const removeInitialLoader = (): void => {
   }
 };
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<Root />);
+ReactDOM.createRoot(document.getElementById("root")!).render(<Root />);
 
 // Remove the static HTML loader after React has mounted
 removeInitialLoader();

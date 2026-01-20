@@ -1,20 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { CheckCircle, ChevronLeft, ChevronRight, Info, Search, X, ArrowDown } from 'lucide-react';
-import { getWallets, getWalletDisplayName } from '../../Utils';
-import { useToast } from "../../utils/useToast";
-import { loadConfigFromCookies } from '../../Utils';
-import * as web3 from '@solana/web3.js';
-import bs58 from 'bs58';
-import { sendToJitoBundleService } from '../../utils/jitoService';
-import type { ApiResponse } from '../../utils/types';
-import { createConnectionFromConfig } from '../../utils/rpcManager';
+import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import {
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  Search,
+  X,
+  ArrowDown,
+} from "lucide-react";
+import { getWallets, getWalletDisplayName } from "../../utils/wallet";
+import { useToast } from "../../utils/hooks";
+import { loadConfigFromCookies } from "../../utils/storage";
+import * as web3 from "@solana/web3.js";
+import bs58 from "bs58";
+import { sendToJitoBundleService } from "../../utils/jitoService";
+import type { ApiResponse } from "../../utils/types";
+import { createConnectionFromConfig } from "../../utils/rpcManager";
 
 interface WindowWithConfig {
   tradingServerUrl?: string;
 }
 
-const STEPS_BURN = ['Token Address', 'Select Source', 'Burn Details', 'Review'];
+const STEPS_BURN = ["Token Address", "Select Source", "Burn Details", "Review"];
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -22,8 +30,7 @@ interface BaseModalProps {
 }
 
 interface BurnModalProps extends BaseModalProps {
-  handleRefresh: () => void;
-  tokenAddress?: string; 
+  tokenAddress?: string;
   solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
 }
@@ -33,44 +40,50 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   onClose,
   tokenAddress: initialTokenAddress,
   solBalances,
-  tokenBalances
+  tokenBalances,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [tokenAddress, setTokenAddress] = useState<string>(initialTokenAddress || '');
-  const [sourceWallet, setSourceWallet] = useState<string>('');
-  const [tokenAccounts, setTokenAccounts] = useState<Array<{
-    mint: string;
-    balance: number;
-    symbol: string;
-  }>>([]);
-  const [amount, setAmount] = useState<string>('');
+  const [tokenAddress, setTokenAddress] = useState<string>(
+    initialTokenAddress || "",
+  );
+  const [sourceWallet, setSourceWallet] = useState<string>("");
+  const [tokenAccounts, setTokenAccounts] = useState<
+    Array<{
+      mint: string;
+      balance: number;
+      symbol: string;
+    }>
+  >([]);
+  const [amount, setAmount] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortOption, setSortOption] = useState('address');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [balanceFilter, setBalanceFilter] = useState('all');
-  const [modalClass, setModalClass] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortOption, setSortOption] = useState("address");
+  const [sortDirection, setSortDirection] = useState("asc");
+  const [balanceFilter, setBalanceFilter] = useState("all");
+  const [modalClass, setModalClass] = useState("");
   const [showInfoTip, setShowInfoTip] = useState(false);
   const [buttonHover, setButtonHover] = useState(false);
-  const [tokenBalancesForWallets, setTokenBalancesForWallets] = useState<Map<string, number>>(new Map());
-  
+  const [tokenBalancesForWallets, setTokenBalancesForWallets] = useState<
+    Map<string, number>
+  >(new Map());
+
   const wallets = getWallets();
   const { showToast } = useToast();
 
   // Reset form state
   const resetForm = useCallback((): void => {
     setCurrentStep(0);
-    setTokenAddress(initialTokenAddress || '');
-    setSourceWallet('');
-    setAmount('');
+    setTokenAddress(initialTokenAddress || "");
+    setSourceWallet("");
+    setAmount("");
     setIsConfirmed(false);
-    setSearchTerm('');
-    setSortOption('address');
-    setSortDirection('asc');
-    setBalanceFilter('all');
+    setSearchTerm("");
+    setSortOption("address");
+    setSortDirection("asc");
+    setBalanceFilter("all");
     setTokenBalancesForWallets(new Map());
   }, [initialTokenAddress]);
 
@@ -79,13 +92,13 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     if (isOpen) {
       resetForm();
       // Add entrance animation class
-      setModalClass('animate-modal-in');
-      
+      setModalClass("animate-modal-in");
+
       // Simulate a typing/loading effect for a  feel
       const timer = setTimeout(() => {
-        setModalClass('');
+        setModalClass("");
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
     return undefined;
@@ -101,14 +114,16 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   // Fetch token balances for all wallets when token address is provided
   const fetchTokenBalancesForAllWallets = async (): Promise<void> => {
     if (!tokenAddress) return;
-    
+
     setIsLoadingBalances(true);
     try {
       const savedConfig = loadConfigFromCookies();
-      const connection = await createConnectionFromConfig(savedConfig?.rpcEndpoints);
-      
+      const connection = await createConnectionFromConfig(
+        savedConfig?.rpcEndpoints,
+      );
+
       const balancesMap = new Map<string, number>();
-      
+
       // Validate token address
       try {
         new web3.PublicKey(tokenAddress);
@@ -122,19 +137,19 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       await Promise.all(
         wallets.map(async (wallet) => {
           try {
-            const keypair = web3.Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-            const publicKey = keypair.publicKey;
-            
-            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-              publicKey,
-              {
-                mint: new web3.PublicKey(tokenAddress),
-              }
+            const keypair = web3.Keypair.fromSecretKey(
+              bs58.decode(wallet.privateKey),
             );
+            const publicKey = keypair.publicKey;
+
+            const tokenAccounts =
+              await connection.getParsedTokenAccountsByOwner(publicKey, {
+                mint: new web3.PublicKey(tokenAddress),
+              });
 
             if (tokenAccounts.value.length > 0) {
-              const accountData = tokenAccounts.value[0].account.data as { 
-                parsed: { info: { tokenAmount: { uiAmount: number } } } 
+              const accountData = tokenAccounts.value[0].account.data as {
+                parsed: { info: { tokenAmount: { uiAmount: number } } };
               };
               const balance = accountData.parsed.info.tokenAmount.uiAmount;
               balancesMap.set(wallet.address, balance);
@@ -142,15 +157,18 @@ export const BurnModal: React.FC<BurnModalProps> = ({
               balancesMap.set(wallet.address, 0);
             }
           } catch (error) {
-            console.error(`Error fetching balance for wallet ${wallet.address}:`, error);
+            console.error(
+              `Error fetching balance for wallet ${wallet.address}:`,
+              error,
+            );
             balancesMap.set(wallet.address, 0);
           }
-        })
+        }),
       );
 
       setTokenBalancesForWallets(balancesMap);
     } catch (error) {
-      console.error('Error fetching token balances:', error);
+      console.error("Error fetching token balances:", error);
       showToast("Failed to fetch token balances", "error");
     } finally {
       setIsLoadingBalances(false);
@@ -161,40 +179,42 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   useEffect((): void => {
     const fetchTokenAccounts = async (): Promise<void> => {
       if (!sourceWallet || !tokenAddress) return;
-      
+
       setIsLoadingTokens(true);
       try {
         const savedConfig = loadConfigFromCookies();
-        const connection = await createConnectionFromConfig(savedConfig?.rpcEndpoints);
-
-        const keypair = web3.Keypair.fromSecretKey(
-          bs58.decode(sourceWallet)
+        const connection = await createConnectionFromConfig(
+          savedConfig?.rpcEndpoints,
         );
+
+        const keypair = web3.Keypair.fromSecretKey(bs58.decode(sourceWallet));
         const publicKey = keypair.publicKey;
-              
+
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
           publicKey,
           {
             mint: new web3.PublicKey(tokenAddress),
-          }
+          },
         );
 
         if (tokenAccounts.value.length > 0) {
-          const accountData = tokenAccounts.value[0].account.data as { 
-            parsed: { info: { tokenAmount: { uiAmount: number } } } 
+          const accountData = tokenAccounts.value[0].account.data as {
+            parsed: { info: { tokenAmount: { uiAmount: number } } };
           };
           const balance = accountData.parsed.info.tokenAmount.uiAmount;
-          
-          setTokenAccounts([{
-            mint: tokenAddress,
-            balance: balance,
-            symbol: tokenAddress.slice(0, 4)
-          }]);
+
+          setTokenAccounts([
+            {
+              mint: tokenAddress,
+              balance: balance,
+              symbol: tokenAddress.slice(0, 4),
+            },
+          ]);
         } else {
           setTokenAccounts([]);
         }
       } catch (error) {
-        console.error('Error fetching token accounts:', error);
+        console.error("Error fetching token accounts:", error);
         showToast("Failed to fetch token accounts", "error");
         setTokenAccounts([]);
       } finally {
@@ -221,39 +241,39 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       // Fetch balances before moving to next step
       await fetchTokenBalancesForAllWallets();
     }
-    
+
     if (currentStep === 1 && !sourceWallet) {
       showToast("Please select source wallet", "error");
       return;
     }
-    
+
     if (currentStep === 2) {
       if (!amount || parseFloat(amount) <= 0) {
         showToast("Please enter a valid amount", "error");
         return;
       }
     }
-    
+
     // Add transition animation
-    setModalClass('animate-step-out');
+    setModalClass("animate-step-out");
     setTimeout(() => {
-      setCurrentStep(prev => Math.min(prev + 1, STEPS_BURN.length - 1));
-      setModalClass('animate-step-in');
-      
+      setCurrentStep((prev) => Math.min(prev + 1, STEPS_BURN.length - 1));
+      setModalClass("animate-step-in");
+
       // Remove animation class after it completes
-      setTimeout(() => setModalClass(''), 500);
+      setTimeout(() => setModalClass(""), 500);
     }, 300);
   };
 
   const handleBack = (): void => {
     // Add transition animation
-    setModalClass('animate-step-back-out');
+    setModalClass("animate-step-back-out");
     setTimeout(() => {
-      setCurrentStep(prev => Math.max(prev - 1, 0));
-      setModalClass('animate-step-back-in');
-      
+      setCurrentStep((prev) => Math.max(prev - 1, 0));
+      setModalClass("animate-step-back-in");
+
       // Remove animation class after it completes
-      setTimeout(() => setModalClass(''), 500);
+      setTimeout(() => setModalClass(""), 500);
     }, 300);
   };
 
@@ -265,57 +285,71 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     try {
       // Get the wallet keypair
       const walletKeypair = web3.Keypair.fromSecretKey(
-        bs58.decode(sourceWallet)
+        bs58.decode(sourceWallet),
       );
-      
+
       // 1. Request unsigned transaction from backend
-      const baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
-      
+      const baseUrl =
+        (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") ||
+        "";
+
       const prepareResponse = await fetch(`${baseUrl}/v2/sol/burn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           walletPublicKey: walletKeypair.publicKey.toString(),
           tokenAddress: tokenAddress,
-          amount: amount
+          amount: amount,
         }),
       });
 
       if (!prepareResponse.ok) {
-        const errorData = await prepareResponse.json() as ApiResponse;
-        throw new Error(errorData.error || `Failed to prepare transaction: HTTP ${prepareResponse.status}`);
+        const errorData = (await prepareResponse.json()) as ApiResponse;
+        throw new Error(
+          errorData.error ||
+            `Failed to prepare transaction: HTTP ${prepareResponse.status}`,
+        );
       }
 
-      const prepareResult = await prepareResponse.json() as ApiResponse<{ transaction: string }>;
-      
+      const prepareResult = (await prepareResponse.json()) as ApiResponse<{
+        transaction: string;
+      }>;
+
       if (!prepareResult.success || !prepareResult.data) {
-        throw new Error(prepareResult.error || 'Failed to prepare transaction');
+        throw new Error(prepareResult.error || "Failed to prepare transaction");
       }
 
       // 2. Deserialize and sign the transaction (now expecting base58)
       const transactionData = prepareResult.data;
       if (!transactionData) {
-        throw new Error('No transaction data received');
+        throw new Error("No transaction data received");
       }
       const transactionBuffer = bs58.decode(transactionData.transaction); // Changed from base64 to base58
-      
+
       // Deserialize the transaction
-      const transaction = web3.VersionedTransaction.deserialize(transactionBuffer);
-      
+      const transaction =
+        web3.VersionedTransaction.deserialize(transactionBuffer);
+
       // Sign the transaction with the wallet's private key
       transaction.sign([walletKeypair]);
-      
+
       // Serialize the signed transaction
       const signedTransactionBuffer = transaction.serialize();
 
       const signedTransactionBs58 = bs58.encode(signedTransactionBuffer);
       // 3. Submit the signed transaction to Jito via the bundle service
       try {
-        const submitResult = await sendToJitoBundleService(signedTransactionBs58);
-        console.info('Transaction successfully submitted to Jito:', submitResult);
+        const submitResult = await sendToJitoBundleService(
+          signedTransactionBs58,
+        );
+        console.info(
+          "Transaction successfully submitted to Jito:",
+          submitResult,
+        );
       } catch (error) {
-        console.error('Error submitting transaction:', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error("Error submitting transaction:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         throw new Error(`Failed to submit transaction: ${errorMessage}`);
       }
 
@@ -323,9 +357,13 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       resetForm();
       onClose();
     } catch (error) {
-      console.error('Error:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      showToast(`Token burn failed: ${errorMessage || 'Unknown error'}`, "error");
+      console.error("Error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      showToast(
+        `Token burn failed: ${errorMessage || "Unknown error"}`,
+        "error",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -342,67 +380,80 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   // Get the token balance for the selected token
   const getSelectedTokenBalance = (): number => {
     if (!sourceWallet) return 0;
-    const wallet = wallets.find(w => w.privateKey === sourceWallet);
+    const wallet = wallets.find((w) => w.privateKey === sourceWallet);
     if (!wallet) return 0;
     return tokenBalancesForWallets.get(wallet.address) || 0;
   };
 
   // Get the token symbol for the selected token
   const getSelectedTokenSymbol = (): string => {
-    return tokenAddress.slice(0, 4) || 'TKN';
+    return tokenAddress.slice(0, 4) || "TKN";
   };
 
   // Filter wallets based on search and other filters
-  const filterWallets = (walletList: typeof wallets, search: string): typeof wallets => {
+  const filterWallets = (
+    walletList: typeof wallets,
+    search: string,
+  ): typeof wallets => {
     // First filter out wallets with zero token balance (only if token address is set AND balances have been fetched)
     let filtered = walletList;
     if (tokenAddress && tokenBalancesForWallets.size > 0) {
-      filtered = walletList.filter((wallet): boolean => 
-        (tokenBalancesForWallets.get(wallet.address) || 0) > 0
+      filtered = walletList.filter(
+        (wallet): boolean =>
+          (tokenBalancesForWallets.get(wallet.address) || 0) > 0,
       );
     }
-    
+
     // Then apply search filter
     if (search) {
-      filtered = filtered.filter((wallet): boolean => 
-        wallet.address.toLowerCase().includes(search.toLowerCase())
+      filtered = filtered.filter((wallet): boolean =>
+        wallet.address.toLowerCase().includes(search.toLowerCase()),
       );
     }
-    
+
     // Then apply balance filter
-    if (balanceFilter !== 'all') {
-      if (balanceFilter === 'nonZero') {
-        filtered = filtered.filter((wallet): boolean => 
-          (solBalances.get(wallet.address) || 0) > 0 || 
-          (tokenBalancesForWallets.get(wallet.address) || 0) > 0
+    if (balanceFilter !== "all") {
+      if (balanceFilter === "nonZero") {
+        filtered = filtered.filter(
+          (wallet): boolean =>
+            (solBalances.get(wallet.address) || 0) > 0 ||
+            (tokenBalancesForWallets.get(wallet.address) || 0) > 0,
         );
-      } else if (balanceFilter === 'highBalance') {
-        filtered = filtered.filter((wallet): boolean => 
-          (solBalances.get(wallet.address) || 0) >= 0.1 || 
-          (tokenBalancesForWallets.get(wallet.address) || 0) >= 10
+      } else if (balanceFilter === "highBalance") {
+        filtered = filtered.filter(
+          (wallet): boolean =>
+            (solBalances.get(wallet.address) || 0) >= 0.1 ||
+            (tokenBalancesForWallets.get(wallet.address) || 0) >= 10,
         );
-      } else if (balanceFilter === 'lowBalance') {
-        filtered = filtered.filter((wallet): boolean => 
-          ((solBalances.get(wallet.address) || 0) < 0.1 && (solBalances.get(wallet.address) || 0) > 0) ||
-          ((tokenBalancesForWallets.get(wallet.address) || 0) < 10 && (tokenBalancesForWallets.get(wallet.address) || 0) > 0)
+      } else if (balanceFilter === "lowBalance") {
+        filtered = filtered.filter(
+          (wallet): boolean =>
+            ((solBalances.get(wallet.address) || 0) < 0.1 &&
+              (solBalances.get(wallet.address) || 0) > 0) ||
+            ((tokenBalancesForWallets.get(wallet.address) || 0) < 10 &&
+              (tokenBalancesForWallets.get(wallet.address) || 0) > 0),
         );
       }
     }
-    
+
     // Finally, sort the wallets
     return filtered.sort((a, b): number => {
-      if (sortOption === 'address') {
-        return sortDirection === 'asc' 
+      if (sortOption === "address") {
+        return sortDirection === "asc"
           ? a.address.localeCompare(b.address)
           : b.address.localeCompare(a.address);
-      } else if (sortOption === 'balance') {
+      } else if (sortOption === "balance") {
         const balanceA = solBalances.get(a.address) || 0;
         const balanceB = solBalances.get(b.address) || 0;
-        return sortDirection === 'asc' ? balanceA - balanceB : balanceB - balanceA;
-      } else if (sortOption === 'tokenBalance') {
+        return sortDirection === "asc"
+          ? balanceA - balanceB
+          : balanceB - balanceA;
+      } else if (sortOption === "tokenBalance") {
         const tokenBalanceA = tokenBalancesForWallets.get(a.address) || 0;
         const tokenBalanceB = tokenBalancesForWallets.get(b.address) || 0;
-        return sortDirection === 'asc' ? tokenBalanceA - tokenBalanceB : tokenBalanceB - tokenBalanceA;
+        return sortDirection === "asc"
+          ? tokenBalanceA - tokenBalanceB
+          : tokenBalanceB - tokenBalanceA;
       }
       return 0;
     });
@@ -412,44 +463,44 @@ export const BurnModal: React.FC<BurnModalProps> = ({
   if (!isOpen) return null;
 
   // Animation keyframes for  elements
-  const modalStyleElement = document.createElement('style');
+  const modalStyleElement = document.createElement("style");
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
       0% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
       50% { box-shadow: 0 0 15px var(--color-primary-80), 0 0 25px var(--color-primary-40); }
       100% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
     }
-    
+
     @keyframes modal-fade-in {
       0% { opacity: 0; }
       100% { opacity: 1; }
     }
-    
+
     @keyframes modal-slide-up {
       0% { transform: translateY(20px); opacity: 0; }
       100% { transform: translateY(0); opacity: 1; }
     }
-    
+
     @keyframes modal-scan-line {
       0% { transform: translateY(-100%); opacity: 0.3; }
       100% { transform: translateY(100%); opacity: 0; }
     }
-    
+
     .modal-content {
       position: relative;
     }
-    
+
     .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
-    
+
     .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
-    
+
     .modal-btn-::after {
       content: "";
       position: absolute;
@@ -467,21 +518,21 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       transition: all 0.5s ease;
       opacity: 0;
     }
-    
+
     .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
-    
+
     .modal-btn-:active {
       transform: scale(0.95);
     }
-    
+
     .progress-bar- {
       position: relative;
       overflow: hidden;
     }
-    
+
     .progress-bar-::after {
       content: "";
       position: absolute;
@@ -500,25 +551,25 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       transform: translateX(-100%);
       animation: progress-shine 3s infinite;
     }
-    
+
     @keyframes progress-shine {
       0% { transform: translateX(-100%); }
       20% { transform: translateX(100%); }
       100% { transform: translateX(100%); }
     }
-    
+
     .glitch-text:hover {
       text-shadow: 0 0 2px var(--color-primary), 0 0 4px var(--color-primary);
       animation: glitch 2s infinite;
     }
-    
+
     @keyframes glitch {
       2%, 8% { transform: translate(-2px, 0) skew(0.3deg); }
       4%, 6% { transform: translate(2px, 0) skew(-0.3deg); }
       62%, 68% { transform: translate(0, 0) skew(0.33deg); }
       64%, 66% { transform: translate(0, 0) skew(-0.33deg); }
     }
-    
+
     /* Animation classes for step transitions */
     @keyframes modal-in {
       0% { transform: translateY(20px); opacity: 0; }
@@ -549,7 +600,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       0% { opacity: 0; }
       100% { opacity: 1; }
     }
-    
+
     .animate-modal-in {
       animation: modal-in 0.5s ease-out forwards;
     }
@@ -573,36 +624,36 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     .animate-content-fade {
       animation: content-fade 0.5s ease forwards;
     }
-    
+
     .animate-pulse-slow {
       animation: pulse-slow 2s infinite;
     }
-    
+
     @keyframes pulse-slow {
       0%, 100% { opacity: 0.3; }
       50% { opacity: 0.7; }
     }
-    
+
     /*  scrollbar */
     .scrollbar::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
-    
+
     .scrollbar::-webkit-scrollbar-track {
       background: var(--color-bg-tertiary);
       border-radius: 3px;
     }
-    
+
     .scrollbar::-webkit-scrollbar-thumb {
       background: var(--color-scrollbar-thumb);
       border-radius: 3px;
     }
-    
+
     .scrollbar::-webkit-scrollbar-thumb:hover {
       background: var(--color-primary);
     }
-    
+
     /* Responsive styles */
     @media (max-width: 768px) {
       .modal-content {
@@ -618,8 +669,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-app-primary-85">
       <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-2xl overflow-hidden transform modal-content">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-grid">
-        </div>
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
         {/* Header */}
         <div className="relative z-10 p-4 flex justify-between items-center border-b border-app-primary-40">
@@ -628,10 +678,11 @@ export const BurnModal: React.FC<BurnModalProps> = ({
               <ArrowDown size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> BURN PROTOCOL <span className="color-primary">/</span>
+              <span className="color-primary">/</span> BURN PROTOCOL{" "}
+              <span className="color-primary">/</span>
             </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-app-secondary hover:color-primary transition-colors p-1 hover:bg-primary-20 rounded"
           >
@@ -641,9 +692,11 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
         {/* Progress Indicator */}
         <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
-          <div 
+          <div
             className="h-full bg-app-primary-color transition-all duration-300"
-            style={{ width: `${((currentStep + 1) / STEPS_BURN.length) * 100}%` }}
+            style={{
+              width: `${((currentStep + 1) / STEPS_BURN.length) * 100}%`,
+            }}
           ></div>
         </div>
 
@@ -655,35 +708,41 @@ export const BurnModal: React.FC<BurnModalProps> = ({
               <React.Fragment key={step}>
                 {/* Step circle */}
                 <div className="flex-1 flex flex-col items-center relative z-10">
-                  <div className={`w-8 h-8 rounded-full font-mono flex items-center justify-center border-2 transition-all duration-300 ${
-                    index < currentStep 
-                      ? 'border-app-primary bg-app-primary-color text-app-primary' 
-                      : index === currentStep 
-                        ? 'border-app-primary color-primary bg-app-primary' 
-                        : 'border-app-primary-20 text-app-muted bg-app-primary'
-                  }`}>
+                  <div
+                    className={`w-8 h-8 rounded-full font-mono flex items-center justify-center border-2 transition-all duration-300 ${
+                      index < currentStep
+                        ? "border-app-primary bg-app-primary-color text-app-primary"
+                        : index === currentStep
+                          ? "border-app-primary color-primary bg-app-primary"
+                          : "border-app-primary-20 text-app-muted bg-app-primary"
+                    }`}
+                  >
                     {index < currentStep ? (
                       <CheckCircle size={16} />
                     ) : (
                       <span className="text-sm">{index + 1}</span>
                     )}
                   </div>
-                  
+
                   {/* Step label */}
-                  <span className={`mt-2 text-xs transition-all duration-300 font-mono tracking-wide ${
-                    index <= currentStep ? 'text-app-primary' : 'text-app-muted'
-                  }`}>
+                  <span
+                    className={`mt-2 text-xs transition-all duration-300 font-mono tracking-wide ${
+                      index <= currentStep
+                        ? "text-app-primary"
+                        : "text-app-muted"
+                    }`}
+                  >
                     {step}
                   </span>
                 </div>
-                
+
                 {/* Connector line between steps */}
                 {index < STEPS_BURN.length - 1 && (
                   <div className="flex-1 flex items-center justify-center relative -mx-1 pb-8 z-0">
                     <div className="h-px w-full bg-app-primary-20 relative">
-                      <div 
+                      <div
                         className="absolute top-0 left-0 h-full bg-app-primary-color transition-all duration-500"
-                        style={{ width: index < currentStep ? '100%' : '0%' }}
+                        style={{ width: index < currentStep ? "100%" : "0%" }}
                       ></div>
                     </div>
                   </div>
@@ -693,19 +752,30 @@ export const BurnModal: React.FC<BurnModalProps> = ({
           </div>
 
           {/* Step Content */}
-          <form onSubmit={currentStep === STEPS_BURN.length - 1 ? handleBurn : (e) => e.preventDefault()}>
+          <form
+            onSubmit={
+              currentStep === STEPS_BURN.length - 1
+                ? handleBurn
+                : (e) => e.preventDefault()
+            }
+          >
             {/* Step 0: Token Address */}
             {currentStep === 0 && (
-              <div className={`space-y-4 ${modalClass || 'animate-content-fade'}`}>
+              <div
+                className={`space-y-4 ${modalClass || "animate-content-fade"}`}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg font-medium text-app-primary font-mono">
-                    <span className="color-primary">/</span> TOKEN ADDRESS <span className="color-primary">/</span>
+                    <span className="color-primary">/</span> TOKEN ADDRESS{" "}
+                    <span className="color-primary">/</span>
                   </h3>
                 </div>
 
                 {/* Token Address Input */}
                 <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">
-                  <label className="text-sm font-medium text-app-primary font-mono mb-2 block">ENTER_TOKEN_MINT_ADDRESS</label>
+                  <label className="text-sm font-medium text-app-primary font-mono mb-2 block">
+                    ENTER_TOKEN_MINT_ADDRESS
+                  </label>
                   <input
                     type="text"
                     value={tokenAddress}
@@ -721,7 +791,9 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                 {tokenAddress && (
                   <div className="mt-4 p-4 rounded-lg border border-app-primary-30 bg-primary-05">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm color-primary font-mono tracking-wide">TOKEN_SET</span>
+                      <span className="text-sm color-primary font-mono tracking-wide">
+                        TOKEN_SET
+                      </span>
                       <div className="flex items-center bg-app-tertiary px-2 py-1 rounded-lg border border-app-primary-20">
                         <span className="text-sm font-mono text-app-primary">
                           {formatAddress(tokenAddress)}
@@ -745,17 +817,26 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
             {/* Step 1: Select Source Wallet */}
             {currentStep === 1 && (
-              <div className={`space-y-4 ${modalClass || 'animate-content-fade'}`}>
+              <div
+                className={`space-y-4 ${modalClass || "animate-content-fade"}`}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
                     <div className="color-primary border border-app-primary-30 p-1 rounded">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <rect x="2" y="5" width="20" height="14" rx="2" />
                         <path d="M16 10h2M6 14h12" />
                       </svg>
                     </div>
                     <h3 className="text-lg font-medium text-app-primary font-mono">
-                      <span className="color-primary">/</span> SELECT SOURCE <span className="color-primary">/</span>
+                      <span className="color-primary">/</span> SELECT SOURCE{" "}
+                      <span className="color-primary">/</span>
                     </h3>
                   </div>
                 </div>
@@ -763,7 +844,10 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                 {/* Search and Filters */}
                 <div className="mb-3 flex space-x-2">
                   <div className="relative flex-grow">
-                    <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary" />
+                    <Search
+                      size={14}
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary"
+                    />
                     <input
                       type="text"
                       value={searchTerm}
@@ -772,8 +856,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                       placeholder="SEARCH WALLETS_"
                     />
                   </div>
-                  
-                  <select 
+
+                  <select
                     className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                     value={sortOption}
                     onChange={(e) => setSortOption(e.target.value)}
@@ -782,18 +866,20 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     <option value="balance">SOL BAL</option>
                     <option value="tokenBalance">TOKEN BAL</option>
                   </select>
-                  
+
                   <button
                     type="button"
                     className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:text-app-primary hover-border-primary transition-all modal-btn-"
-                    onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                    onClick={() =>
+                      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+                    }
                   >
-                    {sortDirection === 'asc' ? '↑' : '↓'}
+                    {sortDirection === "asc" ? "↑" : "↓"}
                   </button>
                 </div>
 
                 <div className="mb-3">
-                  <select 
+                  <select
                     className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                     value={balanceFilter}
                     onChange={(e) => setBalanceFilter(e.target.value)}
@@ -810,31 +896,51 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                   <div className="max-h-64 overflow-y-auto scrollbar">
                     {filterWallets(wallets, searchTerm).length > 0 ? (
                       filterWallets(wallets, searchTerm).map((wallet) => (
-                        <div 
+                        <div
                           key={wallet.id}
                           className={`flex items-center p-3 cursor-pointer border-b border-app-primary-20 last:border-b-0 transition-all duration-150 hover:bg-app-secondary
-                                    ${sourceWallet === wallet.privateKey 
-                                      ? 'bg-primary-10 border-l-2 border-l-app-primary' 
-                                      : 'border-l-2 border-l-transparent hover:border-l-app-primary-50'}`}
+                                    ${
+                                      sourceWallet === wallet.privateKey
+                                        ? "bg-primary-10 border-l-2 border-l-app-primary"
+                                        : "border-l-2 border-l-transparent hover:border-l-app-primary-50"
+                                    }`}
                           onClick={() => setSourceWallet(wallet.privateKey)}
                         >
-                          <div className={`w-4 h-4 mr-3 rounded-full flex items-center justify-center transition-all duration-200
-                                          ${sourceWallet === wallet.privateKey
-                                            ? 'bg-app-primary-color' 
-                                            : 'border border-app-secondary'}`}>
+                          <div
+                            className={`w-4 h-4 mr-3 rounded-full flex items-center justify-center transition-all duration-200
+                                          ${
+                                            sourceWallet === wallet.privateKey
+                                              ? "bg-app-primary-color"
+                                              : "border border-app-secondary"
+                                          }`}
+                          >
                             {sourceWallet === wallet.privateKey && (
-                              <CheckCircle size={10} className="text-app-primary" />
+                              <CheckCircle
+                                size={10}
+                                className="text-app-primary"
+                              />
                             )}
                           </div>
                           <div className="flex-1 flex justify-between items-center">
-                            <span className="font-mono text-sm text-app-primary glitch-text">{getWalletDisplayName(wallet)}</span>
+                            <span className="font-mono text-sm text-app-primary glitch-text">
+                              {getWalletDisplayName(wallet)}
+                            </span>
                             <div className="flex flex-col items-end">
                               <span className="text-xs text-app-secondary font-mono">
-                                {(solBalances.get(wallet.address) || 0).toFixed(4)} SOL
+                                {(solBalances.get(wallet.address) || 0).toFixed(
+                                  4,
+                                )}{" "}
+                                SOL
                               </span>
-                              {(tokenBalancesForWallets.get(wallet.address) || 0) > 0 && (
+                              {(tokenBalancesForWallets.get(wallet.address) ||
+                                0) > 0 && (
                                 <span className="text-xs color-primary font-mono">
-                                  {(tokenBalancesForWallets.get(wallet.address) || 0).toFixed(4)} {tokenAddress.slice(0, 4)}
+                                  {(
+                                    tokenBalancesForWallets.get(
+                                      wallet.address,
+                                    ) || 0
+                                  ).toFixed(4)}{" "}
+                                  {tokenAddress.slice(0, 4)}
                                 </span>
                               )}
                             </div>
@@ -843,8 +949,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                       ))
                     ) : (
                       <div className="p-4 text-sm text-app-secondary text-center font-mono">
-                        {searchTerm 
-                          ? "[ NO MATCHING WALLETS FOUND ]" 
+                        {searchTerm
+                          ? "[ NO MATCHING WALLETS FOUND ]"
                           : "[ NO WALLETS AVAILABLE ]"}
                       </div>
                     )}
@@ -854,22 +960,40 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                 {sourceWallet && (
                   <div className="mt-4 p-4 rounded-lg border border-app-primary-30 bg-primary-05">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm color-primary font-mono tracking-wide">SELECTED_WALLET</span>
+                      <span className="text-sm color-primary font-mono tracking-wide">
+                        SELECTED_WALLET
+                      </span>
                       <div className="flex items-center bg-app-tertiary px-2 py-1 rounded-lg border border-app-primary-20">
                         <span className="text-sm font-mono text-app-primary glitch-text">
-                          {getWalletDisplayName(wallets.find(w => w.privateKey === sourceWallet)!)}
+                          {getWalletDisplayName(
+                            wallets.find((w) => w.privateKey === sourceWallet)!,
+                          )}
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-app-secondary font-mono">BALANCES</span>
+                      <span className="text-sm text-app-secondary font-mono">
+                        BALANCES
+                      </span>
                       <div className="flex flex-col items-end">
                         <span className="text-sm text-app-primary font-mono">
-                          {(solBalances.get(wallets.find(w => w.privateKey === sourceWallet)?.address || '') || 0).toFixed(4)} SOL
+                          {(
+                            solBalances.get(
+                              wallets.find((w) => w.privateKey === sourceWallet)
+                                ?.address || "",
+                            ) || 0
+                          ).toFixed(4)}{" "}
+                          SOL
                         </span>
                         <span className="text-sm color-primary font-mono">
-                          {(tokenBalancesForWallets.get(wallets.find(w => w.privateKey === sourceWallet)?.address || '') || 0).toFixed(4)} {tokenAddress.slice(0, 4)}
+                          {(
+                            tokenBalancesForWallets.get(
+                              wallets.find((w) => w.privateKey === sourceWallet)
+                                ?.address || "",
+                            ) || 0
+                          ).toFixed(4)}{" "}
+                          {tokenAddress.slice(0, 4)}
                         </span>
                       </div>
                     </div>
@@ -880,15 +1004,24 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
             {/* Step 2: Enter Burn Amount */}
             {currentStep === 2 && (
-              <div className={`space-y-6 ${modalClass || 'animate-content-fade'}`}>
+              <div
+                className={`space-y-6 ${modalClass || "animate-content-fade"}`}
+              >
                 <div className="flex items-center space-x-2 mb-4">
                   <div className="color-primary border border-app-primary-30 p-1 rounded">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M12 19l-7-7 7-7M5 12h14" />
                     </svg>
                   </div>
                   <h3 className="text-lg font-medium text-app-primary font-mono">
-                    <span className="color-primary">/</span> BURN AMOUNT <span className="color-primary">/</span>
+                    <span className="color-primary">/</span> BURN AMOUNT{" "}
+                    <span className="color-primary">/</span>
                   </h3>
                 </div>
 
@@ -905,12 +1038,14 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     {/* Selected Token Info */}
                     <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-app-primary font-mono">SELECTED_TOKEN</span>
-                        {tokenAccounts.find(t => t.mint === tokenAddress) ? (
+                        <span className="text-sm text-app-primary font-mono">
+                          SELECTED_TOKEN
+                        </span>
+                        {tokenAccounts.find((t) => t.mint === tokenAddress) ? (
                           <div className="flex items-center">
                             <div className="w-6 h-6 rounded-full bg-primary-20 border border-app-primary-30 flex items-center justify-center mr-2">
                               <span className="text-xs color-primary font-mono">
-                                {getSelectedTokenSymbol()[0] || 'T'}
+                                {getSelectedTokenSymbol()[0] || "T"}
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -924,7 +1059,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                           </div>
                         ) : (
                           <span className="text-sm text-app-secondary font-mono">
-                            {tokenAddress.slice(0, 6)}...{tokenAddress.slice(-4)}
+                            {tokenAddress.slice(0, 6)}...
+                            {tokenAddress.slice(-4)}
                           </span>
                         )}
                       </div>
@@ -933,28 +1069,56 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     {/* Source Wallet Info */}
                     <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-app-primary font-mono">SOURCE_WALLET</span>
+                        <span className="text-sm text-app-primary font-mono">
+                          SOURCE_WALLET
+                        </span>
                         <div className="flex items-center">
                           <div className="w-6 h-6 rounded-full bg-app-tertiary border border-app-primary-30 flex items-center justify-center mr-2">
-                            <svg className="w-3 h-3 text-app-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg
+                              className="w-3 h-3 text-app-secondary"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
                               <rect x="2" y="5" width="20" height="14" rx="2" />
                               <path d="M16 10h2M6 14h12" />
                             </svg>
                           </div>
                           <span className="text-sm text-app-primary font-mono glitch-text">
-                            {getWalletDisplayName(wallets.find(w => w.privateKey === sourceWallet)!)}
+                            {getWalletDisplayName(
+                              wallets.find(
+                                (w) => w.privateKey === sourceWallet,
+                              )!,
+                            )}
                           </span>
                         </div>
                       </div>
-                      
+
                       <div className="flex justify-between items-center mt-2">
-                        <span className="text-sm text-app-secondary font-mono">BALANCES</span>
+                        <span className="text-sm text-app-secondary font-mono">
+                          BALANCES
+                        </span>
                         <div className="flex flex-col items-end">
                           <span className="text-sm text-app-primary font-mono">
-                            {(solBalances.get(wallets.find(w => w.privateKey === sourceWallet)?.address || '') || 0).toFixed(4)} SOL
+                            {(
+                              solBalances.get(
+                                wallets.find(
+                                  (w) => w.privateKey === sourceWallet,
+                                )?.address || "",
+                              ) || 0
+                            ).toFixed(4)}{" "}
+                            SOL
                           </span>
                           <span className="text-sm color-primary font-mono">
-                            {(tokenBalances.get(wallets.find(w => w.privateKey === sourceWallet)?.address || '') || 0).toFixed(4)} {tokenAddress.slice(0, 4)}
+                            {(
+                              tokenBalances.get(
+                                wallets.find(
+                                  (w) => w.privateKey === sourceWallet,
+                                )?.address || "",
+                              ) || 0
+                            ).toFixed(4)}{" "}
+                            {tokenAddress.slice(0, 4)}
                           </span>
                         </div>
                       </div>
@@ -967,19 +1131,29 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                           <label className="text-sm font-medium text-app-primary font-mono">
                             BURN_AMOUNT
                           </label>
-                          <div className="relative" onMouseEnter={() => setShowInfoTip(true)} onMouseLeave={() => setShowInfoTip(false)}>
-                            <Info size={14} className="text-app-secondary cursor-help" />
+                          <div
+                            className="relative"
+                            onMouseEnter={() => setShowInfoTip(true)}
+                            onMouseLeave={() => setShowInfoTip(false)}
+                          >
+                            <Info
+                              size={14}
+                              className="text-app-secondary cursor-help"
+                            />
                             {showInfoTip && (
                               <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded-lg shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
-                                <span className="color-primary">!</span> This amount will be permanently destroyed
+                                <span className="color-primary">!</span> This
+                                amount will be permanently destroyed
                               </div>
                             )}
                           </div>
                         </div>
-                        {tokenAccounts.find(t => t.mint === tokenAddress) && (
+                        {tokenAccounts.find((t) => t.mint === tokenAddress) && (
                           <button
                             type="button"
-                            onClick={() => setAmount(getSelectedTokenBalance().toString())}
+                            onClick={() =>
+                              setAmount(getSelectedTokenBalance().toString())
+                            }
                             className="text-xs px-2 py-0.5 bg-primary-10 hover:bg-primary-20 border border-app-primary-30 color-primary rounded-lg transition-all modal-btn- font-mono"
                           >
                             MAX
@@ -992,13 +1166,13 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                         <div className="absolute -bottom-px left-4 right-4 h-px bg-app-primary-50"></div>
                         <div className="absolute top-3 -left-px bottom-3 w-px bg-app-primary-50"></div>
                         <div className="absolute top-3 -right-px bottom-3 w-px bg-app-primary-50"></div>
-                        
+
                         <input
                           type="text"
                           value={amount}
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
                               setAmount(value);
                             }
                           }}
@@ -1017,37 +1191,50 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                         {/*  burn effect background */}
                         <div className="absolute inset-0 bg-gradient-to-b from-primary-05 to-transparent"></div>
                         <div className="absolute inset-0 modal-content::before pointer-events-none opacity-30"></div>
-                        
+
                         <div className="relative p-4 border border-app-primary-30 rounded-lg">
                           <div className="absolute top-0 right-0 p-1 bg-app-primary border-l border-b border-app-primary-30 color-primary text-xs font-mono">
                             BURN_PREVIEW
                           </div>
-                          
+
                           <div className="flex justify-between items-center mt-4">
-                            <span className="text-sm text-app-secondary font-mono">BURN_AMOUNT</span>
+                            <span className="text-sm text-app-secondary font-mono">
+                              BURN_AMOUNT
+                            </span>
                             <span className="text-sm font-semibold color-primary font-mono glitch-text">
                               {amount} {getSelectedTokenSymbol()}
                             </span>
                           </div>
-                          
+
                           <div className="flex justify-between items-center mt-2">
-                            <span className="text-sm text-app-secondary font-mono">CURRENT_BALANCE</span>
-                            <span className="text-sm text-app-primary font-mono">{getSelectedTokenBalance()} {getSelectedTokenSymbol()}</span>
-                          </div>
-                          
-                          <div className="flex justify-between items-center mt-2">
-                            <span className="text-sm text-app-secondary font-mono">BALANCE_AFTER_BURN</span>
+                            <span className="text-sm text-app-secondary font-mono">
+                              CURRENT_BALANCE
+                            </span>
                             <span className="text-sm text-app-primary font-mono">
-                              {Math.max(0, getSelectedTokenBalance() - parseFloat(amount)).toFixed(4)} {getSelectedTokenSymbol()}
+                              {getSelectedTokenBalance()}{" "}
+                              {getSelectedTokenSymbol()}
                             </span>
                           </div>
-                          
+
+                          <div className="flex justify-between items-center mt-2">
+                            <span className="text-sm text-app-secondary font-mono">
+                              BALANCE_AFTER_BURN
+                            </span>
+                            <span className="text-sm text-app-primary font-mono">
+                              {Math.max(
+                                0,
+                                getSelectedTokenBalance() - parseFloat(amount),
+                              ).toFixed(4)}{" "}
+                              {getSelectedTokenSymbol()}
+                            </span>
+                          </div>
+
                           {/* Visual representation of burning */}
                           <div className="mt-4 h-2 bg-app-tertiary rounded-lg overflow-hidden">
-                            <div 
+                            <div
                               className="h-full bg-app-primary-color transition-all duration-500"
-                              style={{ 
-                                width: `${Math.min(100, (parseFloat(amount) / getSelectedTokenBalance()) * 100)}%` 
+                              style={{
+                                width: `${Math.min(100, (parseFloat(amount) / getSelectedTokenBalance()) * 100)}%`,
                               }}
                             ></div>
                           </div>
@@ -1065,15 +1252,24 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
             {/* Step 3: Review and Confirm */}
             {currentStep === 3 && (
-              <div className={`space-y-6 ${modalClass || 'animate-content-fade'}`}>
+              <div
+                className={`space-y-6 ${modalClass || "animate-content-fade"}`}
+              >
                 <div className="flex items-center space-x-2 mb-4">
                   <div className="color-primary border border-app-primary-30 p-1 rounded">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
                   <h3 className="text-lg font-medium text-app-primary font-mono">
-                    <span className="color-primary">/</span> REVIEW BURN <span className="color-primary">/</span>
+                    <span className="color-primary">/</span> REVIEW BURN{" "}
+                    <span className="color-primary">/</span>
                   </h3>
                 </div>
 
@@ -1086,88 +1282,124 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                       </h4>
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-app-secondary font-mono">TOKEN</span>
+                          <span className="text-sm text-app-secondary font-mono">
+                            TOKEN
+                          </span>
                           <div className="flex items-center">
                             <div className="w-5 h-5 rounded-full bg-primary-20 border border-app-primary-30 flex items-center justify-center mr-2">
                               <span className="text-xs color-primary font-mono">
-                                {getSelectedTokenSymbol()[0] || 'T'}
+                                {getSelectedTokenSymbol()[0] || "T"}
                               </span>
                             </div>
-                            <span className="text-sm text-app-primary font-mono">{getSelectedTokenSymbol()}</span>
+                            <span className="text-sm text-app-primary font-mono">
+                              {getSelectedTokenSymbol()}
+                            </span>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-app-secondary font-mono">TOKEN_ADDR</span>
+                          <span className="text-sm text-app-secondary font-mono">
+                            TOKEN_ADDR
+                          </span>
                           <span className="text-sm font-mono text-app-primary glitch-text">
-                            {tokenAddress.slice(0, 6)}...{tokenAddress.slice(-4)}
+                            {tokenAddress.slice(0, 6)}...
+                            {tokenAddress.slice(-4)}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-app-secondary font-mono">SOURCE</span>
+                          <span className="text-sm text-app-secondary font-mono">
+                            SOURCE
+                          </span>
                           <span className="text-sm font-mono text-app-primary glitch-text">
-                            {formatAddress(wallets.find(w => w.privateKey === sourceWallet)?.address || '')}
+                            {formatAddress(
+                              wallets.find((w) => w.privateKey === sourceWallet)
+                                ?.address || "",
+                            )}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-app-secondary font-mono">BALANCE</span>
-                          <span className="text-sm text-app-primary font-mono">{getSelectedTokenBalance()} {getSelectedTokenSymbol()}</span>
+                          <span className="text-sm text-app-secondary font-mono">
+                            BALANCE
+                          </span>
+                          <span className="text-sm text-app-primary font-mono">
+                            {getSelectedTokenBalance()}{" "}
+                            {getSelectedTokenSymbol()}
+                          </span>
                         </div>
-                        
+
                         <div className="pt-2 border-t border-app-primary-30 flex items-center justify-between">
-                          <span className="text-sm font-medium text-app-primary font-mono">BURN_AMOUNT</span>
+                          <span className="text-sm font-medium text-app-primary font-mono">
+                            BURN_AMOUNT
+                          </span>
                           <span className="text-sm font-semibold color-primary font-mono glitch-text">
                             {amount} {getSelectedTokenSymbol()}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-app-secondary font-mono">NEW_BALANCE</span>
+                          <span className="text-sm text-app-secondary font-mono">
+                            NEW_BALANCE
+                          </span>
                           <span className="text-sm text-app-primary font-mono">
-                            {Math.max(0, getSelectedTokenBalance() - parseFloat(amount)).toFixed(4)} {getSelectedTokenSymbol()}
+                            {Math.max(
+                              0,
+                              getSelectedTokenBalance() - parseFloat(amount),
+                            ).toFixed(4)}{" "}
+                            {getSelectedTokenSymbol()}
                           </span>
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Warning Box */}
                     <div className="relative bg-primary-05 border border-app-primary-20 rounded-lg p-3 overflow-hidden">
                       {/* Scanline effect */}
                       <div className="absolute inset-0 modal-content::before pointer-events-none opacity-20"></div>
-                      
+
                       <div className="flex items-start color-primary text-sm">
-                        <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg
+                          className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
                           <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                         <span className="font-mono leading-relaxed">
-                          <span className="font-bold">WARNING:</span> This burn operation is permanent and irreversible. The tokens will be destroyed from the blockchain.
+                          <span className="font-bold">WARNING:</span> This burn
+                          operation is permanent and irreversible. The tokens
+                          will be destroyed from the blockchain.
                         </span>
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Right Column - Burn Effect Visualization */}
                   <div className="bg-app-tertiary rounded-lg border border-app-primary-30 p-4 relative overflow-hidden">
                     {/* Futuristic decorations */}
                     <div className="absolute top-0 right-0 w-16 h-16 border-t border-r border-app-primary-20"></div>
                     <div className="absolute bottom-0 left-0 w-16 h-16 border-b border-l border-app-primary-20"></div>
-                    
+
                     <h4 className="text-base font-semibold text-app-primary font-mono mb-6 relative z-10">
                       <span className="color-primary">&gt;</span> BURN_EFFECT
                     </h4>
-                    
+
                     <div className="flex flex-col items-center justify-center h-44 space-y-6 relative z-10">
                       <div className="flex items-center justify-center w-full">
                         <div className="flex flex-col items-center">
-                          <span className="text-sm text-app-secondary mb-1 font-mono">CURRENT</span>
+                          <span className="text-sm text-app-secondary mb-1 font-mono">
+                            CURRENT
+                          </span>
                           <div className="text-lg font-semibold text-app-primary font-mono">
-                            {getSelectedTokenBalance()} {getSelectedTokenSymbol()}
+                            {getSelectedTokenBalance()}{" "}
+                            {getSelectedTokenSymbol()}
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Animated burn arrow */}
                       <div className="relative">
                         <ArrowDown size={24} className="color-primary" />
@@ -1175,17 +1407,23 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                           <ArrowDown size={24} className="opacity-50" />
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center justify-center w-full">
                         <div className="flex flex-col items-center">
-                          <span className="text-sm text-app-secondary mb-1 font-mono">AFTER_BURN</span>
+                          <span className="text-sm text-app-secondary mb-1 font-mono">
+                            AFTER_BURN
+                          </span>
                           <div className="text-lg font-semibold color-primary font-mono glitch-text">
-                            {Math.max(0, getSelectedTokenBalance() - parseFloat(amount)).toFixed(4)} {getSelectedTokenSymbol()}
+                            {Math.max(
+                              0,
+                              getSelectedTokenBalance() - parseFloat(amount),
+                            ).toFixed(4)}{" "}
+                            {getSelectedTokenSymbol()}
                           </div>
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Destructive animation effect */}
                     <div className="absolute bottom-0 left-0 right-0 h-1/4 from-primary-10 bg-gradient-to-t to-transparent"></div>
                   </div>
@@ -1193,23 +1431,26 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
                 {/* Confirmation Checkbox with  style */}
                 <div className="bg-app-tertiary rounded-lg border border-app-primary-30 p-4 mt-4">
-                  <div 
+                  <div
                     className="flex items-start gap-3 cursor-pointer"
                     onClick={() => setIsConfirmed(!isConfirmed)}
                   >
                     <div className="relative mt-1">
-                      <div 
-                        className={`w-5 h-5 border border-app-primary-40 rounded transition-all ${isConfirmed ? 'bg-app-primary-color border-0' : ''}`}
+                      <div
+                        className={`w-5 h-5 border border-app-primary-40 rounded transition-all ${isConfirmed ? "bg-app-primary-color border-0" : ""}`}
                       ></div>
-                      <CheckCircle 
-                        size={14} 
-                        className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? 'opacity-100' : 'opacity-0'}`}
+                      <CheckCircle
+                        size={14}
+                        className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? "opacity-100" : "opacity-0"}`}
                       />
                     </div>
                     <span className="text-sm text-app-primary leading-relaxed font-mono select-none">
-                      I confirm that I want to burn <span className="color-primary font-medium">
+                      I confirm that I want to burn{" "}
+                      <span className="color-primary font-medium">
                         {amount} {getSelectedTokenSymbol()}
-                      </span>. I understand this action cannot be undone and the tokens will be permanently removed from circulation.
+                      </span>
+                      . I understand this action cannot be undone and the tokens
+                      will be permanently removed from circulation.
                     </span>
                   </div>
                 </div>
@@ -1223,7 +1464,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                 type="button"
                 onClick={currentStep === 0 ? onClose : handleBack}
                 disabled={isSubmitting}
-                className={`px-4 py-2 bg-app-tertiary border border-app-primary-30 hover-border-primary rounded-lg transition-all modal-btn- flex items-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`px-4 py-2 bg-app-tertiary border border-app-primary-30 hover-border-primary rounded-lg transition-all modal-btn- flex items-center ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {currentStep === 0 ? (
                   <span className="font-mono text-app-primary">CANCEL</span>
@@ -1237,10 +1478,14 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
               {/* Next/Submit Button */}
               <button
-                type={currentStep === STEPS_BURN.length - 1 ? 'submit' : 'button'}
-                onClick={currentStep === STEPS_BURN.length - 1 ? undefined : handleNext}
+                type={
+                  currentStep === STEPS_BURN.length - 1 ? "submit" : "button"
+                }
+                onClick={
+                  currentStep === STEPS_BURN.length - 1 ? undefined : handleNext
+                }
                 disabled={
-                  isSubmitting || 
+                  isSubmitting ||
                   isLoadingBalances ||
                   (currentStep === 0 && !tokenAddress) ||
                   (currentStep === 1 && !sourceWallet) ||
@@ -1249,15 +1494,19 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                 }
                 onMouseEnter={() => setButtonHover(true)}
                 onMouseLeave={() => setButtonHover(false)}
-                className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider 
-                          ${(isSubmitting || 
+                className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider
+                          ${
+                            isSubmitting ||
                             isLoadingBalances ||
                             (currentStep === 0 && !tokenAddress) ||
                             (currentStep === 1 && !sourceWallet) ||
-                            (currentStep === 2 && (!amount || parseFloat(amount) <= 0)) ||
-                            (currentStep === STEPS_BURN.length - 1 && !isConfirmed))
-                              ? 'bg-app-primary-50 text-app-primary-80 cursor-not-allowed opacity-50' 
-                              : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
+                            (currentStep === 2 &&
+                              (!amount || parseFloat(amount) <= 0)) ||
+                            (currentStep === STEPS_BURN.length - 1 &&
+                              !isConfirmed)
+                              ? "bg-app-primary-50 text-app-primary-80 cursor-not-allowed opacity-50"
+                              : "bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-"
+                          }`}
               >
                 {/* Button Content */}
                 {currentStep === STEPS_BURN.length - 1 ? (
@@ -1284,9 +1533,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
             </div>
           </form>
         </div>
-        
-</div>
+      </div>
     </div>,
-    document.body
+    document.body,
   );
 };

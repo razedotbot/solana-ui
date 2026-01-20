@@ -1,6 +1,6 @@
 /**
  * Trading Type Definitions
- * 
+ *
  * This module contains all trading-related type definitions
  * for the Solana trading application, including buy/sell operations,
  * bundle configurations, and trading results.
@@ -16,21 +16,7 @@
  * - 'batch': Process wallets in batches of 5 with delay between batches
  * - 'all-in-one': Process all wallets simultaneously
  */
-export type BundleMode = 'single' | 'batch' | 'all-in-one';
-
-// ============================================================================
-// Script Types
-// ============================================================================
-
-/**
- * Script types for different DEX and operation combinations
- * Used to determine which backend endpoint to call
- */
-export type ScriptType = 
-  | 'buy' | 'sell'
-  | 'consolidate' | 'distribute' | 'mixer' | 'cleaner'
-  | 'bonkcreate' | 'cookcreate' | 'pumpcreate' | 'mooncreate' | 'boopcreate'
-  | 'deploy';
+export type BundleMode = "single" | "batch" | "all-in-one";
 
 // ============================================================================
 // Wallet Trading Types
@@ -202,7 +188,7 @@ export interface TradeHistoryEntry {
   /** Unique identifier for the trade */
   id: string;
   /** Type of trade operation */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Token mint address */
   tokenAddress: string;
   /** Number of wallets involved */
@@ -210,7 +196,7 @@ export interface TradeHistoryEntry {
   /** Amount traded (SOL for buy, percentage or tokens for sell) */
   amount: number;
   /** Type of amount ('sol' or 'percentage') */
-  amountType: 'sol' | 'percentage';
+  amountType: "sol" | "percentage";
   /** Whether the trade was successful */
   success: boolean;
   /** Error message if trade failed */
@@ -226,7 +212,7 @@ export interface TradeHistoryEntry {
  */
 export interface AddTradeHistoryInput {
   /** Type of trade operation */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Token mint address */
   tokenAddress: string;
   /** Number of wallets involved */
@@ -234,7 +220,7 @@ export interface AddTradeHistoryInput {
   /** Amount traded */
   amount: number;
   /** Type of amount */
-  amountType: 'sol' | 'percentage';
+  amountType: "sol" | "percentage";
   /** Whether the trade was successful */
   success: boolean;
   /** Error message if trade failed */
@@ -268,7 +254,7 @@ export interface TradingState {
   /** Whether a trade is currently in progress */
   isTrading: boolean;
   /** Current operation type */
-  operationType?: 'buy' | 'sell';
+  operationType?: "buy" | "sell";
   /** Progress percentage (0-100) */
   progress?: number;
   /** Status message */
@@ -344,7 +330,7 @@ export interface QuickTradeParams {
   /** Token address to trade */
   tokenAddress: string;
   /** Trade type */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Amount (SOL for buy, percentage for sell) */
   amount: number;
   /** Wallets to use for the trade */

@@ -1,13 +1,13 @@
 /**
  * Component Type Definitions
- * 
+ *
  * This module contains all UI component-related type definitions
  * for the Solana trading application, including modal props,
  * page props, and shared UI component interfaces.
  */
 
-import type { Connection } from '@solana/web3.js';
-import type { WalletType, MasterWallet } from './wallet';
+import type { Connection } from "@solana/web3.js";
+import type { WalletType, MasterWallet } from "./wallet";
 
 // ============================================================================
 // Common UI Types
@@ -16,7 +16,7 @@ import type { WalletType, MasterWallet } from './wallet';
 /**
  * Toast notification type
  */
-export type ToastType = 'success' | 'error' | 'info' | 'warning';
+export type ToastType = "success" | "error" | "info" | "warning";
 
 /**
  * Toast notification interface
@@ -53,7 +53,7 @@ export interface PresetTab {
 /**
  * Funding mode for fund modal
  */
-export type FundingMode = 'distribute' | 'mixer';
+export type FundingMode = "distribute" | "mixer";
 
 /**
  * Props for the Fund Modal component
@@ -228,7 +228,7 @@ export interface QuickTradeModalProps {
   /** Token address to trade */
   tokenAddress: string;
   /** Trade type */
-  tradeType: 'buy' | 'sell';
+  tradeType: "buy" | "sell";
   /** List of available wallets */
   wallets: WalletType[];
   /** Map of wallet addresses to SOL balances */
@@ -276,7 +276,7 @@ export interface CalculatePNLModalProps {
 /**
  * Mobile page type
  */
-export type MobilePage = 'wallets' | 'chart' | 'actions';
+export type MobilePage = "wallets" | "chart" | "actions";
 
 /**
  * Props for the Mobile Layout component
@@ -333,56 +333,6 @@ export interface SettingsPageProps {
 }
 
 // ============================================================================
-// Button Props Types
-// ============================================================================
-
-/**
- * Props for preset button components
- */
-export interface PresetButtonProps {
-  /** Button label */
-  label: string;
-  /** Button value */
-  value: string | number;
-  /** Whether the button is active */
-  isActive?: boolean;
-  /** Click handler */
-  onClick: () => void;
-  /** Whether the button is disabled */
-  disabled?: boolean;
-}
-
-/**
- * Props for tab button components
- */
-export interface TabButtonProps {
-  /** Tab label */
-  label: string;
-  /** Whether the tab is active */
-  isActive: boolean;
-  /** Click handler */
-  onClick: () => void;
-  /** Optional icon */
-  icon?: React.ReactNode;
-}
-
-/**
- * Props for service button components
- */
-export interface ServiceButtonProps {
-  /** Service name */
-  name: string;
-  /** Service description */
-  description?: string;
-  /** Whether the service is active */
-  isActive: boolean;
-  /** Click handler */
-  onClick: () => void;
-  /** Optional icon */
-  icon?: React.ReactNode;
-}
-
-// ============================================================================
 // Wallet Amount Types
 // ============================================================================
 
@@ -403,7 +353,7 @@ export interface WalletAmount {
 /**
  * Transfer status
  */
-export type TransferStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type TransferStatus = "pending" | "processing" | "completed" | "failed";
 
 /**
  * Transfer queue item for batch transfers
@@ -421,128 +371,4 @@ export interface TransferQueueItem {
   error?: string;
   /** Transaction signature if completed */
   signature?: string;
-}
-
-// ============================================================================
-// Filter and Sort Types
-// ============================================================================
-
-/**
- * Balance filter options
- */
-export type BalanceFilter = 'all' | 'nonZero' | 'highBalance' | 'lowBalance';
-
-/**
- * Sort options for wallet lists
- */
-export type SortOption = 'address' | 'balance' | 'label';
-
-/**
- * Sort direction
- */
-export type SortDirection = 'asc' | 'desc';
-
-/**
- * Filter and sort state for wallet lists
- */
-export interface WalletListFilterState {
-  /** Search term */
-  searchTerm: string;
-  /** Balance filter */
-  balanceFilter: BalanceFilter;
-  /** Sort option */
-  sortOption: SortOption;
-  /** Sort direction */
-  sortDirection: SortDirection;
-}
-
-// ============================================================================
-// Form State Types
-// ============================================================================
-
-/**
- * Modal form step
- */
-export type ModalStep = 0 | 1 | 2;
-
-/**
- * Common modal state
- */
-export interface ModalState {
-  /** Current step */
-  currentStep: ModalStep;
-  /** Whether form is submitting */
-  isSubmitting: boolean;
-  /** Whether user has confirmed */
-  isConfirmed: boolean;
-}
-
-// ============================================================================
-// Header and Menu Types
-// ============================================================================
-
-/**
- * Menu item configuration
- */
-export interface MenuItem {
-  /** Unique identifier */
-  id: string;
-  /** Display label */
-  label: string;
-  /** Icon component */
-  icon?: React.ReactNode;
-  /** Click handler */
-  onClick: () => void;
-  /** Whether the item is disabled */
-  disabled?: boolean;
-  /** Whether to show a divider after this item */
-  divider?: boolean;
-}
-
-/**
- * Header props
- */
-export interface HeaderProps {
-  /** Current token address */
-  tokenAddress: string;
-  /** Callback to update token address */
-  setTokenAddress: (address: string) => void;
-  /** Whether to show settings */
-  showSettings?: boolean;
-  /** Callback to toggle settings */
-  onToggleSettings?: () => void;
-}
-
-// ============================================================================
-// Notification Types
-// ============================================================================
-
-/**
- * Notification item
- */
-export interface NotificationItem {
-  /** Unique identifier */
-  id: string;
-  /** Notification title */
-  title: string;
-  /** Notification message */
-  message: string;
-  /** Notification type */
-  type: ToastType;
-  /** Unix timestamp */
-  timestamp: number;
-  /** Whether the notification has been read */
-  read: boolean;
-}
-
-/**
- * Notification props
- */
-export interface NotificationsProps {
-  /** List of notifications */
-  notifications: NotificationItem[];
-  /** Callback to mark notification as read */
-  onMarkRead: (id: string) => void;
-  /** Callback to clear all notifications */
-  onClearAll: () => void;
 }

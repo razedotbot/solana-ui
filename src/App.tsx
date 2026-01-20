@@ -23,17 +23,17 @@ import { brand } from "./utils/brandConfig";
 import type { Connection } from "@solana/web3.js";
 import logo from "./logo.png";
 import { initStyles } from "./components/Styles";
+import { fetchWalletBalances } from "./utils/wallet";
+import { saveWalletsToCookies } from "./utils/storage";
 import {
-  saveWalletsToCookies,
   loadQuickBuyPreferencesFromCookies,
   saveQuickBuyPreferencesToCookies,
-  fetchWalletBalances,
   saveSplitSizesToCookies,
   loadSplitSizesFromCookies,
   saveViewModeToCookies,
   loadViewModeFromCookies,
   type ViewMode,
-} from "./Utils";
+} from "./utils/storage";
 import type {
   WalletType,
   ConfigType,
@@ -44,7 +44,7 @@ import type {
 } from "./utils/types";
 import Split from "./components/Split";
 import { addRecentToken } from "./utils/recentTokens";
-import { useAppContext } from "./contexts/useAppContext";
+import { useAppContext } from "./contexts";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
 
 // Extend Window interface to include server-related properties
@@ -236,9 +236,13 @@ const WalletManager: React.FC = () => {
   }, []);
 
   // View mode state - Simple (left column hidden) or Advanced (left column visible)
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    loadViewModeFromCookies(),
-  );
+  // On mobile, always default to simple mode
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (window.innerWidth < 768) {
+      return "simple";
+    }
+    return loadViewModeFromCookies();
+  });
 
   // Store advanced sizes separately so we can restore them when switching back from simple mode
   const [savedAdvancedSizes, setSavedAdvancedSizes] = useState<number[]>(() => {
@@ -1246,27 +1250,54 @@ const WalletManager: React.FC = () => {
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {/* View Mode Toggle */}
-                    <button
-                      onClick={handleViewModeToggle}
-                      className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
-                      title={
-                        viewMode === "simple"
-                          ? "Switch to Advanced mode"
-                          : "Switch to Simple mode"
-                      }
-                    >
-                      <Columns2
-                        size={16}
-                        className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
-                      />
-                      <span className="text-xs font-mono color-primary font-medium tracking-wider">
-                        {viewMode === "simple" ? "SIMPLE" : "ADVANCED"}
-                      </span>
-                    </button>
+                    {/* View Mode Toggle - Hidden on mobile */}
+                    {!isMobile && (
+                      <button
+                        onClick={handleViewModeToggle}
+                        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                        title={
+                          viewMode === "simple"
+                            ? "Switch to Advanced mode"
+                            : "Switch to Simple mode"
+                        }
+                      >
+                        <Columns2
+                          size={16}
+                          className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
+                        />
+                        <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                          {viewMode === "simple" ? "SIMPLE" : "ADVANCED"}
+                        </span>
+                      </button>
+                    )}
 
-                    {/* Tools Dropdown */}
-                    <ToolsDropdown />
+                    {/* Mobile: Inline buttons, Desktop: Dropdown */}
+                    {isMobile ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => navigate("/wallets")}
+                          className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                          title="Wallets"
+                        >
+                          <Wallet size={14} className="color-primary" />
+                          <span className="text-xs font-mono color-primary">
+                            WALLETS
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => navigate("/settings")}
+                          className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                          title="Settings"
+                        >
+                          <Settings size={14} className="color-primary" />
+                          <span className="text-xs font-mono color-primary">
+                            SETTINGS
+                          </span>
+                        </button>
+                      </div>
+                    ) : (
+                      <ToolsDropdown />
+                    )}
                   </div>
                 </div>
               </nav>
@@ -1364,27 +1395,54 @@ const WalletManager: React.FC = () => {
                       </button>
 
                       <div className="flex items-center gap-2">
-                        {/* View Mode Toggle */}
-                        <button
-                          onClick={handleViewModeToggle}
-                          className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
-                          title={
-                            viewMode === "simple"
-                              ? "Switch to Advanced mode"
-                              : "Switch to Simple mode"
-                          }
-                        >
-                          <Columns2
-                            size={16}
-                            className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
-                          />
-                          <span className="text-xs font-mono color-primary font-medium tracking-wider">
-                            {viewMode === "simple" ? "SIMPLE" : "ADVANCED"}
-                          </span>
-                        </button>
+                        {/* View Mode Toggle - Hidden on mobile */}
+                        {!isMobile && (
+                          <button
+                            onClick={handleViewModeToggle}
+                            className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                            title={
+                              viewMode === "simple"
+                                ? "Switch to Advanced mode"
+                                : "Switch to Simple mode"
+                            }
+                          >
+                            <Columns2
+                              size={16}
+                              className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
+                            />
+                            <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                              {viewMode === "simple" ? "SIMPLE" : "ADVANCED"}
+                            </span>
+                          </button>
+                        )}
 
-                        {/* Tools Dropdown */}
-                        <ToolsDropdown />
+                        {/* Mobile: Inline buttons, Desktop: Dropdown */}
+                        {isMobile ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => navigate("/wallets")}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                              title="Wallets"
+                            >
+                              <Wallet size={14} className="color-primary" />
+                              <span className="text-xs font-mono color-primary">
+                                WALLETS
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => navigate("/settings")}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                              title="Settings"
+                            >
+                              <Settings size={14} className="color-primary" />
+                              <span className="text-xs font-mono color-primary">
+                                SETTINGS
+                              </span>
+                            </button>
+                          </div>
+                        ) : (
+                          <ToolsDropdown />
+                        )}
                       </div>
                     </div>
                   </nav>

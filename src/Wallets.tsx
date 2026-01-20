@@ -8,18 +8,18 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import {
-  saveWalletsToCookies,
   copyToClipboard,
   toggleWallet,
   getWalletDisplayName,
-} from "./Utils";
+} from "./utils/wallet";
+import { saveWalletsToCookies } from "./utils/storage";
 import type {
   WalletType,
   WalletCategory,
   CategoryQuickTradeSettings,
 } from "./utils/types";
 import { formatTokenBalance } from "./utils/formatting";
-import { useToast } from "./utils/useToast";
+import { useToast } from "./utils/hooks";
 import { executeBuy, createBuyConfig, validateBuyInputs } from "./utils/buy";
 import {
   executeSell,

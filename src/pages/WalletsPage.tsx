@@ -34,25 +34,24 @@ import type {
   MasterWallet,
   CustomQuickTradeSettings,
 } from "../utils/types";
+import { formatAddress } from "../utils/formatting";
 import {
-  formatAddress,
   copyToClipboard,
   downloadPrivateKey,
   deleteWallet,
-  saveWalletsToCookies,
-  loadWalletsFromCookies,
   importWallet,
   fetchSolBalance,
   downloadAllWallets,
   handleCleanupWallets,
-  loadMasterWallets,
   saveMasterWallets,
+  loadMasterWallets,
   createMasterWallet,
   createHDWalletFromMaster,
   deleteMasterWallet as deleteMasterWalletUtil,
   getMasterWalletMnemonic,
   updateMasterWalletAccountCount,
-} from "../Utils";
+} from "../utils/wallet";
+import { loadWalletsFromCookies, saveWalletsToCookies } from "../utils/storage";
 import CreateMasterWalletModal from "../components/modals/CreateMasterWalletModal";
 import CreateWalletModal from "../components/modals/CreateWalletModal";
 import ImportWalletModal from "../components/modals/ImportWalletModal";
@@ -70,8 +69,8 @@ import {
   validateMnemonic,
   getMnemonicWordCount,
 } from "../utils/hdWallet";
-import { useAppContext } from "../contexts/useAppContext";
-import { useToast } from "../utils/useToast";
+import { useAppContext } from "../contexts";
+import { useToast } from "../utils/hooks";
 
 type SortField = "solBalance";
 type SortDirection = "asc" | "desc";
@@ -1078,7 +1077,7 @@ export const WalletsPage: React.FC = () => {
   const archivedCount = wallets.filter((w) => w.isArchived).length;
 
   return (
-    <div className="h-screen bg-app-primary text-app-tertiary flex flex-col overflow-hidden">
+    <div className="h-full min-h-screen md:h-screen bg-app-primary text-app-tertiary flex flex-col overflow-hidden">
       {/* Horizontal Header */}
       <HorizontalHeader />
 
@@ -1102,7 +1101,7 @@ export const WalletsPage: React.FC = () => {
         </div>
 
         {/* Content container */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 py-6 flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="relative z-10 max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6 pb-20 md:pb-6 flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Quick Stats & Master Wallets Row */}
           <div className="mb-6 pb-4 border-b border-app-primary-20 flex-shrink-0">
             <div className="flex flex-wrap items-start gap-3 justify-between">
@@ -1548,7 +1547,7 @@ export const WalletsPage: React.FC = () => {
           {/* Table Container */}
           <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
             <div className="flex-1 overflow-y-auto overflow-x-auto border border-app-primary-20 rounded-lg min-h-0">
-              <table className="w-full text-xs sm:text-sm font-mono min-w-[600px]">
+              <table className="w-full text-xs sm:text-sm font-mono">
                 {/* Header */}
                 <thead className="sticky top-0 bg-app-primary border-b border-app-primary-20 z-10">
                   <tr>
@@ -1621,7 +1620,7 @@ export const WalletsPage: React.FC = () => {
                         </div>
                       )}
                     </th>
-                    <th className="p-2 sm:p-3 text-left bg-app-primary">
+                    <th className="hidden sm:table-cell p-2 sm:p-3 text-left bg-app-primary">
                       <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
                         <span className="text-app-secondary-80">QUICKMODE</span>
                         <WalletTooltip
@@ -1643,7 +1642,7 @@ export const WalletsPage: React.FC = () => {
                         </WalletTooltip>
                       </div>
                     </th>
-                    <th className="p-2 sm:p-3 text-left bg-app-primary">
+                    <th className="hidden sm:table-cell p-2 sm:p-3 text-left bg-app-primary">
                       <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
                         <span className="text-app-secondary-80">TYPE</span>
                       </div>
@@ -1701,7 +1700,7 @@ export const WalletsPage: React.FC = () => {
                         <SortIcon field="solBalance" />
                       </button>
                     </th>
-                    <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">
+                    <th className="hidden sm:table-cell p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">
                       PRIVATE KEY
                     </th>
                     <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">
@@ -1806,7 +1805,7 @@ export const WalletsPage: React.FC = () => {
                             </div>
                           )}
                         </td>
-                        <td className="p-2 sm:p-3">
+                        <td className="hidden sm:table-cell p-2 sm:p-3">
                           {editingCategory === wallet.id ? (
                             <div className="flex items-center gap-2">
                               <select
@@ -1873,7 +1872,7 @@ export const WalletsPage: React.FC = () => {
                             </div>
                           )}
                         </td>
-                        <td className="p-2 sm:p-3">
+                        <td className="hidden sm:table-cell p-2 sm:p-3">
                           <span
                             className={`text-app-primary font-mono text-xs sm:text-sm px-2 py-1 rounded ${
                               wallet.source === "hd-derived"
@@ -1906,7 +1905,7 @@ export const WalletsPage: React.FC = () => {
                             {solBalance.toFixed(4)}
                           </span>
                         </td>
-                        <td className="p-2 sm:p-3">
+                        <td className="hidden sm:table-cell p-2 sm:p-3">
                           <WalletTooltip
                             content="Click to copy private key"
                             position="top"
@@ -1922,7 +1921,7 @@ export const WalletsPage: React.FC = () => {
                           </WalletTooltip>
                         </td>
                         <td className="p-2 sm:p-3">
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 flex-wrap">
                             {wallet.isArchived ? (
                               <WalletTooltip
                                 content="Unarchive Wallet"
@@ -2109,7 +2108,6 @@ export const WalletsPage: React.FC = () => {
                 setActiveModal(null);
                 setBurnTokenBalances(new Map());
               }}
-              handleRefresh={() => void refreshBalances()}
               tokenAddress={burnTokenAddress}
               solBalances={solBalances}
               tokenBalances={burnTokenBalances}

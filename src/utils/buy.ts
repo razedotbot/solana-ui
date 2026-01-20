@@ -6,7 +6,7 @@
 
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
-import { loadConfigFromCookies } from "../Utils";
+import { loadConfigFromCookies } from "./storage";
 import { TRADING } from "./constants";
 import type { ApiResponse } from "./types";
 import type {
@@ -17,8 +17,8 @@ import type {
   BuyBundle,
   BuyResult,
 } from "./types";
-import { addTradeHistory } from "./trading";
 import {
+  addTradeHistory,
   checkRateLimit,
   getServerBaseUrl,
   isSelfHostedServer,
@@ -30,7 +30,7 @@ import {
   getFeeLamports,
   processBatchResults,
   createBatchErrorMessage,
-} from "./trading/shared";
+} from "./trading";
 
 export type {
   WalletBuy,

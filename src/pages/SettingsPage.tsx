@@ -10,9 +10,9 @@ import {
   RefreshCw,
   BookOpen,
 } from "lucide-react";
-import { useAppContext } from "../contexts/useAppContext";
-import { useToast } from "../utils/useToast";
-import { saveConfigToCookies } from "../Utils";
+import { useAppContext } from "../contexts";
+import { useToast } from "../utils/hooks";
+import { saveConfigToCookies } from "../utils/storage";
 import { HorizontalHeader } from "../components/HorizontalHeader";
 import type { ServerInfo } from "../utils/types";
 import { RPCEndpointManager } from "../components/RPCEndpointManager";

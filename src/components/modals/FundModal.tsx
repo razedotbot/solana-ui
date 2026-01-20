@@ -1,14 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { ArrowsUpFromLine, DollarSign, X, CheckCircle, Info, Search, ChevronRight, Settings } from 'lucide-react';
-import type { Connection } from '@solana/web3.js';
-import { useToast } from "../../utils/useToast";
-import { getWalletDisplayName } from '../../Utils';
-import type { WalletType } from '../../utils/types';
-import { batchDistributeSOL, validateDistributionInputs } from '../../utils/distribute';
-import { batchMixSOL, validateMixingInputs } from '../../utils/mixer';
+import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import {
+  ArrowsUpFromLine,
+  DollarSign,
+  X,
+  CheckCircle,
+  Info,
+  Search,
+  ChevronRight,
+  Settings,
+} from "lucide-react";
+import type { Connection } from "@solana/web3.js";
+import { useToast } from "../../utils/hooks";
+import { getWalletDisplayName } from "../../utils/wallet";
+import type { WalletType, ComponentWalletAmount } from "../../utils/types";
+import {
+  batchDistributeSOL,
+  validateDistributionInputs,
+} from "../../utils/distribute";
+import { batchMixSOL, validateMixingInputs } from "../../utils/mixer";
 
-type FundingMode = 'distribute' | 'mixer';
+type FundingMode = "distribute" | "mixer";
 
 interface FundModalProps {
   isOpen: boolean;
@@ -19,17 +31,14 @@ interface FundModalProps {
   initialMode?: FundingMode;
 }
 
-interface WalletAmount {
-  address: string;
-  amount: string;
-}
+// Using ComponentWalletAmount from types (alias for modal form handling)
 
 export const FundModal: React.FC<FundModalProps> = ({
   isOpen,
   onClose,
   wallets,
   solBalances,
-  initialMode = 'distribute'
+  initialMode = "distribute",
 }) => {
   // States for the modal
   const [currentStep, setCurrentStep] = useState(0);
@@ -39,22 +48,29 @@ export const FundModal: React.FC<FundModalProps> = ({
   const { showToast } = useToast();
 
   // States for fund operation
-  const [selectedRecipientWallets, setSelectedRecipientWallets] = useState<string[]>([]);
-  const [selectedSenderWallet, setSelectedSenderWallet] = useState('');
-  const [commonAmount, setCommonAmount] = useState('');
+  const [selectedRecipientWallets, setSelectedRecipientWallets] = useState<
+    string[]
+  >([]);
+  const [selectedSenderWallet, setSelectedSenderWallet] = useState("");
+  const [commonAmount, setCommonAmount] = useState("");
   const [useCustomAmounts, setUseCustomAmounts] = useState(false);
-  const [walletAmounts, setWalletAmounts] = useState<WalletAmount[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [senderSearchTerm, setSenderSearchTerm] = useState('');
+  const [walletAmounts, setWalletAmounts] = useState<ComponentWalletAmount[]>(
+    [],
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [senderSearchTerm, setSenderSearchTerm] = useState("");
   const [showInfoTip, setShowInfoTip] = useState(false);
-  const [sortOption, setSortOption] = useState('address');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [balanceFilter, setBalanceFilter] = useState('all');
-  
+  const [sortOption, setSortOption] = useState("address");
+  const [sortDirection, setSortDirection] = useState("asc");
+  const [balanceFilter, setBalanceFilter] = useState("all");
+
   // Get wallet SOL balance by address
-  const getWalletBalance = useCallback((address: string): number => {
-    return solBalances.has(address) ? solBalances.get(address) || 0 : 0;
-  }, [solBalances]);
+  const getWalletBalance = useCallback(
+    (address: string): number => {
+      return solBalances.has(address) ? solBalances.get(address) || 0 : 0;
+    },
+    [solBalances],
+  );
 
   // Calculate total amount for all recipients
   const calculateTotalAmount = (): number => {
@@ -63,17 +79,18 @@ export const FundModal: React.FC<FundModalProps> = ({
         return total + (parseFloat(item.amount) || 0);
       }, 0);
     } else {
-      return parseFloat(commonAmount || '0') * selectedRecipientWallets.length;
+      return parseFloat(commonAmount || "0") * selectedRecipientWallets.length;
     }
   };
-  
+
   // Function to highlight recipients with missing amounts
   const hasEmptyAmounts = (): boolean => {
     if (!useCustomAmounts) return false;
-    
-    return walletAmounts.some(wallet => 
-      selectedRecipientWallets.includes(wallet.address) && 
-      (!wallet.amount || parseFloat(wallet.amount) === 0)
+
+    return walletAmounts.some(
+      (wallet) =>
+        selectedRecipientWallets.includes(wallet.address) &&
+        (!wallet.amount || parseFloat(wallet.amount) === 0),
     );
   };
 
@@ -87,38 +104,40 @@ export const FundModal: React.FC<FundModalProps> = ({
     setCurrentStep(0);
     setIsConfirmed(false);
     setSelectedRecipientWallets([]);
-    setSelectedSenderWallet('');
-    setCommonAmount('');
+    setSelectedSenderWallet("");
+    setCommonAmount("");
     setUseCustomAmounts(false);
     setWalletAmounts([]);
-    setSearchTerm('');
-    setSenderSearchTerm('');
-    setSortOption('address');
-    setSortDirection('asc');
-    setBalanceFilter('all');
+    setSearchTerm("");
+    setSenderSearchTerm("");
+    setSortOption("address");
+    setSortDirection("asc");
+    setBalanceFilter("all");
   }, []);
 
   // Update wallet amounts based on selected wallets
   const updateWalletAmounts = useCallback((): void => {
-    setWalletAmounts(prevWalletAmounts => {
+    setWalletAmounts((prevWalletAmounts) => {
       if (useCustomAmounts) {
         // Maintain existing amounts for wallets that remain selected
-        const existingAmounts = new Map(prevWalletAmounts.map(w => [w.address, w.amount]));
-        
+        const existingAmounts = new Map(
+          prevWalletAmounts.map((w) => [w.address, w.amount]),
+        );
+
         // Create a new walletAmounts array with currently selected wallets
-        const newWalletAmounts = selectedRecipientWallets.map(address => ({
+        const newWalletAmounts = selectedRecipientWallets.map((address) => ({
           address,
-          amount: existingAmounts.get(address) || commonAmount || ''
+          amount: existingAmounts.get(address) || commonAmount || "",
         }));
-        
+
         return newWalletAmounts;
       } else {
         // When using common amount, just create entries with the common amount
-        const newWalletAmounts = selectedRecipientWallets.map(address => ({
+        const newWalletAmounts = selectedRecipientWallets.map((address) => ({
           address,
-          amount: commonAmount
+          amount: commonAmount,
         }));
-        
+
         return newWalletAmounts;
       }
     });
@@ -149,24 +168,22 @@ export const FundModal: React.FC<FundModalProps> = ({
 
   // Get wallet by address
   const getWalletByAddress = (address: string): WalletType | undefined => {
-    return wallets.find(wallet => wallet.address === address);
+    return wallets.find((wallet) => wallet.address === address);
   };
 
   // Get wallet private key by address
   const getPrivateKeyByAddress = (address: string): string => {
     const wallet = getWalletByAddress(address);
-    return wallet ? wallet.privateKey : '';
+    return wallet ? wallet.privateKey : "";
   };
 
   // Handle wallet amount change
   const handleWalletAmountChange = (address: string, value: string): void => {
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setWalletAmounts(prev => 
-        prev.map(wallet => 
-          wallet.address === address 
-            ? { ...wallet, amount: value } 
-            : wallet
-        )
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      setWalletAmounts((prev) =>
+        prev.map((wallet) =>
+          wallet.address === address ? { ...wallet, amount: value } : wallet,
+        ),
       );
     }
   };
@@ -177,7 +194,7 @@ export const FundModal: React.FC<FundModalProps> = ({
     if (!isConfirmed) return;
 
     setIsSubmitting(true);
-    
+
     try {
       // Get sender private key
       const senderPrivateKey = getPrivateKeyByAddress(selectedSenderWallet);
@@ -191,32 +208,32 @@ export const FundModal: React.FC<FundModalProps> = ({
       const senderWallet = {
         address: selectedSenderWallet,
         privateKey: senderPrivateKey,
-        amount: '0' // Not used for sender
+        amount: "0", // Not used for sender
       };
 
       // Prepare recipient wallets with their private keys and amounts
       const recipientWallets = walletAmounts
-        .filter(wallet => selectedRecipientWallets.includes(wallet.address))
-        .map(wallet => ({
+        .filter((wallet) => selectedRecipientWallets.includes(wallet.address))
+        .map((wallet) => ({
           address: wallet.address,
           privateKey: getPrivateKeyByAddress(wallet.address),
-          amount: wallet.amount
+          amount: wallet.amount,
         }))
-        .filter(wallet => wallet.privateKey && wallet.amount);
+        .filter((wallet) => wallet.privateKey && wallet.amount);
 
       // Validate all inputs based on mode
       let validation;
-      if (fundingMode === 'distribute') {
+      if (fundingMode === "distribute") {
         validation = validateDistributionInputs(
           senderWallet,
           recipientWallets,
-          senderBalance
+          senderBalance,
         );
       } else {
         validation = validateMixingInputs(
           senderWallet,
           recipientWallets,
-          senderBalance
+          senderBalance,
         );
       }
 
@@ -228,26 +245,31 @@ export const FundModal: React.FC<FundModalProps> = ({
 
       // Execute the operation based on mode
       let result;
-      if (fundingMode === 'distribute') {
+      if (fundingMode === "distribute") {
         result = await batchDistributeSOL(senderWallet, recipientWallets);
       } else {
         result = await batchMixSOL(senderWallet, recipientWallets);
       }
-      
+
       if (result.success) {
-        const modeText = fundingMode === 'distribute' ? 'distributed' : 'mixed';
+        const modeText = fundingMode === "distribute" ? "distributed" : "mixed";
         showToast(`SOL ${modeText} successfully`, "success");
         resetForm();
         onClose();
       } else {
-        const modeText = fundingMode === 'distribute' ? 'Distribution' : 'Mixing';
+        const modeText =
+          fundingMode === "distribute" ? "Distribution" : "Mixing";
         showToast(result.error || `${modeText} failed`, "error");
       }
     } catch (error) {
       console.error(`${fundingMode} error:`, error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const modeText = fundingMode === 'distribute' ? 'Distribution' : 'Mixing';
-      showToast(`${modeText} failed: ` + (errorMessage || "Unknown error"), "error");
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const modeText = fundingMode === "distribute" ? "Distribution" : "Mixing";
+      showToast(
+        `${modeText} failed: ` + (errorMessage || "Unknown error"),
+        "error",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -255,9 +277,9 @@ export const FundModal: React.FC<FundModalProps> = ({
 
   // Function to handle recipient wallet selection toggles
   const toggleRecipientWalletSelection = (address: string): void => {
-    setSelectedRecipientWallets(prev => {
+    setSelectedRecipientWallets((prev) => {
       if (prev.includes(address)) {
-        return prev.filter(a => a !== address);
+        return prev.filter((a) => a !== address);
       } else {
         return [...prev, address];
       }
@@ -266,64 +288,82 @@ export const FundModal: React.FC<FundModalProps> = ({
 
   // Get available wallets for recipient selection (exclude sender)
   const getAvailableRecipientWallets = (): WalletType[] => {
-    return wallets.filter(wallet => wallet.address !== selectedSenderWallet);
+    return wallets.filter((wallet) => wallet.address !== selectedSenderWallet);
   };
 
   // Get available wallets for sender selection (exclude recipients and zero balance wallets)
   const getAvailableSenderWallets = (): WalletType[] => {
-    return wallets.filter(wallet => 
-      !selectedRecipientWallets.includes(wallet.address) && 
-      (getWalletBalance(wallet.address) || 0) > 0
+    return wallets.filter(
+      (wallet) =>
+        !selectedRecipientWallets.includes(wallet.address) &&
+        (getWalletBalance(wallet.address) || 0) > 0,
     );
   };
-  
+
   // Handle select/deselect all for recipient wallets
   const handleSelectAllRecipients = (): void => {
-    if (selectedRecipientWallets.length === getAvailableRecipientWallets().length) {
+    if (
+      selectedRecipientWallets.length === getAvailableRecipientWallets().length
+    ) {
       setSelectedRecipientWallets([]);
     } else {
-      setSelectedRecipientWallets(getAvailableRecipientWallets().map(wallet => wallet.address));
+      setSelectedRecipientWallets(
+        getAvailableRecipientWallets().map((wallet) => wallet.address),
+      );
     }
   };
 
   // Apply common amount to all selected wallets
   const applyCommonAmountToAll = (): void => {
-    setWalletAmounts(prev => 
-      prev.map(wallet => ({ ...wallet, amount: commonAmount }))
+    setWalletAmounts((prev) =>
+      prev.map((wallet) => ({ ...wallet, amount: commonAmount })),
     );
   };
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
+  const filterWallets = (
+    walletList: WalletType[],
+    search: string,
+  ): WalletType[] => {
     // First apply search filter
     let filtered = walletList;
     if (search) {
-      filtered = filtered.filter(wallet => 
-        wallet.address.toLowerCase().includes(search.toLowerCase())
+      filtered = filtered.filter((wallet) =>
+        wallet.address.toLowerCase().includes(search.toLowerCase()),
       );
     }
-    
+
     // Then apply balance filter
-    if (balanceFilter !== 'all') {
-      if (balanceFilter === 'nonZero') {
-        filtered = filtered.filter(wallet => (getWalletBalance(wallet.address) || 0) > 0);
-      } else if (balanceFilter === 'highBalance') {
-        filtered = filtered.filter(wallet => (getWalletBalance(wallet.address) || 0) >= 0.1);
-      } else if (balanceFilter === 'lowBalance') {
-        filtered = filtered.filter(wallet => (getWalletBalance(wallet.address) || 0) < 0.1 && (getWalletBalance(wallet.address) || 0) > 0);
+    if (balanceFilter !== "all") {
+      if (balanceFilter === "nonZero") {
+        filtered = filtered.filter(
+          (wallet) => (getWalletBalance(wallet.address) || 0) > 0,
+        );
+      } else if (balanceFilter === "highBalance") {
+        filtered = filtered.filter(
+          (wallet) => (getWalletBalance(wallet.address) || 0) >= 0.1,
+        );
+      } else if (balanceFilter === "lowBalance") {
+        filtered = filtered.filter(
+          (wallet) =>
+            (getWalletBalance(wallet.address) || 0) < 0.1 &&
+            (getWalletBalance(wallet.address) || 0) > 0,
+        );
       }
     }
-    
+
     // Finally, sort the wallets
     return filtered.sort((a, b) => {
-      if (sortOption === 'address') {
-        return sortDirection === 'asc' 
+      if (sortOption === "address") {
+        return sortDirection === "asc"
           ? a.address.localeCompare(b.address)
           : b.address.localeCompare(a.address);
-      } else if (sortOption === 'balance') {
+      } else if (sortOption === "balance") {
         const balanceA = getWalletBalance(a.address) || 0;
         const balanceB = getWalletBalance(b.address) || 0;
-        return sortDirection === 'asc' ? balanceA - balanceB : balanceB - balanceA;
+        return sortDirection === "asc"
+          ? balanceA - balanceB
+          : balanceB - balanceA;
       }
       return 0;
     });
@@ -336,8 +376,8 @@ export const FundModal: React.FC<FundModalProps> = ({
 
   // Get wallet amount by address
   const getWalletAmount = (address: string): string => {
-    const wallet = walletAmounts.find(w => w.address === address);
-    return wallet ? wallet.amount : '';
+    const wallet = walletAmounts.find((w) => w.address === address);
+    return wallet ? wallet.amount : "";
   };
 
   // Get mode-specific text
@@ -350,14 +390,22 @@ export const FundModal: React.FC<FundModalProps> = ({
     infoTip: string;
   } => {
     return {
-      title: fundingMode === 'distribute' ? 'DISTRIBUTE SOL' : 'SOL MIXER',
-      action: fundingMode === 'distribute' ? 'DISTRIBUTE SOL' : 'MIX SOL',
-      summaryTitle: fundingMode === 'distribute' ? 'DISTRIBUTION SUMMARY' : 'MIXING SUMMARY',
-      totalLabel: fundingMode === 'distribute' ? 'TOTAL TO SEND:' : 'TOTAL TO MIX:',
-      confirmText: fundingMode === 'distribute' ? 'I CONFIRM THIS DISTRIBUTION OPERATION' : 'I CONFIRM THIS MIXING OPERATION',
-      infoTip: fundingMode === 'distribute' 
-        ? 'This amount will be sent to each selected recipient wallet'
-        : 'This amount will be mixed to each selected recipient wallet'
+      title: fundingMode === "distribute" ? "DISTRIBUTE SOL" : "SOL MIXER",
+      action: fundingMode === "distribute" ? "DISTRIBUTE SOL" : "MIX SOL",
+      summaryTitle:
+        fundingMode === "distribute"
+          ? "DISTRIBUTION SUMMARY"
+          : "MIXING SUMMARY",
+      totalLabel:
+        fundingMode === "distribute" ? "TOTAL TO SEND:" : "TOTAL TO MIX:",
+      confirmText:
+        fundingMode === "distribute"
+          ? "I CONFIRM THIS DISTRIBUTION OPERATION"
+          : "I CONFIRM THIS MIXING OPERATION",
+      infoTip:
+        fundingMode === "distribute"
+          ? "This amount will be sent to each selected recipient wallet"
+          : "This amount will be mixed to each selected recipient wallet",
     };
   };
 
@@ -367,44 +415,44 @@ export const FundModal: React.FC<FundModalProps> = ({
   if (!isOpen) return null;
 
   // Animation keyframes for elements
-  const modalStyleElement = document.createElement('style');
+  const modalStyleElement = document.createElement("style");
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
       0% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
       50% { box-shadow: 0 0 15px var(--color-primary-80), 0 0 25px var(--color-primary-40); }
       100% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
     }
-    
+
     @keyframes modal-fade-in {
       0% { opacity: 0; }
       100% { opacity: 1; }
     }
-    
+
     @keyframes modal-slide-up {
       0% { transform: translateY(20px); opacity: 0; }
       100% { transform: translateY(0); opacity: 1; }
     }
-    
+
     @keyframes modal-scan-line {
       0% { transform: translateY(-100%); opacity: 0.3; }
       100% { transform: translateY(100%); opacity: 0; }
     }
-    
+
     .modal-content {
       position: relative;
     }
-    
+
     .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
-    
+
     .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
-    
+
     .modal-btn-::after {
       content: "";
       position: absolute;
@@ -422,21 +470,21 @@ export const FundModal: React.FC<FundModalProps> = ({
       transition: all 0.5s ease;
       opacity: 0;
     }
-    
+
     .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
-    
+
     .modal-btn-:active {
       transform: scale(0.95);
     }
-    
+
     .progress-bar- {
       position: relative;
       overflow: hidden;
     }
-    
+
     .progress-bar-::after {
       content: "";
       position: absolute;
@@ -455,18 +503,18 @@ export const FundModal: React.FC<FundModalProps> = ({
       transform: translateX(-100%);
       animation: progress-shine 3s infinite;
     }
-    
+
     @keyframes progress-shine {
       0% { transform: translateX(-100%); }
       20% { transform: translateX(100%); }
       100% { transform: translateX(100%); }
     }
-    
+
     .glitch-text:hover {
       text-shadow: 0 0 2px var(--color-primary), 0 0 4px var(--color-primary);
       animation: glitch 2s infinite;
     }
-    
+
     @keyframes glitch {
       2%, 8% { transform: translate(-2px, 0) skew(0.3deg); }
       4%, 6% { transform: translate(2px, 0) skew(-0.3deg); }
@@ -486,7 +534,7 @@ export const FundModal: React.FC<FundModalProps> = ({
         margin-top: 1rem;
       }
     }
-    
+
     @media (max-width: 768px) {
       .modal-flex-col-md {
         flex-direction: column;
@@ -498,7 +546,7 @@ export const FundModal: React.FC<FundModalProps> = ({
         margin-top: 1rem;
       }
     }
-    
+
     @media (max-width: 640px) {
       .modal-text-xs-sm {
         font-size: 0.75rem;
@@ -519,8 +567,7 @@ export const FundModal: React.FC<FundModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-app-primary-85">
       <div className="relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-6xl overflow-hidden transform modal-content">
         {/* Ambient grid background */}
-        <div className="absolute inset-0 z-0 opacity-10 bg-grid">
-        </div>
+        <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>
 
         {/* Header */}
         <div className="relative z-10 p-4 flex justify-between items-center border-b border-app-primary-40">
@@ -529,10 +576,11 @@ export const FundModal: React.FC<FundModalProps> = ({
               <ArrowsUpFromLine size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> {modeText.title} <span className="color-primary">/</span>
+              <span className="color-primary">/</span> {modeText.title}{" "}
+              <span className="color-primary">/</span>
             </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-app-secondary hover:color-primary-light transition-colors p-1 hover:bg-primary-20 rounded"
           >
@@ -543,24 +591,26 @@ export const FundModal: React.FC<FundModalProps> = ({
         {/* Mode Selector */}
         <div className="relative z-10 px-4 py-3 border-b border-app-primary-30 bg-app-tertiary">
           <div className="flex items-center justify-center gap-4">
-            <span className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">Mode:</span>
+            <span className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+              Mode:
+            </span>
             <div className="flex gap-2">
               <button
-                onClick={() => setFundingMode('distribute')}
+                onClick={() => setFundingMode("distribute")}
                 className={`px-4 py-2 rounded-lg text-sm font-mono transition-all duration-200 border ${
-                  fundingMode === 'distribute'
-                    ? 'bg-app-primary-color text-app-primary border-app-primary-40 shadow-md'
-                    : 'bg-app-secondary text-app-secondary-60 border-app-primary-30 hover:bg-app-primary-10'
+                  fundingMode === "distribute"
+                    ? "bg-app-primary-color text-app-primary border-app-primary-40 shadow-md"
+                    : "bg-app-secondary text-app-secondary-60 border-app-primary-30 hover:bg-app-primary-10"
                 }`}
               >
                 DISTRIBUTE
               </button>
               <button
-                onClick={() => setFundingMode('mixer')}
+                onClick={() => setFundingMode("mixer")}
                 className={`px-4 py-2 rounded-lg text-sm font-mono transition-all duration-200 border ${
-                  fundingMode === 'mixer'
-                    ? 'bg-app-primary-color text-app-primary border-app-primary-40 shadow-md'
-                    : 'bg-app-secondary text-app-secondary-60 border-app-primary-30 hover:bg-app-primary-10'
+                  fundingMode === "mixer"
+                    ? "bg-app-primary-color text-app-primary border-app-primary-40 shadow-md"
+                    : "bg-app-secondary text-app-secondary-60 border-app-primary-30 hover:bg-app-primary-10"
                 }`}
               >
                 MIXER
@@ -571,9 +621,9 @@ export const FundModal: React.FC<FundModalProps> = ({
 
         {/* Progress Indicator */}
         <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
-          <div 
+          <div
             className="h-full bg-app-primary-color transition-all duration-300"
-            style={{ width: currentStep === 0 ? '50%' : '100%' }}
+            style={{ width: currentStep === 0 ? "50%" : "100%" }}
           ></div>
         </div>
 
@@ -587,7 +637,8 @@ export const FundModal: React.FC<FundModalProps> = ({
                 <div className="w-1/2 modal-w-full-lg">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
-                      <span className="color-primary">&#62;</span> From Wallet <span className="color-primary">&#60;</span>
+                      <span className="color-primary">&#62;</span> From Wallet{" "}
+                      <span className="color-primary">&#60;</span>
                     </label>
                     {selectedSenderWallet && (
                       <div className="flex items-center gap-1 text-xs">
@@ -602,7 +653,10 @@ export const FundModal: React.FC<FundModalProps> = ({
                   {/* Sender Search and Filters */}
                   <div className="mb-2 flex space-x-2">
                     <div className="relative flex-grow">
-                      <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary" />
+                      <Search
+                        size={14}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary"
+                      />
                       <input
                         type="text"
                         value={senderSearchTerm}
@@ -611,8 +665,8 @@ export const FundModal: React.FC<FundModalProps> = ({
                         placeholder="SEARCH SENDER WALLETS..."
                       />
                     </div>
-                    
-                    <select 
+
+                    <select
                       className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                       value={sortOption}
                       onChange={(e) => setSortOption(e.target.value)}
@@ -620,64 +674,100 @@ export const FundModal: React.FC<FundModalProps> = ({
                       <option value="address">ADDRESS</option>
                       <option value="balance">BALANCE</option>
                     </select>
-                    
+
                     <button
                       className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary-light hover-border-primary transition-all modal-btn-"
-                      onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                      onClick={() =>
+                        setSortDirection(
+                          sortDirection === "asc" ? "desc" : "asc",
+                        )
+                      }
                     >
-                      {sortDirection === 'asc' ? '↑' : '↓'}
+                      {sortDirection === "asc" ? "↑" : "↓"}
                     </button>
                   </div>
 
                   <div className="max-h-48 overflow-y-auto border border-app-primary-20 rounded-lg shadow-inner bg-app-tertiary transition-all duration-200 hover-border-primary-40 scrollbar-thin">
-                    {filterWallets(getAvailableSenderWallets(), senderSearchTerm).length > 0 ? (
-                      filterWallets(getAvailableSenderWallets(), senderSearchTerm).map((wallet) => (
-                        <div 
+                    {filterWallets(
+                      getAvailableSenderWallets(),
+                      senderSearchTerm,
+                    ).length > 0 ? (
+                      filterWallets(
+                        getAvailableSenderWallets(),
+                        senderSearchTerm,
+                      ).map((wallet) => (
+                        <div
                           key={wallet.id}
                           className={`flex items-center p-2.5 hover-bg-secondary cursor-pointer transition-all duration-200 border-b border-app-primary-20 last:border-b-0
-                                    ${selectedSenderWallet === wallet.address ? 'bg-primary-10 border-app-primary-30' : ''}`}
-                          onClick={() => setSelectedSenderWallet(wallet.address)}
+                                    ${selectedSenderWallet === wallet.address ? "bg-primary-10 border-app-primary-30" : ""}`}
+                          onClick={() =>
+                            setSelectedSenderWallet(wallet.address)
+                          }
                         >
-                          <div className={`w-5 h-5 mr-3 rounded flex items-center justify-center transition-all duration-300
-                                          ${selectedSenderWallet === wallet.address
-                                            ? 'bg-app-primary-color shadow-md shadow-app-primary-40' 
-                                            : 'border border-app-primary-30 bg-app-tertiary'}`}>
+                          <div
+                            className={`w-5 h-5 mr-3 rounded flex items-center justify-center transition-all duration-300
+                                          ${
+                                            selectedSenderWallet ===
+                                            wallet.address
+                                              ? "bg-app-primary-color shadow-md shadow-app-primary-40"
+                                              : "border border-app-primary-30 bg-app-tertiary"
+                                          }`}
+                          >
                             {selectedSenderWallet === wallet.address && (
-                              <CheckCircle size={14} className="text-app-primary animate-[fadeIn_0.2s_ease]" />
+                              <CheckCircle
+                                size={14}
+                                className="text-app-primary animate-[fadeIn_0.2s_ease]"
+                              />
                             )}
                           </div>
                           <div className="flex-1 flex justify-between items-center">
-                            <span className="font-mono text-sm text-app-primary glitch-text">{getWalletDisplayName(wallet)}</span>
-                            <span className="text-xs text-app-secondary font-mono">{formatSolBalance(getWalletBalance(wallet.address) || 0)} SOL</span>
+                            <span className="font-mono text-sm text-app-primary glitch-text">
+                              {getWalletDisplayName(wallet)}
+                            </span>
+                            <span className="text-xs text-app-secondary font-mono">
+                              {formatSolBalance(
+                                getWalletBalance(wallet.address) || 0,
+                              )}{" "}
+                              SOL
+                            </span>
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="p-3 text-sm text-app-secondary text-center font-mono">
-                        {senderSearchTerm ? "NO WALLETS FOUND" : "NO WALLETS AVAILABLE"}
+                        {senderSearchTerm
+                          ? "NO WALLETS FOUND"
+                          : "NO WALLETS AVAILABLE"}
                       </div>
                     )}
                   </div>
                 </div>
-                
+
                 {/* Right Side - Recipient Wallets */}
                 <div className="w-1/2 modal-w-full-lg modal-mt-4-lg">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
-                      <span className="color-primary">&#62;</span> To Wallets <span className="color-primary">&#60;</span>
+                      <span className="color-primary">&#62;</span> To Wallets{" "}
+                      <span className="color-primary">&#60;</span>
                     </label>
-                    <button 
+                    <button
                       onClick={handleSelectAllRecipients}
                       className="text-xs px-2 py-0.5 bg-app-tertiary hover-bg-secondary text-app-secondary hover:color-primary-light rounded border border-app-primary-30 hover-border-primary transition-all duration-200 font-mono"
                     >
-                      {selectedRecipientWallets.length === getAvailableRecipientWallets().length ? 'DESELECT ALL' : 'SELECT ALL'}
+                      {selectedRecipientWallets.length ===
+                      getAvailableRecipientWallets().length
+                        ? "DESELECT ALL"
+                        : "SELECT ALL"}
                     </button>
                   </div>
 
                   {/* Recipient Search and Filters */}
                   <div className="mb-2 flex space-x-2">
                     <div className="relative flex-grow">
-                      <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary" />
+                      <Search
+                        size={14}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary"
+                      />
                       <input
                         type="text"
                         value={searchTerm}
@@ -686,8 +776,8 @@ export const FundModal: React.FC<FundModalProps> = ({
                         placeholder="SEARCH RECIPIENT WALLETS..."
                       />
                     </div>
-                    
-                    <select 
+
+                    <select
                       className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                       value={balanceFilter}
                       onChange={(e) => setBalanceFilter(e.target.value)}
@@ -700,35 +790,58 @@ export const FundModal: React.FC<FundModalProps> = ({
                   </div>
 
                   <div className="max-h-48 overflow-y-auto border border-app-primary-20 rounded-lg shadow-inner bg-app-tertiary transition-all duration-200 hover-border-primary-40 scrollbar-thin">
-                    {filterWallets(getAvailableRecipientWallets(), searchTerm).length > 0 ? (
-                      filterWallets(getAvailableRecipientWallets(), searchTerm).map((wallet) => (
-                        <div 
+                    {filterWallets(getAvailableRecipientWallets(), searchTerm)
+                      .length > 0 ? (
+                      filterWallets(
+                        getAvailableRecipientWallets(),
+                        searchTerm,
+                      ).map((wallet) => (
+                        <div
                           key={wallet.id}
                           className={`flex items-center p-2.5 hover-bg-secondary transition-all duration-200 border-b border-app-primary-20 last:border-b-0
-                                    ${selectedRecipientWallets.includes(wallet.address) ? 'bg-primary-10 border-app-primary-30' : ''}`}
+                                    ${selectedRecipientWallets.includes(wallet.address) ? "bg-primary-10 border-app-primary-30" : ""}`}
                         >
-                          <div 
+                          <div
                             className={`w-5 h-5 mr-3 rounded flex items-center justify-center transition-all duration-300 cursor-pointer
-                                        ${selectedRecipientWallets.includes(wallet.address) 
-                                          ? 'bg-app-primary-color shadow-md shadow-app-primary-40' 
-                                          : 'border border-app-primary-30 bg-app-tertiary'}`}
-                            onClick={() => toggleRecipientWalletSelection(wallet.address)}
+                                        ${
+                                          selectedRecipientWallets.includes(
+                                            wallet.address,
+                                          )
+                                            ? "bg-app-primary-color shadow-md shadow-app-primary-40"
+                                            : "border border-app-primary-30 bg-app-tertiary"
+                                        }`}
+                            onClick={() =>
+                              toggleRecipientWalletSelection(wallet.address)
+                            }
                           >
-                            {selectedRecipientWallets.includes(wallet.address) && (
-                              <CheckCircle size={14} className="text-app-primary animate-[fadeIn_0.2s_ease]" />
+                            {selectedRecipientWallets.includes(
+                              wallet.address,
+                            ) && (
+                              <CheckCircle
+                                size={14}
+                                className="text-app-primary animate-[fadeIn_0.2s_ease]"
+                              />
                             )}
                           </div>
                           <div className="flex-1 flex justify-between items-center">
-                            <span 
+                            <span
                               className="font-mono text-sm text-app-primary cursor-pointer glitch-text"
-                              onClick={() => toggleRecipientWalletSelection(wallet.address)}
+                              onClick={() =>
+                                toggleRecipientWalletSelection(wallet.address)
+                              }
                             >
                               {getWalletDisplayName(wallet)}
                             </span>
-                            
-                            {useCustomAmounts && selectedRecipientWallets.includes(wallet.address) ? (
+
+                            {useCustomAmounts &&
+                            selectedRecipientWallets.includes(
+                              wallet.address,
+                            ) ? (
                               <div className="relative w-24 ml-2">
-                                <DollarSign size={12} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-app-secondary" />
+                                <DollarSign
+                                  size={12}
+                                  className="absolute left-2 top-1/2 transform -translate-y-1/2 text-app-secondary"
+                                />
                                 <input
                                   type="text"
                                   value={getWalletAmount(wallet.address)}
@@ -736,8 +849,14 @@ export const FundModal: React.FC<FundModalProps> = ({
                                   onChange={(e) => {
                                     e.stopPropagation();
                                     const value = e.target.value;
-                                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                                      handleWalletAmountChange(wallet.address, value);
+                                    if (
+                                      value === "" ||
+                                      /^\d*\.?\d*$/.test(value)
+                                    ) {
+                                      handleWalletAmountChange(
+                                        wallet.address,
+                                        value,
+                                      );
                                     }
                                   }}
                                   className="w-full pl-6 pr-2 py-1 bg-app-secondary border border-app-primary-30 rounded text-xs text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
@@ -745,45 +864,67 @@ export const FundModal: React.FC<FundModalProps> = ({
                                 />
                               </div>
                             ) : (
-                              <span className="text-xs text-app-secondary font-mono">{formatSolBalance(getWalletBalance(wallet.address) || 0)} SOL</span>
+                              <span className="text-xs text-app-secondary font-mono">
+                                {formatSolBalance(
+                                  getWalletBalance(wallet.address) || 0,
+                                )}{" "}
+                                SOL
+                              </span>
                             )}
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="p-3 text-sm text-app-secondary text-center font-mono">
-                        {searchTerm ? "NO WALLETS FOUND" : "NO WALLETS AVAILABLE"}
+                        {searchTerm
+                          ? "NO WALLETS FOUND"
+                          : "NO WALLETS AVAILABLE"}
                       </div>
                     )}
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs">
                     <span className="text-app-secondary font-mono">
-                      SELECTED: <span className="color-primary font-medium">{selectedRecipientWallets.length}</span> WALLETS
+                      SELECTED:{" "}
+                      <span className="color-primary font-medium">
+                        {selectedRecipientWallets.length}
+                      </span>{" "}
+                      WALLETS
                     </span>
-                    {selectedRecipientWallets.length > 0 && commonAmount && !useCustomAmounts && (
-                      <span className="text-app-secondary font-mono">
-                        EACH RECEIVES: <span className="color-primary font-medium">{commonAmount} SOL</span>
-                      </span>
-                    )}
+                    {selectedRecipientWallets.length > 0 &&
+                      commonAmount &&
+                      !useCustomAmounts && (
+                        <span className="text-app-secondary font-mono">
+                          EACH RECEIVES:{" "}
+                          <span className="color-primary font-medium">
+                            {commonAmount} SOL
+                          </span>
+                        </span>
+                      )}
                   </div>
                 </div>
               </div>
-              
+
               {/* Amount Input and Preview Section */}
               <div className="w-full mx-auto mt-6">
                 {/* Toggle between common and custom amounts */}
                 <div className="flex items-center justify-between mb-2 max-w-md mx-auto">
                   <div className="flex items-center gap-1">
                     <Settings size={14} className="text-app-secondary" />
-                    <span className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">Amount Settings</span>
+                    <span className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
+                      Amount Settings
+                    </span>
                   </div>
                   <div className="flex items-center">
-                    <span className="text-xs text-app-secondary mr-2 font-mono">CUSTOM AMOUNT PER WALLET</span>
-                    <div 
+                    <span className="text-xs text-app-secondary mr-2 font-mono">
+                      CUSTOM AMOUNT PER WALLET
+                    </span>
+                    <div
                       onClick={() => setUseCustomAmounts(!useCustomAmounts)}
-                      className={`w-10 h-5 rounded-full cursor-pointer transition-all duration-200 flex items-center ${useCustomAmounts ? 'bg-app-primary-color' : 'bg-app-tertiary border border-app-primary-30'}`}
+                      className={`w-10 h-5 rounded-full cursor-pointer transition-all duration-200 flex items-center ${useCustomAmounts ? "bg-app-primary-color" : "bg-app-tertiary border border-app-primary-30"}`}
                     >
-                      <div className={`w-4 h-4 rounded-full bg-app-primary transform transition-all duration-200 ${useCustomAmounts ? 'translate-x-5' : 'translate-x-1'}`}></div>
+                      <div
+                        className={`w-4 h-4 rounded-full bg-app-primary transform transition-all duration-200 ${useCustomAmounts ? "translate-x-5" : "translate-x-1"}`}
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -795,10 +936,19 @@ export const FundModal: React.FC<FundModalProps> = ({
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-1">
                           <label className="text-sm font-medium text-app-secondary font-mono uppercase tracking-wider">
-                            <span className="color-primary">&#62;</span> Amount per Wallet <span className="color-primary">&#60;</span>
+                            <span className="color-primary">&#62;</span> Amount
+                            per Wallet{" "}
+                            <span className="color-primary">&#60;</span>
                           </label>
-                          <div className="relative" onMouseEnter={() => setShowInfoTip(true)} onMouseLeave={() => setShowInfoTip(false)}>
-                            <Info size={14} className="text-app-secondary cursor-help" />
+                          <div
+                            className="relative"
+                            onMouseEnter={() => setShowInfoTip(true)}
+                            onMouseLeave={() => setShowInfoTip(false)}
+                          >
+                            <Info
+                              size={14}
+                              className="text-app-secondary cursor-help"
+                            />
                             {showInfoTip && (
                               <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
                                 {modeText.infoTip}
@@ -808,42 +958,59 @@ export const FundModal: React.FC<FundModalProps> = ({
                         </div>
                       </div>
                       <div className="relative">
-                        <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary" />
+                        <DollarSign
+                          size={16}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary"
+                        />
                         <input
                           type="text"
                           value={commonAmount}
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
                               setCommonAmount(value);
                             }
                           }}
                           className={`w-full pl-9 pr-4 py-2.5 bg-app-tertiary border rounded-lg text-app-primary focus:outline-none transition-all duration-200 modal-input- font-mono
-                                    ${hasEnoughBalance ? 'border-app-primary-30 focus-border-primary' : 'border-error-alt'}`}
+                                    ${hasEnoughBalance ? "border-app-primary-30 focus-border-primary" : "border-error-alt"}`}
                           placeholder="0.001"
                         />
                       </div>
                     </div>
-                    
+
                     {/* Real-time preview - in the same row */}
-                    {selectedSenderWallet && commonAmount && selectedRecipientWallets.length > 0 && (
-                      <div className="w-1/2 bg-app-tertiary rounded-lg p-3 border border-app-primary-30 modal-w-full-md modal-mt-4-md">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-app-secondary font-mono">{modeText.totalLabel}</span>
-                          <span className={`text-sm font-semibold font-mono ${hasEnoughBalance ? 'color-primary' : 'text-error-alt'}`}>
-                            {totalAmount.toFixed(4)} SOL
-                          </span>
+                    {selectedSenderWallet &&
+                      commonAmount &&
+                      selectedRecipientWallets.length > 0 && (
+                        <div className="w-1/2 bg-app-tertiary rounded-lg p-3 border border-app-primary-30 modal-w-full-md modal-mt-4-md">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-app-secondary font-mono">
+                              {modeText.totalLabel}
+                            </span>
+                            <span
+                              className={`text-sm font-semibold font-mono ${hasEnoughBalance ? "color-primary" : "text-error-alt"}`}
+                            >
+                              {totalAmount.toFixed(4)} SOL
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-sm text-app-secondary font-mono">
+                              REMAINING BALANCE:
+                            </span>
+                            <span className="text-sm text-app-primary font-mono">
+                              {(senderBalance - totalAmount).toFixed(4)} SOL
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-sm text-app-secondary font-mono">
+                              EACH WALLET RECEIVES:
+                            </span>
+                            <span className="text-sm color-primary font-mono">
+                              {commonAmount} SOL
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-sm text-app-secondary font-mono">REMAINING BALANCE:</span>
-                          <span className="text-sm text-app-primary font-mono">{(senderBalance - totalAmount).toFixed(4)} SOL</span>
-                        </div>
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-sm text-app-secondary font-mono">EACH WALLET RECEIVES:</span>
-                          <span className="text-sm color-primary font-mono">{commonAmount} SOL</span>
-                        </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 )}
 
@@ -854,13 +1021,16 @@ export const FundModal: React.FC<FundModalProps> = ({
                       {/* Quick set common amount control */}
                       <div className="flex items-center gap-2 mb-2">
                         <div className="relative flex-grow">
-                          <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary" />
+                          <DollarSign
+                            size={16}
+                            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary"
+                          />
                           <input
                             type="text"
                             value={commonAmount}
                             onChange={(e) => {
                               const value = e.target.value;
-                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                              if (value === "" || /^\d*\.?\d*$/.test(value)) {
                                 setCommonAmount(value);
                               }
                             }}
@@ -872,38 +1042,52 @@ export const FundModal: React.FC<FundModalProps> = ({
                           onClick={applyCommonAmountToAll}
                           disabled={!commonAmount}
                           className={`whitespace-nowrap px-3 py-2 text-sm rounded-lg transition-all font-mono border
-                                    ${!commonAmount 
-                                      ? 'bg-app-tertiary text-app-secondary-60 border-app-primary-20 cursor-not-allowed' 
-                                      : 'bg-app-tertiary hover-bg-secondary text-app-primary border-app-primary-30 hover-border-primary modal-btn-'}`}
+                                    ${
+                                      !commonAmount
+                                        ? "bg-app-tertiary text-app-secondary-60 border-app-primary-20 cursor-not-allowed"
+                                        : "bg-app-tertiary hover-bg-secondary text-app-primary border-app-primary-30 hover-border-primary modal-btn-"
+                                    }`}
                         >
                           APPLY TO ALL
                         </button>
                       </div>
                     </div>
-                    
+
                     {/* Real-time preview for custom amounts */}
                     {selectedSenderWallet && totalAmount > 0 && (
                       <div className="w-2/5 bg-app-tertiary rounded-lg p-3 border border-app-primary-30 modal-w-full-md modal-mt-4-md">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-app-secondary font-mono">{modeText.totalLabel}</span>
-                          <span className={`text-sm font-semibold font-mono ${hasEnoughBalance ? 'color-primary' : 'text-error-alt'}`}>
+                          <span className="text-sm text-app-secondary font-mono">
+                            {modeText.totalLabel}
+                          </span>
+                          <span
+                            className={`text-sm font-semibold font-mono ${hasEnoughBalance ? "color-primary" : "text-error-alt"}`}
+                          >
                             {totalAmount.toFixed(4)} SOL
                           </span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="text-sm text-app-secondary font-mono">REMAINING BALANCE:</span>
-                          <span className="text-sm text-app-primary font-mono">{(senderBalance - totalAmount).toFixed(4)} SOL</span>
+                          <span className="text-sm text-app-secondary font-mono">
+                            REMAINING BALANCE:
+                          </span>
+                          <span className="text-sm text-app-primary font-mono">
+                            {(senderBalance - totalAmount).toFixed(4)} SOL
+                          </span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="text-sm text-app-secondary font-mono">RECIPIENTS:</span>
-                          <span className="text-sm text-app-primary font-mono">{selectedRecipientWallets.length} WALLETS</span>
+                          <span className="text-sm text-app-secondary font-mono">
+                            RECIPIENTS:
+                          </span>
+                          <span className="text-sm text-app-primary font-mono">
+                            {selectedRecipientWallets.length} WALLETS
+                          </span>
                         </div>
                       </div>
                     )}
                   </div>
                 )}
               </div>
-              
+
               {/* Next/Cancel Buttons */}
               <div className="flex justify-end gap-3 mt-6">
                 <button
@@ -915,23 +1099,29 @@ export const FundModal: React.FC<FundModalProps> = ({
                 <button
                   onClick={() => setCurrentStep(1)}
                   disabled={
-                    !selectedSenderWallet || 
-                    selectedRecipientWallets.length === 0 || 
+                    !selectedSenderWallet ||
+                    selectedRecipientWallets.length === 0 ||
                     !hasEnoughBalance ||
-                    (useCustomAmounts && (totalAmount === 0 || hasEmptyAmounts())) ||
+                    (useCustomAmounts &&
+                      (totalAmount === 0 || hasEmptyAmounts())) ||
                     (!useCustomAmounts && !commonAmount)
                   }
                   className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider text-app-primary
-                            ${!selectedSenderWallet || 
-                              selectedRecipientWallets.length === 0 || 
+                            ${
+                              !selectedSenderWallet ||
+                              selectedRecipientWallets.length === 0 ||
                               !hasEnoughBalance ||
-                              (useCustomAmounts && (totalAmount === 0 || hasEmptyAmounts())) ||
+                              (useCustomAmounts &&
+                                (totalAmount === 0 || hasEmptyAmounts())) ||
                               (!useCustomAmounts && !commonAmount)
-                              ? 'bg-primary-50 cursor-not-allowed opacity-50' 
-                              : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
+                                ? "bg-primary-50 cursor-not-allowed opacity-50"
+                                : "bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-"
+                            }`}
                 >
                   {hasEmptyAmounts() && (
-                    <span className="text-xs mr-2 bg-error-alt-20 text-error-alt px-2 py-0.5 rounded font-mono">MISSING AMOUNTS</span>
+                    <span className="text-xs mr-2 bg-error-alt-20 text-error-alt px-2 py-0.5 rounded font-mono">
+                      MISSING AMOUNTS
+                    </span>
                   )}
                   <span>REVIEW</span>
                   <ChevronRight size={16} className="ml-1" />
@@ -939,73 +1129,114 @@ export const FundModal: React.FC<FundModalProps> = ({
               </div>
             </div>
           )}
-          
+
           {currentStep === 1 && (
             <div className="flex space-x-4 modal-flex-col-lg animate-[fadeIn_0.3s_ease]">
               {/* Left Side - Summary */}
               <div className="w-1/2 space-y-4 modal-w-full-lg">
                 <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">
-                  <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">{modeText.summaryTitle}</h3>
-                  
+                  <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">
+                    {modeText.summaryTitle}
+                  </h3>
+
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-app-secondary font-mono">FROM WALLET:</span>
+                      <span className="text-sm text-app-secondary font-mono">
+                        FROM WALLET:
+                      </span>
                       <div className="flex items-center bg-app-secondary px-2 py-1 rounded border border-app-primary-20">
-                        <span className="text-sm font-mono text-app-primary glitch-text">{getWalletByAddress(selectedSenderWallet) ? getWalletDisplayName(getWalletByAddress(selectedSenderWallet)!) : formatAddress(selectedSenderWallet)}</span>
+                        <span className="text-sm font-mono text-app-primary glitch-text">
+                          {getWalletByAddress(selectedSenderWallet)
+                            ? getWalletDisplayName(
+                                getWalletByAddress(selectedSenderWallet)!,
+                              )
+                            : formatAddress(selectedSenderWallet)}
+                        </span>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-app-secondary font-mono">WALLET BALANCE:</span>
-                      <span className="text-sm text-app-primary font-mono">{formatSolBalance(senderBalance)} SOL</span>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-app-secondary font-mono">RECIPIENTS:</span>
-                      <span className="text-sm text-app-primary font-mono">{selectedRecipientWallets.length} WALLETS</span>
+                      <span className="text-sm text-app-secondary font-mono">
+                        WALLET BALANCE:
+                      </span>
+                      <span className="text-sm text-app-primary font-mono">
+                        {formatSolBalance(senderBalance)} SOL
+                      </span>
                     </div>
-                    
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-app-secondary font-mono">
+                        RECIPIENTS:
+                      </span>
+                      <span className="text-sm text-app-primary font-mono">
+                        {selectedRecipientWallets.length} WALLETS
+                      </span>
+                    </div>
+
                     {!useCustomAmounts && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-app-secondary font-mono">AMOUNT PER WALLET:</span>
-                        <span className="text-sm color-primary font-medium font-mono">{commonAmount} SOL</span>
+                        <span className="text-sm text-app-secondary font-mono">
+                          AMOUNT PER WALLET:
+                        </span>
+                        <span className="text-sm color-primary font-medium font-mono">
+                          {commonAmount} SOL
+                        </span>
                       </div>
                     )}
-                    
+
                     {useCustomAmounts && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-app-secondary font-mono">CUSTOM AMOUNTS:</span>
-                        <span className="text-sm color-primary font-medium font-mono">YES</span>
+                        <span className="text-sm text-app-secondary font-mono">
+                          CUSTOM AMOUNTS:
+                        </span>
+                        <span className="text-sm color-primary font-medium font-mono">
+                          YES
+                        </span>
                       </div>
                     )}
-                    
+
                     <div className="pt-2 border-t border-app-primary-20 flex items-center justify-between">
-                      <span className="text-sm font-medium text-app-secondary font-mono">{modeText.totalLabel}</span>
-                      <span className="text-sm font-semibold color-primary font-mono">{totalAmount.toFixed(4)} SOL</span>
+                      <span className="text-sm font-medium text-app-secondary font-mono">
+                        {modeText.totalLabel}
+                      </span>
+                      <span className="text-sm font-semibold color-primary font-mono">
+                        {totalAmount.toFixed(4)} SOL
+                      </span>
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-app-secondary font-mono">REMAINING BALANCE:</span>
-                      <span className="text-sm text-app-primary font-mono">{(senderBalance - totalAmount).toFixed(4)} SOL</span>
+                      <span className="text-sm text-app-secondary font-mono">
+                        REMAINING BALANCE:
+                      </span>
+                      <span className="text-sm text-app-primary font-mono">
+                        {(senderBalance - totalAmount).toFixed(4)} SOL
+                      </span>
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Confirmation Checkbox */}
                 <div className="flex items-center px-3 py-3 bg-app-tertiary rounded-lg border border-app-primary-30">
-                  <div 
+                  <div
                     className="flex items-center cursor-pointer"
                     onClick={() => setIsConfirmed(!isConfirmed)}
                   >
                     <div className="relative mx-1">
-                      <div 
+                      <div
                         className="w-5 h-5 border border-app-primary-40 rounded peer-checked:bg-app-primary-color peer-checked:border-0 transition-all cursor-pointer"
                         style={{
-                          backgroundColor: isConfirmed ? 'var(--color-primary)' : 'transparent',
-                          borderColor: isConfirmed ? 'var(--color-primary)' : 'var(--color-primary-40)'
+                          backgroundColor: isConfirmed
+                            ? "var(--color-primary)"
+                            : "transparent",
+                          borderColor: isConfirmed
+                            ? "var(--color-primary)"
+                            : "var(--color-primary-40)",
                         }}
                       ></div>
-                      <CheckCircle size={14} className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? 'opacity-100' : 'opacity-0'}`} />
+                      <CheckCircle
+                        size={14}
+                        className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? "opacity-100" : "opacity-0"}`}
+                      />
                     </div>
                     <span className="text-app-primary text-sm ml-2 cursor-pointer select-none font-mono">
                       {modeText.confirmText}
@@ -1013,27 +1244,46 @@ export const FundModal: React.FC<FundModalProps> = ({
                   </div>
                 </div>
               </div>
-              
+
               {/* Right Side - Recipients List */}
               <div className="w-1/2 modal-w-full-lg modal-mt-4-lg">
                 <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30 h-full">
-                  <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">SELECTED RECIPIENTS</h3>
-                  
+                  <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">
+                    SELECTED RECIPIENTS
+                  </h3>
+
                   <div className="max-h-64 overflow-y-auto pr-1 scrollbar-thin">
                     {selectedRecipientWallets.length > 0 ? (
                       selectedRecipientWallets.map((address, index) => {
                         const wallet = getWalletByAddress(address);
-                        const amount = useCustomAmounts ? getWalletAmount(address) : commonAmount;
-                        
+                        const amount = useCustomAmounts
+                          ? getWalletAmount(address)
+                          : commonAmount;
+
                         return wallet ? (
-                          <div key={wallet.id} className="flex items-center justify-between py-1.5 border-b border-app-primary-20 last:border-b-0">
+                          <div
+                            key={wallet.id}
+                            className="flex items-center justify-between py-1.5 border-b border-app-primary-20 last:border-b-0"
+                          >
                             <div className="flex items-center">
-                              <span className="text-app-secondary text-xs mr-2 w-6 font-mono">{index + 1}.</span>
-                              <span className="font-mono text-sm text-app-primary glitch-text">{getWalletDisplayName(wallet)}</span>
+                              <span className="text-app-secondary text-xs mr-2 w-6 font-mono">
+                                {index + 1}.
+                              </span>
+                              <span className="font-mono text-sm text-app-primary glitch-text">
+                                {getWalletDisplayName(wallet)}
+                              </span>
                             </div>
                             <div className="flex items-center">
-                              <span className="text-xs text-app-secondary mr-2 font-mono">CURRENT: {formatSolBalance(getWalletBalance(wallet.address) || 0)} SOL</span>
-                              <span className="text-xs color-primary font-mono">+{amount} SOL</span>
+                              <span className="text-xs text-app-secondary mr-2 font-mono">
+                                CURRENT:{" "}
+                                {formatSolBalance(
+                                  getWalletBalance(wallet.address) || 0,
+                                )}{" "}
+                                SOL
+                              </span>
+                              <span className="text-xs color-primary font-mono">
+                                +{amount} SOL
+                              </span>
                             </div>
                           </div>
                         ) : null;
@@ -1048,7 +1298,7 @@ export const FundModal: React.FC<FundModalProps> = ({
               </div>
             </div>
           )}
-          
+
           {/* Back/Fund Buttons */}
           {currentStep === 1 && (
             <div className="flex justify-end gap-3 mt-6">
@@ -1061,10 +1311,12 @@ export const FundModal: React.FC<FundModalProps> = ({
               <button
                 onClick={handleFund}
                 disabled={!isConfirmed || isSubmitting}
-                className={`px-5 py-2.5 text-app-primary rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider 
-                          ${!isConfirmed || isSubmitting
-                            ? 'bg-primary-50 cursor-not-allowed opacity-50' 
-                            : 'bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
+                className={`px-5 py-2.5 text-app-primary rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider
+                          ${
+                            !isConfirmed || isSubmitting
+                              ? "bg-primary-50 cursor-not-allowed opacity-50"
+                              : "bg-app-primary-color hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-"
+                          }`}
               >
                 {isSubmitting ? (
                   <>
@@ -1078,11 +1330,8 @@ export const FundModal: React.FC<FundModalProps> = ({
             </div>
           )}
         </div>
-
-
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
-

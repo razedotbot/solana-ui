@@ -1,6 +1,6 @@
 /**
  * WebSocket Type Definitions
- * 
+ *
  * This module contains all WebSocket and real-time communication
  * type definitions for the Solana trading application, including
  * message types, trade data, and connection configurations.
@@ -15,7 +15,7 @@
  */
 export interface WebSocketWelcomeMessage {
   /** Message type identifier */
-  type: 'welcome';
+  type: "welcome";
   /** Optional welcome message text */
   message?: string;
 }
@@ -25,7 +25,7 @@ export interface WebSocketWelcomeMessage {
  */
 export interface WebSocketConnectionMessage {
   /** Message type identifier */
-  type: 'connection';
+  type: "connection";
   /** Unique client identifier assigned by server */
   clientId?: string;
 }
@@ -35,7 +35,7 @@ export interface WebSocketConnectionMessage {
  */
 export interface WebSocketSubscriptionMessage {
   /** Message type identifier */
-  type: 'subscription_confirmed' | 'event_subscription_confirmed';
+  type: "subscription_confirmed" | "event_subscription_confirmed";
   /** List of subscribed signer addresses */
   signers?: string[];
 }
@@ -45,7 +45,7 @@ export interface WebSocketSubscriptionMessage {
  */
 export interface WebSocketTradeMessage {
   /** Message type identifier */
-  type: 'trade' | 'transaction';
+  type: "trade" | "transaction";
   /** Transaction data object */
   transaction?: TradeTransactionData;
   /** Alternative data field for transaction */
@@ -70,7 +70,7 @@ export interface WebSocketTradeMessage {
  */
 export interface WebSocketErrorMessage {
   /** Message type identifier */
-  type: 'error';
+  type: "error";
   /** Error message text */
   message?: string;
   /** Alternative error field */
@@ -80,11 +80,11 @@ export interface WebSocketErrorMessage {
 /**
  * Union type of all WebSocket message types
  */
-export type WebSocketMessage = 
-  | WebSocketWelcomeMessage 
-  | WebSocketConnectionMessage 
-  | WebSocketSubscriptionMessage 
-  | WebSocketTradeMessage 
+export type WebSocketMessage =
+  | WebSocketWelcomeMessage
+  | WebSocketConnectionMessage
+  | WebSocketSubscriptionMessage
+  | WebSocketTradeMessage
   | WebSocketErrorMessage;
 
 // ============================================================================
@@ -138,7 +138,7 @@ export interface TradeTransactionData {
  */
 export interface AutomateTrade {
   /** Trade type (buy or sell) */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Trader wallet address */
   address: string;
   /** Amount of tokens traded */
@@ -215,7 +215,7 @@ export interface MultiTokenWebSocketConfig {
  */
 export interface CopyTradeData {
   /** Trade type (buy or sell) */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Address of the trader being copied */
   signerAddress: string;
   /** Token mint address */
@@ -259,12 +259,12 @@ export interface CopyTradeWebSocketConfig {
 /**
  * WebSocket connection state
  */
-export type WebSocketConnectionState = 
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'reconnecting'
-  | 'error';
+export type WebSocketConnectionState =
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "reconnecting"
+  | "error";
 
 /**
  * WebSocket connection status information
@@ -291,7 +291,7 @@ export interface WebSocketStatus {
  */
 export interface TokenSubscriptionRequest {
   /** Action type */
-  action: 'subscribe' | 'unsubscribe';
+  action: "subscribe" | "unsubscribe";
   /** Token mint address */
   tokenMint: string;
 }
@@ -301,7 +301,7 @@ export interface TokenSubscriptionRequest {
  */
 export interface SignerSubscriptionRequest {
   /** Action type */
-  action: 'subscribe' | 'unsubscribe';
+  action: "subscribe" | "unsubscribe";
   /** List of signer addresses */
   signers: string[];
 }
@@ -309,8 +309,8 @@ export interface SignerSubscriptionRequest {
 /**
  * Union type of subscription requests
  */
-export type WebSocketSubscriptionRequest = 
-  | TokenSubscriptionRequest 
+export type WebSocketSubscriptionRequest =
+  | TokenSubscriptionRequest
   | SignerSubscriptionRequest;
 
 // ============================================================================
@@ -379,21 +379,4 @@ export interface WebSocketAuthConfig {
   apiKey: string;
   /** Whether to include key in URL query params */
   useQueryParam?: boolean;
-}
-
-/**
- * Authentication error codes
- */
-export type WebSocketAuthErrorCode = 1003 | 1008;
-
-/**
- * Authentication error information
- */
-export interface WebSocketAuthError {
-  /** Error code */
-  code: WebSocketAuthErrorCode;
-  /** Error reason/message */
-  reason: string;
-  /** Whether this is an authentication error */
-  isAuthError: boolean;
 }

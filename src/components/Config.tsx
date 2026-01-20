@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { X, Settings, CreditCard, BookOpen } from 'lucide-react';
-import type { ConfigType } from '../Utils';
-import { RPCEndpointManager } from './RPCEndpointManager';
-import { createDefaultEndpoints, type RPCEndpoint } from '../utils/rpcManager';
+import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
+import { X, Settings, CreditCard, BookOpen } from "lucide-react";
+import type { ConfigType } from "../utils/types";
+import { RPCEndpointManager } from "./RPCEndpointManager";
+import { createDefaultEndpoints, type RPCEndpoint } from "../utils/rpcManager";
 
 interface ConfigProps {
   isOpen: boolean;
@@ -20,49 +20,49 @@ const Config: React.FC<ConfigProps> = ({
   config,
   onConfigChange,
   onSave,
-  onShowTutorial
+  onShowTutorial,
 }) => {
   // Add  styles when the modal is opened
   useEffect(() => {
     if (isOpen) {
-      const styleElement = document.createElement('style');
+      const styleElement = document.createElement("style");
       styleElement.textContent = `
         @keyframes config-pulse {
           0% { box-shadow: 0 0 5px rgba(2, 179, 109, 0.5), 0 0 15px rgba(2, 179, 109, 0.2); }
           50% { box-shadow: 0 0 15px rgba(2, 179, 109, 0.8), 0 0 25px rgba(2, 179, 109, 0.4); }
           100% { box-shadow: 0 0 5px rgba(2, 179, 109, 0.5), 0 0 15px rgba(2, 179, 109, 0.2); }
         }
-        
+
         @keyframes config-fade-in {
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
-        
+
         @keyframes config-slide-up {
           0% { transform: translateY(20px); opacity: 0; }
           100% { transform: translateY(0); opacity: 1; }
         }
-        
+
         @keyframes config-scan-line {
           0% { transform: translateY(-100%); opacity: 0.3; }
           100% { transform: translateY(100%); opacity: 0; }
         }
-        
+
         .config-container {
           animation: config-fade-in 0.3s ease;
         }
-        
+
         .config-content {
           animation: config-slide-up 0.4s ease;
           position: relative;
         }
-        
+
         .config-content::before {
           content: "";
           position: absolute;
           width: 100%;
           height: 5px;
-          background: linear-gradient(to bottom, 
+          background: linear-gradient(to bottom,
             transparent 0%,
             rgba(2, 179, 109, 0.2) 50%,
             transparent 100%);
@@ -70,22 +70,22 @@ const Config: React.FC<ConfigProps> = ({
           animation: config-scan-line 8s linear infinite;
           pointer-events: none;
         }
-        
+
         .config-glow {
           animation: config-pulse 4s infinite;
         }
-        
+
         .config-input-:focus {
           box-shadow: 0 0 0 1px rgba(2, 179, 109, 0.7), 0 0 15px rgba(2, 179, 109, 0.5);
           transition: all 0.3s ease;
         }
-        
+
         .config-btn- {
           position: relative;
           overflow: hidden;
           transition: all 0.3s ease;
         }
-        
+
         .config-btn-::after {
           content: "";
           position: absolute;
@@ -103,21 +103,21 @@ const Config: React.FC<ConfigProps> = ({
           transition: all 0.5s ease;
           opacity: 0;
         }
-        
+
         .config-btn-:hover::after {
           opacity: 1;
           transform: rotate(45deg) translate(50%, 50%);
         }
-        
+
         .config-btn-:active {
           transform: scale(0.95);
         }
-        
+
         .glitch-text:hover {
           text-shadow: 0 0 2px #02b36d, 0 0 4px #02b36d;
           animation: glitch 2s infinite;
         }
-        
+
         @keyframes glitch {
           2%, 8% { transform: translate(-2px, 0) skew(0.3deg); }
           4%, 6% { transform: translate(2px, 0) skew(-0.3deg); }
@@ -126,17 +126,17 @@ const Config: React.FC<ConfigProps> = ({
         }
       `;
       document.head.appendChild(styleElement);
-      
+
       // Add a class to the body to prevent scrolling when modal is open
-      document.body.style.overflow = 'hidden';
-      
+      document.body.style.overflow = "hidden";
+
       return () => {
         // Safely remove style element if it's still a child
         if (styleElement.parentNode === document.head) {
           document.head.removeChild(styleElement);
         }
         // Restore scrolling when modal is closed
-        document.body.style.overflow = '';
+        document.body.style.overflow = "";
       };
     }
     return undefined;
@@ -145,27 +145,27 @@ const Config: React.FC<ConfigProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div 
-      className="fixed inset-0 flex items-center justify-center backdrop-blur-sm config-container" 
+    <div
+      className="fixed inset-0 flex items-center justify-center backdrop-blur-sm config-container"
       style={{
-        backgroundColor: 'rgba(5, 10, 14, 0.85)',
+        backgroundColor: "rgba(5, 10, 14, 0.85)",
         zIndex: 9999, // Extremely high z-index to ensure it's on top
       }}
     >
-      <div 
+      <div
         className="relative bg-[#050a0e] border border-[#02b36d40] rounded-lg shadow-lg w-full max-w-md overflow-hidden transform config-content config-glow"
         style={{ zIndex: 10000 }} // Even higher z-index for the modal content
       >
         {/* Ambient grid background */}
-        <div 
+        <div
           className="absolute inset-0 z-0 opacity-10"
           style={{
-            backgroundImage: 'linear-gradient(rgba(2, 179, 109, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(2, 179, 109, 0.2) 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
-            backgroundPosition: 'center center',
+            backgroundImage:
+              "linear-gradient(rgba(2, 179, 109, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(2, 179, 109, 0.2) 1px, transparent 1px)",
+            backgroundSize: "20px 20px",
+            backgroundPosition: "center center",
           }}
-        >
-        </div>
+        ></div>
 
         {/* Header */}
         <div className="relative z-10 p-4 flex justify-between items-center border-b border-[#02b36d40]">
@@ -174,10 +174,11 @@ const Config: React.FC<ConfigProps> = ({
               <Settings size={16} className="text-[#02b36d]" />
             </div>
             <h2 className="text-lg font-semibold text-[#e4fbf2] font-mono">
-              <span className="text-[#02b36d]">/</span> SYSTEM CONFIG <span className="text-[#02b36d]">/</span>
+              <span className="text-[#02b36d]">/</span> SYSTEM CONFIG{" "}
+              <span className="text-[#02b36d]">/</span>
             </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-[#7ddfbd] hover:text-[#02b36d] transition-colors p-1 hover:bg-[#02b36d20] rounded"
           >
@@ -191,19 +192,20 @@ const Config: React.FC<ConfigProps> = ({
             <RPCEndpointManager
               endpoints={
                 config.rpcEndpoints
-                  ? JSON.parse(config.rpcEndpoints) as RPCEndpoint[]
+                  ? (JSON.parse(config.rpcEndpoints) as RPCEndpoint[])
                   : createDefaultEndpoints()
               }
               onChange={(endpoints) => {
-                onConfigChange('rpcEndpoints', JSON.stringify(endpoints));
+                onConfigChange("rpcEndpoints", JSON.stringify(endpoints));
               }}
             />
           </div>
-          
+
           <div className="group animate-[fadeIn_0.4s_ease]">
             <div className="flex items-center gap-1 mb-2">
               <label className="text-sm font-medium text-[#7ddfbd] group-hover:text-[#02b36d] transition-colors duration-200 font-mono uppercase tracking-wider">
-                <span className="text-[#02b36d]">&#62;</span> Transaction Fee (SOL) <span className="text-[#02b36d]">&#60;</span>
+                <span className="text-[#02b36d]">&#62;</span> Transaction Fee
+                (SOL) <span className="text-[#02b36d]">&#60;</span>
               </label>
               <CreditCard size={14} className="text-[#7ddfbd]" />
             </div>
@@ -211,7 +213,9 @@ const Config: React.FC<ConfigProps> = ({
               <input
                 type="number"
                 value={config.transactionFee}
-                onChange={(e) => onConfigChange('transactionFee', e.target.value)}
+                onChange={(e) =>
+                  onConfigChange("transactionFee", e.target.value)
+                }
                 className="w-full px-4 py-2.5 bg-[#091217] border border-[#02b36d30] rounded-lg text-[#e4fbf2] shadow-inner focus:border-[#02b36d] focus:ring-1 focus:ring-[#02b36d50] focus:outline-none transition-all duration-200 config-input- font-mono tracking-wider"
                 step="0.000001"
                 min="0"
@@ -220,7 +224,7 @@ const Config: React.FC<ConfigProps> = ({
               <div className="absolute inset-0 rounded-lg pointer-events-none border border-transparent group-hover:border-[#02b36d30] transition-all duration-300"></div>
             </div>
           </div>
-          
+
           {onShowTutorial && (
             <div className="group animate-[fadeIn_0.45s_ease]">
               <button
@@ -235,7 +239,7 @@ const Config: React.FC<ConfigProps> = ({
               </button>
             </div>
           )}
-          
+
           <div className="pt-4 animate-[fadeIn_0.5s_ease]">
             <button
               onClick={onSave}
@@ -245,11 +249,9 @@ const Config: React.FC<ConfigProps> = ({
             </button>
           </div>
         </div>
-        
-
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };
 

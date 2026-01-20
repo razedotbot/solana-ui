@@ -3,14 +3,18 @@
  * Handles wallet creation, import, and manipulation operations.
  */
 
-import type { Connection } from '@solana/web3.js';
-import { Keypair, PublicKey } from '@solana/web3.js';
-import bs58 from 'bs58';
-import { encryptData, decryptData } from './encryption';
-import { deriveWalletFromMnemonic } from './hdWallet';
-import { formatAddress } from './formatting';
-import { loadWalletsFromCookies, saveMasterWallets, loadMasterWallets } from './storage';
-import type { WalletType, WalletCategory, MasterWallet } from './types';
+import type { Connection } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
+import bs58 from "bs58";
+import { encryptData, decryptData } from "./encryption";
+import { deriveWalletFromMnemonic } from "./hdWallet";
+import { formatAddress } from "./formatting";
+import {
+  loadWalletsFromCookies,
+  saveMasterWallets,
+  loadMasterWallets,
+} from "./storage";
+import type { WalletType, WalletCategory, MasterWallet } from "./types";
 
 // ============= ID Generation =============
 
@@ -28,7 +32,7 @@ export function generateWalletId(): number {
  */
 export function toggleWallet(wallets: WalletType[], id: number): WalletType[] {
   return wallets.map((wallet) =>
-    wallet.id === id ? { ...wallet, isActive: !wallet.isActive } : wallet
+    wallet.id === id ? { ...wallet, isActive: !wallet.isActive } : wallet,
   );
 }
 
@@ -52,30 +56,31 @@ export function createNewWallet(): WalletType {
     address,
     privateKey,
     isActive: false,
-    category: 'Medium',
-    source: 'imported',
+    category: "Medium",
+    source: "imported",
   };
 }
 
 /**
  * Import a wallet from a private key string.
  */
-export function importWallet(
-  privateKeyString: string
-): { wallet: WalletType | null; error?: string } {
+export function importWallet(privateKeyString: string): {
+  wallet: WalletType | null;
+  error?: string;
+} {
   try {
     if (!privateKeyString.trim()) {
-      return { wallet: null, error: 'Private key cannot be empty' };
+      return { wallet: null, error: "Private key cannot be empty" };
     }
 
     let privateKeyBytes;
     try {
       privateKeyBytes = bs58.decode(privateKeyString);
       if (privateKeyBytes.length !== 64) {
-        return { wallet: null, error: 'Invalid private key length' };
+        return { wallet: null, error: "Invalid private key length" };
       }
     } catch {
-      return { wallet: null, error: 'Invalid private key format' };
+      return { wallet: null, error: "Invalid private key format" };
     }
 
     const keypair = Keypair.fromSecretKey(privateKeyBytes);
@@ -86,14 +91,14 @@ export function importWallet(
       address,
       privateKey: privateKeyString,
       isActive: false,
-      category: 'Medium',
-      source: 'imported',
+      category: "Medium",
+      source: "imported",
     };
 
     return { wallet };
   } catch (error) {
-    console.error('Error importing wallet:', error);
-    return { wallet: null, error: 'Failed to import wallet' };
+    console.error("Error importing wallet:", error);
+    return { wallet: null, error: "Failed to import wallet" };
   }
 }
 
@@ -113,7 +118,7 @@ export function getWallets(): WalletType[] {
   try {
     return loadWalletsFromCookies();
   } catch (error) {
-    console.error('Error loading wallets:', error);
+    console.error("Error loading wallets:", error);
     return [];
   }
 }
@@ -126,7 +131,7 @@ export function getActiveWallets(): WalletType[] {
     const wallets = loadWalletsFromCookies();
     return wallets.filter((wallet: WalletType) => wallet.isActive);
   } catch (error) {
-    console.error('Error loading active wallets from cookies:', error);
+    console.error("Error loading active wallets from cookies:", error);
     return [];
   }
 }
@@ -137,10 +142,10 @@ export function getActiveWallets(): WalletType[] {
 export function getActiveWalletPrivateKeys(): string {
   try {
     const activeWallets = getActiveWallets();
-    return activeWallets.map((wallet) => wallet.privateKey).join(',');
+    return activeWallets.map((wallet) => wallet.privateKey).join(",");
   } catch (error) {
-    console.error('Error getting private keys:', error);
-    return '';
+    console.error("Error getting private keys:", error);
+    return "";
   }
 }
 
@@ -152,7 +157,7 @@ export function getActiveWalletPrivateKeys(): string {
 export function createMasterWallet(
   name: string,
   mnemonic: string,
-  color?: string
+  color?: string,
 ): MasterWallet {
   const encryptedMnemonic = encryptData(mnemonic);
 
@@ -173,8 +178,8 @@ export function getMasterWalletMnemonic(masterWallet: MasterWallet): string {
   try {
     return decryptData(masterWallet.encryptedMnemonic);
   } catch (error) {
-    console.error('Error decrypting master wallet mnemonic:', error);
-    throw new Error('Failed to decrypt mnemonic');
+    console.error("Error decrypting master wallet mnemonic:", error);
+    throw new Error("Failed to decrypt mnemonic");
   }
 }
 
@@ -184,10 +189,10 @@ export function getMasterWalletMnemonic(masterWallet: MasterWallet): string {
 export function updateMasterWalletAccountCount(
   masterWallets: MasterWallet[],
   masterWalletId: string,
-  accountCount: number
+  accountCount: number,
 ): MasterWallet[] {
   return masterWallets.map((mw) =>
-    mw.id === masterWalletId ? { ...mw, accountCount } : mw
+    mw.id === masterWalletId ? { ...mw, accountCount } : mw,
   );
 }
 
@@ -196,7 +201,7 @@ export function updateMasterWalletAccountCount(
  */
 export function deleteMasterWallet(
   masterWallets: MasterWallet[],
-  masterWalletId: string
+  masterWalletId: string,
 ): MasterWallet[] {
   return masterWallets.filter((mw) => mw.id !== masterWalletId);
 }
@@ -207,7 +212,7 @@ export function deleteMasterWallet(
 export function createHDWalletFromMaster(
   masterWallet: MasterWallet,
   accountIndex: number,
-  category: WalletCategory = 'Medium'
+  category: WalletCategory = "Medium",
 ): WalletType {
   const mnemonic = getMasterWalletMnemonic(masterWallet);
   const derived = deriveWalletFromMnemonic(mnemonic, accountIndex);
@@ -218,7 +223,7 @@ export function createHDWalletFromMaster(
     privateKey: derived.privateKey,
     isActive: false,
     category,
-    source: 'hd-derived',
+    source: "hd-derived",
     masterWalletId: masterWallet.id,
     derivationIndex: accountIndex,
   };
@@ -233,7 +238,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('RPC request timeout')), timeoutMs)
+      setTimeout(() => reject(new Error("RPC request timeout")), timeoutMs),
     ),
   ]);
 }
@@ -244,7 +249,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 export async function fetchTokenBalance(
   connection: Connection,
   walletAddress: string,
-  tokenMint: string
+  tokenMint: string,
 ): Promise<number> {
   try {
     const walletPublicKey = new PublicKey(walletAddress);
@@ -254,9 +259,9 @@ export async function fetchTokenBalance(
       connection.getParsedTokenAccountsByOwner(
         walletPublicKey,
         { mint: tokenMintPublicKey },
-        'processed'
+        "processed",
       ),
-      1000
+      1000,
     );
 
     if (tokenAccounts.value.length === 0) return 0;
@@ -267,7 +272,7 @@ export async function fetchTokenBalance(
     const balance = parsedData.info.tokenAmount.uiAmount;
     return balance || 0;
   } catch (error) {
-    console.error('Error fetching token balance:', error);
+    console.error("Error fetching token balance:", error);
     return 0;
   }
 }
@@ -277,17 +282,17 @@ export async function fetchTokenBalance(
  */
 export async function fetchSolBalance(
   connection: Connection,
-  walletAddress: string
+  walletAddress: string,
 ): Promise<number> {
   try {
     const publicKey = new PublicKey(walletAddress);
     const balance = await withTimeout(
-      connection.getBalance(publicKey, 'processed'),
-      1000
+      connection.getBalance(publicKey, "processed"),
+      1000,
     );
     return balance / 1e9;
   } catch (error) {
-    console.error('Error fetching SOL balance:', error);
+    console.error("Error fetching SOL balance:", error);
     return 0;
   }
 }
@@ -298,7 +303,7 @@ export async function fetchSolBalance(
 export async function refreshWalletBalance(
   wallet: WalletType,
   connection: Connection,
-  tokenAddress?: string
+  tokenAddress?: string,
 ): Promise<WalletType> {
   try {
     if (!tokenAddress) return wallet;
@@ -306,7 +311,7 @@ export async function refreshWalletBalance(
     const tokenBalance = await fetchTokenBalance(
       connection,
       wallet.address,
-      tokenAddress
+      tokenAddress,
     );
 
     return {
@@ -314,7 +319,7 @@ export async function refreshWalletBalance(
       tokenBalance: tokenBalance,
     };
   } catch (error) {
-    console.error('Error refreshing wallet balance:', error);
+    console.error("Error refreshing wallet balance:", error);
     return wallet;
   }
 }
@@ -322,7 +327,7 @@ export async function refreshWalletBalance(
 /**
  * Balance refresh strategy type.
  */
-export type BalanceRefreshStrategy = 'sequential' | 'batch' | 'parallel';
+export type BalanceRefreshStrategy = "sequential" | "batch" | "parallel";
 
 /**
  * Options for balance refresh.
@@ -347,36 +352,42 @@ export async function fetchWalletBalances(
   setTokenBalances: (balances: Map<string, number>) => void,
   currentSolBalances?: Map<string, number>,
   currentTokenBalances?: Map<string, number>,
-  onlyIfZeroOrNullOrOptions: boolean | BalanceRefreshOptions = false
+  onlyIfZeroOrNullOrOptions: boolean | BalanceRefreshOptions = false,
 ): Promise<{
   solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
 }> {
   const options: BalanceRefreshOptions =
-    typeof onlyIfZeroOrNullOrOptions === 'boolean'
+    typeof onlyIfZeroOrNullOrOptions === "boolean"
       ? { onlyIfZeroOrNull: onlyIfZeroOrNullOrOptions }
       : onlyIfZeroOrNullOrOptions;
 
   const {
-    strategy = 'batch',
+    strategy = "batch",
     batchSize = 5,
     delay = 50,
     onlyIfZeroOrNull = false,
   } = options;
 
-  const newSolBalances = new Map(currentSolBalances || new Map<string, number>());
-  const newTokenBalances = new Map(currentTokenBalances || new Map<string, number>());
+  const newSolBalances = new Map(
+    currentSolBalances || new Map<string, number>(),
+  );
+  const newTokenBalances = new Map(
+    currentTokenBalances || new Map<string, number>(),
+  );
 
   const isRpcManager =
-    typeof connectionOrRpcManager === 'object' &&
-    'createConnection' in connectionOrRpcManager;
+    typeof connectionOrRpcManager === "object" &&
+    "createConnection" in connectionOrRpcManager;
 
   const processWallet = async (wallet: WalletType): Promise<void> => {
     try {
       let connection: Connection;
       if (isRpcManager) {
         connection = await (
-          connectionOrRpcManager as { createConnection: () => Promise<Connection> }
+          connectionOrRpcManager as {
+            createConnection: () => Promise<Connection>;
+          }
         ).createConnection();
       } else {
         connection = connectionOrRpcManager;
@@ -406,7 +417,7 @@ export async function fetchWalletBalances(
           const tokenBalance = await fetchTokenBalance(
             connection,
             wallet.address,
-            tokenAddress
+            tokenAddress,
           );
           newTokenBalances.set(wallet.address, tokenBalance);
         }
@@ -424,7 +435,7 @@ export async function fetchWalletBalances(
   };
 
   switch (strategy) {
-    case 'sequential': {
+    case "sequential": {
       for (let i = 0; i < wallets.length; i++) {
         await processWallet(wallets[i]);
         updateState();
@@ -435,7 +446,7 @@ export async function fetchWalletBalances(
       break;
     }
 
-    case 'batch': {
+    case "batch": {
       for (let i = 0; i < wallets.length; i += batchSize) {
         const batch = wallets.slice(i, Math.min(i + batchSize, wallets.length));
         await Promise.all(batch.map((wallet) => processWallet(wallet)));
@@ -447,7 +458,7 @@ export async function fetchWalletBalances(
       break;
     }
 
-    case 'parallel': {
+    case "parallel": {
       await Promise.all(wallets.map((wallet) => processWallet(wallet)));
       updateState();
       break;
@@ -475,19 +486,19 @@ export async function fetchWalletBalances(
  */
 export function handleSortWallets(
   wallets: WalletType[],
-  sortDirection: 'asc' | 'desc',
-  setSortDirection: (direction: 'asc' | 'desc') => void,
+  sortDirection: "asc" | "desc",
+  setSortDirection: (direction: "asc" | "desc") => void,
   solBalances: Map<string, number>,
-  setWallets: (wallets: WalletType[]) => void
+  setWallets: (wallets: WalletType[]) => void,
 ): void {
-  const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+  const newDirection = sortDirection === "asc" ? "desc" : "asc";
   setSortDirection(newDirection);
 
   const sortedWallets = [...wallets].sort((a, b) => {
     const balanceA = solBalances.get(a.address) || 0;
     const balanceB = solBalances.get(b.address) || 0;
 
-    if (newDirection === 'asc') {
+    if (newDirection === "asc") {
       return balanceA - balanceB;
     } else {
       return balanceB - balanceA;
@@ -505,7 +516,7 @@ export function handleCleanupWallets(
   solBalances: Map<string, number>,
   tokenBalances: Map<string, number>,
   setWallets: (wallets: WalletType[]) => void,
-  showToast: (message: string, type: 'success' | 'error') => void
+  showToast: (message: string, type: "success" | "error") => void,
 ): void {
   const seenAddresses = new Set<string>();
   let emptyCount = 0;
@@ -532,14 +543,16 @@ export function handleCleanupWallets(
   if (emptyCount > 0 || duplicateCount > 0) {
     const messages: string[] = [];
     if (emptyCount > 0) {
-      messages.push(`${emptyCount} empty wallet${emptyCount === 1 ? '' : 's'}`);
+      messages.push(`${emptyCount} empty wallet${emptyCount === 1 ? "" : "s"}`);
     }
     if (duplicateCount > 0) {
-      messages.push(`${duplicateCount} duplicate${duplicateCount === 1 ? '' : 's'}`);
+      messages.push(
+        `${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}`,
+      );
     }
-    showToast(`Removed ${messages.join(' and ')}`, 'success');
+    showToast(`Removed ${messages.join(" and ")}`, "success");
   } else {
-    showToast('No empty wallets or duplicates found', 'success');
+    showToast("No empty wallets or duplicates found", "success");
   }
 
   setWallets(cleanedWallets);
@@ -552,14 +565,14 @@ export function handleCleanupWallets(
  */
 export async function copyToClipboard(
   text: string,
-  showToast: (message: string, type: 'success' | 'error') => void
+  showToast: (message: string, type: "success" | "error") => void,
 ): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
-    showToast('Copied successfully', 'success');
+    showToast("Copied successfully", "success");
     return true;
   } catch (error) {
-    console.error('Failed to copy:', error);
+    console.error("Failed to copy:", error);
     return false;
   }
 }
@@ -568,9 +581,9 @@ export async function copyToClipboard(
  * Download a single wallet's private key.
  */
 export function downloadPrivateKey(wallet: WalletType): void {
-  const blob = new Blob([wallet.privateKey], { type: 'text/plain' });
+  const blob = new Blob([wallet.privateKey], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = `wallet-${wallet.address.slice(0, 8)}.key`;
   document.body.appendChild(a);
@@ -585,18 +598,41 @@ export function downloadPrivateKey(wallet: WalletType): void {
 export function downloadAllWallets(wallets: WalletType[]): void {
   const formattedText = wallets
     .map((wallet) => `${wallet.address}\n${wallet.privateKey}\n\n`)
-    .join('');
+    .join("");
 
-  const blob = new Blob([formattedText], { type: 'text/plain' });
+  const blob = new Blob([formattedText], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
-  a.download = 'wallets.txt';
+  a.download = "wallets.txt";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ============= Wallet Filtering Utilities =============
+
+/**
+ * Counts the number of active wallets in the provided wallet array.
+ * Note: This operates on an in-memory array, not storage.
+ * @param wallets Array of wallet objects
+ * @returns Number of active wallets (excludes archived wallets)
+ */
+export const countActiveWallets = (wallets: WalletType[]): number => {
+  return wallets.filter((wallet) => wallet.isActive && !wallet.isArchived)
+    .length;
+};
+
+/**
+ * Returns an array of only the active wallets from a provided array.
+ * Note: This operates on an in-memory array, not storage.
+ * @param wallets Array of wallet objects
+ * @returns Array of active wallets (excludes archived wallets)
+ */
+export const filterActiveWallets = (wallets: WalletType[]): WalletType[] => {
+  return wallets.filter((wallet) => wallet.isActive && !wallet.isArchived);
+};
 
 // Re-export storage functions for convenience
 export { saveMasterWallets, loadMasterWallets };

@@ -1,11 +1,17 @@
 /**
  * AutomatePage - Unified Trading Tools Page
- * 
+ *
  * Combines Sniper Bot, Copy Trade, and Automate into a single interface
  * with real-time WebSocket connections and trade execution.
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Zap,
   Users,
@@ -18,17 +24,17 @@ import {
   CheckCircle,
   XCircle,
   Crosshair,
-  RefreshCw
-} from 'lucide-react';
-import { HorizontalHeader } from '../components/HorizontalHeader';
-import { useAppContext } from '../contexts/useAppContext';
-import { formatAddress } from '../utils/formatting';
-import { executeTrade } from '../utils/trading';
-import type { TradingConfig } from '../utils/trading';
-import type { WalletType } from '../utils/types';
+  RefreshCw,
+} from "lucide-react";
+import { HorizontalHeader } from "../components/HorizontalHeader";
+import { useAppContext } from "../contexts";
+import { formatAddress } from "../utils/formatting";
+import { executeTrade } from "../utils/trading";
+import type { TradingConfig } from "../utils/trading";
+import type { WalletType } from "../utils/types";
 
 // Import unified components
-import { TradingTools } from '../components/tools';
+import { TradingTools } from "../components/tools";
 import type {
   ToolType,
   SniperProfile,
@@ -38,22 +44,22 @@ import type {
   DeployEvent,
   MigrationEvent,
   CopyTradeData,
-  WalletType as UnifiedWalletType
-} from '../components/tools/automate/types';
+  WalletType as UnifiedWalletType,
+} from "../components/tools/automate/types";
 import {
   loadSniperProfiles,
   loadCopyTradeProfiles,
   loadStrategies,
   updateSniperProfile,
   updateCopyTradeProfile,
-} from '../components/tools/automate/storage';
+} from "../components/tools/automate/storage";
 
 // Import WebSocket managers
 import {
   SniperBotWebSocketManager,
-  CopyTradeWebSocketManager
-} from '../utils/websocket';
-import type { MultiTokenWebSocketManager } from '../utils/websocket';
+  CopyTradeWebSocketManager,
+} from "../utils/websocket";
+import type { MultiTokenWebSocketManager } from "../utils/websocket";
 
 // Unified styles are handled by app's global CSS
 
@@ -75,7 +81,7 @@ interface ExecutionLogEntry {
 
 interface RecentEvent {
   id: string;
-  type: 'deploy' | 'migration' | 'trade';
+  type: "deploy" | "migration" | "trade";
   data: SniperEvent | CopyTradeData;
   matchedProfiles: string[];
   executed: boolean;
@@ -92,7 +98,7 @@ export const AutomatePage: React.FC = () => {
     wallets: contextWallets,
     config: contextConfig,
     solBalances,
-    showToast: contextShowToast
+    showToast: contextShowToast,
   } = useAppContext();
 
   // WebSocket refs
@@ -108,7 +114,9 @@ export const AutomatePage: React.FC = () => {
 
   // Profile states (for execution logic)
   const [sniperProfiles, setSniperProfiles] = useState<SniperProfile[]>([]);
-  const [copyTradeProfiles, setCopyTradeProfiles] = useState<CopyTradeProfile[]>([]);
+  const [copyTradeProfiles, setCopyTradeProfiles] = useState<
+    CopyTradeProfile[]
+  >([]);
   const [strategies, setStrategies] = useState<TradingStrategy[]>([]);
 
   // Execution logs and events
@@ -117,7 +125,7 @@ export const AutomatePage: React.FC = () => {
 
   // Selected wallets for trading (uses first available wallet by default)
   const selectedWalletAddresses = useMemo(() => {
-    return contextWallets.map(w => w.address);
+    return contextWallets.map((w) => w.address);
   }, [contextWallets]);
 
   // Stats
@@ -125,7 +133,7 @@ export const AutomatePage: React.FC = () => {
     totalExecutions: 0,
     successfulExecutions: 0,
     failedExecutions: 0,
-    activeProfiles: 0
+    activeProfiles: 0,
   });
 
   // ========== Load Profiles ==========
@@ -144,280 +152,313 @@ export const AutomatePage: React.FC = () => {
 
   // ========== Calculate Stats ==========
   useEffect(() => {
-    const activeSniper = sniperProfiles.filter(p => p.isActive).length;
-    const activeCopyTrade = copyTradeProfiles.filter(p => p.isActive).length;
-    const activeAutomate = strategies.filter(s => s.isActive).length;
+    const activeSniper = sniperProfiles.filter((p) => p.isActive).length;
+    const activeCopyTrade = copyTradeProfiles.filter((p) => p.isActive).length;
+    const activeAutomate = strategies.filter((s) => s.isActive).length;
 
-    const successful = executionLogs.filter(l => l.success).length;
-    const failed = executionLogs.filter(l => !l.success).length;
+    const successful = executionLogs.filter((l) => l.success).length;
+    const failed = executionLogs.filter((l) => !l.success).length;
 
     setStats({
       totalExecutions: executionLogs.length,
       successfulExecutions: successful,
       failedExecutions: failed,
-      activeProfiles: activeSniper + activeCopyTrade + activeAutomate
+      activeProfiles: activeSniper + activeCopyTrade + activeAutomate,
     });
   }, [sniperProfiles, copyTradeProfiles, strategies, executionLogs]);
 
   // ========== Convert wallets for TradingTools ==========
   const availableWallets: UnifiedWalletType[] = useMemo(() => {
-    return contextWallets.map(w => {
+    return contextWallets.map((w) => {
       const walletName = (w as { name?: string }).name;
       return {
         address: w.address,
         privateKey: w.privateKey,
         name: walletName || formatAddress(w.address),
-        balance: solBalances.get(w.address) ?? 0
+        balance: solBalances.get(w.address) ?? 0,
       };
     });
   }, [contextWallets, solBalances]);
 
   // ========== Execute Trade Helper ==========
-  const executeTradeAction = useCallback(async (
-    actionType: 'buy' | 'sell',
-    tokenAddress: string,
-    amount: number,
-    walletAddresses: string[],
-    profileName: string,
-    toolType: ToolType
-  ): Promise<boolean> => {
-    const walletsToUse = contextWallets.filter(w => walletAddresses.includes(w.address));
-
-    if (walletsToUse.length === 0) {
-      contextShowToast?.('No wallets available for trading', 'error');
-      return false;
-    }
-
-    const walletsForTrade: WalletType[] = walletsToUse.map((w, index) => ({
-      id: index,
-      address: w.address,
-      privateKey: w.privateKey || '',
-      isActive: true
-    }));
-
-    try {
-      const tradingConfig: TradingConfig = {
-        tokenAddress,
-        ...(actionType === 'buy'
-          ? { solAmount: amount }
-          : { sellPercent: amount }
-        )
-      };
-
-      const selectedDex = contextConfig?.selectedDex || 'raydium';
-
-      await executeTrade(
-        selectedDex,
-        walletsForTrade,
-        tradingConfig,
-        actionType === 'buy',
-        solBalances
+  const executeTradeAction = useCallback(
+    async (
+      actionType: "buy" | "sell",
+      tokenAddress: string,
+      amount: number,
+      walletAddresses: string[],
+      profileName: string,
+      toolType: ToolType,
+    ): Promise<boolean> => {
+      const walletsToUse = contextWallets.filter((w) =>
+        walletAddresses.includes(w.address),
       );
 
-      // Log success
-      const logEntry: ExecutionLogEntry = {
-        id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        type: toolType,
-        profileName,
-        action: actionType.toUpperCase(),
-        amount,
-        token: tokenAddress,
-        success: true,
-        timestamp: Date.now()
-      };
-      setExecutionLogs(prev => [logEntry, ...prev].slice(0, 100));
+      if (walletsToUse.length === 0) {
+        contextShowToast?.("No wallets available for trading", "error");
+        return false;
+      }
 
-      contextShowToast?.(`${actionType.toUpperCase()} executed for ${profileName}`, 'success');
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const walletsForTrade: WalletType[] = walletsToUse.map((w, index) => ({
+        id: index,
+        address: w.address,
+        privateKey: w.privateKey || "",
+        isActive: true,
+      }));
 
-      // Log failure
-      const logEntry: ExecutionLogEntry = {
-        id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        type: toolType,
-        profileName,
-        action: actionType.toUpperCase(),
-        amount,
-        token: tokenAddress,
-        success: false,
-        error: errorMessage,
-        timestamp: Date.now()
-      };
-      setExecutionLogs(prev => [logEntry, ...prev].slice(0, 100));
+      try {
+        const tradingConfig: TradingConfig = {
+          tokenAddress,
+          ...(actionType === "buy"
+            ? { solAmount: amount }
+            : { sellPercent: amount }),
+        };
 
-      console.error(`Trade execution error:`, errorMessage);
-      contextShowToast?.(`Trade failed: ${errorMessage}`, 'error');
-      return false;
-    }
-  }, [contextWallets, contextConfig, solBalances, contextShowToast]);
+        const selectedDex = contextConfig?.selectedDex || "raydium";
+
+        await executeTrade(
+          selectedDex,
+          walletsForTrade,
+          tradingConfig,
+          actionType === "buy",
+          solBalances,
+        );
+
+        // Log success
+        const logEntry: ExecutionLogEntry = {
+          id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: toolType,
+          profileName,
+          action: actionType.toUpperCase(),
+          amount,
+          token: tokenAddress,
+          success: true,
+          timestamp: Date.now(),
+        };
+        setExecutionLogs((prev) => [logEntry, ...prev].slice(0, 100));
+
+        contextShowToast?.(
+          `${actionType.toUpperCase()} executed for ${profileName}`,
+          "success",
+        );
+        return true;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        // Log failure
+        const logEntry: ExecutionLogEntry = {
+          id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: toolType,
+          profileName,
+          action: actionType.toUpperCase(),
+          amount,
+          token: tokenAddress,
+          success: false,
+          error: errorMessage,
+          timestamp: Date.now(),
+        };
+        setExecutionLogs((prev) => [logEntry, ...prev].slice(0, 100));
+
+        console.error(`Trade execution error:`, errorMessage);
+        contextShowToast?.(`Trade failed: ${errorMessage}`, "error");
+        return false;
+      }
+    },
+    [contextWallets, contextConfig, solBalances, contextShowToast],
+  );
 
   // ========== Sniper Bot Logic ==========
-  const handleSniperEvent = useCallback(async (event: SniperEvent) => {
-    // Add to recent events
-    const recentEvent: RecentEvent = {
-      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: event.type,
-      data: event,
-      matchedProfiles: [],
-      executed: false,
-      timestamp: Date.now()
-    };
+  const handleSniperEvent = useCallback(
+    async (event: SniperEvent) => {
+      // Add to recent events
+      const recentEvent: RecentEvent = {
+        id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: event.type,
+        data: event,
+        matchedProfiles: [],
+        executed: false,
+        timestamp: Date.now(),
+      };
 
-    // Find matching active profiles
-    const currentProfiles = loadSniperProfiles();
-    const matchingProfiles = currentProfiles.filter(profile => {
-      if (!profile.isActive) return false;
-      if (profile.eventType !== 'both' && profile.eventType !== event.type) return false;
+      // Find matching active profiles
+      const currentProfiles = loadSniperProfiles();
+      const matchingProfiles = currentProfiles.filter((profile) => {
+        if (!profile.isActive) return false;
+        if (profile.eventType !== "both" && profile.eventType !== event.type)
+          return false;
 
-      // Check cooldown
-      if (profile.lastExecuted) {
-        let cooldownMs = profile.cooldown;
-        if (profile.cooldownUnit === 'seconds') cooldownMs *= 1000;
-        if (profile.cooldownUnit === 'minutes') cooldownMs *= 60000;
-        if (Date.now() - profile.lastExecuted < cooldownMs) return false;
-      }
+        // Check cooldown
+        if (profile.lastExecuted) {
+          let cooldownMs = profile.cooldown;
+          if (profile.cooldownUnit === "seconds") cooldownMs *= 1000;
+          if (profile.cooldownUnit === "minutes") cooldownMs *= 60000;
+          if (Date.now() - profile.lastExecuted < cooldownMs) return false;
+        }
 
-      // Check max executions
-      if (profile.maxExecutions && profile.executionCount >= profile.maxExecutions) return false;
+        // Check max executions
+        if (
+          profile.maxExecutions &&
+          profile.executionCount >= profile.maxExecutions
+        )
+          return false;
 
-      // Check filters (if any)
-      if (profile.filters.length > 0) {
-        const enabledFilters = profile.filters.filter(f => f.enabled);
-        if (enabledFilters.length > 0) {
-          const allMatch = enabledFilters.every(filter => {
-            if (filter.platform && event.data.platform !== filter.platform) return false;
-            if (filter.mint && event.data.mint !== filter.mint) return false;
-            if (filter.signer && event.type === 'deploy') {
-              if (event.data.signer !== filter.signer) return false;
-            }
-            return true;
+        // Check filters (if any)
+        if (profile.filters.length > 0) {
+          const enabledFilters = profile.filters.filter((f) => f.enabled);
+          if (enabledFilters.length > 0) {
+            const allMatch = enabledFilters.every((filter) => {
+              if (filter.platform && event.data.platform !== filter.platform)
+                return false;
+              if (filter.mint && event.data.mint !== filter.mint) return false;
+              if (filter.signer && event.type === "deploy") {
+                if (event.data.signer !== filter.signer) return false;
+              }
+              return true;
+            });
+            if (!allMatch) return false;
+          }
+        }
+
+        return true;
+      });
+
+      recentEvent.matchedProfiles = matchingProfiles.map((p) => p.id);
+      setRecentEvents((prev) => [recentEvent, ...prev].slice(0, 50));
+
+      // Execute for matching profiles
+      for (const profile of matchingProfiles) {
+        // Calculate buy amount
+        let solAmount = profile.buyAmount;
+        if (
+          profile.buyAmountType === "percentage" &&
+          selectedWalletAddresses.length > 0
+        ) {
+          const firstWalletBalance =
+            solBalances.get(selectedWalletAddresses[0]) ?? 0;
+          solAmount = (firstWalletBalance * profile.buyAmount) / 100;
+        }
+
+        const success = await executeTradeAction(
+          "buy",
+          event.data.mint,
+          solAmount,
+          selectedWalletAddresses,
+          profile.name,
+          "sniper",
+        );
+
+        if (success) {
+          recentEvent.executed = true;
+          // Update profile
+          updateSniperProfile({
+            ...profile,
+            executionCount: profile.executionCount + 1,
+            lastExecuted: Date.now(),
           });
-          if (!allMatch) return false;
+          setSniperProfiles(loadSniperProfiles());
         }
       }
 
-      return true;
-    });
-
-    recentEvent.matchedProfiles = matchingProfiles.map(p => p.id);
-    setRecentEvents(prev => [recentEvent, ...prev].slice(0, 50));
-
-    // Execute for matching profiles
-    for (const profile of matchingProfiles) {
-      // Calculate buy amount
-      let solAmount = profile.buyAmount;
-      if (profile.buyAmountType === 'percentage' && selectedWalletAddresses.length > 0) {
-        const firstWalletBalance = solBalances.get(selectedWalletAddresses[0]) ?? 0;
-        solAmount = (firstWalletBalance * profile.buyAmount) / 100;
-      }
-
-      const success = await executeTradeAction(
-        'buy',
-        event.data.mint,
-        solAmount,
-        selectedWalletAddresses,
-        profile.name,
-        'sniper'
+      // Update event in list
+      setRecentEvents((prev) =>
+        prev.map((e) => (e.id === recentEvent.id ? recentEvent : e)),
       );
-
-      if (success) {
-        recentEvent.executed = true;
-        // Update profile
-        updateSniperProfile({
-          ...profile,
-          executionCount: profile.executionCount + 1,
-          lastExecuted: Date.now()
-        });
-        setSniperProfiles(loadSniperProfiles());
-      }
-    }
-
-    // Update event in list
-    setRecentEvents(prev => prev.map(e => e.id === recentEvent.id ? recentEvent : e));
-  }, [selectedWalletAddresses, solBalances, executeTradeAction]);
+    },
+    [selectedWalletAddresses, solBalances, executeTradeAction],
+  );
 
   // ========== Copy Trade Logic ==========
-  const handleCopyTrade = useCallback(async (trade: CopyTradeData) => {
-    // Add to recent events
-    const recentEvent: RecentEvent = {
-      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: 'trade',
-      data: trade,
-      matchedProfiles: [],
-      executed: false,
-      timestamp: Date.now()
-    };
+  const handleCopyTrade = useCallback(
+    async (trade: CopyTradeData) => {
+      // Add to recent events
+      const recentEvent: RecentEvent = {
+        id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: "trade",
+        data: trade,
+        matchedProfiles: [],
+        executed: false,
+        timestamp: Date.now(),
+      };
 
-    // Find matching active profiles
-    const currentProfiles = loadCopyTradeProfiles();
-    const matchingProfiles = currentProfiles.filter(profile => {
-      if (!profile.isActive) return false;
-      if (!profile.walletAddresses.includes(trade.signerAddress)) return false;
+      // Find matching active profiles
+      const currentProfiles = loadCopyTradeProfiles();
+      const matchingProfiles = currentProfiles.filter((profile) => {
+        if (!profile.isActive) return false;
+        if (!profile.walletAddresses.includes(trade.signerAddress))
+          return false;
 
-      // Check token filtering
-      if (profile.tokenFilterMode === 'specific') {
-        if (!profile.specificTokens.includes(trade.tokenMint)) return false;
-      }
-      if (profile.blacklistedTokens.includes(trade.tokenMint)) return false;
-
-      // Check cooldown
-      if (profile.lastExecuted) {
-        let cooldownMs = profile.cooldown;
-        if (profile.cooldownUnit === 'seconds') cooldownMs *= 1000;
-        if (profile.cooldownUnit === 'minutes') cooldownMs *= 60000;
-        if (Date.now() - profile.lastExecuted < cooldownMs) return false;
-      }
-
-      // Check max executions
-      if (profile.maxExecutions && profile.executionCount >= profile.maxExecutions) return false;
-
-      return true;
-    });
-
-    recentEvent.matchedProfiles = matchingProfiles.map(p => p.id);
-    setRecentEvents(prev => [recentEvent, ...prev].slice(0, 50));
-
-    // Execute for matching profiles
-    for (const profile of matchingProfiles) {
-      let actionType: 'buy' | 'sell' = trade.type;
-      let solAmount = trade.solAmount;
-
-      if (profile.mode === 'simple' && profile.simpleConfig) {
-        if (profile.simpleConfig.mirrorTradeType) {
-          actionType = trade.type;
+        // Check token filtering
+        if (profile.tokenFilterMode === "specific") {
+          if (!profile.specificTokens.includes(trade.tokenMint)) return false;
         }
-        solAmount = trade.solAmount * profile.simpleConfig.amountMultiplier;
+        if (profile.blacklistedTokens.includes(trade.tokenMint)) return false;
+
+        // Check cooldown
+        if (profile.lastExecuted) {
+          let cooldownMs = profile.cooldown;
+          if (profile.cooldownUnit === "seconds") cooldownMs *= 1000;
+          if (profile.cooldownUnit === "minutes") cooldownMs *= 60000;
+          if (Date.now() - profile.lastExecuted < cooldownMs) return false;
+        }
+
+        // Check max executions
+        if (
+          profile.maxExecutions &&
+          profile.executionCount >= profile.maxExecutions
+        )
+          return false;
+
+        return true;
+      });
+
+      recentEvent.matchedProfiles = matchingProfiles.map((p) => p.id);
+      setRecentEvents((prev) => [recentEvent, ...prev].slice(0, 50));
+
+      // Execute for matching profiles
+      for (const profile of matchingProfiles) {
+        let actionType: "buy" | "sell" = trade.type;
+        let solAmount = trade.solAmount;
+
+        if (profile.mode === "simple" && profile.simpleConfig) {
+          if (profile.simpleConfig.mirrorTradeType) {
+            actionType = trade.type;
+          }
+          solAmount = trade.solAmount * profile.simpleConfig.amountMultiplier;
+        }
+
+        const success = await executeTradeAction(
+          actionType,
+          trade.tokenMint,
+          solAmount,
+          selectedWalletAddresses,
+          profile.name,
+          "copytrade",
+        );
+
+        if (success) {
+          recentEvent.executed = true;
+          // Update profile
+          updateCopyTradeProfile({
+            ...profile,
+            executionCount: profile.executionCount + 1,
+            lastExecuted: Date.now(),
+          });
+          setCopyTradeProfiles(loadCopyTradeProfiles());
+        }
       }
 
-      const success = await executeTradeAction(
-        actionType,
-        trade.tokenMint,
-        solAmount,
-        selectedWalletAddresses,
-        profile.name,
-        'copytrade'
+      // Update event in list
+      setRecentEvents((prev) =>
+        prev.map((e) => (e.id === recentEvent.id ? recentEvent : e)),
       );
-
-      if (success) {
-        recentEvent.executed = true;
-        // Update profile
-        updateCopyTradeProfile({
-          ...profile,
-          executionCount: profile.executionCount + 1,
-          lastExecuted: Date.now()
-        });
-        setCopyTradeProfiles(loadCopyTradeProfiles());
-      }
-    }
-
-    // Update event in list
-    setRecentEvents(prev => prev.map(e => e.id === recentEvent.id ? recentEvent : e));
-  }, [selectedWalletAddresses, executeTradeAction]);
+    },
+    [selectedWalletAddresses, executeTradeAction],
+  );
 
   // ========== Initialize Sniper WebSocket ==========
   useEffect(() => {
-    const activeSniper = sniperProfiles.some(p => p.isActive);
+    const activeSniper = sniperProfiles.some((p) => p.isActive);
 
     if (!activeSniper) {
       if (sniperWsRef.current) {
@@ -445,7 +486,7 @@ export const AutomatePage: React.FC = () => {
         const msg = error instanceof Error ? error.message : String(error);
         setWsError(msg);
         setSniperConnected(false);
-      }
+      },
     });
 
     return () => {
@@ -455,8 +496,10 @@ export const AutomatePage: React.FC = () => {
 
   // ========== Initialize CopyTrade WebSocket ==========
   useEffect(() => {
-    const activeCopyTrade = copyTradeProfiles.filter(p => p.isActive);
-    const walletsToMonitor = [...new Set(activeCopyTrade.flatMap(p => p.walletAddresses))];
+    const activeCopyTrade = copyTradeProfiles.filter((p) => p.isActive);
+    const walletsToMonitor = [
+      ...new Set(activeCopyTrade.flatMap((p) => p.walletAddresses)),
+    ];
 
     if (walletsToMonitor.length === 0) {
       if (copyTradeWsRef.current) {
@@ -484,7 +527,7 @@ export const AutomatePage: React.FC = () => {
         const msg = error instanceof Error ? error.message : String(error);
         setWsError(msg);
         setCopyTradeConnected(false);
-      }
+      },
     });
 
     return () => {
@@ -505,13 +548,17 @@ export const AutomatePage: React.FC = () => {
   }, []);
 
   // ========== Handle Execute from TradingTools ==========
-  const handleExecute = useCallback((_type: ToolType, _profileId: string, _action: unknown) => {
-    // This is called when user manually triggers an action from TradingTools
-    // The automatic execution is handled by the WebSocket handlers above
-  }, []);
+  const handleExecute = useCallback(
+    (_type: ToolType, _profileId: string, _action: unknown) => {
+      // This is called when user manually triggers an action from TradingTools
+      // The automatic execution is handled by the WebSocket handlers above
+    },
+    [],
+  );
 
   // ========== Connection Status ==========
-  const isAnyConnected = sniperConnected || copyTradeConnected || automateConnected;
+  const isAnyConnected =
+    sniperConnected || copyTradeConnected || automateConnected;
   const hasActiveProfiles = stats.activeProfiles > 0;
 
   return (
@@ -532,8 +579,8 @@ export const AutomatePage: React.FC = () => {
                   linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
                   linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
                 `,
-                backgroundSize: '20px 20px',
-                backgroundPosition: 'center center',
+                backgroundSize: "20px 20px",
+                backgroundPosition: "center center",
               }}
             ></div>
           </div>
@@ -545,48 +592,78 @@ export const AutomatePage: React.FC = () => {
           <div className="mb-6 flex flex-wrap items-start gap-3 justify-between border-b border-app-primary-20 pb-4">
             <div className="flex items-center gap-3">
               <div>
-                <h1 className="text-xl font-bold text-app-primary font-mono tracking-wide">AUTOMATE</h1>
-                <p className="text-xs text-app-secondary-80 font-mono">Unified trading tools - Sniper, Copy Trade, and Strategy automation</p>
+                <h1 className="text-xl font-bold text-app-primary font-mono tracking-wide">
+                  AUTOMATE
+                </h1>
+                <p className="text-xs text-app-secondary-80 font-mono">
+                  Unified trading tools - Sniper, Copy Trade, and Strategy
+                  automation
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4">
               <div className="grid grid-cols-4 gap-2 sm:flex sm:gap-6 text-xs sm:text-sm font-mono">
                 <div className="text-center">
-                  <div className="text-success font-bold">{stats.activeProfiles}</div>
-                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">ACTIVE</div>
+                  <div className="text-success font-bold">
+                    {stats.activeProfiles}
+                  </div>
+                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">
+                    ACTIVE
+                  </div>
                 </div>
                 <div className="text-center">
-                  <div className="color-primary font-bold">{stats.totalExecutions}</div>
-                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">TOTAL</div>
+                  <div className="color-primary font-bold">
+                    {stats.totalExecutions}
+                  </div>
+                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">
+                    TOTAL
+                  </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-success font-bold">{stats.successfulExecutions}</div>
-                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">SUCCESS</div>
+                  <div className="text-success font-bold">
+                    {stats.successfulExecutions}
+                  </div>
+                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">
+                    SUCCESS
+                  </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-error-alt font-bold">{stats.failedExecutions}</div>
-                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">FAILED</div>
+                  <div className="text-error-alt font-bold">
+                    {stats.failedExecutions}
+                  </div>
+                  <div className="text-app-secondary-80 text-[10px] sm:text-xs">
+                    FAILED
+                  </div>
                 </div>
               </div>
 
               {/* Connection Status Badges */}
               <div className="flex items-center gap-2">
-                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${sniperConnected
-                  ? 'bg-app-primary-10 color-primary border border-app-primary-color/30'
-                  : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
-                  }`}>
+                <div
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${
+                    sniperConnected
+                      ? "bg-app-primary-10 color-primary border border-app-primary-color/30"
+                      : "bg-app-primary-20 text-app-secondary-60 border border-app-primary-40"
+                  }`}
+                >
                   <Zap className="w-3 h-3" />
                 </div>
-                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${copyTradeConnected
-                  ? 'bg-app-primary-10 color-primary border border-app-primary-color/30'
-                  : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
-                  }`}>
+                <div
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${
+                    copyTradeConnected
+                      ? "bg-app-primary-10 color-primary border border-app-primary-color/30"
+                      : "bg-app-primary-20 text-app-secondary-60 border border-app-primary-40"
+                  }`}
+                >
                   <Users className="w-3 h-3" />
                 </div>
-                <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${automateConnected
-                  ? 'bg-app-primary-10 color-primary border border-app-primary-color/30'
-                  : 'bg-app-primary-20 text-app-secondary-60 border border-app-primary-40'
-                  }`}>
+                <div
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono ${
+                    automateConnected
+                      ? "bg-app-primary-10 color-primary border border-app-primary-color/30"
+                      : "bg-app-primary-20 text-app-secondary-60 border border-app-primary-40"
+                  }`}
+                >
                   <Bot className="w-3 h-3" />
                 </div>
               </div>
@@ -615,7 +692,9 @@ export const AutomatePage: React.FC = () => {
           {wsError && (
             <div className="mb-4 p-3 bg-error-alt-20 border border-error-alt rounded flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-error-alt" />
-              <span className="font-mono text-sm text-error-alt">{wsError}</span>
+              <span className="font-mono text-sm text-error-alt">
+                {wsError}
+              </span>
             </div>
           )}
 
@@ -623,7 +702,8 @@ export const AutomatePage: React.FC = () => {
             <div className="mb-4 p-3 bg-warning-20 border border-warning rounded flex items-center gap-2">
               <Key className="w-4 h-4 text-warning" />
               <span className="font-mono text-sm text-warning">
-                No API key configured. Go to Settings to add your streaming API key for real-time data.
+                No API key configured. Go to Settings to add your streaming API
+                key for real-time data.
               </span>
             </div>
           )}
@@ -647,7 +727,9 @@ export const AutomatePage: React.FC = () => {
                     <Rocket className="w-4 h-4 text-warning" />
                     Recent Events
                   </h3>
-                  <span className="text-xs font-mono text-app-secondary-60">{recentEvents.length}</span>
+                  <span className="text-xs font-mono text-app-secondary-60">
+                    {recentEvents.length}
+                  </span>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {recentEvents.length === 0 ? (
@@ -656,13 +738,21 @@ export const AutomatePage: React.FC = () => {
                     </div>
                   ) : (
                     <div className="divide-y divide-app-primary-20">
-                      {recentEvents.slice(0, 15).map(event => (
-                        <div key={event.id} className="px-4 py-2.5 hover:bg-app-primary-10 transition-colors">
+                      {recentEvents.slice(0, 15).map((event) => (
+                        <div
+                          key={event.id}
+                          className="px-4 py-2.5 hover:bg-app-primary-10 transition-colors"
+                        >
                           <div className="flex items-center justify-between mb-1">
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${event.type === 'deploy' ? 'bg-blue-500/20 text-blue-400' :
-                              event.type === 'migration' ? 'bg-purple-500/20 text-purple-400' :
-                                'bg-app-primary-10 color-primary'
-                              }`}>
+                            <span
+                              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                                event.type === "deploy"
+                                  ? "bg-blue-500/20 text-blue-400"
+                                  : event.type === "migration"
+                                    ? "bg-purple-500/20 text-purple-400"
+                                    : "bg-app-primary-10 color-primary"
+                              }`}
+                            >
                               {event.type.toUpperCase()}
                             </span>
                             {event.executed && (
@@ -670,10 +760,13 @@ export const AutomatePage: React.FC = () => {
                             )}
                           </div>
                           <div className="text-xs font-mono text-app-secondary-60 truncate">
-                            {event.type === 'trade'
-                              ? formatAddress((event.data as CopyTradeData).tokenMint)
-                              : formatAddress((event.data as SniperEvent).data.mint)
-                            }
+                            {event.type === "trade"
+                              ? formatAddress(
+                                  (event.data as CopyTradeData).tokenMint,
+                                )
+                              : formatAddress(
+                                  (event.data as SniperEvent).data.mint,
+                                )}
                           </div>
                           <div className="text-[10px] font-mono text-app-secondary-40">
                             {new Date(event.timestamp).toLocaleTimeString()}
@@ -692,7 +785,9 @@ export const AutomatePage: React.FC = () => {
                     <Clock className="w-4 h-4 text-success" />
                     Execution Log
                   </h3>
-                  <span className="text-xs font-mono text-app-secondary-60">{executionLogs.length}</span>
+                  <span className="text-xs font-mono text-app-secondary-60">
+                    {executionLogs.length}
+                  </span>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {executionLogs.length === 0 ? (
@@ -701,28 +796,36 @@ export const AutomatePage: React.FC = () => {
                     </div>
                   ) : (
                     <div className="divide-y divide-app-primary-20">
-                      {executionLogs.slice(0, 15).map(log => (
+                      {executionLogs.slice(0, 15).map((log) => (
                         <div
                           key={log.id}
-                          className={`px-4 py-2.5 ${log.success ? 'bg-success-10' : 'bg-error-alt-10'}`}
+                          className={`px-4 py-2.5 ${log.success ? "bg-success-10" : "bg-error-alt-10"}`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
-                              {log.success
-                                ? <CheckCircle className="w-3 h-3 text-success" />
-                                : <XCircle className="w-3 h-3 text-error-alt" />
-                              }
-                              <span className="text-xs font-mono text-app-primary">{log.profileName}</span>
+                              {log.success ? (
+                                <CheckCircle className="w-3 h-3 text-success" />
+                              ) : (
+                                <XCircle className="w-3 h-3 text-error-alt" />
+                              )}
+                              <span className="text-xs font-mono text-app-primary">
+                                {log.profileName}
+                              </span>
                             </div>
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${log.action === 'BUY'
-                              ? 'bg-success-20 text-success'
-                              : 'bg-error-alt-20 text-error-alt'
-                              }`}>
+                            <span
+                              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                                log.action === "BUY"
+                                  ? "bg-success-20 text-success"
+                                  : "bg-error-alt-20 text-error-alt"
+                              }`}
+                            >
                               {log.action}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-[10px] font-mono">
-                            <span className="text-app-secondary-60">{log.amount.toFixed(4)} SOL</span>
+                            <span className="text-app-secondary-60">
+                              {log.amount.toFixed(4)} SOL
+                            </span>
                             <span className="text-app-secondary-40">
                               {new Date(log.timestamp).toLocaleTimeString()}
                             </span>
@@ -741,31 +844,41 @@ export const AutomatePage: React.FC = () => {
 
               {/* Quick Stats */}
               <div className="bg-app-accent border border-app-primary-40 rounded-lg p-4">
-                <h3 className="font-mono text-sm font-medium color-primary mb-3">Session Stats</h3>
+                <h3 className="font-mono text-sm font-medium color-primary mb-3">
+                  Session Stats
+                </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="text-center p-2 bg-app-primary rounded-lg border border-app-primary-40">
                     <div className="text-lg font-mono font-semibold text-success">
                       {stats.activeProfiles}
                     </div>
-                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">Active</div>
+                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">
+                      Active
+                    </div>
                   </div>
                   <div className="text-center p-2 bg-app-primary rounded-lg border border-app-primary-40">
                     <div className="text-lg font-mono font-semibold color-primary">
                       {stats.totalExecutions}
                     </div>
-                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">Total</div>
+                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">
+                      Total
+                    </div>
                   </div>
                   <div className="text-center p-2 bg-app-primary rounded-lg border border-app-primary-40">
                     <div className="text-lg font-mono font-semibold text-success">
                       {stats.successfulExecutions}
                     </div>
-                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">Success</div>
+                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">
+                      Success
+                    </div>
                   </div>
                   <div className="text-center p-2 bg-app-primary rounded-lg border border-app-primary-40">
                     <div className="text-lg font-mono font-semibold text-error-alt">
                       {stats.failedExecutions}
                     </div>
-                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">Failed</div>
+                    <div className="text-[10px] font-mono text-app-secondary-60 uppercase">
+                      Failed
+                    </div>
                   </div>
                 </div>
               </div>

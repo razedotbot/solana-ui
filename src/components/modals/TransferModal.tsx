@@ -1,21 +1,35 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { ArrowUpDown, X, CheckCircle, DollarSign, Info, Search, Coins, RefreshCw } from 'lucide-react';
-import type { Connection } from '@solana/web3.js';
-import { 
-  Keypair, 
-  VersionedTransaction, 
+import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import {
+  ArrowUpDown,
+  X,
+  CheckCircle,
+  DollarSign,
+  Info,
+  Search,
+  Coins,
+  RefreshCw,
+} from "lucide-react";
+import type { Connection } from "@solana/web3.js";
+import {
+  Keypair,
+  VersionedTransaction,
   MessageV0,
-  PublicKey
-} from '@solana/web3.js';
-import bs58 from 'bs58';
-import { useToast } from "../../utils/useToast";
-import type { WalletType } from '../../utils/types';
-import { getWalletDisplayName, fetchTokenBalance, loadConfigFromCookies } from '../../Utils';
-import { formatAddress, formatSolBalance, formatTokenBalance } from '../../utils/formatting';
-import { Buffer } from 'buffer';
-import { sendToJitoBundleService } from '../../utils/jitoService';
-import { createConnectionFromConfig } from '../../utils/rpcManager';
+  PublicKey,
+} from "@solana/web3.js";
+import bs58 from "bs58";
+import { useToast } from "../../utils/hooks";
+import type { WalletType } from "../../utils/types";
+import { getWalletDisplayName, fetchTokenBalance } from "../../utils/wallet";
+import { loadConfigFromCookies } from "../../utils/storage";
+import {
+  formatAddress,
+  formatSolBalance,
+  formatTokenBalance,
+} from "../../utils/formatting";
+import { Buffer } from "buffer";
+import { sendToJitoBundleService } from "../../utils/jitoService";
+import { createConnectionFromConfig } from "../../utils/rpcManager";
 
 interface WindowWithConfig {
   tradingServerUrl?: string;
@@ -37,8 +51,8 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   wallets,
   solBalances,
   connection: _connection,
-  tokenAddress = '',
-  tokenBalances = new Map()
+  tokenAddress = "",
+  tokenBalances = new Map(),
 }) => {
   // States for the modal
   const [currentStep, setCurrentStep] = useState(0);
@@ -49,33 +63,39 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   // States for transfer operation
   const [sourceWallets, setSourceWallets] = useState<string[]>([]); // Multiple source wallets
   const [receiverAddresses, setReceiverAddresses] = useState<string[]>([]); // Multiple recipients
-  const [newRecipientAddress, setNewRecipientAddress] = useState(''); // Input for new recipient
-  const [selectedToken, setSelectedToken] = useState('');
-  const [tokenAddressInput, setTokenAddressInput] = useState(''); // Local token address input
-  const [amount, setAmount] = useState('');
-  const [transferType, setTransferType] = useState<'SOL' | 'TOKEN'>('SOL');
-  const [distributionMode, setDistributionMode] = useState<'percentage' | 'amount'>('amount'); // How to distribute amounts
-  
+  const [newRecipientAddress, setNewRecipientAddress] = useState(""); // Input for new recipient
+  const [selectedToken, setSelectedToken] = useState("");
+  const [tokenAddressInput, setTokenAddressInput] = useState(""); // Local token address input
+  const [amount, setAmount] = useState("");
+  const [transferType, setTransferType] = useState<"SOL" | "TOKEN">("SOL");
+  const [distributionMode, setDistributionMode] = useState<
+    "percentage" | "amount"
+  >("amount"); // How to distribute amounts
+
   // States for batch transfer processing
-  const [transferQueue, setTransferQueue] = useState<Array<{
-    sourceWallet: string;
-    recipient: string;
-    amount: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed';
-    error?: string;
-    signature?: string;
-  }>>([]);
+  const [transferQueue, setTransferQueue] = useState<
+    Array<{
+      sourceWallet: string;
+      recipient: string;
+      amount: string;
+      status: "pending" | "processing" | "completed" | "failed";
+      error?: string;
+      signature?: string;
+    }>
+  >([]);
   const [currentTransferIndex, setCurrentTransferIndex] = useState(0);
   const [batchProcessing, setBatchProcessing] = useState(false);
-  
+
   // States for  functionality
-  const [sourceSearchTerm, setSourceSearchTerm] = useState('');
-  const [sortOption, setSortOption] = useState('address');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [balanceFilter, setBalanceFilter] = useState('all');
-  
+  const [sourceSearchTerm, setSourceSearchTerm] = useState("");
+  const [sortOption, setSortOption] = useState("address");
+  const [sortDirection, setSortDirection] = useState("asc");
+  const [balanceFilter, setBalanceFilter] = useState("all");
+
   // States for custom token balance fetching
-  const [customTokenBalances, setCustomTokenBalances] = useState<Map<string, number>>(new Map());
+  const [customTokenBalances, setCustomTokenBalances] = useState<
+    Map<string, number>
+  >(new Map());
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   const [balancesFetched, setBalancesFetched] = useState(false);
 
@@ -92,10 +112,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
   // Update selectedToken when transferType changes to TOKEN
   useEffect(() => {
-    if (transferType === 'TOKEN' && tokenAddressInput) {
+    if (transferType === "TOKEN" && tokenAddressInput) {
       setSelectedToken(tokenAddressInput);
-    } else if (transferType === 'SOL') {
-      setSelectedToken('');
+    } else if (transferType === "SOL") {
+      setSelectedToken("");
     }
   }, [transferType, tokenAddressInput]);
 
@@ -107,125 +127,157 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   // Get wallet token balance by address
   // Use custom token balances if we're using a custom token address, otherwise use prop balances
   const getWalletTokenBalance = (address: string): number => {
-    const isCustomToken = tokenAddressInput && tokenAddressInput !== tokenAddress;
+    const isCustomToken =
+      tokenAddressInput && tokenAddressInput !== tokenAddress;
     if (isCustomToken && customTokenBalances.size > 0) {
       return customTokenBalances.get(address) ?? 0;
     }
-    const balance: number | undefined = tokenBalances.get(address) as number | undefined;
+    const balance: number | undefined = tokenBalances.get(address) as
+      | number
+      | undefined;
     return balance ?? 0;
   };
 
   // Get wallet by privateKey
-  const getWalletByPrivateKey = (privateKey: string): WalletType | undefined => {
-    return wallets.find(wallet => wallet.privateKey === privateKey);
+  const getWalletByPrivateKey = (
+    privateKey: string,
+  ): WalletType | undefined => {
+    return wallets.find((wallet) => wallet.privateKey === privateKey);
   };
 
   // Fetch token balances for custom token address
-  const fetchTokenBalancesForCustomToken = useCallback(async (): Promise<void> => {
-    if (!tokenAddressInput) {
-      showToast("Please enter a token address", "error");
-      return;
-    }
-    
-    // Validate token address
-    try {
-      new PublicKey(tokenAddressInput);
-    } catch {
-      showToast("Invalid token address", "error");
-      return;
-    }
-    
-    setIsLoadingBalances(true);
-    setBalancesFetched(false);
-    
-    try {
-      const savedConfig = loadConfigFromCookies();
-      const connection = await createConnectionFromConfig(savedConfig?.rpcEndpoints);
-      
-      const newBalances = new Map<string, number>();
-      
-      // Fetch token balance for each wallet
-      for (const wallet of wallets) {
-        try {
-          const balance = await fetchTokenBalance(connection, wallet.address, tokenAddressInput);
-          newBalances.set(wallet.address, balance);
-        } catch (error) {
-          console.error(`Error fetching balance for ${wallet.address}:`, error);
-          newBalances.set(wallet.address, 0);
-        }
+  const fetchTokenBalancesForCustomToken =
+    useCallback(async (): Promise<void> => {
+      if (!tokenAddressInput) {
+        showToast("Please enter a token address", "error");
+        return;
       }
-      
-      setCustomTokenBalances(newBalances);
-      setBalancesFetched(true);
-      
-      const walletsWithBalance = Array.from(newBalances.values()).filter(b => b > 0).length;
-      showToast(`Found ${walletsWithBalance} wallet(s) with token balance`, "success");
-    } catch (error) {
-      console.error('Error fetching token balances:', error);
-      showToast("Failed to fetch token balances", "error");
-    } finally {
-      setIsLoadingBalances(false);
-    }
-  }, [tokenAddressInput, wallets, showToast]);
+
+      // Validate token address
+      try {
+        new PublicKey(tokenAddressInput);
+      } catch {
+        showToast("Invalid token address", "error");
+        return;
+      }
+
+      setIsLoadingBalances(true);
+      setBalancesFetched(false);
+
+      try {
+        const savedConfig = loadConfigFromCookies();
+        const connection = await createConnectionFromConfig(
+          savedConfig?.rpcEndpoints,
+        );
+
+        const newBalances = new Map<string, number>();
+
+        // Fetch token balance for each wallet
+        for (const wallet of wallets) {
+          try {
+            const balance = await fetchTokenBalance(
+              connection,
+              wallet.address,
+              tokenAddressInput,
+            );
+            newBalances.set(wallet.address, balance);
+          } catch (error) {
+            console.error(
+              `Error fetching balance for ${wallet.address}:`,
+              error,
+            );
+            newBalances.set(wallet.address, 0);
+          }
+        }
+
+        setCustomTokenBalances(newBalances);
+        setBalancesFetched(true);
+
+        const walletsWithBalance = Array.from(newBalances.values()).filter(
+          (b) => b > 0,
+        ).length;
+        showToast(
+          `Found ${walletsWithBalance} wallet(s) with token balance`,
+          "success",
+        );
+      } catch (error) {
+        console.error("Error fetching token balances:", error);
+        showToast("Failed to fetch token balances", "error");
+      } finally {
+        setIsLoadingBalances(false);
+      }
+    }, [tokenAddressInput, wallets, showToast]);
 
   // Auto-fetch token balances when token address is set
   useEffect(() => {
-    if (transferType !== 'TOKEN' || !tokenAddressInput || isLoadingBalances || balancesFetched) {
+    if (
+      transferType !== "TOKEN" ||
+      !tokenAddressInput ||
+      isLoadingBalances ||
+      balancesFetched
+    ) {
       return;
     }
-    
+
     // Validate token address before fetching
     try {
       new PublicKey(tokenAddressInput);
     } catch {
       return; // Invalid address, don't fetch
     }
-    
+
     // Debounce the fetch to avoid fetching on every keystroke
     const timeoutId = setTimeout(() => {
       void fetchTokenBalancesForCustomToken();
     }, 500);
-    
+
     return () => clearTimeout(timeoutId);
-  }, [tokenAddressInput, transferType, isLoadingBalances, balancesFetched, fetchTokenBalancesForCustomToken]);
+  }, [
+    tokenAddressInput,
+    transferType,
+    isLoadingBalances,
+    balancesFetched,
+    fetchTokenBalancesForCustomToken,
+  ]);
 
   // Helper functions for multi-wallet selection
   const toggleSourceWallet = (privateKey: string): void => {
-    setSourceWallets(prev => 
-      prev.includes(privateKey) 
-        ? prev.filter(pk => pk !== privateKey)
-        : [...prev, privateKey]
+    setSourceWallets((prev) =>
+      prev.includes(privateKey)
+        ? prev.filter((pk) => pk !== privateKey)
+        : [...prev, privateKey],
     );
   };
 
   const addRecipientAddress = (address: string): void => {
     if (address.trim() && !receiverAddresses.includes(address.trim())) {
-      setReceiverAddresses(prev => [...prev, address.trim()]);
-      setNewRecipientAddress(''); // Clear the input field
+      setReceiverAddresses((prev) => [...prev, address.trim()]);
+      setNewRecipientAddress(""); // Clear the input field
     }
   };
 
   const removeRecipientAddress = (address: string): void => {
-    setReceiverAddresses(prev => prev.filter(addr => addr !== address));
+    setReceiverAddresses((prev) => prev.filter((addr) => addr !== address));
   };
 
   // Calculate transfer amounts based on distribution mode
   const calculateTransferAmounts = (): string[] => {
-    const inputAmount = parseFloat(amount || '0');
-    
-    if (distributionMode === 'percentage') {
+    const inputAmount = parseFloat(amount || "0");
+
+    if (distributionMode === "percentage") {
       // In percentage mode, the input amount is a percentage (0-100)
       // Calculate the percentage of each wallet's balance to transfer
       const percentage = inputAmount / 100;
-      
-      return sourceWallets.map(privateKey => {
+
+      return sourceWallets.map((privateKey) => {
         const wallet = getWalletByPrivateKey(privateKey);
-        if (!wallet) return '0';
-        
-        const balance = transferType === 'SOL' 
-          ? getWalletBalance(wallet.address)
-          : getWalletTokenBalance(wallet.address);
-          
+        if (!wallet) return "0";
+
+        const balance =
+          transferType === "SOL"
+            ? getWalletBalance(wallet.address)
+            : getWalletTokenBalance(wallet.address);
+
         const transferAmount = balance * percentage;
         return transferAmount.toString();
       });
@@ -239,24 +291,23 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const createTransferQueue = (): typeof transferQueue => {
     const amounts = calculateTransferAmounts();
     const queue: typeof transferQueue = [];
-    
+
     sourceWallets.forEach((sourceWallet, walletIndex) => {
       receiverAddresses.forEach((recipient) => {
         // In percentage mode, each wallet has its own calculated amount
         // In amount mode, all wallets use the same amount
-        const transferAmount = distributionMode === 'percentage' 
-          ? amounts[walletIndex] 
-          : amounts[0]; // All wallets use the same amount in 'amount' mode
-          
+        const transferAmount =
+          distributionMode === "percentage" ? amounts[walletIndex] : amounts[0]; // All wallets use the same amount in 'amount' mode
+
         queue.push({
           sourceWallet,
           recipient,
           amount: transferAmount,
-          status: 'pending'
+          status: "pending",
         });
       });
     });
-    
+
     setTransferQueue(queue);
     return queue;
   };
@@ -267,19 +318,19 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     setIsConfirmed(false);
     setSourceWallets([]);
     setReceiverAddresses([]);
-    setNewRecipientAddress('');
-    setSelectedToken('');
-    setTokenAddressInput('');
-    setAmount('');
-    setTransferType('SOL');
-    setDistributionMode('amount');
+    setNewRecipientAddress("");
+    setSelectedToken("");
+    setTokenAddressInput("");
+    setAmount("");
+    setTransferType("SOL");
+    setDistributionMode("amount");
     setTransferQueue([]);
     setCurrentTransferIndex(0);
     setBatchProcessing(false);
-    setSourceSearchTerm('');
-    setSortOption('address');
-    setSortDirection('asc');
-    setBalanceFilter('all');
+    setSourceSearchTerm("");
+    setSortOption("address");
+    setSortDirection("asc");
+    setBalanceFilter("all");
     setCustomTokenBalances(new Map());
     setIsLoadingBalances(false);
     setBalancesFetched(false);
@@ -289,40 +340,47 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const handleBatchTransfer = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
-    
+
     setBatchProcessing(true);
     setIsSubmitting(true);
-    
+
     const queue = createTransferQueue();
     let completedCount = 0;
     let failedCount = 0;
-    
+
     try {
       for (let i = 0; i < queue.length; i++) {
         setCurrentTransferIndex(i);
         const transfer = queue[i];
-        
+
         // Update status to processing
-        setTransferQueue(prev => prev.map((t, idx) => 
-          idx === i ? { ...t, status: 'processing' } : t
-        ));
-        
+        setTransferQueue((prev) =>
+          prev.map((t, idx) =>
+            idx === i ? { ...t, status: "processing" } : t,
+          ),
+        );
+
         try {
-          const selectedWalletObj = getWalletByPrivateKey(transfer.sourceWallet);
+          const selectedWalletObj = getWalletByPrivateKey(
+            transfer.sourceWallet,
+          );
           if (!selectedWalletObj) {
-            throw new Error('Source wallet not found');
+            throw new Error("Source wallet not found");
           }
 
-          
           // Step 1: Request the transaction from the backend
-          const baseUrl = (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
+          const baseUrl =
+            (window as WindowWithConfig).tradingServerUrl?.replace(
+              /\/+$/,
+              "",
+            ) || "";
           const buildResponse = await fetch(`${baseUrl}/v2/sol/transfer`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               senderPublicKey: selectedWalletObj.address,
               receiver: transfer.recipient,
-              tokenAddress: transferType === 'TOKEN' ? selectedToken : null,
+              tokenAddress: transferType === "TOKEN" ? selectedToken : null,
               amount: transfer.amount,
             }),
           });
@@ -331,66 +389,80 @@ export const TransferModal: React.FC<TransferModalProps> = ({
             throw new Error(`HTTP error! status: ${buildResponse.status}`);
           }
 
-          const buildResult = await buildResponse.json() as { success: boolean; error?: string; data: { transaction: string } };
+          const buildResult = (await buildResponse.json()) as {
+            success: boolean;
+            error?: string;
+            data: { transaction: string };
+          };
           if (!buildResult.success) {
             throw new Error(buildResult.error);
           }
 
           // Step 2: Deserialize the transaction message from Base58
-          const transactionBuffer = Buffer.from(bs58.decode(buildResult.data.transaction));
+          const transactionBuffer = Buffer.from(
+            bs58.decode(buildResult.data.transaction),
+          );
           const messageV0 = MessageV0.deserialize(transactionBuffer);
-          
+
           // Step 3: Create and sign the versioned transaction
           const transaction = new VersionedTransaction(messageV0);
-          
+
           // Create keypair from private key
-          const keypair = Keypair.fromSecretKey(bs58.decode(transfer.sourceWallet));
-          
+          const keypair = Keypair.fromSecretKey(
+            bs58.decode(transfer.sourceWallet),
+          );
+
           // Sign the transaction
           transaction.sign([keypair]);
-          
+
           // Step 4: Send the signed transaction via Jito Bundle Service
           const serializedTransaction = bs58.encode(transaction.serialize());
-          const jitoResult = await sendToJitoBundleService(serializedTransaction) as { signature?: string; txid?: string };
-          
+          const jitoResult = (await sendToJitoBundleService(
+            serializedTransaction,
+          )) as { signature?: string; txid?: string };
+
           // Extract signature from Jito result
-          const signature = jitoResult.signature || jitoResult.txid || 'Unknown';
-          
+          const signature =
+            jitoResult.signature || jitoResult.txid || "Unknown";
+
           // Update status to completed
-          setTransferQueue(prev => prev.map((t, idx) => 
-            idx === i ? { ...t, status: 'completed', signature } : t
-          ));
-          
+          setTransferQueue((prev) =>
+            prev.map((t, idx) =>
+              idx === i ? { ...t, status: "completed", signature } : t,
+            ),
+          );
+
           completedCount++;
-          
         } catch (error) {
           console.error(`Transfer ${i + 1} failed:`, error);
-          
-          let errorMessage = 'Transfer failed';
+
+          let errorMessage = "Transfer failed";
           if (error instanceof Error) {
             errorMessage = error.message;
           }
-          
+
           // Update status to failed
-          setTransferQueue(prev => prev.map((t, idx) => 
-            idx === i ? { ...t, status: 'failed', error: errorMessage } : t
-          ));
-          
+          setTransferQueue((prev) =>
+            prev.map((t, idx) =>
+              idx === i ? { ...t, status: "failed", error: errorMessage } : t,
+            ),
+          );
+
           failedCount++;
         }
-        
+
         // Small delay between transfers to avoid rate limiting
         if (i < queue.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
-      
+
       // Show summary
       showToast(
-        `Batch transfer completed: ${completedCount} successful, ${failedCount} failed`, 
-        completedCount > 0 ? "success" : "error"
+        `Batch transfer completed: ${completedCount} successful, ${failedCount} failed`,
+        completedCount > 0 ? "success" : "error",
       );
-      
+
       if (completedCount === queue.length) {
         // All transfers successful, close modal after delay
         setTimeout(() => {
@@ -398,10 +470,9 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           onClose();
         }, 3000);
       }
-      
     } catch (error) {
-      console.error('Batch transfer error:', error);
-      showToast('Batch transfer failed', "error");
+      console.error("Batch transfer error:", error);
+      showToast("Batch transfer failed", "error");
     } finally {
       setBatchProcessing(false);
       setIsSubmitting(false);
@@ -409,14 +480,20 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   };
 
   // Filter and sort wallets based on search term and other criteria
-  const filterWallets = (walletList: WalletType[], search: string): WalletType[] => {
+  const filterWallets = (
+    walletList: WalletType[],
+    search: string,
+  ): WalletType[] => {
     // Check if using a custom token that needs balance fetching
-    const isCustomToken = transferType === 'TOKEN' && tokenAddressInput && tokenAddressInput !== tokenAddress;
+    const isCustomToken =
+      transferType === "TOKEN" &&
+      tokenAddressInput &&
+      tokenAddressInput !== tokenAddress;
     const hasBalanceData = isCustomToken ? balancesFetched : true;
-    
+
     // Filter based on transfer type and balance
-    let filtered = walletList.filter(wallet => {
-      if (transferType === 'SOL') {
+    let filtered = walletList.filter((wallet) => {
+      if (transferType === "SOL") {
         return (getWalletBalance(wallet.address) || 0) > 0;
       } else {
         // For custom tokens without fetched balances, show all wallets
@@ -426,45 +503,57 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         return (getWalletTokenBalance(wallet.address) || 0) > 0;
       }
     });
-    
+
     // Then apply search filter
     if (search) {
-      filtered = filtered.filter(wallet => 
-        wallet.address.toLowerCase().includes(search.toLowerCase())
+      filtered = filtered.filter((wallet) =>
+        wallet.address.toLowerCase().includes(search.toLowerCase()),
       );
     }
-    
+
     // Then apply additional balance filter
-    if (balanceFilter !== 'all') {
-      if (balanceFilter === 'highBalance') {
-        if (transferType === 'SOL') {
-          filtered = filtered.filter(wallet => (getWalletBalance(wallet.address) || 0) >= 0.1);
+    if (balanceFilter !== "all") {
+      if (balanceFilter === "highBalance") {
+        if (transferType === "SOL") {
+          filtered = filtered.filter(
+            (wallet) => (getWalletBalance(wallet.address) || 0) >= 0.1,
+          );
         } else {
-          filtered = filtered.filter(wallet => (getWalletTokenBalance(wallet.address) || 0) >= 1000);
+          filtered = filtered.filter(
+            (wallet) => (getWalletTokenBalance(wallet.address) || 0) >= 1000,
+          );
         }
-      } else if (balanceFilter === 'lowBalance') {
-        if (transferType === 'SOL') {
-          filtered = filtered.filter(wallet => (getWalletBalance(wallet.address) || 0) < 0.1);
+      } else if (balanceFilter === "lowBalance") {
+        if (transferType === "SOL") {
+          filtered = filtered.filter(
+            (wallet) => (getWalletBalance(wallet.address) || 0) < 0.1,
+          );
         } else {
-          filtered = filtered.filter(wallet => (getWalletTokenBalance(wallet.address) || 0) < 1000);
+          filtered = filtered.filter(
+            (wallet) => (getWalletTokenBalance(wallet.address) || 0) < 1000,
+          );
         }
       }
     }
-    
+
     // Finally, sort the wallets
     return filtered.sort((a, b) => {
-      if (sortOption === 'address') {
-        return sortDirection === 'asc' 
+      if (sortOption === "address") {
+        return sortDirection === "asc"
           ? a.address.localeCompare(b.address)
           : b.address.localeCompare(a.address);
-      } else if (sortOption === 'balance') {
-        const balanceA = transferType === 'SOL' 
-          ? (getWalletBalance(a.address) || 0)
-          : (getWalletTokenBalance(a.address) || 0);
-        const balanceB = transferType === 'SOL' 
-          ? (getWalletBalance(b.address) || 0)
-          : (getWalletTokenBalance(b.address) || 0);
-        return sortDirection === 'asc' ? balanceA - balanceB : balanceB - balanceA;
+      } else if (sortOption === "balance") {
+        const balanceA =
+          transferType === "SOL"
+            ? getWalletBalance(a.address) || 0
+            : getWalletTokenBalance(a.address) || 0;
+        const balanceB =
+          transferType === "SOL"
+            ? getWalletBalance(b.address) || 0
+            : getWalletTokenBalance(b.address) || 0;
+        return sortDirection === "asc"
+          ? balanceA - balanceB
+          : balanceB - balanceA;
       }
       return 0;
     });
@@ -474,44 +563,44 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   if (!isOpen) return null;
 
   // Animation keyframes for  elements
-  const modalStyleElement = document.createElement('style');
+  const modalStyleElement = document.createElement("style");
   modalStyleElement.textContent = `
     @keyframes modal-pulse {
       0% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
       50% { box-shadow: 0 0 15px var(--color-primary-80), 0 0 25px var(--color-primary-40); }
       100% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
     }
-    
+
     @keyframes modal-fade-in {
       0% { opacity: 0; }
       100% { opacity: 1; }
     }
-    
+
     @keyframes modal-slide-up {
       0% { transform: translateY(20px); opacity: 0; }
       100% { transform: translateY(0); opacity: 1; }
     }
-    
+
     @keyframes modal-scan-line {
       0% { transform: translateY(-100%); opacity: 0.3; }
       100% { transform: translateY(100%); opacity: 0; }
     }
-    
+
     .modal-content {
       position: relative;
     }
-    
+
     .modal-input-:focus {
       box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
       transition: all 0.3s ease;
     }
-    
+
     .modal-btn- {
       position: relative;
       overflow: hidden;
       transition: all 0.3s ease;
     }
-    
+
     .modal-btn-::after {
       content: "";
       position: absolute;
@@ -529,21 +618,21 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       transition: all 0.5s ease;
       opacity: 0;
     }
-    
+
     .modal-btn-:hover::after {
       opacity: 1;
       transform: rotate(45deg) translate(50%, 50%);
     }
-    
+
     .modal-btn-:active {
       transform: scale(0.95);
     }
-    
+
     .progress-bar- {
       position: relative;
       overflow: hidden;
     }
-    
+
     .progress-bar-::after {
       content: "";
       position: absolute;
@@ -562,48 +651,48 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       transform: translateX(-100%);
       animation: progress-shine 3s infinite;
     }
-    
+
     @keyframes progress-shine {
       0% { transform: translateX(-100%); }
       20% { transform: translateX(100%); }
       100% { transform: translateX(100%); }
     }
-    
+
     .glitch-text:hover {
       text-shadow: 0 0 2px var(--color-primary), 0 0 4px var(--color-primary);
       animation: glitch 2s infinite;
     }
-    
+
     @keyframes glitch {
       2%, 8% { transform: translate(-2px, 0) skew(0.3deg); }
       4%, 6% { transform: translate(2px, 0) skew(-0.3deg); }
       62%, 68% { transform: translate(0, 0) skew(0.33deg); }
       64%, 66% { transform: translate(0, 0) skew(-0.33deg); }
     }
-    
+
     @keyframes fadeIn {
       0% { opacity: 0; }
       100% { opacity: 1; }
     }
-    
+
     @keyframes scale-in {
       0% { transform: scale(0); }
       100% { transform: scale(1); }
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar {
       width: 4px;
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar-track {
       background: var(--color-bg-tertiary);
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar-thumb {
       background: var(--color-primary);
       border-radius: 2px;
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar-thumb:hover {
       background: var(--color-primary-dark);
     }
@@ -623,10 +712,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({
               <ArrowUpDown size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> TRANSFER CONSOLE <span className="color-primary">/</span>
+              <span className="color-primary">/</span> TRANSFER CONSOLE{" "}
+              <span className="color-primary">/</span>
             </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-app-secondary hover:color-primary transition-colors p-1 hover:bg-primary-20 rounded"
           >
@@ -636,9 +726,9 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
         {/* Progress Indicator */}
         <div className="relative w-full h-1 bg-app-tertiary progress-bar-">
-          <div 
+          <div
             className="h-full bg-app-primary-color transition-all duration-300"
-            style={{ width: currentStep === 0 ? '50%' : '100%' }}
+            style={{ width: currentStep === 0 ? "50%" : "100%" }}
           ></div>
         </div>
 
@@ -652,16 +742,17 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                   {/* Transfer Type Selection */}
                   <div className="group mb-4">
                     <label className="block text-sm font-medium text-app-secondary mb-2 group-hover:color-primary transition-colors duration-200 font-mono uppercase tracking-wider">
-                      <span className="color-primary">&#62;</span> Transfer Type <span className="color-primary">&#60;</span>
+                      <span className="color-primary">&#62;</span> Transfer Type{" "}
+                      <span className="color-primary">&#60;</span>
                     </label>
                     <div className="flex space-x-3">
                       <button
                         type="button"
-                        onClick={() => setTransferType('SOL')}
+                        onClick={() => setTransferType("SOL")}
                         className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn- ${
-                          transferType === 'SOL'
-                            ? 'bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40'
-                            : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
+                          transferType === "SOL"
+                            ? "bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40"
+                            : "bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary"
                         }`}
                       >
                         <DollarSign size={16} className="mr-2" />
@@ -669,23 +760,24 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTransferType('TOKEN')}
+                        onClick={() => setTransferType("TOKEN")}
                         className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn- ${
-                          transferType === 'TOKEN'
-                            ? 'bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40'
-                            : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
+                          transferType === "TOKEN"
+                            ? "bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40"
+                            : "bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary"
                         }`}
                       >
                         <Coins size={16} className="mr-2" />
                         TOKEN
                       </button>
                     </div>
-                    
+
                     {/* Token Address Input - shown when TOKEN is selected */}
-                    {transferType === 'TOKEN' && (
+                    {transferType === "TOKEN" && (
                       <div className="mt-3">
                         <label className="block text-xs font-medium text-app-secondary mb-1.5 font-mono uppercase tracking-wider">
-                          <span className="color-primary">&#62;</span> Token Address <span className="color-primary">&#60;</span>
+                          <span className="color-primary">&#62;</span> Token
+                          Address <span className="color-primary">&#60;</span>
                         </label>
                         <div className="flex space-x-2">
                           <input
@@ -706,22 +798,29 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                             disabled={!tokenAddressInput || isLoadingBalances}
                             className={`px-3 py-2 rounded-lg border transition-all duration-200 font-mono text-xs flex items-center ${
                               !tokenAddressInput || isLoadingBalances
-                                ? 'bg-app-tertiary border-app-primary-20 text-app-secondary-40 cursor-not-allowed'
-                                : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
+                                ? "bg-app-tertiary border-app-primary-20 text-app-secondary-40 cursor-not-allowed"
+                                : "bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary"
                             }`}
                             title="Fetch token balances for all wallets"
                           >
-                            <RefreshCw size={14} className={`${isLoadingBalances ? 'animate-spin' : ''}`} />
+                            <RefreshCw
+                              size={14}
+                              className={`${isLoadingBalances ? "animate-spin" : ""}`}
+                            />
                           </button>
                         </div>
                         {tokenAddressInput && (
                           <div className="mt-1.5 flex items-center justify-between">
                             <div className="text-xs color-primary font-mono">
-                              <span className="text-app-secondary">TOKEN:</span> {formatAddress(tokenAddressInput)}
+                              <span className="text-app-secondary">TOKEN:</span>{" "}
+                              {formatAddress(tokenAddressInput)}
                             </div>
                             {isLoadingBalances && (
                               <div className="text-xs text-app-secondary font-mono flex items-center">
-                                <RefreshCw size={10} className="animate-spin mr-1" />
+                                <RefreshCw
+                                  size={10}
+                                  className="animate-spin mr-1"
+                                />
                                 FETCHING BALANCES...
                               </div>
                             )}
@@ -733,12 +832,14 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                             )}
                           </div>
                         )}
-                        {tokenAddressInput && !balancesFetched && !isLoadingBalances && (
-                          <div className="mt-2 text-xs text-warning font-mono flex items-center">
-                            <Info size={12} className="mr-1" />
-                            Click refresh to fetch token balances for wallets
-                          </div>
-                        )}
+                        {tokenAddressInput &&
+                          !balancesFetched &&
+                          !isLoadingBalances && (
+                            <div className="mt-2 text-xs text-warning font-mono flex items-center">
+                              <Info size={12} className="mr-1" />
+                              Click refresh to fetch token balances for wallets
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -747,14 +848,19 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                   <div className="group mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium text-app-secondary group-hover:color-primary transition-colors duration-200 font-mono uppercase tracking-wider">
-                        <span className="color-primary">&#62;</span> Source Wallets ({sourceWallets.length} selected) <span className="color-primary">&#60;</span>
+                        <span className="color-primary">&#62;</span> Source
+                        Wallets ({sourceWallets.length} selected){" "}
+                        <span className="color-primary">&#60;</span>
                       </label>
                     </div>
 
                     {/* Source Search and Filters */}
                     <div className="mb-2 flex space-x-2">
                       <div className="relative flex-grow">
-                        <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary" />
+                        <Search
+                          size={14}
+                          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-app-secondary"
+                        />
                         <input
                           type="text"
                           value={sourceSearchTerm}
@@ -763,8 +869,8 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                           placeholder="SEARCH WALLETS..."
                         />
                       </div>
-                      
-                      <select 
+
+                      <select
                         className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                         value={sortOption}
                         onChange={(e) => setSortOption(e.target.value)}
@@ -772,70 +878,117 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                         <option value="address">ADDRESS</option>
                         <option value="balance">BALANCE</option>
                       </select>
-                      
+
                       <button
                         className="p-2 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-secondary hover:color-primary hover-border-primary transition-all modal-btn-"
-                        onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                        onClick={() =>
+                          setSortDirection(
+                            sortDirection === "asc" ? "desc" : "asc",
+                          )
+                        }
                       >
-                        {sortDirection === 'asc' ? '↑' : '↓'}
+                        {sortDirection === "asc" ? "↑" : "↓"}
                       </button>
                     </div>
 
                     <div className="h-48 overflow-y-auto border border-app-primary-20 rounded-lg shadow-inner bg-app-tertiary transition-all duration-200 group-hover:border-app-primary-40 scrollbar-thin">
                       {filterWallets(wallets, sourceSearchTerm).length > 0 ? (
-                        filterWallets(wallets, sourceSearchTerm).map((wallet) => (
-                          <div 
-                            key={wallet.id}
-                            className={`flex items-center p-2.5 hover-bg-secondary cursor-pointer transition-all duration-200 border-b border-app-primary-20 last:border-b-0
-                                      ${sourceWallets.includes(wallet.privateKey) ? 'bg-primary-10 border-app-primary-30' : ''}`}
-                            onClick={() => toggleSourceWallet(wallet.privateKey)}
-                          >
-                            <div className={`w-5 h-5 mr-3 rounded flex items-center justify-center transition-all duration-300
-                                            ${sourceWallets.includes(wallet.privateKey)
-                                              ? 'bg-app-primary-color shadow-md shadow-app-primary-40' 
-                                              : 'border border-app-primary-30 bg-app-tertiary'}`}>
-                              {sourceWallets.includes(wallet.privateKey) && (
-                                <CheckCircle size={14} className="text-app-primary animate-[fadeIn_0.2s_ease]" />
-                              )}
-                            </div>
-                            <div className="flex-1 flex flex-col">
-                              <span className="font-mono text-sm text-app-primary glitch-text">{getWalletDisplayName(wallet)}</span>
-                              <div className="flex items-center mt-0.5">
-                                {transferType === 'SOL' ? (
-                                  <>
-                                    <DollarSign size={12} className="text-app-secondary mr-1" />
-                                    <span className="text-xs text-app-secondary font-mono">{formatSolBalance(getWalletBalance(wallet.address) || 0)} SOL</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Coins size={12} className="text-app-secondary mr-1" />
-                                    <span className="text-xs text-app-secondary font-mono">{formatTokenBalance(getWalletTokenBalance(wallet.address) || 0)} TKN</span>
-                                  </>
+                        filterWallets(wallets, sourceSearchTerm).map(
+                          (wallet) => (
+                            <div
+                              key={wallet.id}
+                              className={`flex items-center p-2.5 hover-bg-secondary cursor-pointer transition-all duration-200 border-b border-app-primary-20 last:border-b-0
+                                      ${sourceWallets.includes(wallet.privateKey) ? "bg-primary-10 border-app-primary-30" : ""}`}
+                              onClick={() =>
+                                toggleSourceWallet(wallet.privateKey)
+                              }
+                            >
+                              <div
+                                className={`w-5 h-5 mr-3 rounded flex items-center justify-center transition-all duration-300
+                                            ${
+                                              sourceWallets.includes(
+                                                wallet.privateKey,
+                                              )
+                                                ? "bg-app-primary-color shadow-md shadow-app-primary-40"
+                                                : "border border-app-primary-30 bg-app-tertiary"
+                                            }`}
+                              >
+                                {sourceWallets.includes(wallet.privateKey) && (
+                                  <CheckCircle
+                                    size={14}
+                                    className="text-app-primary animate-[fadeIn_0.2s_ease]"
+                                  />
                                 )}
                               </div>
+                              <div className="flex-1 flex flex-col">
+                                <span className="font-mono text-sm text-app-primary glitch-text">
+                                  {getWalletDisplayName(wallet)}
+                                </span>
+                                <div className="flex items-center mt-0.5">
+                                  {transferType === "SOL" ? (
+                                    <>
+                                      <DollarSign
+                                        size={12}
+                                        className="text-app-secondary mr-1"
+                                      />
+                                      <span className="text-xs text-app-secondary font-mono">
+                                        {formatSolBalance(
+                                          getWalletBalance(wallet.address) || 0,
+                                        )}{" "}
+                                        SOL
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Coins
+                                        size={12}
+                                        className="text-app-secondary mr-1"
+                                      />
+                                      <span className="text-xs text-app-secondary font-mono">
+                                        {formatTokenBalance(
+                                          getWalletTokenBalance(
+                                            wallet.address,
+                                          ) || 0,
+                                        )}{" "}
+                                        TKN
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          ),
+                        )
                       ) : (
                         <div className="p-3 text-sm text-app-secondary text-center font-mono">
-                          {transferType === 'TOKEN' && tokenAddressInput && !balancesFetched ? (
+                          {transferType === "TOKEN" &&
+                          tokenAddressInput &&
+                          !balancesFetched ? (
                             <>
-                              <div>CLICK THE REFRESH BUTTON TO FETCH BALANCES</div>
-                              <div className="text-xs mt-1 text-app-secondary-60">Wallet balances will be shown after fetching</div>
+                              <div>
+                                CLICK THE REFRESH BUTTON TO FETCH BALANCES
+                              </div>
+                              <div className="text-xs mt-1 text-app-secondary-60">
+                                Wallet balances will be shown after fetching
+                              </div>
                             </>
-                          ) : sourceSearchTerm 
-                            ? `NO WALLETS FOUND WITH ${transferType} BALANCE > 0` 
-                            : `NO WALLETS AVAILABLE WITH ${transferType} BALANCE > 0`}
+                          ) : sourceSearchTerm ? (
+                            `NO WALLETS FOUND WITH ${transferType} BALANCE > 0`
+                          ) : (
+                            `NO WALLETS AVAILABLE WITH ${transferType} BALANCE > 0`
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Recipient Addresses */}
                   <div className="group">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium text-app-secondary group-hover:color-primary transition-colors duration-200 font-mono uppercase tracking-wider">
-                        <span className="color-primary">&#62;</span> Recipients ({receiverAddresses.length}) <span className="color-primary">&#60;</span>
+                        <span className="color-primary">&#62;</span> Recipients
+                        ({receiverAddresses.length}){" "}
+                        <span className="color-primary">&#60;</span>
                       </label>
                     </div>
 
@@ -846,7 +999,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                         value={newRecipientAddress}
                         onChange={(e) => setNewRecipientAddress(e.target.value)}
                         onKeyPress={(e) => {
-                          if (e.key === 'Enter' && newRecipientAddress.trim()) {
+                          if (e.key === "Enter" && newRecipientAddress.trim()) {
                             addRecipientAddress(newRecipientAddress.trim());
                           }
                         }}
@@ -871,21 +1024,44 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                     <div className="h-32 overflow-y-auto border border-app-primary-20 rounded-lg bg-app-tertiary scrollbar-thin">
                       {receiverAddresses.length > 0 ? (
                         receiverAddresses.map((address, index) => (
-                          <div key={index} className="flex items-center justify-between p-2.5 border-b border-app-primary-20 last:border-b-0 hover-bg-secondary transition-all duration-200">
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2.5 border-b border-app-primary-20 last:border-b-0 hover-bg-secondary transition-all duration-200"
+                          >
                             <div className="flex-1">
-                              <span className="font-mono text-sm text-app-primary">{formatAddress(address)}</span>
-                              {transferType === 'SOL' && solBalances.has(address) && (
-                                <div className="flex items-center mt-0.5">
-                                  <DollarSign size={12} className="text-app-secondary mr-1" />
-                                  <span className="text-xs text-app-secondary font-mono">{formatSolBalance(getWalletBalance(address) || 0)} SOL</span>
-                                </div>
-                              )}
-                              {transferType === 'TOKEN' && tokenBalances.has(address) && (
-                                <div className="flex items-center mt-0.5">
-                                  <Coins size={12} className="text-app-secondary mr-1" />
-                                  <span className="text-xs text-app-secondary font-mono">{formatTokenBalance(getWalletTokenBalance(address) || 0)} TKN</span>
-                                </div>
-                              )}
+                              <span className="font-mono text-sm text-app-primary">
+                                {formatAddress(address)}
+                              </span>
+                              {transferType === "SOL" &&
+                                solBalances.has(address) && (
+                                  <div className="flex items-center mt-0.5">
+                                    <DollarSign
+                                      size={12}
+                                      className="text-app-secondary mr-1"
+                                    />
+                                    <span className="text-xs text-app-secondary font-mono">
+                                      {formatSolBalance(
+                                        getWalletBalance(address) || 0,
+                                      )}{" "}
+                                      SOL
+                                    </span>
+                                  </div>
+                                )}
+                              {transferType === "TOKEN" &&
+                                tokenBalances.has(address) && (
+                                  <div className="flex items-center mt-0.5">
+                                    <Coins
+                                      size={12}
+                                      className="text-app-secondary mr-1"
+                                    />
+                                    <span className="text-xs text-app-secondary font-mono">
+                                      {formatTokenBalance(
+                                        getWalletTokenBalance(address) || 0,
+                                      )}{" "}
+                                      TKN
+                                    </span>
+                                  </div>
+                                )}
                             </div>
                             <button
                               type="button"
@@ -914,32 +1090,37 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 {sourceWallets.length > 0 && receiverAddresses.length > 0 && (
                   <div className="group">
                     <label className="block text-sm font-medium text-app-secondary mb-2 group-hover:color-primary transition-colors duration-200 font-mono uppercase tracking-wider">
-                      <span className="color-primary">&#62;</span> Distribution Mode <span className="color-primary">&#60;</span>
+                      <span className="color-primary">&#62;</span> Distribution
+                      Mode <span className="color-primary">&#60;</span>
                     </label>
                     <div className="space-y-2">
                       <button
                         type="button"
-                        onClick={() => setDistributionMode('amount')}
+                        onClick={() => setDistributionMode("amount")}
                         className={`w-full p-3 rounded-lg border transition-all duration-200 font-mono text-sm ${
-                          distributionMode === 'amount'
-                            ? 'bg-primary-10 border-app-primary color-primary'
-                            : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
+                          distributionMode === "amount"
+                            ? "bg-primary-10 border-app-primary color-primary"
+                            : "bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary"
                         }`}
                       >
                         <div className="font-semibold mb-1">FIXED AMOUNT</div>
-                        <div className="text-xs opacity-80">Transfer exact amount from each wallet</div>
+                        <div className="text-xs opacity-80">
+                          Transfer exact amount from each wallet
+                        </div>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDistributionMode('percentage')}
+                        onClick={() => setDistributionMode("percentage")}
                         className={`w-full p-3 rounded-lg border transition-all duration-200 font-mono text-sm ${
-                          distributionMode === 'percentage'
-                            ? 'bg-primary-10 border-app-primary color-primary'
-                            : 'bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary'
+                          distributionMode === "percentage"
+                            ? "bg-primary-10 border-app-primary color-primary"
+                            : "bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary"
                         }`}
                       >
                         <div className="font-semibold mb-1">PERCENTAGE</div>
-                        <div className="text-xs opacity-80">Transfer % of each wallet's balance</div>
+                        <div className="text-xs opacity-80">
+                          Transfer % of each wallet's balance
+                        </div>
                       </button>
                     </div>
                   </div>
@@ -948,8 +1129,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 {/* Amount Input */}
                 <div className="group">
                   <label className="block text-sm font-medium text-app-secondary mb-1.5 group-hover:color-primary transition-colors duration-200 font-mono uppercase tracking-wider">
-                    <span className="color-primary">&#62;</span> 
-                    {distributionMode === 'percentage' ? 'Percentage (%)' : `Amount (${transferType})`} 
+                    <span className="color-primary">&#62;</span>
+                    {distributionMode === "percentage"
+                      ? "Percentage (%)"
+                      : `Amount (${transferType})`}
                     <span className="color-primary">&#60;</span>
                   </label>
                   <div className="relative">
@@ -958,25 +1141,40 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       className="w-full px-4 py-2.5 pr-16 bg-app-tertiary border border-app-primary-30 rounded-lg text-app-primary shadow-inner focus-border-primary focus:ring-1 ring-primary-50 focus:outline-none transition-all duration-200 modal-input- font-mono tracking-wider"
-                      placeholder={distributionMode === 'percentage' ? 'ENTER %' : `ENTER ${transferType}`}
-                      step={distributionMode === 'percentage' ? '0.1' : (transferType === 'SOL' ? '0.0001' : '1')}
+                      placeholder={
+                        distributionMode === "percentage"
+                          ? "ENTER %"
+                          : `ENTER ${transferType}`
+                      }
+                      step={
+                        distributionMode === "percentage"
+                          ? "0.1"
+                          : transferType === "SOL"
+                            ? "0.0001"
+                            : "1"
+                      }
                       min="0"
-                      max={distributionMode === 'percentage' ? '100' : undefined}
+                      max={
+                        distributionMode === "percentage" ? "100" : undefined
+                      }
                     />
                     <button
                       type="button"
                       onClick={() => {
                         if (sourceWallets.length > 0) {
-                          if (distributionMode === 'percentage') {
-                            setAmount('100');
+                          if (distributionMode === "percentage") {
+                            setAmount("100");
                           } else {
-                            const maxBalance = Math.min(...sourceWallets.map(privateKey => {
-                              const wallet = getWalletByPrivateKey(privateKey);
-                              if (!wallet) return 0;
-                              return transferType === 'SOL' 
-                                ? getWalletBalance(wallet.address) || 0
-                                : getWalletTokenBalance(wallet.address) || 0;
-                            }));
+                            const maxBalance = Math.min(
+                              ...sourceWallets.map((privateKey) => {
+                                const wallet =
+                                  getWalletByPrivateKey(privateKey);
+                                if (!wallet) return 0;
+                                return transferType === "SOL"
+                                  ? getWalletBalance(wallet.address) || 0
+                                  : getWalletTokenBalance(wallet.address) || 0;
+                              }),
+                            );
                             setAmount(maxBalance.toString());
                           }
                         }
@@ -990,112 +1188,164 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 </div>
 
                 {/* Transfer Summary */}
-                {sourceWallets.length > 0 && receiverAddresses.length > 0 && amount && (
-                  <div className="bg-app-tertiary border border-app-primary-30 rounded-lg p-4">
-                    <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">TRANSFER SUMMARY</h3>
-                    
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-                        <div>
-                          <span className="text-app-secondary">SOURCES:</span>
-                          <span className="color-primary ml-1 font-semibold">{sourceWallets.length}</span>
-                        </div>
-                        <div>
-                          <span className="text-app-secondary">RECIPIENTS:</span>
-                          <span className="color-primary ml-1 font-semibold">{receiverAddresses.length}</span>
-                        </div>
-                        <div>
-                          <span className="text-app-secondary">AMOUNT:</span>
-                          <span className="color-primary ml-1 font-semibold">
-                            {distributionMode === 'percentage' ? `${amount}%` : `${amount} ${transferType}`}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-app-secondary">TOTAL TXN:</span>
-                          <span className="color-primary ml-1 font-semibold">{sourceWallets.length * receiverAddresses.length}</span>
-                        </div>
-                      </div>
+                {sourceWallets.length > 0 &&
+                  receiverAddresses.length > 0 &&
+                  amount && (
+                    <div className="bg-app-tertiary border border-app-primary-30 rounded-lg p-4">
+                      <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">
+                        TRANSFER SUMMARY
+                      </h3>
 
-                      <div className="text-xs font-mono text-app-secondary">
-                        {distributionMode === 'percentage' ? (
-                          `${amount}% of each wallet's balance to each of ${receiverAddresses.length} recipient(s)`
-                        ) : (
-                          `${amount} ${transferType} from each wallet to each of ${receiverAddresses.length} recipient(s)`
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                          <div>
+                            <span className="text-app-secondary">SOURCES:</span>
+                            <span className="color-primary ml-1 font-semibold">
+                              {sourceWallets.length}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-app-secondary">
+                              RECIPIENTS:
+                            </span>
+                            <span className="color-primary ml-1 font-semibold">
+                              {receiverAddresses.length}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-app-secondary">AMOUNT:</span>
+                            <span className="color-primary ml-1 font-semibold">
+                              {distributionMode === "percentage"
+                                ? `${amount}%`
+                                : `${amount} ${transferType}`}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-app-secondary">
+                              TOTAL TXN:
+                            </span>
+                            <span className="color-primary ml-1 font-semibold">
+                              {sourceWallets.length * receiverAddresses.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-xs font-mono text-app-secondary">
+                          {distributionMode === "percentage"
+                            ? `${amount}% of each wallet's balance to each of ${receiverAddresses.length} recipient(s)`
+                            : `${amount} ${transferType} from each wallet to each of ${receiverAddresses.length} recipient(s)`}
+                        </div>
+
+                        {transferType === "TOKEN" && selectedToken && (
+                          <div className="p-2 bg-app-primary rounded border border-app-primary-20">
+                            <p className="text-xs text-app-secondary font-mono mb-1">
+                              TOKEN:
+                            </p>
+                            <p className="text-xs text-app-primary font-mono break-all">
+                              {selectedToken}
+                            </p>
+                          </div>
                         )}
                       </div>
 
-                      {transferType === 'TOKEN' && selectedToken && (
-                        <div className="p-2 bg-app-primary rounded border border-app-primary-20">
-                          <p className="text-xs text-app-secondary font-mono mb-1">TOKEN:</p>
-                          <p className="text-xs text-app-primary font-mono break-all">{selectedToken}</p>
+                      {/* Confirmation Checkbox */}
+                      <div
+                        className="flex items-center px-3 py-3 bg-app-primary rounded-lg border border-app-primary-40 mt-4 cursor-pointer"
+                        onClick={() => setIsConfirmed(!isConfirmed)}
+                      >
+                        <div className="relative mx-1">
+                          <div
+                            className={`w-5 h-5 border border-app-primary-40 rounded transition-all ${isConfirmed ? "bg-app-primary-color border-0" : ""}`}
+                          ></div>
+                          <CheckCircle
+                            size={14}
+                            className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? "opacity-100" : "opacity-0"}`}
+                          />
                         </div>
-                      )}
-                    </div>
-
-                    {/* Confirmation Checkbox */}
-                    <div 
-                      className="flex items-center px-3 py-3 bg-app-primary rounded-lg border border-app-primary-40 mt-4 cursor-pointer"
-                      onClick={() => setIsConfirmed(!isConfirmed)}
-                    >
-                      <div className="relative mx-1">
-                        <div 
-                          className={`w-5 h-5 border border-app-primary-40 rounded transition-all ${isConfirmed ? 'bg-app-primary-color border-0' : ''}`}
-                        ></div>
-                        <CheckCircle size={14} className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? 'opacity-100' : 'opacity-0'}`} />
+                        <span className="text-app-primary text-sm ml-2 select-none font-mono">
+                          CONFIRM BATCH TRANSFER
+                        </span>
                       </div>
-                      <span className="text-app-primary text-sm ml-2 select-none font-mono">
-                        CONFIRM BATCH TRANSFER
-                      </span>
-                    </div>
 
-                    {/* Execute Button */}
-                    <button
-                      onClick={handleBatchTransfer}
-                      disabled={!isConfirmed || isSubmitting || batchProcessing}
-                      className={`w-full mt-4 px-5 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all duration-300 font-mono tracking-wider
-                                ${!isConfirmed || isSubmitting || batchProcessing
-                                  ? 'bg-primary-50 text-app-secondary-80 cursor-not-allowed opacity-50' 
-                                  : 'bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-'}`}
-                    >
-                      {isSubmitting || batchProcessing ? (
-                        <>
-                          <div className="h-4 w-4 rounded-full border-2 border-app-secondary-80 border-t-transparent animate-spin mr-2"></div>
-                          {batchProcessing ? 'PROCESSING...' : 'INITIALIZING...'}
-                        </>
-                      ) : (
-                        `EXECUTE BATCH (${sourceWallets.length * receiverAddresses.length} TXN)`
-                      )}
-                    </button>
-                  </div>
-                )}
+                      {/* Execute Button */}
+                      <button
+                        onClick={handleBatchTransfer}
+                        disabled={
+                          !isConfirmed || isSubmitting || batchProcessing
+                        }
+                        className={`w-full mt-4 px-5 py-3 rounded-lg shadow-lg flex items-center justify-center transition-all duration-300 font-mono tracking-wider
+                                ${
+                                  !isConfirmed ||
+                                  isSubmitting ||
+                                  batchProcessing
+                                    ? "bg-primary-50 text-app-secondary-80 cursor-not-allowed opacity-50"
+                                    : "bg-app-primary-color text-app-primary hover:bg-app-primary-dark transform hover:-translate-y-0.5 modal-btn-"
+                                }`}
+                      >
+                        {isSubmitting || batchProcessing ? (
+                          <>
+                            <div className="h-4 w-4 rounded-full border-2 border-app-secondary-80 border-t-transparent animate-spin mr-2"></div>
+                            {batchProcessing
+                              ? "PROCESSING..."
+                              : "INITIALIZING..."}
+                          </>
+                        ) : (
+                          `EXECUTE BATCH (${sourceWallets.length * receiverAddresses.length} TXN)`
+                        )}
+                      </button>
+                    </div>
+                  )}
 
                 {/* Processing Progress */}
                 {batchProcessing && transferQueue.length > 0 && (
                   <div className="bg-app-quaternary border border-app-primary-40 rounded-lg p-4">
-                    <p className="text-sm color-primary font-medium mb-3 font-mono">PROCESSING PROGRESS</p>
+                    <p className="text-sm color-primary font-medium mb-3 font-mono">
+                      PROCESSING PROGRESS
+                    </p>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-mono">
                         <span className="text-app-secondary">CURRENT:</span>
-                        <span className="color-primary">{currentTransferIndex + 1} / {transferQueue.length}</span>
+                        <span className="color-primary">
+                          {currentTransferIndex + 1} / {transferQueue.length}
+                        </span>
                       </div>
                       <div className="w-full bg-app-tertiary rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-app-primary-color h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${((currentTransferIndex + 1) / transferQueue.length) * 100}%` }}
+                          style={{
+                            width: `${((currentTransferIndex + 1) / transferQueue.length) * 100}%`,
+                          }}
                         ></div>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-xs font-mono mt-2">
                         <div className="text-center">
                           <span className="text-app-secondary">DONE:</span>
-                          <span className="color-primary ml-1">{transferQueue.filter(t => t.status === 'completed').length}</span>
+                          <span className="color-primary ml-1">
+                            {
+                              transferQueue.filter(
+                                (t) => t.status === "completed",
+                              ).length
+                            }
+                          </span>
                         </div>
                         <div className="text-center">
                           <span className="text-app-secondary">ACTIVE:</span>
-                          <span className="text-warning ml-1">{transferQueue.filter(t => t.status === 'processing').length}</span>
+                          <span className="text-warning ml-1">
+                            {
+                              transferQueue.filter(
+                                (t) => t.status === "processing",
+                              ).length
+                            }
+                          </span>
                         </div>
                         <div className="text-center">
                           <span className="text-app-secondary">FAILED:</span>
-                          <span className="text-warning ml-1">{transferQueue.filter(t => t.status === 'failed').length}</span>
+                          <span className="text-warning ml-1">
+                            {
+                              transferQueue.filter((t) => t.status === "failed")
+                                .length
+                            }
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1105,9 +1355,8 @@ export const TransferModal: React.FC<TransferModalProps> = ({
             </div>
           </div>
         </div>
-        
-</div>
+      </div>
     </div>,
-    document.body
+    document.body,
   );
 };

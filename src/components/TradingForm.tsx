@@ -1,116 +1,127 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { Loader2, Move, Edit3, Check, ClipboardList, X, RefreshCw, Calendar, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
-import { 
-  createMultipleLimitOrders, 
-  getActiveOrders, 
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
+import {
+  Loader2,
+  Move,
+  Edit3,
+  Check,
+  ClipboardList,
+  X,
+  RefreshCw,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
+} from "lucide-react";
+import {
+  createMultipleLimitOrders,
+  getActiveOrders,
   processLimitOrderBundle,
   cancelOrderWithBundle,
   solToLamports,
   validateLimitOrderConfig,
   calculatePrice,
   type LimitOrderConfig,
-  type ActiveOrdersResponse
-} from '../utils/limitorders';
-import { useToast } from '../utils/useToast';
-import { toggleWallet, saveWalletsToCookies, getWalletDisplayName } from '../Utils';
-import { formatTokenBalance } from '../utils/formatting';
-import type { WalletType } from '../Utils';
+  type ActiveOrdersResponse,
+} from "../utils/limitorders";
+import { useToast } from "../utils/hooks";
+import { toggleWallet, getWalletDisplayName } from "../utils/wallet";
+import { saveWalletsToCookies } from "../utils/storage";
+import { formatTokenBalance } from "../utils/formatting";
+import type { WalletType } from "../utils/types";
 
 interface PresetButtonProps {
   value: string;
   onExecute: () => void;
   onChange: (newValue: string) => void;
   isLoading: boolean;
-  variant?: 'buy' | 'sell';
+  variant?: "buy" | "sell";
   isEditMode: boolean;
   index: number;
 }
 
 // Preset Button component
-const PresetButton = React.memo<PresetButtonProps>(({ 
-  value, 
-  onExecute, 
-  onChange,
-  isLoading, 
-  variant = 'buy',
-  isEditMode
-}) => {
-  const [editValue, setEditValue] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
+const PresetButton = React.memo<PresetButtonProps>(
+  ({ value, onExecute, onChange, isLoading, variant = "buy", isEditMode }) => {
+    const [editValue, setEditValue] = useState(value);
+    const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setEditValue(value);
-  }, [value]);
+    useEffect(() => {
+      setEditValue(value);
+    }, [value]);
 
-  useEffect(() => {
-    if (isEditMode && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isEditMode]);
+    useEffect(() => {
+      if (isEditMode && inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, [isEditMode]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+      if (e.key === "Enter") {
+        const newValue = parseFloat(editValue);
+        if (!isNaN(newValue) && newValue > 0) {
+          onChange(newValue.toString());
+        }
+      } else if (e.key === "Escape") {
+        setEditValue(value);
+      }
+    };
+
+    const handleBlur = (): void => {
       const newValue = parseFloat(editValue);
       if (!isNaN(newValue) && newValue > 0) {
         onChange(newValue.toString());
+      } else {
+        setEditValue(value);
       }
-    } else if (e.key === 'Escape') {
-      setEditValue(value);
-    }
-  };
+    };
 
-  const handleBlur = (): void => {
-    const newValue = parseFloat(editValue);
-    if (!isNaN(newValue) && newValue > 0) {
-      onChange(newValue.toString());
-    } else {
-      setEditValue(value);
-    }
-  };
-
-  if (isEditMode) {
-    return (
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          className="w-full h-8 px-2 text-xs font-mono rounded border text-center
+    if (isEditMode) {
+      return (
+        <div className="relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) =>
+              setEditValue(e.target.value.replace(/[^0-9.]/g, ""))
+            }
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            className="w-full h-8 px-2 text-xs font-mono rounded border text-center
                    bg-app-primary text-app-primary border-app-primary-color
                    focus:outline-none focus:ring-1 focus:ring-app-primary-40"
-        />
-      </div>
-    );
-  }
+          />
+        </div>
+      );
+    }
 
-  return (
-    <button
-      onClick={() => onExecute()}
-      disabled={isLoading}
-      className={`relative group px-2 py-1.5 text-xs font-mono rounded border transition-all duration-200
+    return (
+      <button
+        onClick={() => onExecute()}
+        disabled={isLoading}
+        className={`relative group px-2 py-1.5 text-xs font-mono rounded border transition-all duration-200
                 min-w-[48px] h-8 flex items-center justify-center
                 disabled:opacity-50 disabled:cursor-not-allowed
-                ${variant === 'buy' 
-                  ? 'bg-app-primary-60 border-app-primary-40 color-primary hover-bg-primary-20 hover-border-primary' 
-                  : 'bg-app-primary-60 border-error-alt-40 text-error-alt hover-bg-error-30 hover-border-error-alt'
+                ${
+                  variant === "buy"
+                    ? "bg-app-primary-60 border-app-primary-40 color-primary hover-bg-primary-20 hover-border-primary"
+                    : "bg-app-primary-60 border-error-alt-40 text-error-alt hover-bg-error-30 hover-border-error-alt"
                 }`}
-    >
-      {isLoading ? (
-        <div className="flex items-center gap-1">
-          <Loader2 size={10} className="animate-spin" />
-          <span>{value}</span>
-        </div>
-      ) : (
-        value
-      )}
-    </button>
-  );
-});
-PresetButton.displayName = 'PresetButton';
+      >
+        {isLoading ? (
+          <div className="flex items-center gap-1">
+            <Loader2 size={10} className="animate-spin" />
+            <span>{value}</span>
+          </div>
+        ) : (
+          value
+        )}
+      </button>
+    );
+  },
+);
+PresetButton.displayName = "PresetButton";
 
 interface TabButtonProps {
   label: string;
@@ -121,76 +132,79 @@ interface TabButtonProps {
 }
 
 // Tab Button component
-const TabButton = React.memo<TabButtonProps>(({ label, isActive, onClick, onEdit, isEditMode }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(label);
-  const inputRef = useRef(null);
+const TabButton = React.memo<TabButtonProps>(
+  ({ label, isActive, onClick, onEdit, isEditMode }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editValue, setEditValue] = useState(label);
+    const inputRef = useRef(null);
 
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      (inputRef.current as HTMLInputElement).focus();
-      (inputRef.current as HTMLInputElement).select();
-    }
-  }, [isEditing]);
+    useEffect(() => {
+      if (isEditing && inputRef.current) {
+        (inputRef.current as HTMLInputElement).focus();
+        (inputRef.current as HTMLInputElement).select();
+      }
+    }, [isEditing]);
 
-  const handleClick = (): void => {
-    if (isEditMode) {
-      setIsEditing(true);
-      setEditValue(label);
-    } else {
-      onClick();
-    }
-  };
+    const handleClick = (): void => {
+      if (isEditMode) {
+        setIsEditing(true);
+        setEditValue(label);
+      } else {
+        onClick();
+      }
+    };
 
-  const handleSave = (): void => {
-    if (editValue.trim()) {
-      onEdit(editValue.trim());
-    }
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      setEditValue(label);
+    const handleSave = (): void => {
+      if (editValue.trim()) {
+        onEdit(editValue.trim());
+      }
       setIsEditing(false);
-    }
-  };
+    };
 
-  if (isEditing) {
-    return (
-      <div className="flex-1">
-        <input
-          ref={inputRef}
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSave}
-          className="w-full px-2 py-1 text-xs font-mono rounded
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+      if (e.key === "Enter") {
+        handleSave();
+      } else if (e.key === "Escape") {
+        setEditValue(label);
+        setIsEditing(false);
+      }
+    };
+
+    if (isEditing) {
+      return (
+        <div className="flex-1">
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleSave}
+            className="w-full px-2 py-1 text-xs font-mono rounded
                    bg-app-primary text-app-primary border border-app-primary-color
                    focus:outline-none focus:ring-1 focus:ring-app-primary-40"
-        />
-      </div>
-    );
-  }
+          />
+        </div>
+      );
+    }
 
-  return (
-    <button
-      onClick={handleClick}
-      className={`flex-1 px-3 py-1.5 text-xs font-mono rounded transition-all duration-200
-                ${isActive 
-                  ? 'bg-primary-20 border border-app-primary-80 color-primary' 
-                  : 'bg-app-primary-60 border border-app-primary-40 text-app-secondary-60 hover-border-primary-40 hover-text-app-secondary'
+    return (
+      <button
+        onClick={handleClick}
+        className={`flex-1 px-3 py-1.5 text-xs font-mono rounded transition-all duration-200
+                ${
+                  isActive
+                    ? "bg-primary-20 border border-app-primary-80 color-primary"
+                    : "bg-app-primary-60 border border-app-primary-40 text-app-secondary-60 hover-border-primary-40 hover-text-app-secondary"
                 }
-                ${isEditMode ? 'cursor-text' : 'cursor-pointer'}`}
-    >
-      {label}
-    </button>
-  );
-});
-TabButton.displayName = 'TabButton';
+                ${isEditMode ? "cursor-text" : "cursor-pointer"}`}
+      >
+        {label}
+      </button>
+    );
+  },
+);
+TabButton.displayName = "TabButton";
 
 interface CalendarWidgetProps {
   isOpen: boolean;
@@ -202,164 +216,184 @@ interface CalendarWidgetProps {
 }
 
 // Calendar Widget Component
-const CalendarWidget = React.memo<CalendarWidgetProps>(({ 
-  isOpen, 
-  onClose, 
-  selectedDate, 
-  onDateSelect, 
-  selectedTime, 
-  onTimeChange 
-}) => {
-  const [currentMonth, setCurrentMonth] = useState(selectedDate.getMonth());
-  const [currentYear, setCurrentYear] = useState(selectedDate.getFullYear());
-  
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-  
-  const handlePrevMonth = (): void => {
-    if (currentMonth === 0) {
-      setCurrentMonth(11);
-      setCurrentYear(currentYear - 1);
-    } else {
-      setCurrentMonth(currentMonth - 1);
-    }
-  };
-  
-  const handleNextMonth = (): void => {
-    if (currentMonth === 11) {
-      setCurrentMonth(0);
-      setCurrentYear(currentYear + 1);
-    } else {
-      setCurrentMonth(currentMonth + 1);
-    }
-  };
-  
-  const handleDateClick = (day: number): void => {
-    const newDate = new Date(currentYear, currentMonth, day);
-    onDateSelect(newDate);
-  };
-  
-  const isToday = (day: number): boolean => {
-    const today = new Date();
-    return today.getDate() === day && 
-           today.getMonth() === currentMonth && 
-           today.getFullYear() === currentYear;
-  };
-  
-  const isSelected = (day: number): boolean => {
-    return selectedDate.getDate() === day && 
-           selectedDate.getMonth() === currentMonth && 
-           selectedDate.getFullYear() === currentYear;
-  };
-  
-  if (!isOpen) return null;
-  
-  return (
-    <div className="absolute top-full left-0 z-50 mt-1 bg-app-primary border border-app-primary-40 rounded-lg shadow-lg shadow-black-80 p-2 min-w-[240px]">
-      {/* Calendar Header */}
-      <div className="flex items-center justify-between mb-2">
-        <button
-          onClick={handlePrevMonth}
-          className="p-0.5 hover:bg-app-primary-20 rounded transition-colors"
-        >
-          <ChevronLeft size={14} className="text-app-secondary" />
-        </button>
-        <div className="text-xs font-mono text-app-primary">
-          {monthNames[currentMonth]} {currentYear}
-        </div>
-        <button
-          onClick={handleNextMonth}
-          className="p-0.5 hover:bg-app-primary-20 rounded transition-colors"
-        >
-          <ChevronRight size={14} className="text-app-secondary" />
-        </button>
-      </div>
-      
-      {/* Days of Week */}
-      <div className="grid grid-cols-7 gap-0.5 mb-1">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-          <div key={day} className="text-[10px] font-mono text-app-secondary-60 text-center py-0.5">
-            {day}
+const CalendarWidget = React.memo<CalendarWidgetProps>(
+  ({
+    isOpen,
+    onClose,
+    selectedDate,
+    onDateSelect,
+    selectedTime,
+    onTimeChange,
+  }) => {
+    const [currentMonth, setCurrentMonth] = useState(selectedDate.getMonth());
+    const [currentYear, setCurrentYear] = useState(selectedDate.getFullYear());
+
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+
+    const handlePrevMonth = (): void => {
+      if (currentMonth === 0) {
+        setCurrentMonth(11);
+        setCurrentYear(currentYear - 1);
+      } else {
+        setCurrentMonth(currentMonth - 1);
+      }
+    };
+
+    const handleNextMonth = (): void => {
+      if (currentMonth === 11) {
+        setCurrentMonth(0);
+        setCurrentYear(currentYear + 1);
+      } else {
+        setCurrentMonth(currentMonth + 1);
+      }
+    };
+
+    const handleDateClick = (day: number): void => {
+      const newDate = new Date(currentYear, currentMonth, day);
+      onDateSelect(newDate);
+    };
+
+    const isToday = (day: number): boolean => {
+      const today = new Date();
+      return (
+        today.getDate() === day &&
+        today.getMonth() === currentMonth &&
+        today.getFullYear() === currentYear
+      );
+    };
+
+    const isSelected = (day: number): boolean => {
+      return (
+        selectedDate.getDate() === day &&
+        selectedDate.getMonth() === currentMonth &&
+        selectedDate.getFullYear() === currentYear
+      );
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="absolute top-full left-0 z-50 mt-1 bg-app-primary border border-app-primary-40 rounded-lg shadow-lg shadow-black-80 p-2 min-w-[240px]">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={handlePrevMonth}
+            className="p-0.5 hover:bg-app-primary-20 rounded transition-colors"
+          >
+            <ChevronLeft size={14} className="text-app-secondary" />
+          </button>
+          <div className="text-xs font-mono text-app-primary">
+            {monthNames[currentMonth]} {currentYear}
           </div>
-        ))}
-      </div>
-      
-      {/* Calendar Days */}
-      <div className="grid grid-cols-7 gap-0.5 mb-2">
-        {/* Empty cells for days before month starts */}
-        {Array.from({ length: firstDayOfMonth }, (_, i) => (
-          <div key={`empty-${i}`} className="h-6"></div>
-        ))}
-        
-        {/* Days of the month */}
-        {Array.from({ length: daysInMonth }, (_, i) => {
-          const day = i + 1;
-          return (
-            <button
+          <button
+            onClick={handleNextMonth}
+            className="p-0.5 hover:bg-app-primary-20 rounded transition-colors"
+          >
+            <ChevronRight size={14} className="text-app-secondary" />
+          </button>
+        </div>
+
+        {/* Days of Week */}
+        <div className="grid grid-cols-7 gap-0.5 mb-1">
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+            <div
               key={day}
-              onClick={() => handleDateClick(day)}
-              className={`h-6 w-6 text-[10px] font-mono rounded transition-colors flex items-center justify-center
-                ${isSelected(day) 
-                  ? 'bg-app-primary-color text-black' 
-                  : isToday(day)
-                    ? 'bg-app-primary-20 text-app-primary border border-app-primary-40'
-                    : 'text-app-secondary hover:bg-app-primary-20'
-                }`}
+              className="text-[10px] font-mono text-app-secondary-60 text-center py-0.5"
             >
               {day}
-            </button>
-          );
-        })}
-      </div>
-      
-      {/* Time Input */}
-      <div className="border-t border-app-primary-40 pt-2">
-        <label className="text-[10px] font-mono text-app-secondary-60 uppercase block mb-1">
-          Time
-        </label>
-        <input
-          type="time"
-          value={selectedTime}
-          onChange={(e) => onTimeChange(e.target.value)}
-          className="w-full px-1.5 py-1 bg-app-primary-80-alpha border border-app-primary-40 rounded 
-                   text-app-primary placeholder-app-secondary-60 font-mono text-[10px] 
-                   focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40 
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Days */}
+        <div className="grid grid-cols-7 gap-0.5 mb-2">
+          {/* Empty cells for days before month starts */}
+          {Array.from({ length: firstDayOfMonth }, (_, i) => (
+            <div key={`empty-${i}`} className="h-6"></div>
+          ))}
+
+          {/* Days of the month */}
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            return (
+              <button
+                key={day}
+                onClick={() => handleDateClick(day)}
+                className={`h-6 w-6 text-[10px] font-mono rounded transition-colors flex items-center justify-center
+                ${
+                  isSelected(day)
+                    ? "bg-app-primary-color text-black"
+                    : isToday(day)
+                      ? "bg-app-primary-20 text-app-primary border border-app-primary-40"
+                      : "text-app-secondary hover:bg-app-primary-20"
+                }`}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Time Input */}
+        <div className="border-t border-app-primary-40 pt-2">
+          <label className="text-[10px] font-mono text-app-secondary-60 uppercase block mb-1">
+            Time
+          </label>
+          <input
+            type="time"
+            value={selectedTime}
+            onChange={(e) => onTimeChange(e.target.value)}
+            className="w-full px-1.5 py-1 bg-app-primary-80-alpha border border-app-primary-40 rounded
+                   text-app-primary placeholder-app-secondary-60 font-mono text-[10px]
+                   focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40
                    transition-all duration-300"
-        />
-      </div>
-      
-      {/* Action Buttons */}
-      <div className="flex gap-1 mt-2">
-        <button
-          onClick={onClose}
-          className="flex-1 px-2 py-1 text-[10px] font-mono bg-app-primary-60 border border-app-primary-40 
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-1 mt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 px-2 py-1 text-[10px] font-mono bg-app-primary-60 border border-app-primary-40
                    text-app-secondary rounded hover:bg-app-primary-20 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => {
-            const dateTime = new Date(selectedDate);
-            const [hours, minutes] = selectedTime.split(':');
-            dateTime.setHours(parseInt(hours), parseInt(minutes));
-            onDateSelect(dateTime);
-            onClose();
-          }}
-          className="flex-1 px-2 py-1 text-[10px] font-mono bg-app-primary-color text-black rounded 
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              const dateTime = new Date(selectedDate);
+              const [hours, minutes] = selectedTime.split(":");
+              dateTime.setHours(parseInt(hours), parseInt(minutes));
+              onDateSelect(dateTime);
+              onClose();
+            }}
+            className="flex-1 px-2 py-1 text-[10px] font-mono bg-app-primary-color text-black rounded
                    hover:bg-app-primary-dark transition-colors"
-        >
-          Select
-        </button>
+          >
+            Select
+          </button>
+        </div>
       </div>
-    </div>
-  );
-});
-CalendarWidget.displayName = 'CalendarWidget';
+    );
+  },
+);
+CalendarWidget.displayName = "CalendarWidget";
 
 // Wallet Selector Popup Component - rendered via portal
 interface WalletSelectorPopupProps {
@@ -381,7 +415,7 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
   onClose,
   onToggleWallet,
   onSelectAll,
-  onSelectAllWithBalance
+  onSelectAllWithBalance,
 }) => {
   const popupRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, right: 0 });
@@ -392,7 +426,7 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
       const rect = walletSelectorRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + 4,
-        right: window.innerWidth - rect.right
+        right: window.innerWidth - rect.right,
       });
     }
   }, [walletSelectorRef]);
@@ -401,8 +435,8 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent): void => {
       if (
-        popupRef.current && 
-        !popupRef.current.contains(e.target as Node) && 
+        popupRef.current &&
+        !popupRef.current.contains(e.target as Node) &&
         walletSelectorRef.current &&
         !walletSelectorRef.current.contains(e.target as Node)
       ) {
@@ -410,12 +444,12 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose, walletSelectorRef]);
 
   return (
-    <div 
+    <div
       ref={popupRef}
       className="fixed z-[9999]"
       style={{
@@ -442,72 +476,86 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
 
         {/* Wallet List */}
         <div className="overflow-y-auto max-h-[340px]">
-          {wallets.filter(w => !w.isArchived).map((wallet) => {
-            const solBal = solBalances.get(wallet.address) || 0;
-            const tokenBal = tokenBalances.get(wallet.address) || 0;
-            
-            return (
-              <div
-                key={wallet.id}
-                onClick={() => onToggleWallet(wallet.id)}
-                className={`
+          {wallets
+            .filter((w) => !w.isArchived)
+            .map((wallet) => {
+              const solBal = solBalances.get(wallet.address) || 0;
+              const tokenBal = tokenBalances.get(wallet.address) || 0;
+
+              return (
+                <div
+                  key={wallet.id}
+                  onClick={() => onToggleWallet(wallet.id)}
+                  className={`
                   flex items-center justify-between px-3 py-2 cursor-pointer transition-all duration-200
                   border-b border-app-primary-20 last:border-b-0
-                  ${wallet.isActive 
-                    ? 'bg-primary-20 border-l-2 border-l-primary' 
-                    : 'hover:bg-app-primary-60'
+                  ${
+                    wallet.isActive
+                      ? "bg-primary-20 border-l-2 border-l-primary"
+                      : "hover:bg-app-primary-60"
                   }
                 `}
-              >
-                {/* Selection indicator & wallet info */}
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {/* Selection checkbox */}
-                  <div className={`
+                >
+                  {/* Selection indicator & wallet info */}
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {/* Selection checkbox */}
+                    <div
+                      className={`
                     w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
-                    ${wallet.isActive 
-                      ? 'bg-app-primary-color border-app-primary-color' 
-                      : 'bg-transparent border-app-primary-40'
+                    ${
+                      wallet.isActive
+                        ? "bg-app-primary-color border-app-primary-color"
+                        : "bg-transparent border-app-primary-40"
                     }
-                  `}>
-                    {wallet.isActive && (
-                      <Check size={10} className="text-black" />
-                    )}
+                  `}
+                    >
+                      {wallet.isActive && (
+                        <Check size={10} className="text-black" />
+                      )}
+                    </div>
+
+                    {/* Wallet name and address */}
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span
+                        className={`text-xs font-mono truncate ${wallet.isActive ? "text-app-primary" : "text-app-secondary"}`}
+                      >
+                        {getWalletDisplayName(wallet)}
+                      </span>
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
+                        <Zap size={8} className="text-app-secondary-40" />
+                        <span>Off</span>
+                        <span className="text-app-primary-40">
+                          {wallet.address.slice(0, 5)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Wallet name and address */}
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className={`text-xs font-mono truncate ${wallet.isActive ? 'text-app-primary' : 'text-app-secondary'}`}>
-                      {getWalletDisplayName(wallet)}
-                    </span>
-                    <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
-                      <Zap size={8} className="text-app-secondary-40" />
-                      <span>Off</span>
-                      <span className="text-app-primary-40">{wallet.address.slice(0, 5)}</span>
+                  {/* Balances */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {/* SOL Balance */}
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
+                      <span
+                        className={`text-xs font-mono ${solBal > 0 ? "text-app-primary" : "text-app-secondary-60"}`}
+                      >
+                        {solBal.toFixed(3)}
+                      </span>
+                    </div>
+
+                    {/* Token Balance */}
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-3 bg-app-primary-color rounded-sm"></div>
+                      <span
+                        className={`text-xs font-mono ${tokenBal > 0 ? "color-primary" : "text-app-secondary-60"}`}
+                      >
+                        {formatTokenBalance(tokenBal)}
+                      </span>
                     </div>
                   </div>
                 </div>
-
-                {/* Balances */}
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {/* SOL Balance */}
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
-                    <span className={`text-xs font-mono ${solBal > 0 ? 'text-app-primary' : 'text-app-secondary-60'}`}>
-                      {solBal.toFixed(3)}
-                    </span>
-                  </div>
-
-                  {/* Token Balance */}
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-3 bg-app-primary-color rounded-sm"></div>
-                    <span className={`text-xs font-mono ${tokenBal > 0 ? 'color-primary' : 'text-app-secondary-60'}`}>
-                      {formatTokenBalance(tokenBal)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
     </div>
@@ -526,9 +574,14 @@ interface TradingCardProps {
   setBuyAmount: (amount: string) => void;
   sellAmount: string;
   setSellAmount: (amount: string) => void;
-  handleTradeSubmit: (wallets: WalletType[], isBuy: boolean, dex: string, buyAmount?: string, sellAmount?: string) => Promise<void>;
+  handleTradeSubmit: (
+    wallets: WalletType[],
+    isBuy: boolean,
+    dex: string,
+    buyAmount?: string,
+    sellAmount?: string,
+  ) => Promise<void>;
   isLoading: boolean;
-  getScriptName: (script: string) => string;
   countActiveWallets: (wallets: WalletType[]) => number;
   currentMarketCap: number | null;
   solBalances: Map<string, number>;
@@ -538,8 +591,8 @@ interface TradingCardProps {
   solPrice: number | null;
 }
 
-const TradingCard: React.FC<TradingCardProps> = ({ 
-  tokenAddress, 
+const TradingCard: React.FC<TradingCardProps> = ({
+  tokenAddress,
   wallets,
   setWallets,
   selectedDex,
@@ -555,104 +608,119 @@ const TradingCard: React.FC<TradingCardProps> = ({
   tokenBalances,
   onOpenFloating,
   isFloatingCardOpen,
-  solPrice
+  solPrice,
 }) => {
   const { showToast } = useToast();
-  const [activeMainTab, setActiveMainTab] = useState('trading'); // 'orders' or 'trading'
-  const [activeTradeType, setActiveTradeType] = useState<'buy' | 'sell'>('buy');
-  const [orderType, setOrderType] = useState('market');
+  const [activeMainTab, setActiveMainTab] = useState("trading"); // 'orders' or 'trading'
+  const [activeTradeType, setActiveTradeType] = useState<"buy" | "sell">("buy");
+  const [orderType, setOrderType] = useState("market");
   const [isEditMode, setIsEditMode] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const walletSelectorRef = useRef<HTMLDivElement>(null);
   const [, setIsDropdownOpen] = useState(false);
   const [showWalletSelector, setShowWalletSelector] = useState(false);
-  
+
   // Limit order state
-  const [limitOrderSolAmount, setLimitOrderSolAmount] = useState('');
-  const [limitOrderTokenAmount, setLimitOrderTokenAmount] = useState('');
-  const [limitOrderMarketCap, setLimitOrderMarketCap] = useState('');
-  const [limitOrderAvgPrice, setLimitOrderAvgPrice] = useState('');
-  const [limitOrderPrice, setLimitOrderPrice] = useState('');
-  const [limitOrderExpiry, setLimitOrderExpiry] = useState('');
+  const [limitOrderSolAmount, setLimitOrderSolAmount] = useState("");
+  const [limitOrderTokenAmount, setLimitOrderTokenAmount] = useState("");
+  const [limitOrderMarketCap, setLimitOrderMarketCap] = useState("");
+  const [limitOrderAvgPrice, setLimitOrderAvgPrice] = useState("");
+  const [limitOrderPrice, setLimitOrderPrice] = useState("");
+  const [limitOrderExpiry, setLimitOrderExpiry] = useState("");
   const [marketCapSlider, setMarketCapSlider] = useState(0); // -100% to +200%
   const [baseMarketCap, setBaseMarketCap] = useState(0);
   const [isCreatingLimitOrder, setIsCreatingLimitOrder] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
-  const [selectedTime, setSelectedTime] = useState('12:00');
-  const [activeOrders, setActiveOrders] = useState<ActiveOrdersResponse | null>(null);
+  const [selectedTime, setSelectedTime] = useState("12:00");
+  const [activeOrders, setActiveOrders] = useState<ActiveOrdersResponse | null>(
+    null,
+  );
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   // const [orderErrors, setOrderErrors] = useState<string[]>([]);
-  const [cancellingOrders, setCancellingOrders] = useState<Set<string>>(new Set());
-  
+  const [cancellingOrders, setCancellingOrders] = useState<Set<string>>(
+    new Set(),
+  );
+
   interface PresetTab {
     id: string;
     label: string;
     buyPresets: string[];
     sellPresets: string[];
   }
-  
+
   // Default preset tabs
   const defaultPresetTabs: PresetTab[] = [
     {
-      id: 'degen',
-      label: 'DEGEN',
-      buyPresets: ['0.01', '0.05', '0.1', '0.5'],
-      sellPresets: ['25', '50', '75', '100']
+      id: "degen",
+      label: "DEGEN",
+      buyPresets: ["0.01", "0.05", "0.1", "0.5"],
+      sellPresets: ["25", "50", "75", "100"],
     },
     {
-      id: 'diamond',
-      label: 'DIAMOND',
-      buyPresets: ['0.001', '0.01', '0.05', '0.1'],
-      sellPresets: ['10', '25', '50', '75']
+      id: "diamond",
+      label: "DIAMOND",
+      buyPresets: ["0.001", "0.01", "0.05", "0.1"],
+      sellPresets: ["10", "25", "50", "75"],
     },
     {
-      id: 'yolo',
-      label: 'YOLO',
-      buyPresets: ['0.1', '0.5', '1', '5'],
-      sellPresets: ['50', '75', '90', '100']
-    }
+      id: "yolo",
+      label: "YOLO",
+      buyPresets: ["0.1", "0.5", "1", "5"],
+      sellPresets: ["50", "75", "90", "100"],
+    },
   ];
 
   // Load presets from cookies
-  const loadPresetsFromCookies = (): { tabs: PresetTab[]; activeTabId: string } => {
+  const loadPresetsFromCookies = (): {
+    tabs: PresetTab[];
+    activeTabId: string;
+  } => {
     try {
       const savedPresets = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('tradingPresets='))
-        ?.split('=')[1];
-      
+        .split("; ")
+        .find((row) => row.startsWith("tradingPresets="))
+        ?.split("=")[1];
+
       if (savedPresets) {
         const decoded = decodeURIComponent(savedPresets);
-        const parsed = JSON.parse(decoded) as { tabs?: unknown; activeTabId?: string };
+        const parsed = JSON.parse(decoded) as {
+          tabs?: unknown;
+          activeTabId?: string;
+        };
         return {
-          tabs: Array.isArray(parsed.tabs) ? parsed.tabs as PresetTab[] : defaultPresetTabs,
-          activeTabId: parsed.activeTabId || 'degen'
+          tabs: Array.isArray(parsed.tabs)
+            ? (parsed.tabs as PresetTab[])
+            : defaultPresetTabs,
+          activeTabId: parsed.activeTabId || "degen",
         };
       }
     } catch (error) {
-      console.error('Error loading presets from cookies:', error);
+      console.error("Error loading presets from cookies:", error);
     }
     return {
       tabs: defaultPresetTabs,
-      activeTabId: 'degen'
+      activeTabId: "degen",
     };
   };
 
   // Save presets to cookies
-  const savePresetsToCookies = (tabs: PresetTab[], activeTabId: string): void => {
+  const savePresetsToCookies = (
+    tabs: PresetTab[],
+    activeTabId: string,
+  ): void => {
     try {
       const presetsData = {
         tabs,
-        activeTabId
+        activeTabId,
       };
       const encoded = encodeURIComponent(JSON.stringify(presetsData));
       const expires = new Date();
       expires.setFullYear(expires.getFullYear() + 1); // 1 year expiry
       document.cookie = `tradingPresets=${encoded}; expires=${expires.toUTCString()}; path=/`;
     } catch (error) {
-      console.error('Error saving presets to cookies:', error);
+      console.error("Error saving presets to cookies:", error);
     }
   };
 
@@ -660,8 +728,10 @@ const TradingCard: React.FC<TradingCardProps> = ({
   const initialPresets = loadPresetsFromCookies();
   const [presetTabs, setPresetTabs] = useState(initialPresets.tabs);
   const [activeTabId, setActiveTabId] = useState(initialPresets.activeTabId);
-  const activeTab = presetTabs.find((tab: PresetTab) => tab.id === activeTabId) || presetTabs[0];
-  
+  const activeTab =
+    presetTabs.find((tab: PresetTab) => tab.id === activeTabId) ||
+    presetTabs[0];
+
   // Save presets to cookies whenever they change (debounced)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -669,50 +739,58 @@ const TradingCard: React.FC<TradingCardProps> = ({
     }, 500); // Debounce by 500ms
 
     return () => clearTimeout(timeoutId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetTabs, activeTabId]);
-  
+
   // Handle tab switching with cookie save
   const handleTabSwitch = (tabId: string): void => {
     setActiveTabId(tabId);
   };
-  
+
   // Edit preset handlers
   const handleEditBuyPreset = (index: number, newValue: string): void => {
-    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
-      tab.id === activeTabId 
-        ? {
-            ...tab,
-            buyPresets: tab.buyPresets.map((preset: string, i: number) => i === index ? newValue : preset)
-          }
-        : tab
-    ));
+    setPresetTabs((tabs: PresetTab[]) =>
+      tabs.map((tab: PresetTab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              buyPresets: tab.buyPresets.map((preset: string, i: number) =>
+                i === index ? newValue : preset,
+              ),
+            }
+          : tab,
+      ),
+    );
   };
-  
+
   const handleEditSellPreset = (index: number, newValue: string): void => {
-    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
-      tab.id === activeTabId 
-        ? {
-            ...tab,
-            sellPresets: tab.sellPresets.map((preset: string, i: number) => i === index ? newValue : preset)
-          }
-        : tab
-    ));
+    setPresetTabs((tabs: PresetTab[]) =>
+      tabs.map((tab: PresetTab) =>
+        tab.id === activeTabId
+          ? {
+              ...tab,
+              sellPresets: tab.sellPresets.map((preset: string, i: number) =>
+                i === index ? newValue : preset,
+              ),
+            }
+          : tab,
+      ),
+    );
   };
-  
+
   // Edit tab label
   const handleEditTabLabel = (tabId: string, newLabel: string): void => {
-    setPresetTabs((tabs: PresetTab[]) => tabs.map((tab: PresetTab) => 
-      tab.id === tabId ? { ...tab, label: newLabel } : tab
-    ));
+    setPresetTabs((tabs: PresetTab[]) =>
+      tabs.map((tab: PresetTab) =>
+        tab.id === tabId ? { ...tab, label: newLabel } : tab,
+      ),
+    );
   };
-  
-  
-  
+
   // Handle amount change
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const value = e.target.value.replace(/[^0-9.]/g, '');
-    if (activeTradeType === 'buy') {
+    const value = e.target.value.replace(/[^0-9.]/g, "");
+    if (activeTradeType === "buy") {
       setBuyAmount(value);
     } else {
       setSellAmount(value);
@@ -721,7 +799,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
 
   // Handle preset click
   const handlePresetClick = (preset: string): void => {
-    if (activeTradeType === 'buy') {
+    if (activeTradeType === "buy") {
       setBuyAmount(preset);
       void handleTradeSubmit(wallets, true, selectedDex, preset, undefined);
     } else {
@@ -733,77 +811,82 @@ const TradingCard: React.FC<TradingCardProps> = ({
   // Limit Order Handlers
   const loadActiveOrders = async (): Promise<void> => {
     if (!wallets || wallets.length === 0) {
-      showToast('No wallets available', 'error');
+      showToast("No wallets available", "error");
       return;
     }
-    
+
     // Don't load orders if no token is selected
     if (!tokenAddress) {
       setActiveOrders(null);
-      showToast('No token selected', 'error');
+      showToast("No token selected", "error");
       return;
     }
-    
+
     // Check if trading server URL is configured
-    const tradingServerUrl = (window as { tradingServerUrl?: string }).tradingServerUrl;
+    const tradingServerUrl = (window as { tradingServerUrl?: string })
+      .tradingServerUrl;
     if (!tradingServerUrl) {
-      showToast('Trading server URL not configured', 'error');
+      showToast("Trading server URL not configured", "error");
       setActiveOrders(null);
       return;
     }
-    
+
     setIsLoadingOrders(true);
     try {
       // Get orders for all active wallets
       const activeWallets = wallets.filter((w: WalletType) => w.isActive);
       if (activeWallets.length === 0) {
         setActiveOrders(null);
-        showToast('No active wallets found', 'error');
+        showToast("No active wallets found", "error");
         return;
       }
 
       // Load all orders for all active wallets with a single call per wallet (no filters)
-      const allOrdersPromises = activeWallets.map((wallet: WalletType) => 
-        getActiveOrders(wallet.address) // Fetch all orders without filters
+      const allOrdersPromises = activeWallets.map(
+        (wallet: WalletType) => getActiveOrders(wallet.address), // Fetch all orders without filters
       );
 
       const allOrdersResponses = await Promise.all(allOrdersPromises);
-      
+
       // Combine all successful responses
-      const successfulResponses = allOrdersResponses.filter(response => response.success);
-      
+      const successfulResponses = allOrdersResponses.filter(
+        (response) => response.success,
+      );
+
       if (successfulResponses.length === 0) {
-        console.error('Failed to load active orders from any wallet');
+        console.error("Failed to load active orders from any wallet");
         const errorMessages = allOrdersResponses
-          .filter(response => !response.success)
-          .map(response => response.error)
+          .filter((response) => !response.success)
+          .map((response) => response.error)
           .filter(Boolean);
-        
+
         if (errorMessages.length > 0) {
-          showToast(`Failed to load orders: ${errorMessages[0]}`, 'error');
+          showToast(`Failed to load orders: ${errorMessages[0]}`, "error");
         } else {
-          showToast('Failed to load active orders', 'error');
+          showToast("Failed to load active orders", "error");
         }
         setActiveOrders(null);
         return;
       }
 
       // Combine all orders from all wallets
-      const allOrders = successfulResponses.reduce<Array<{
-        publicKey: string;
-        account: {
-          orderKey: string;
-          userPubkey: string;
-          maker: string;
-          inputMint: string;
-          outputMint: string;
-          makingAmount: string;
-          takingAmount: string;
-          rawTakingAmount: string;
-          expiredAt: number | null;
-          base: 'input' | 'output';
-        };
-      }>>((acc, response) => {
+      const allOrders = successfulResponses.reduce<
+        Array<{
+          publicKey: string;
+          account: {
+            orderKey: string;
+            userPubkey: string;
+            maker: string;
+            inputMint: string;
+            outputMint: string;
+            makingAmount: string;
+            takingAmount: string;
+            rawTakingAmount: string;
+            expiredAt: number | null;
+            base: "input" | "output";
+          };
+        }>
+      >((acc, response) => {
         if (response.orders?.orders) {
           acc.push(...response.orders.orders);
         }
@@ -813,36 +896,47 @@ const TradingCard: React.FC<TradingCardProps> = ({
       // Filter orders to only include those related to the current token
       // Buy orders: inputMint is SOL, outputMint is the token
       // Sell orders: inputMint is the token, outputMint is SOL
-      const SOL_MINT = 'So11111111111111111111111111111111111111112';
-      
-      const filteredOrders = allOrders.filter((order: { inputMint?: string; outputMint?: string; account?: { inputMint?: string; outputMint?: string } }) => {
-        const inputMint = order.inputMint || order.account?.inputMint;
-        const outputMint = order.outputMint || order.account?.outputMint;
-        
-        // Check if this order is related to the current token
-        const isBuyOrder = inputMint === SOL_MINT && outputMint === tokenAddress;
-        const isSellOrder = inputMint === tokenAddress && outputMint === SOL_MINT;
-        
-        return isBuyOrder || isSellOrder;
-      });
+      const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-      console.info('All orders fetched:', allOrders.length);
-      console.info('Filtered orders for token:', filteredOrders.length);
-      console.info('Sample filtered order:', filteredOrders[0]);
+      const filteredOrders = allOrders.filter(
+        (order: {
+          inputMint?: string;
+          outputMint?: string;
+          account?: { inputMint?: string; outputMint?: string };
+        }) => {
+          const inputMint = order.inputMint || order.account?.inputMint;
+          const outputMint = order.outputMint || order.account?.outputMint;
+
+          // Check if this order is related to the current token
+          const isBuyOrder =
+            inputMint === SOL_MINT && outputMint === tokenAddress;
+          const isSellOrder =
+            inputMint === tokenAddress && outputMint === SOL_MINT;
+
+          return isBuyOrder || isSellOrder;
+        },
+      );
+
+      console.info("All orders fetched:", allOrders.length);
+      console.info("Filtered orders for token:", filteredOrders.length);
+      console.info("Sample filtered order:", filteredOrders[0]);
 
       // Create a combined response with filtered orders
       const combinedResponse = {
         success: true,
         orders: {
-          orders: filteredOrders
-        }
+          orders: filteredOrders,
+        },
       };
 
       setActiveOrders(combinedResponse);
-      showToast(`Refreshed ${filteredOrders.length} active orders`, 'success');
+      showToast(`Refreshed ${filteredOrders.length} active orders`, "success");
     } catch (error) {
-      console.error('Error loading active orders:', error);
-      showToast(`Error loading orders: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      console.error("Error loading active orders:", error);
+      showToast(
+        `Error loading orders: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "error",
+      );
       setActiveOrders(null);
     } finally {
       setIsLoadingOrders(false);
@@ -852,20 +946,23 @@ const TradingCard: React.FC<TradingCardProps> = ({
   const handleCreateLimitOrder = async (): Promise<void> => {
     // Ensure calculated amounts exist
     if (!limitOrderSolAmount || !limitOrderTokenAmount) {
-      showToast('Please ensure both SOL and token amounts are calculated', 'error');
+      showToast(
+        "Please ensure both SOL and token amounts are calculated",
+        "error",
+      );
       return;
     }
 
     // Validate minimum SOL amount (0.1 SOL)
     const solAmount = parseFloat(limitOrderSolAmount);
     if (solAmount < 0.1) {
-      showToast('Minimum SOL amount for limit orders is 0.1 SOL', 'error');
+      showToast("Minimum SOL amount for limit orders is 0.1 SOL", "error");
       return;
     }
 
     const activeWallets = wallets.filter((w: WalletType) => w.isActive);
     if (activeWallets.length === 0) {
-      showToast('No active wallets selected', 'error');
+      showToast("No active wallets selected", "error");
       return;
     }
 
@@ -876,132 +973,161 @@ const TradingCard: React.FC<TradingCardProps> = ({
       let makingAmount: string;
       let takingAmount: string;
 
-      if (activeTradeType === 'buy') {
+      if (activeTradeType === "buy") {
         // Buy order: SOL → Token (normal decimal handling)
         makingAmount = solToLamports(parseFloat(limitOrderSolAmount));
-        takingAmount = (parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)).toString(); // Token decimals
+        takingAmount = (
+          parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)
+        ).toString(); // Token decimals
       } else {
         // Sell order: Token → SOL (inverted inputs - token amount goes to makingAmount, SOL amount goes to takingAmount)
-        makingAmount = (parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)).toString(); // Token amount with token decimals
+        makingAmount = (
+          parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)
+        ).toString(); // Token amount with token decimals
         takingAmount = solToLamports(parseFloat(limitOrderSolAmount)); // SOL amount with SOL decimals
       }
 
       // Create order configuration based on trade type (buy vs sell)
-      const orderConfig: Omit<LimitOrderConfig, 'maker'> = activeTradeType === 'buy' ? {
-        // Buy order: SOL → Token
-        inputMint: 'So11111111111111111111111111111111111111112', // SOL mint
-        outputMint: tokenAddress,
-        makingAmount,
-        takingAmount,
-        slippageBps: 50, // 0.5% slippage
-        expiredAt: limitOrderExpiry ? Math.floor(new Date(limitOrderExpiry).getTime() / 1000) : undefined
-      } : {
-        // Sell order: Token → SOL (mints inverted, decimals inverted)
-        inputMint: tokenAddress,
-        outputMint: 'So11111111111111111111111111111111111111112', // SOL mint
-        makingAmount,
-        takingAmount,
-        slippageBps: 50, // 0.5% slippage
-        expiredAt: limitOrderExpiry ? Math.floor(new Date(limitOrderExpiry).getTime() / 1000) : undefined
-      };
+      const orderConfig: Omit<LimitOrderConfig, "maker"> =
+        activeTradeType === "buy"
+          ? {
+              // Buy order: SOL → Token
+              inputMint: "So11111111111111111111111111111111111111112", // SOL mint
+              outputMint: tokenAddress,
+              makingAmount,
+              takingAmount,
+              slippageBps: 50, // 0.5% slippage
+              expiredAt: limitOrderExpiry
+                ? Math.floor(new Date(limitOrderExpiry).getTime() / 1000)
+                : undefined,
+            }
+          : {
+              // Sell order: Token → SOL (mints inverted, decimals inverted)
+              inputMint: tokenAddress,
+              outputMint: "So11111111111111111111111111111111111111112", // SOL mint
+              makingAmount,
+              takingAmount,
+              slippageBps: 50, // 0.5% slippage
+              expiredAt: limitOrderExpiry
+                ? Math.floor(new Date(limitOrderExpiry).getTime() / 1000)
+                : undefined,
+            };
 
       // Validate the configuration
       const validation = validateLimitOrderConfig({
         ...orderConfig,
-        maker: activeWallets[0].address // Use first wallet for validation
+        maker: activeWallets[0].address, // Use first wallet for validation
       });
 
       if (!validation.valid) {
-        showToast(validation.errors.join(', '), 'error');
+        showToast(validation.errors.join(", "), "error");
         return;
       }
 
       // Create orders for all active wallets
-      const response = await createMultipleLimitOrders(activeWallets, orderConfig);
+      const response = await createMultipleLimitOrders(
+        activeWallets,
+        orderConfig,
+      );
 
       if (response.success) {
-        console.info('Limit orders created successfully:', response.orders);
-        
+        console.info("Limit orders created successfully:", response.orders);
+
         // Process and send the bundle with transactions
         if (response.transactions && response.transactions.length > 0) {
-          console.info('Processing bundle with transactions...');
-          const bundleResult = await processLimitOrderBundle(response, activeWallets);
-          
+          console.info("Processing bundle with transactions...");
+          const bundleResult = await processLimitOrderBundle(
+            response,
+            activeWallets,
+          );
+
           if (bundleResult.success) {
-            console.info('✅ Bundle sent successfully!', bundleResult.bundleId);
-            
+            console.info("✅ Bundle sent successfully!", bundleResult.bundleId);
+
             // Clear form
-            setLimitOrderSolAmount('');
-            setLimitOrderTokenAmount('');
-            setLimitOrderAvgPrice('');
-            setLimitOrderMarketCap('');
-            setLimitOrderPrice('');
-            setLimitOrderExpiry('');
+            setLimitOrderSolAmount("");
+            setLimitOrderTokenAmount("");
+            setLimitOrderAvgPrice("");
+            setLimitOrderMarketCap("");
+            setLimitOrderPrice("");
+            setLimitOrderExpiry("");
             setMarketCapSlider(0);
             setShowCalendar(false);
             setCalendarDate(new Date());
-            setSelectedTime('12:00');
+            setSelectedTime("12:00");
           } else {
-            showToast(`Bundle failed to send: ${bundleResult.error}`, 'error');
+            showToast(`Bundle failed to send: ${bundleResult.error}`, "error");
             return;
           }
         } else {
-          console.info('No transactions to process in the response');
-          
+          console.info("No transactions to process in the response");
+
           // Clear form even if no transactions (orders might still be created)
-          setLimitOrderSolAmount('');
-          setLimitOrderTokenAmount('');
-          setLimitOrderAvgPrice('');
-          setLimitOrderMarketCap('');
-          setLimitOrderPrice('');
-          setLimitOrderExpiry('');
+          setLimitOrderSolAmount("");
+          setLimitOrderTokenAmount("");
+          setLimitOrderAvgPrice("");
+          setLimitOrderMarketCap("");
+          setLimitOrderPrice("");
+          setLimitOrderExpiry("");
           setMarketCapSlider(0);
           setShowCalendar(false);
           setCalendarDate(new Date());
-          setSelectedTime('12:00');
+          setSelectedTime("12:00");
         }
       } else {
-        showToast(response.error || 'Failed to create limit orders', 'error');
+        showToast(response.error || "Failed to create limit orders", "error");
       }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Unknown error occurred', 'error');
+      showToast(
+        error instanceof Error ? error.message : "Unknown error occurred",
+        "error",
+      );
     } finally {
       setIsCreatingLimitOrder(false);
     }
   };
 
-  const handleCancelOrder = async (orderPublicKey: string, makerAddress: string): Promise<void> => {
+  const handleCancelOrder = async (
+    orderPublicKey: string,
+    makerAddress: string,
+  ): Promise<void> => {
     // Find the wallet that matches the maker address
     const wallet = wallets.find((w: WalletType) => w.address === makerAddress);
     if (!wallet) {
-      console.error('Wallet not found for maker address:', makerAddress);
+      console.error("Wallet not found for maker address:", makerAddress);
       return;
     }
 
     // Add order to cancelling set
-    setCancellingOrders(prev => new Set(prev).add(orderPublicKey));
+    setCancellingOrders((prev) => new Set(prev).add(orderPublicKey));
 
     try {
-      console.info('� Starting cancel order process for:', orderPublicKey);
-      
+      console.info("� Starting cancel order process for:", orderPublicKey);
+
       // Use the  cancel order function that handles bundle processing
-      const result = await cancelOrderWithBundle({
-        maker: makerAddress,
-        order: orderPublicKey
-      }, wallet);
+      const result = await cancelOrderWithBundle(
+        {
+          maker: makerAddress,
+          order: orderPublicKey,
+        },
+        wallet,
+      );
 
       if (result.success) {
-        console.info('✅ Order canceled successfully:', result.bundleId);
+        console.info("✅ Order canceled successfully:", result.bundleId);
       } else {
-        console.error('❌ Failed to cancel order:', result.error);
-        showToast(`Failed to cancel order: ${result.error}`, 'error');
+        console.error("❌ Failed to cancel order:", result.error);
+        showToast(`Failed to cancel order: ${result.error}`, "error");
       }
     } catch (error) {
-      console.error('Error canceling order:', error);
-      showToast(`Error canceling order: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      console.error("Error canceling order:", error);
+      showToast(
+        `Error canceling order: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "error",
+      );
     } finally {
       // Remove order from cancelling set
-      setCancellingOrders(prev => {
+      setCancellingOrders((prev) => {
         const newSet = new Set(prev);
         newSet.delete(orderPublicKey);
         return newSet;
@@ -1021,26 +1147,26 @@ const TradingCard: React.FC<TradingCardProps> = ({
   };
 
   const formatDisplayDate = (dateString: string): string => {
-    if (!dateString) return '';
+    if (!dateString) return "";
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   // Format price to avoid scientific notation and limit to 10 decimals
   const formatPrice = (price: number): string => {
-    if (price === 0) return '0';
-    
+    if (price === 0) return "0";
+
     // For very small numbers, use fixed notation with up to 10 decimals
     if (price < 1) {
-      return price.toFixed(10).replace(/\.?0+$/, '');
+      return price.toFixed(10).replace(/\.?0+$/, "");
     }
-    
+
     // For larger numbers, use appropriate decimal places
     if (price >= 1000000) {
       return price.toFixed(2);
@@ -1049,8 +1175,8 @@ const TradingCard: React.FC<TradingCardProps> = ({
     } else if (price >= 1) {
       return price.toFixed(6);
     }
-    
-    return price.toFixed(10).replace(/\.?0+$/, '');
+
+    return price.toFixed(10).replace(/\.?0+$/, "");
   };
 
   // Calculate missing amount and price when inputs change
@@ -1065,7 +1191,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       setLimitOrderAvgPrice(avgPrice);
     }
 
-    if (activeTradeType === 'buy') {
+    if (activeTradeType === "buy") {
       // For buy orders: SOL amount + avg price → calculate token amount
       if (limitOrderSolAmount && avgPrice) {
         const solAmount = parseFloat(limitOrderSolAmount);
@@ -1075,13 +1201,17 @@ const TradingCard: React.FC<TradingCardProps> = ({
         setLimitOrderPrice(formatPrice(avgPriceNum));
       } else if (limitOrderSolAmount && limitOrderTokenAmount) {
         // Fallback: calculate price from amounts
-        const solAmountLamports = solToLamports(parseFloat(limitOrderSolAmount));
-        const tokenAmountRaw = (parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)).toString();
+        const solAmountLamports = solToLamports(
+          parseFloat(limitOrderSolAmount),
+        );
+        const tokenAmountRaw = (
+          parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)
+        ).toString();
         const price = calculatePrice(solAmountLamports, tokenAmountRaw);
         setLimitOrderPrice(formatPrice(price));
         setLimitOrderAvgPrice(formatPrice(price));
       } else {
-        setLimitOrderPrice('');
+        setLimitOrderPrice("");
       }
     } else {
       // For sell orders: token amount + avg price → calculate SOL amount
@@ -1093,16 +1223,27 @@ const TradingCard: React.FC<TradingCardProps> = ({
         setLimitOrderPrice(formatPrice(avgPriceNum));
       } else if (limitOrderSolAmount && limitOrderTokenAmount) {
         // Fallback: calculate price from amounts
-        const solAmountLamports = solToLamports(parseFloat(limitOrderSolAmount));
-        const tokenAmountRaw = (parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)).toString();
+        const solAmountLamports = solToLamports(
+          parseFloat(limitOrderSolAmount),
+        );
+        const tokenAmountRaw = (
+          parseFloat(limitOrderTokenAmount) * Math.pow(10, 6)
+        ).toString();
         const price = calculatePrice(tokenAmountRaw, solAmountLamports);
         setLimitOrderPrice(formatPrice(price));
         setLimitOrderAvgPrice(formatPrice(price));
       } else {
-        setLimitOrderPrice('');
+        setLimitOrderPrice("");
       }
     }
-  }, [limitOrderSolAmount, limitOrderTokenAmount, limitOrderAvgPrice, limitOrderMarketCap, solPrice, activeTradeType]);
+  }, [
+    limitOrderSolAmount,
+    limitOrderTokenAmount,
+    limitOrderAvgPrice,
+    limitOrderMarketCap,
+    solPrice,
+    activeTradeType,
+  ]);
 
   // Initialize base market cap from props
   useEffect(() => {
@@ -1122,26 +1263,32 @@ const TradingCard: React.FC<TradingCardProps> = ({
 
   // Load active orders when switching to orders tab
   useEffect(() => {
-    if (activeMainTab === 'orders') {
+    if (activeMainTab === "orders") {
       void loadActiveOrders();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMainTab, tokenAddress]);
 
   // Close dropdown and calendar when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent): void => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
-      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+      if (
+        calendarRef.current &&
+        !calendarRef.current.contains(event.target as Node)
+      ) {
         setShowCalendar(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -1154,35 +1301,46 @@ const TradingCard: React.FC<TradingCardProps> = ({
     const supply = 1000000000; // 1B tokens
     const avgPrice = currentMarketCap / (solPrice * supply);
 
-    if (activeTradeType === 'buy' && buyAmount) {
+    if (activeTradeType === "buy" && buyAmount) {
       const solAmountNum = parseFloat(buyAmount);
       const tokenAmount = solAmountNum / avgPrice;
       return { tokenAmount, solAmount: solAmountNum };
-    } else if (activeTradeType === 'sell' && sellAmount && tokenBalances) {
+    } else if (activeTradeType === "sell" && sellAmount && tokenBalances) {
       // For sell, sellAmount is percentage of tokens
       const sellPercentage = parseFloat(sellAmount) / 100;
-      
+
       // Calculate total token amount across all active wallets
-      const activeWallets = wallets.filter(wallet => wallet.isActive);
-      const totalTokenAmount = activeWallets.reduce((sum: number, wallet: WalletType) => {
-        return sum + (tokenBalances.get(wallet.address) || 0);
-      }, 0);
-      
+      const activeWallets = wallets.filter((wallet) => wallet.isActive);
+      const totalTokenAmount = activeWallets.reduce(
+        (sum: number, wallet: WalletType) => {
+          return sum + (tokenBalances.get(wallet.address) || 0);
+        },
+        0,
+      );
+
       const tokenAmountToSell = totalTokenAmount * sellPercentage;
       const solAmount = tokenAmountToSell * avgPrice;
       return { tokenAmount: tokenAmountToSell, solAmount };
     }
 
     return { tokenAmount: null, solAmount: null };
-  }, [currentMarketCap, solPrice, buyAmount, sellAmount, activeTradeType, tokenBalances, wallets]);
+  }, [
+    currentMarketCap,
+    solPrice,
+    buyAmount,
+    sellAmount,
+    activeTradeType,
+    tokenBalances,
+    wallets,
+  ]);
 
   // Format number for display
   const formatAmount = (amount: number | null): string => {
-    if (!amount) return '';
+    if (!amount) return "";
     if (amount >= 1000000) {
-      return (amount / 1000000).toFixed(2) + 'M';
+      return (amount / 1000000).toFixed(2) + "M";
     } else if (amount >= 1000) {
-      return (amount / 1000).toFixed(2) + 'K';
+      return (amount / 1000).toFixed(2) + "K";
     } else if (amount < 0.01) {
       return amount.toExponential(2);
     } else {
@@ -1198,42 +1356,44 @@ const TradingCard: React.FC<TradingCardProps> = ({
   };
 
   const handleSelectAll = (): void => {
-    const allActive = wallets.filter(w => !w.isArchived).every(w => w.isActive);
-    const updatedWallets = wallets.map(wallet => ({
+    const allActive = wallets
+      .filter((w) => !w.isArchived)
+      .every((w) => w.isActive);
+    const updatedWallets = wallets.map((wallet) => ({
       ...wallet,
-      isActive: wallet.isArchived ? wallet.isActive : !allActive
+      isActive: wallet.isArchived ? wallet.isActive : !allActive,
     }));
     setWallets(updatedWallets);
     saveWalletsToCookies(updatedWallets);
   };
 
   const handleSelectAllWithBalance = (): void => {
-    const walletsWithBalance = wallets.filter(wallet => {
+    const walletsWithBalance = wallets.filter((wallet) => {
       if (wallet.isArchived) return false;
       const solBal = solBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
       return solBal > 0 || tokenBal > 0;
     });
-    
+
     if (walletsWithBalance.length === 0) {
-      showToast('No wallets with balance found', 'error');
+      showToast("No wallets with balance found", "error");
       return;
     }
 
-    const allWithBalanceActive = walletsWithBalance.every(w => w.isActive);
-    const updatedWallets = wallets.map(wallet => {
+    const allWithBalanceActive = walletsWithBalance.every((w) => w.isActive);
+    const updatedWallets = wallets.map((wallet) => {
       if (wallet.isArchived) return wallet;
       const solBal = solBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
       const hasBalance = solBal > 0 || tokenBal > 0;
-      
+
       if (allWithBalanceActive) {
         return { ...wallet, isActive: false };
       } else {
         return { ...wallet, isActive: hasBalance ? true : wallet.isActive };
       }
     });
-    
+
     setWallets(updatedWallets);
     saveWalletsToCookies(updatedWallets);
   };
@@ -1249,24 +1409,21 @@ const TradingCard: React.FC<TradingCardProps> = ({
       );
     }
 
-    if (activeTradeType === 'buy') {
+    if (activeTradeType === "buy") {
       if (marketOrderAmounts.tokenAmount && buyAmount) {
         return `${formatAmount(marketOrderAmounts.tokenAmount)}`;
       }
-      return 'BUY';
+      return "BUY";
     } else {
       if (marketOrderAmounts.solAmount && sellAmount) {
         return `${formatAmount(marketOrderAmounts.solAmount)}`;
       }
-      return 'SELL';
+      return "SELL";
     }
   };
 
   return (
-    <div 
-      className="relative overflow-hidden rounded-xl shadow-xl"
-
-    >
+    <div className="relative overflow-hidden rounded-xl shadow-xl">
       {/*  corner accents */}
       <div className="absolute top-0 left-0 w-24 h-24 pointer-events-none">
         <div className="absolute top-0 left-0 w-px h-8 bg-gradient-to-b from-app-primary-color to-transparent"></div>
@@ -1290,113 +1447,116 @@ const TradingCard: React.FC<TradingCardProps> = ({
         <div className="flex bg-app-primary-60 border-b border-app-primary-20">
           {/* Orders Tab - Smaller */}
           <button
-            onClick={() => setActiveMainTab('orders')}
+            onClick={() => setActiveMainTab("orders")}
             className={`px-3 py-2 text-xs font-mono tracking-wider transition-all duration-200 ${
-              activeMainTab === 'orders'
-                ? 'bg-app-primary-40 color-primary border-r border-app-primary-60'
-                : 'bg-transparent text-app-secondary-40 hover:text-app-secondary-60 border-r border-app-primary-20'
+              activeMainTab === "orders"
+                ? "bg-app-primary-40 color-primary border-r border-app-primary-60"
+                : "bg-transparent text-app-secondary-40 hover:text-app-secondary-60 border-r border-app-primary-20"
             }`}
           >
             <ClipboardList size={14} />
           </button>
-          
+
           {/* Buy/Sell Toggle - Takes remaining space */}
           <div className="flex flex-1">
             <button
               onClick={() => {
-                setActiveMainTab('trading');
-                setActiveTradeType('buy');
+                setActiveMainTab("trading");
+                setActiveTradeType("buy");
               }}
               className={`flex-1 py-3 px-4 text-sm font-mono tracking-wider transition-all duration-200 ${
-                activeMainTab === 'trading' && activeTradeType === 'buy'
-                  ? 'bg-app-primary-color text-black font-medium'
-                  : 'bg-transparent text-app-secondary-60 hover-text-app-secondary'
+                activeMainTab === "trading" && activeTradeType === "buy"
+                  ? "bg-app-primary-color text-black font-medium"
+                  : "bg-transparent text-app-secondary-60 hover-text-app-secondary"
               }`}
             >
               BUY
             </button>
             <button
               onClick={() => {
-                setActiveMainTab('trading');
-                setActiveTradeType('sell');
+                setActiveMainTab("trading");
+                setActiveTradeType("sell");
               }}
               className={`flex-1 py-3 px-4 text-sm font-mono tracking-wider transition-all duration-200 ${
-                activeMainTab === 'trading' && activeTradeType === 'sell'
-                  ? 'bg-error-alt text-white font-medium'
-                  : 'bg-transparent text-warning-60 hover:text-error-alt'
+                activeMainTab === "trading" && activeTradeType === "sell"
+                  ? "bg-error-alt text-white font-medium"
+                  : "bg-transparent text-warning-60 hover:text-error-alt"
               }`}
             >
               SELL
             </button>
           </div>
-          
+
           {/* Wallet Counter - Clickable */}
           <div className="relative" ref={walletSelectorRef}>
             <button
               onClick={() => setShowWalletSelector(!showWalletSelector)}
               className="flex items-center justify-center px-4 py-2 border-l border-app-primary-20 hover:bg-app-primary-20 transition-colors cursor-pointer h-full"
             >
-                <span className="text-[10px] font-mono color-primary font-semibold">{countActiveWallets(wallets)}</span>
-                <svg 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  className="color-primary"
-                >
-                  <path 
-                    d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18zM3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 4h2v2h-2v-2z" 
-                    fill="currentColor"
-                  />
-                </svg>
+              <span className="text-[10px] font-mono color-primary font-semibold">
+                {countActiveWallets(wallets)}
+              </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                className="color-primary"
+              >
+                <path
+                  d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18zM3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 4h2v2h-2v-2z"
+                  fill="currentColor"
+                />
+              </svg>
             </button>
           </div>
         </div>
       )}
 
       {/* Wallet Selector Popup - Rendered via Portal to escape overflow constraints */}
-      {showWalletSelector && createPortal(
-        <WalletSelectorPopup
-          wallets={wallets}
-          solBalances={solBalances}
-          tokenBalances={tokenBalances}
-          walletSelectorRef={walletSelectorRef}
-          onClose={() => setShowWalletSelector(false)}
-          onToggleWallet={handleToggleWallet}
-          onSelectAll={handleSelectAll}
-          onSelectAllWithBalance={handleSelectAllWithBalance}
-        />,
-        document.body
-      )}
+      {showWalletSelector &&
+        createPortal(
+          <WalletSelectorPopup
+            wallets={wallets}
+            solBalances={solBalances}
+            tokenBalances={tokenBalances}
+            walletSelectorRef={walletSelectorRef}
+            onClose={() => setShowWalletSelector(false)}
+            onToggleWallet={handleToggleWallet}
+            onSelectAll={handleSelectAll}
+            onSelectAllWithBalance={handleSelectAllWithBalance}
+          />,
+          document.body,
+        )}
 
       {/* Order Type Tabs - Only show for trading tab */}
-      {!isFloatingCardOpen && activeMainTab === 'trading' && (
+      {!isFloatingCardOpen && activeMainTab === "trading" && (
         <div className="flex items-center justify-between px-4 py-2 bg-app-primary-40 border-b border-app-primary-10">
           <div className="flex gap-4">
             <button
-              onClick={() => setOrderType('market')}
+              onClick={() => setOrderType("market")}
               className={`text-xs font-mono tracking-wider transition-all duration-200 ${
-                orderType === 'market'
-                  ? 'color-primary border-b-2 border-app-primary-color pb-1'
-                  : 'text-app-secondary-60 hover-text-app-secondary pb-1'
+                orderType === "market"
+                  ? "color-primary border-b-2 border-app-primary-color pb-1"
+                  : "text-app-secondary-60 hover-text-app-secondary pb-1"
               }`}
             >
               MARKET
             </button>
             <button
-              onClick={() => setOrderType('limit')}
+              onClick={() => setOrderType("limit")}
               className={`text-xs font-mono tracking-wider transition-all duration-200 ${
-                orderType === 'limit'
-                  ? 'color-primary border-b-2 border-app-primary-color pb-1'
-                  : 'text-app-secondary-60 hover-text-app-secondary pb-1'
+                orderType === "limit"
+                  ? "color-primary border-b-2 border-app-primary-color pb-1"
+                  : "text-app-secondary-60 hover-text-app-secondary pb-1"
               }`}
             >
               LIMIT
             </button>
           </div>
-          
+
           {/* Action Icons - Hidden for limit orders */}
-          {orderType !== 'limit' && (
+          {orderType !== "limit" && (
             <div className="flex items-center gap-2">
               <button
                 onClick={onOpenFloating}
@@ -1413,7 +1573,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       {/* Main Content */}
       {!isFloatingCardOpen ? (
         <div className="p-3 space-y-2">
-          {activeMainTab === 'orders' ? (
+          {activeMainTab === "orders" ? (
             /* Orders Content */
             <div className="space-y-3">
               {/* Orders Header */}
@@ -1443,159 +1603,226 @@ const TradingCard: React.FC<TradingCardProps> = ({
                 <div className="text-center py-8">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Loader2 size={16} className="animate-spin color-primary" />
-                    <span className="text-app-secondary-60 text-sm font-mono">Loading orders...</span>
+                    <span className="text-app-secondary-60 text-sm font-mono">
+                      Loading orders...
+                    </span>
                   </div>
                 </div>
               ) : !tokenAddress ? (
                 <div className="text-center py-8">
-                  <div className="text-app-secondary-60 text-sm font-mono mb-2">No token selected</div>
+                  <div className="text-app-secondary-60 text-sm font-mono mb-2">
+                    No token selected
+                  </div>
                   <div className="text-app-secondary-40 text-xs font-mono">
                     Select a token to view orders
                   </div>
                 </div>
-              ) : activeOrders && activeOrders.orders && activeOrders.orders.orders.length > 0 ? (
-                 <div className="space-y-2">
-                   {activeOrders.orders.orders.map((order: {
-                     publicKey?: string;
-                     orderKey?: string;
-                     userPubkey?: string;
-                     makingAmount?: string;
-                     takingAmount?: string;
-                     expiredAt?: number | null;
-                     inputMint?: string;
-                     outputMint?: string;
-                     account?: {
-                       orderKey?: string;
-                       userPubkey?: string;
-                       makingAmount?: string;
-                       takingAmount?: string;
-                       expiredAt?: number | null;
-                       inputMint?: string;
-                       outputMint?: string;
-                     };
-                   }, index: number) => {
-                     // Properties might be directly on the order object or nested under account
-                     const orderKey = order.orderKey || order.account?.orderKey || '';
-                     const userPubkey = order.userPubkey || order.account?.userPubkey || '';
-                     const makingAmount = order.makingAmount || order.account?.makingAmount || '0';
-                     const takingAmount = order.takingAmount || order.account?.takingAmount || '0';
-                     const expiredAt = order.expiredAt ?? order.account?.expiredAt ?? null;
-                     const inputMint = order.inputMint || order.account?.inputMint || '';
-                     const outputMint = order.outputMint || order.account?.outputMint || '';
-                     
-                     // Determine if this is a buy or sell order
-                     // Buy order: inputMint is SOL (So11111111111111111111111111111111111111112)
-                     // Sell order: outputMint is SOL (So11111111111111111111111111111111111111112)
-                     const solMint = 'So11111111111111111111111111111111111111112';
-                     const isBuyOrder = inputMint === solMint;
-                     const isSellOrder = outputMint === solMint;
-                     
-                     return (
-                       <div key={orderKey} className="bg-app-primary-60 border border-app-primary-20 rounded-lg p-3">
-                         <div className="flex items-center justify-between mb-2">
-                           <div className="flex items-center gap-2">
-                             <span className={`text-xs font-mono px-2 py-1 rounded ${
-                               isBuyOrder 
-                                 ? 'bg-app-primary-color text-black' 
-                                 : isSellOrder 
-                                 ? 'bg-[#ff3232] text-white' 
-                                 : 'bg-primary-20 color-primary'
-                             }`}>
-                               {isBuyOrder ? 'BUY' : isSellOrder ? 'SELL' : `#${index + 1}`}
-                             </span>
-                             <span className="text-xs font-mono text-app-secondary-60">
-                               {userPubkey.slice(0, 8)}...{userPubkey.slice(-4)}
-                             </span>
-                           </div>
-                           <button
-                             onClick={() => handleCancelOrder(orderKey, userPubkey)}
-                             disabled={cancellingOrders.has(orderKey)}
-                             className="p-1 bg-error-20 border border-error-alt-40 text-error-alt hover-bg-error-30 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                             title={cancellingOrders.has(orderKey) ? "Cancelling..." : "Cancel order"}
-                           >
-                             {cancellingOrders.has(orderKey) ? (
-                               <Loader2 size={12} className="animate-spin" />
-                             ) : (
-                               <X size={12} />
-                             )}
-                           </button>
-                         </div>
-                         
-                         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                           {isBuyOrder ? (
-                             <>
-                               <div>
-                                 <span className="text-app-secondary-60">Spending: </span>
-                                 <span className="text-app-primary">
-                                   {parseFloat(makingAmount).toFixed(4)} SOL
-                                 </span>
-                               </div>
-                               <div>
-                                 <span className="text-app-secondary-60">Receiving: </span>
-                                 <span className="text-app-primary">
-                                   {parseInt(takingAmount).toFixed(2)} tokens
-                                 </span>
-                               </div>
-                               <div className="col-span-2">
-                                 <span className="text-app-secondary-60">Price: </span>
-                                 <span className="color-primary">
-                                   {calculatePrice(makingAmount, takingAmount).toFixed(8)} tokens/SOL
-                                 </span>
-                               </div>
-                             </>
-                           ) : isSellOrder ? (
-                             <>
-                               <div>
-                                 <span className="text-app-secondary-60">Selling: </span>
-                                 <span className="text-app-primary">
-                                   {parseInt(makingAmount).toFixed(2)} tokens
-                                 </span>
-                               </div>
-                               <div>
-                                 <span className="text-app-secondary-60">Receiving: </span>
-                                 <span className="text-app-primary">
-                                   {parseFloat(takingAmount).toFixed(4)} SOL
-                                 </span>
-                               </div>
-                               <div className="col-span-2">
-                                 <span className="text-app-secondary-60">Price: </span>
-                                 <span className="color-primary">
-                                   {(parseFloat(takingAmount) / parseInt(makingAmount)).toFixed(8)} SOL/token
-                                 </span>
-                               </div>
-                             </>
-                           ) : (
-                             <>
-                               <div>
-                                 <span className="text-app-secondary-60">Making: </span>
-                                 <span className="text-app-primary">
-                                   {parseFloat(makingAmount).toFixed(4)}
-                                 </span>
-                               </div>
-                               <div>
-                                 <span className="text-app-secondary-60">Taking: </span>
-                                 <span className="text-app-primary">
-                                   {parseInt(takingAmount).toFixed(2)}
-                                 </span>
-                               </div>
-                             </>
-                           )}
-                           {expiredAt && (
-                             <div className="col-span-2">
-                               <span className="text-app-secondary-60">Expires: </span>
-                               <span className="text-app-primary">
-                                 {new Date(expiredAt * 1000).toLocaleString()}
-                               </span>
-                             </div>
-                           )}
-                         </div>
-                       </div>
-                     );
-                   })}
+              ) : activeOrders &&
+                activeOrders.orders &&
+                activeOrders.orders.orders.length > 0 ? (
+                <div className="space-y-2">
+                  {activeOrders.orders.orders.map(
+                    (
+                      order: {
+                        publicKey?: string;
+                        orderKey?: string;
+                        userPubkey?: string;
+                        makingAmount?: string;
+                        takingAmount?: string;
+                        expiredAt?: number | null;
+                        inputMint?: string;
+                        outputMint?: string;
+                        account?: {
+                          orderKey?: string;
+                          userPubkey?: string;
+                          makingAmount?: string;
+                          takingAmount?: string;
+                          expiredAt?: number | null;
+                          inputMint?: string;
+                          outputMint?: string;
+                        };
+                      },
+                      index: number,
+                    ) => {
+                      // Properties might be directly on the order object or nested under account
+                      const orderKey =
+                        order.orderKey || order.account?.orderKey || "";
+                      const userPubkey =
+                        order.userPubkey || order.account?.userPubkey || "";
+                      const makingAmount =
+                        order.makingAmount ||
+                        order.account?.makingAmount ||
+                        "0";
+                      const takingAmount =
+                        order.takingAmount ||
+                        order.account?.takingAmount ||
+                        "0";
+                      const expiredAt =
+                        order.expiredAt ?? order.account?.expiredAt ?? null;
+                      const inputMint =
+                        order.inputMint || order.account?.inputMint || "";
+                      const outputMint =
+                        order.outputMint || order.account?.outputMint || "";
+
+                      // Determine if this is a buy or sell order
+                      // Buy order: inputMint is SOL (So11111111111111111111111111111111111111112)
+                      // Sell order: outputMint is SOL (So11111111111111111111111111111111111111112)
+                      const solMint =
+                        "So11111111111111111111111111111111111111112";
+                      const isBuyOrder = inputMint === solMint;
+                      const isSellOrder = outputMint === solMint;
+
+                      return (
+                        <div
+                          key={orderKey}
+                          className="bg-app-primary-60 border border-app-primary-20 rounded-lg p-3"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-xs font-mono px-2 py-1 rounded ${
+                                  isBuyOrder
+                                    ? "bg-app-primary-color text-black"
+                                    : isSellOrder
+                                      ? "bg-[#ff3232] text-white"
+                                      : "bg-primary-20 color-primary"
+                                }`}
+                              >
+                                {isBuyOrder
+                                  ? "BUY"
+                                  : isSellOrder
+                                    ? "SELL"
+                                    : `#${index + 1}`}
+                              </span>
+                              <span className="text-xs font-mono text-app-secondary-60">
+                                {userPubkey.slice(0, 8)}...
+                                {userPubkey.slice(-4)}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() =>
+                                handleCancelOrder(orderKey, userPubkey)
+                              }
+                              disabled={cancellingOrders.has(orderKey)}
+                              className="p-1 bg-error-20 border border-error-alt-40 text-error-alt hover-bg-error-30 rounded transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={
+                                cancellingOrders.has(orderKey)
+                                  ? "Cancelling..."
+                                  : "Cancel order"
+                              }
+                            >
+                              {cancellingOrders.has(orderKey) ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <X size={12} />
+                              )}
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                            {isBuyOrder ? (
+                              <>
+                                <div>
+                                  <span className="text-app-secondary-60">
+                                    Spending:{" "}
+                                  </span>
+                                  <span className="text-app-primary">
+                                    {parseFloat(makingAmount).toFixed(4)} SOL
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-app-secondary-60">
+                                    Receiving:{" "}
+                                  </span>
+                                  <span className="text-app-primary">
+                                    {parseInt(takingAmount).toFixed(2)} tokens
+                                  </span>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="text-app-secondary-60">
+                                    Price:{" "}
+                                  </span>
+                                  <span className="color-primary">
+                                    {calculatePrice(
+                                      makingAmount,
+                                      takingAmount,
+                                    ).toFixed(8)}{" "}
+                                    tokens/SOL
+                                  </span>
+                                </div>
+                              </>
+                            ) : isSellOrder ? (
+                              <>
+                                <div>
+                                  <span className="text-app-secondary-60">
+                                    Selling:{" "}
+                                  </span>
+                                  <span className="text-app-primary">
+                                    {parseInt(makingAmount).toFixed(2)} tokens
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-app-secondary-60">
+                                    Receiving:{" "}
+                                  </span>
+                                  <span className="text-app-primary">
+                                    {parseFloat(takingAmount).toFixed(4)} SOL
+                                  </span>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="text-app-secondary-60">
+                                    Price:{" "}
+                                  </span>
+                                  <span className="color-primary">
+                                    {(
+                                      parseFloat(takingAmount) /
+                                      parseInt(makingAmount)
+                                    ).toFixed(8)}{" "}
+                                    SOL/token
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div>
+                                  <span className="text-app-secondary-60">
+                                    Making:{" "}
+                                  </span>
+                                  <span className="text-app-primary">
+                                    {parseFloat(makingAmount).toFixed(4)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-app-secondary-60">
+                                    Taking:{" "}
+                                  </span>
+                                  <span className="text-app-primary">
+                                    {parseInt(takingAmount).toFixed(2)}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                            {expiredAt && (
+                              <div className="col-span-2">
+                                <span className="text-app-secondary-60">
+                                  Expires:{" "}
+                                </span>
+                                <span className="text-app-primary">
+                                  {new Date(expiredAt * 1000).toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-app-secondary-60 text-sm font-mono mb-2">No active orders for this token</div>
+                  <div className="text-app-secondary-60 text-sm font-mono mb-2">
+                    No active orders for this token
+                  </div>
                   <div className="text-app-secondary-40 text-xs font-mono">
                     Create limit orders in the trading tab
                   </div>
@@ -1606,334 +1833,416 @@ const TradingCard: React.FC<TradingCardProps> = ({
             /* Trading Content */
             <>
               {/* Amount Input and Submit Button Row - Hidden for limit orders */}
-          {orderType !== 'limit' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
-                  AMOUNT
-                </label>
-                <span className="text-xs text-app-secondary-60 font-mono">
-                  {activeTradeType === 'buy' ? 'SOL/WALLET' : '% TOKENS'}
-                </span>
-              </div>
-              
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    value={activeTradeType === 'buy' ? buyAmount : sellAmount}
-                    onChange={handleAmountChange}
-                    placeholder="0.0"
-                    disabled={!tokenAddress || isLoading}
-                    className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg 
-                             text-app-primary placeholder-app-secondary-60 font-mono text-sm 
-                             focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40 
+              {orderType !== "limit" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
+                      AMOUNT
+                    </label>
+                    <span className="text-xs text-app-secondary-60 font-mono">
+                      {activeTradeType === "buy" ? "SOL/WALLET" : "% TOKENS"}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={
+                          activeTradeType === "buy" ? buyAmount : sellAmount
+                        }
+                        onChange={handleAmountChange}
+                        placeholder="0.0"
+                        disabled={!tokenAddress || isLoading}
+                        className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg
+                             text-app-primary placeholder-app-secondary-60 font-mono text-sm
+                             focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40
                              transition-all duration-300 shadow-inner-black-80
                              disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  {isLoading && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <Loader2 size={16} className="animate-spin color-primary" />
+                      />
+                      {isLoading && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2
+                            size={16}
+                            className="animate-spin color-primary"
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                
-                {/* Submit Button */}
-                <button
-                  onClick={() => handleTradeSubmit(wallets, activeTradeType === 'buy', selectedDex, activeTradeType === 'buy' ? buyAmount : undefined, activeTradeType === 'sell' ? sellAmount : undefined)}
-                  disabled={!selectedDex || (!buyAmount && !sellAmount) || isLoading || !tokenAddress}
-                  className={`px-4 py-2 text-sm font-mono tracking-wider rounded-lg 
+
+                    {/* Submit Button */}
+                    <button
+                      onClick={() =>
+                        handleTradeSubmit(
+                          wallets,
+                          activeTradeType === "buy",
+                          selectedDex,
+                          activeTradeType === "buy" ? buyAmount : undefined,
+                          activeTradeType === "sell" ? sellAmount : undefined,
+                        )
+                      }
+                      disabled={
+                        !selectedDex ||
+                        (!buyAmount && !sellAmount) ||
+                        isLoading ||
+                        !tokenAddress
+                      }
+                      className={`px-4 py-2 text-sm font-mono tracking-wider rounded-lg
                            transition-all duration-300 relative overflow-hidden whitespace-nowrap
                            disabled:opacity-50 disabled:cursor-not-allowed ${
-                    activeTradeType === 'buy'
-                      ? 'bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-darker text-black font-medium shadow-md shadow-app-primary-40 hover-shadow-app-primary-60 disabled:from-app-primary-40 disabled:to-app-primary-40 disabled:shadow-none'
-                      : 'bg-gradient-to-r from-[#ff3232] to-[#e62929] hover:from-[#e62929] hover:to-[#cc2020] text-white font-medium shadow-md shadow-[#ff323240] hover:shadow-[#ff323260] disabled:from-[#ff323240] disabled:to-[#ff323240] disabled:shadow-none'
-                  }`}
-                >
-                  {getButtonText()}
-                </button>
-              </div>
-            </div>
-          )}
+                             activeTradeType === "buy"
+                               ? "bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-darker text-black font-medium shadow-md shadow-app-primary-40 hover-shadow-app-primary-60 disabled:from-app-primary-40 disabled:to-app-primary-40 disabled:shadow-none"
+                               : "bg-gradient-to-r from-[#ff3232] to-[#e62929] hover:from-[#e62929] hover:to-[#cc2020] text-white font-medium shadow-md shadow-[#ff323240] hover:shadow-[#ff323260] disabled:from-[#ff323240] disabled:to-[#ff323240] disabled:shadow-none"
+                           }`}
+                    >
+                      {getButtonText()}
+                    </button>
+                  </div>
+                </div>
+              )}
 
-          {/* Preset tabs - Hidden for limit orders */}
-          {orderType !== 'limit' && (
-            <div className="flex gap-1 mb-2">
-              {presetTabs.map((tab: PresetTab) => (
-                <TabButton
-                  key={tab.id}
-                  label={tab.label}
-                  isActive={tab.id === activeTabId}
-                  isEditMode={isEditMode}
-                  onClick={() => handleTabSwitch(tab.id)}
-                  onEdit={(newLabel) => handleEditTabLabel(tab.id, newLabel)}
-                />
-              ))}
-              <button
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
-                  isEditMode 
-                    ? 'bg-app-primary-color hover:bg-app-primary-dark text-black' 
-                    : 'bg-app-primary-60 border border-app-primary-40 color-primary hover-bg-primary-20'
-                }`}
-                title={isEditMode ? 'Save changes' : 'Edit presets'}
-              >
-                {isEditMode ? <Check size={12} /> : <Edit3 size={12} />}
-              </button>
-            </div>
-          )}
+              {/* Preset tabs - Hidden for limit orders */}
+              {orderType !== "limit" && (
+                <div className="flex gap-1 mb-2">
+                  {presetTabs.map((tab: PresetTab) => (
+                    <TabButton
+                      key={tab.id}
+                      label={tab.label}
+                      isActive={tab.id === activeTabId}
+                      isEditMode={isEditMode}
+                      onClick={() => handleTabSwitch(tab.id)}
+                      onEdit={(newLabel) =>
+                        handleEditTabLabel(tab.id, newLabel)
+                      }
+                    />
+                  ))}
+                  <button
+                    onClick={() => setIsEditMode(!isEditMode)}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      isEditMode
+                        ? "bg-app-primary-color hover:bg-app-primary-dark text-black"
+                        : "bg-app-primary-60 border border-app-primary-40 color-primary hover-bg-primary-20"
+                    }`}
+                    title={isEditMode ? "Save changes" : "Edit presets"}
+                  >
+                    {isEditMode ? <Check size={12} /> : <Edit3 size={12} />}
+                  </button>
+                </div>
+              )}
 
-          {/* Preset Buttons - Hidden for limit orders */}
-          {orderType !== 'limit' && (
-            <div className="grid grid-cols-4 gap-1">
-              {(activeTradeType === 'buy' ? activeTab.buyPresets : activeTab.sellPresets).map((preset: string, index: number) => (
-                <PresetButton
-                  key={`${activeTradeType}-${index}`}
-                  value={preset}
-                  onExecute={() => handlePresetClick(preset)}
-                  onChange={(newValue) => {
-                    if (activeTradeType === 'buy') {
-                      handleEditBuyPreset(index, newValue);
-                    } else {
-                      handleEditSellPreset(index, newValue);
-                    }
-                  }}
-                  isLoading={isLoading}
-                  variant={activeTradeType}
-                  isEditMode={isEditMode}
-                  index={index}
-                />
-              ))}
-            </div>
-          )}
+              {/* Preset Buttons - Hidden for limit orders */}
+              {orderType !== "limit" && (
+                <div className="grid grid-cols-4 gap-1">
+                  {(activeTradeType === "buy"
+                    ? activeTab.buyPresets
+                    : activeTab.sellPresets
+                  ).map((preset: string, index: number) => (
+                    <PresetButton
+                      key={`${activeTradeType}-${index}`}
+                      value={preset}
+                      onExecute={() => handlePresetClick(preset)}
+                      onChange={(newValue) => {
+                        if (activeTradeType === "buy") {
+                          handleEditBuyPreset(index, newValue);
+                        } else {
+                          handleEditSellPreset(index, newValue);
+                        }
+                      }}
+                      isLoading={isLoading}
+                      variant={activeTradeType}
+                      isEditMode={isEditMode}
+                      index={index}
+                    />
+                  ))}
+                </div>
+              )}
 
-          {/* Limit Order Inputs - Fully Functional */}
-          {orderType === 'limit' && (
-            <div className="space-y-3">
-              
-              {/* Expiry Input (Optional) - Calendar Widget */}
-              <div className="space-y-1 relative">
-                <label className="text-xs font-mono tracking-wider text-app-secondary-60 uppercase">
-                  EXPIRY (OPTIONAL)
-                </label>
-                <div className="relative" ref={calendarRef}>
-                   <button
-                    type="button"
-                    onClick={() => setShowCalendar(!showCalendar)}
-                    disabled={!tokenAddress || isCreatingLimitOrder}
-                    className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg 
-                             text-app-primary placeholder-app-secondary-60 font-mono text-sm 
-                             focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40 
+              {/* Limit Order Inputs - Fully Functional */}
+              {orderType === "limit" && (
+                <div className="space-y-3">
+                  {/* Expiry Input (Optional) - Calendar Widget */}
+                  <div className="space-y-1 relative">
+                    <label className="text-xs font-mono tracking-wider text-app-secondary-60 uppercase">
+                      EXPIRY (OPTIONAL)
+                    </label>
+                    <div className="relative" ref={calendarRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCalendar(!showCalendar)}
+                        disabled={!tokenAddress || isCreatingLimitOrder}
+                        className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg
+                             text-app-primary placeholder-app-secondary-60 font-mono text-sm
+                             focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40
                              transition-all duration-300 shadow-inner-black-80
                              disabled:opacity-50 disabled:cursor-not-allowed
                              flex items-center justify-between"
-                  >
-                    <span className={limitOrderExpiry ? 'text-app-primary' : 'text-app-secondary-60'}>
-                      {limitOrderExpiry ? formatDisplayDate(limitOrderExpiry) : 'Select expiry date...'}
-                    </span>
-                    <Calendar size={16} className="text-app-secondary-60" />
-                  </button>
-                  
-                  {/* Clear button */}
-                  {limitOrderExpiry && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLimitOrderExpiry('');
-                        setLimitOrderMarketCap('');
-                        setMarketCapSlider(0);
-                        setShowCalendar(false);
+                      >
+                        <span
+                          className={
+                            limitOrderExpiry
+                              ? "text-app-primary"
+                              : "text-app-secondary-60"
+                          }
+                        >
+                          {limitOrderExpiry
+                            ? formatDisplayDate(limitOrderExpiry)
+                            : "Select expiry date..."}
+                        </span>
+                        <Calendar size={16} className="text-app-secondary-60" />
+                      </button>
+
+                      {/* Clear button */}
+                      {limitOrderExpiry && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLimitOrderExpiry("");
+                            setLimitOrderMarketCap("");
+                            setMarketCapSlider(0);
+                            setShowCalendar(false);
+                          }}
+                          className="absolute right-8 top-1/2 transform -translate-y-1/2 text-app-secondary-60 hover:text-app-primary transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+
+                      {/* Calendar Widget */}
+                      <CalendarWidget
+                        isOpen={showCalendar}
+                        onClose={() => setShowCalendar(false)}
+                        selectedDate={calendarDate}
+                        onDateSelect={handleCalendarDateSelect}
+                        selectedTime={selectedTime}
+                        onTimeChange={handleCalendarTimeChange}
+                      />
+                    </div>
+                  </div>
+                  {/* First Input - SOL Amount for Buy, Token Amount for Sell */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
+                      {activeTradeType === "buy"
+                        ? "SOL AMOUNT"
+                        : "TOKEN AMOUNT"}
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        activeTradeType === "buy"
+                          ? limitOrderSolAmount
+                          : limitOrderTokenAmount
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, "");
+                        if (activeTradeType === "buy") {
+                          setLimitOrderSolAmount(value);
+                          // Validate SOL amount for buy orders
+                          if (value && parseFloat(value) < 0.1) {
+                            showToast(
+                              "Minimum SOL amount for limit orders is 0.1 SOL",
+                              "error",
+                            );
+                          }
+                        } else {
+                          setLimitOrderTokenAmount(value);
+                          // Validate SOL amount for sell orders
+                          if (value && limitOrderAvgPrice) {
+                            const solAmount =
+                              parseFloat(value) *
+                              parseFloat(limitOrderAvgPrice);
+                            if (solAmount < 0.1) {
+                              showToast(
+                                "Minimum SOL amount for limit orders is 0.1 SOL",
+                                "error",
+                              );
+                            }
+                          }
+                        }
                       }}
-                      className="absolute right-8 top-1/2 transform -translate-y-1/2 text-app-secondary-60 hover:text-app-primary transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                  
-                  {/* Calendar Widget */}
-                  <CalendarWidget
-                    isOpen={showCalendar}
-                    onClose={() => setShowCalendar(false)}
-                    selectedDate={calendarDate}
-                    onDateSelect={handleCalendarDateSelect}
-                    selectedTime={selectedTime}
-                    onTimeChange={handleCalendarTimeChange}
-                  />
-                </div>
-              </div>
-              {/* First Input - SOL Amount for Buy, Token Amount for Sell */}
-              <div className="space-y-1">
-                <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
-                  {activeTradeType === 'buy' ? 'SOL AMOUNT' : 'TOKEN AMOUNT'}
-                </label>
-                <input
-                  type="text"
-                  value={activeTradeType === 'buy' ? limitOrderSolAmount : limitOrderTokenAmount}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9.]/g, '');
-                    if (activeTradeType === 'buy') {
-                      setLimitOrderSolAmount(value);
-                      // Validate SOL amount for buy orders
-                      if (value && parseFloat(value) < 0.1) {
-                        showToast('Minimum SOL amount for limit orders is 0.1 SOL', 'error');
-                      }
-                    } else {
-                      setLimitOrderTokenAmount(value);
-                      // Validate SOL amount for sell orders
-                      if (value && limitOrderAvgPrice) {
-                        const solAmount = parseFloat(value) * parseFloat(limitOrderAvgPrice);
-                        if (solAmount < 0.1) {
-                          showToast('Minimum SOL amount for limit orders is 0.1 SOL', 'error');
-                        }
-                      }
-                    }
-                  }}
-                  placeholder="0.0"
-                  disabled={!tokenAddress || isCreatingLimitOrder}
-                  className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg 
-                           text-app-primary placeholder-app-secondary-60 font-mono text-sm 
-                           focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40 
+                      placeholder="0.0"
+                      disabled={!tokenAddress || isCreatingLimitOrder}
+                      className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg
+                           text-app-primary placeholder-app-secondary-60 font-mono text-sm
+                           focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40
                            transition-all duration-300 shadow-inner-black-80
                            disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
+                    />
+                  </div>
 
-              {/* Second Input - Average Price */}
-              <div className="space-y-1">
-                <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
-                  AVG PRICE (SOL/TOKEN)
-                </label>
-                <input
-                  type="text"
-                  value={limitOrderAvgPrice}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9.]/g, '');
-                    setLimitOrderAvgPrice(value);
-                    // Validate SOL amount for sell orders
-                    if (activeTradeType === 'sell' && limitOrderTokenAmount && value) {
-                      const solAmount = parseFloat(limitOrderTokenAmount) * parseFloat(value);
-                      if (solAmount < 0.1) {
-                        showToast('Minimum SOL amount for limit orders is 0.1 SOL', 'error');
-                      }
-                    }
-                  }}
-                  placeholder="0.0"
-                  disabled={true}
-                  className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg 
-                           text-app-primary placeholder-app-secondary-60 font-mono text-sm 
-                           focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40 
+                  {/* Second Input - Average Price */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
+                      AVG PRICE (SOL/TOKEN)
+                    </label>
+                    <input
+                      type="text"
+                      value={limitOrderAvgPrice}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, "");
+                        setLimitOrderAvgPrice(value);
+                        // Validate SOL amount for sell orders
+                        if (
+                          activeTradeType === "sell" &&
+                          limitOrderTokenAmount &&
+                          value
+                        ) {
+                          const solAmount =
+                            parseFloat(limitOrderTokenAmount) *
+                            parseFloat(value);
+                          if (solAmount < 0.1) {
+                            showToast(
+                              "Minimum SOL amount for limit orders is 0.1 SOL",
+                              "error",
+                            );
+                          }
+                        }
+                      }}
+                      placeholder="0.0"
+                      disabled={true}
+                      className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg
+                           text-app-primary placeholder-app-secondary-60 font-mono text-sm
+                           focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40
                            transition-all duration-300 shadow-inner-black-80
                            disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
+                    />
+                  </div>
 
-              {/* Market Cap Slider */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
-                    MARKET CAP
-                  </label>
-                  <input
-                    type="text"
-                    value={marketCapSlider > 0 ? `+${marketCapSlider}` : marketCapSlider.toString()}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^-0-9.]/g, '');
-                      if (value === '' || value === '-') {
-                        setMarketCapSlider(0);
-                      } else {
-                        const numValue = parseFloat(value);
-                        if (!isNaN(numValue)) {
-                          setMarketCapSlider(Math.round(numValue));
+                  {/* Market Cap Slider */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
+                        MARKET CAP
+                      </label>
+                      <input
+                        type="text"
+                        value={
+                          marketCapSlider > 0
+                            ? `+${marketCapSlider}`
+                            : marketCapSlider.toString()
                         }
-                      }
-                    }}
-                    disabled={!tokenAddress || isCreatingLimitOrder || !baseMarketCap}
-                    className="text-xs font-mono color-primary bg-app-primary-90-alpha border border-app-primary-30 rounded px-1 py-0.5 text-right w-16
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^-0-9.]/g, "");
+                          if (value === "" || value === "-") {
+                            setMarketCapSlider(0);
+                          } else {
+                            const numValue = parseFloat(value);
+                            if (!isNaN(numValue)) {
+                              setMarketCapSlider(Math.round(numValue));
+                            }
+                          }
+                        }}
+                        disabled={
+                          !tokenAddress ||
+                          isCreatingLimitOrder ||
+                          !baseMarketCap
+                        }
+                        className="text-xs font-mono color-primary bg-app-primary-90-alpha border border-app-primary-30 rounded px-1 py-0.5 text-right w-16
                              disabled:opacity-50 disabled:cursor-not-allowed
                              hover:border-app-primary-40 focus:border-app-primary-50 focus:bg-app-primary-80-alpha focus:outline-none
                              transition-all duration-200"
-                  />
-                </div>
-                <div className="relative">
-                  <input
-                    type="range"
-                    min="-100"
-                    max="200"
-                    step="5"
-                    value={marketCapSlider}
-                    onChange={(e) => setMarketCapSlider(parseInt(e.target.value))}
-                    disabled={!tokenAddress || isCreatingLimitOrder || !baseMarketCap}
-                    className="w-full h-2 bg-app-primary-60 rounded-lg appearance-none cursor-pointer
+                      />
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="range"
+                        min="-100"
+                        max="200"
+                        step="5"
+                        value={marketCapSlider}
+                        onChange={(e) =>
+                          setMarketCapSlider(parseInt(e.target.value))
+                        }
+                        disabled={
+                          !tokenAddress ||
+                          isCreatingLimitOrder ||
+                          !baseMarketCap
+                        }
+                        className="w-full h-2 bg-app-primary-60 rounded-lg appearance-none cursor-pointer
                              disabled:opacity-50 disabled:cursor-not-allowed
                              slider-thumb"
-                  />
-                </div>
-                {baseMarketCap > 0 && (
-                  <div className="bg-primary-10 border border-app-primary-20 rounded-lg p-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-mono text-app-secondary-60 uppercase">Target Market Cap:</span>
-                      <span className="text-xs font-mono color-primary">
-                        ${limitOrderMarketCap ? parseFloat(limitOrderMarketCap).toLocaleString() : '0'}
-                      </span>
+                      />
                     </div>
+                    {baseMarketCap > 0 && (
+                      <div className="bg-primary-10 border border-app-primary-20 rounded-lg p-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-mono text-app-secondary-60 uppercase">
+                            Target Market Cap:
+                          </span>
+                          <span className="text-xs font-mono color-primary">
+                            $
+                            {limitOrderMarketCap
+                              ? parseFloat(limitOrderMarketCap).toLocaleString()
+                              : "0"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Calculated Amount Display */}
-              {((activeTradeType === 'buy' && limitOrderTokenAmount) || (activeTradeType === 'sell' && limitOrderSolAmount)) && (
-                <div className="bg-primary-10 border border-app-primary-20 rounded-lg p-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-mono text-app-secondary-60 uppercase">
-                      {activeTradeType === 'buy' ? 'Calculated Token Amount:' : 'Calculated SOL Amount:'}
-                    </span>
-                    <span className="text-xs font-mono color-primary">
-                      {activeTradeType === 'buy' ? limitOrderTokenAmount : limitOrderSolAmount}
-                    </span>
-                  </div>
-                </div>
-              )}
+                  {/* Calculated Amount Display */}
+                  {((activeTradeType === "buy" && limitOrderTokenAmount) ||
+                    (activeTradeType === "sell" && limitOrderSolAmount)) && (
+                    <div className="bg-primary-10 border border-app-primary-20 rounded-lg p-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-mono text-app-secondary-60 uppercase">
+                          {activeTradeType === "buy"
+                            ? "Calculated Token Amount:"
+                            : "Calculated SOL Amount:"}
+                        </span>
+                        <span className="text-xs font-mono color-primary">
+                          {activeTradeType === "buy"
+                            ? limitOrderTokenAmount
+                            : limitOrderSolAmount}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Price Display */}
-              {limitOrderPrice && (
-                <div className="bg-primary-10 border border-app-primary-20 rounded-lg p-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-mono text-app-secondary-60 uppercase">Price:</span>
-                    <span className="text-xs font-mono color-primary">
-                      {limitOrderPrice} {activeTradeType === 'buy' ? 'tokens/SOL' : 'SOL/token'}
-                    </span>
-                  </div>
-                </div>
-              )}
-              
-              {/* Create Order Button */}
-              <button
-                onClick={handleCreateLimitOrder}
-                disabled={
-                  !tokenAddress || 
-                  !limitOrderAvgPrice || 
-                  (activeTradeType === 'buy' && !limitOrderSolAmount) ||
-                  (activeTradeType === 'sell' && !limitOrderTokenAmount) ||
-                  isCreatingLimitOrder || 
-                  wallets.filter((w: WalletType) => w.isActive).length === 0
-                }
-                className="w-full px-4 py-2 text-sm font-mono tracking-wider rounded-lg 
-                         bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-darker 
+                  {/* Price Display */}
+                  {limitOrderPrice && (
+                    <div className="bg-primary-10 border border-app-primary-20 rounded-lg p-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-mono text-app-secondary-60 uppercase">
+                          Price:
+                        </span>
+                        <span className="text-xs font-mono color-primary">
+                          {limitOrderPrice}{" "}
+                          {activeTradeType === "buy"
+                            ? "tokens/SOL"
+                            : "SOL/token"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Create Order Button */}
+                  <button
+                    onClick={handleCreateLimitOrder}
+                    disabled={
+                      !tokenAddress ||
+                      !limitOrderAvgPrice ||
+                      (activeTradeType === "buy" && !limitOrderSolAmount) ||
+                      (activeTradeType === "sell" && !limitOrderTokenAmount) ||
+                      isCreatingLimitOrder ||
+                      wallets.filter((w: WalletType) => w.isActive).length === 0
+                    }
+                    className="w-full px-4 py-2 text-sm font-mono tracking-wider rounded-lg
+                         bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-darker
                          text-black font-medium shadow-md shadow-app-primary-40 hover-shadow-app-primary-60
                          transition-all duration-300 relative overflow-hidden
                          disabled:opacity-50 disabled:cursor-not-allowed disabled:from-app-primary-40 disabled:to-app-primary-40 disabled:shadow-none"
-              >
-                {isCreatingLimitOrder ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 size={16} className="animate-spin" />
-                    CREATING ORDER...
-                  </span>
-                ) : (
-                  `CREATE LIMIT ${activeTradeType.toUpperCase()}`
-                )}
-              </button>
-            </div>
-          )}
+                  >
+                    {isCreatingLimitOrder ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 size={16} className="animate-spin" />
+                        CREATING ORDER...
+                      </span>
+                    ) : (
+                      `CREATE LIMIT ${activeTradeType.toUpperCase()}`
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

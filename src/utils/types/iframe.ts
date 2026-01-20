@@ -1,6 +1,6 @@
 /**
  * Iframe Type Definitions
- * 
+ *
  * This module contains all iframe and communication type definitions
  * for the Solana trading application, including message types,
  * response types, and iframe state management.
@@ -13,7 +13,7 @@
 /**
  * Iframe view types
  */
-export type ViewType = 'holdings' | 'monitor' | 'token';
+export type ViewType = "holdings" | "monitor" | "token";
 
 // ============================================================================
 // Iframe Message Types (Sent TO Iframe)
@@ -24,9 +24,9 @@ export type ViewType = 'holdings' | 'monitor' | 'token';
  */
 export interface NavigateMessage {
   /** Message type identifier */
-  type: 'NAVIGATE';
+  type: "NAVIGATE";
   /** Target view */
-  view: 'holdings' | 'token' | 'monitor';
+  view: "holdings" | "token" | "monitor";
   /** Token mint address for token view */
   tokenMint?: string;
   /** Wallet addresses to include */
@@ -38,19 +38,19 @@ export interface NavigateMessage {
  */
 export interface AddWalletsMessage {
   /** Message type identifier */
-  type: 'ADD_WALLETS';
+  type: "ADD_WALLETS";
   /** Wallets to add */
   wallets: Array<string | { address: string; label?: string }>;
 }
 
 export interface ClearWalletsMessage {
   /** Message type identifier */
-  type: 'CLEAR_WALLETS';
+  type: "CLEAR_WALLETS";
 }
 
 export interface GetWalletsMessage {
   /** Message type identifier */
-  type: 'GET_WALLETS';
+  type: "GET_WALLETS";
 }
 
 /**
@@ -59,7 +59,7 @@ export interface GetWalletsMessage {
  */
 export interface WalletMessage {
   /** Message type identifier */
-  type: 'ADD_WALLETS' | 'CLEAR_WALLETS';
+  type: "ADD_WALLETS" | "CLEAR_WALLETS";
   /** Wallets to add (optional, only present for ADD_WALLETS) */
   wallets?: Array<string | { address: string; label?: string }>;
 }
@@ -74,7 +74,7 @@ export type WalletMessageUnion = AddWalletsMessage | ClearWalletsMessage;
  */
 export interface ToggleNonWhitelistedTradesMessage {
   /** Message type identifier */
-  type: 'TOGGLE_NON_WHITELISTED_TRADES';
+  type: "TOGGLE_NON_WHITELISTED_TRADES";
   /** Whether to enable non-whitelisted trades */
   enabled: boolean;
 }
@@ -84,7 +84,7 @@ export interface ToggleNonWhitelistedTradesMessage {
  */
 export interface SetQuickBuyConfigMessage {
   /** Message type identifier */
-  type: 'SET_QUICK_BUY_CONFIG';
+  type: "SET_QUICK_BUY_CONFIG";
   /** Quick buy configuration */
   config: {
     /** Whether quick buy is enabled */
@@ -105,23 +105,23 @@ export interface SetQuickBuyConfigMessage {
  */
 export interface QuickBuyActivateMessage {
   /** Message type identifier */
-  type: 'QUICKBUY_ACTIVATE';
+  type: "QUICKBUY_ACTIVATE";
 }
 
 export interface QuickBuyDeactivateMessage {
   /** Message type identifier */
-  type: 'QUICKBUY_DEACTIVATE';
+  type: "QUICKBUY_DEACTIVATE";
 }
 
 /**
  * Union type of all messages sent TO iframe
  */
-export type IframeMessage = 
-  | NavigateMessage 
+export type IframeMessage =
+  | NavigateMessage
   | AddWalletsMessage
   | ClearWalletsMessage
   | GetWalletsMessage
-  | ToggleNonWhitelistedTradesMessage 
+  | ToggleNonWhitelistedTradesMessage
   | SetQuickBuyConfigMessage
   | QuickBuyActivateMessage
   | QuickBuyDeactivateMessage;
@@ -135,7 +135,7 @@ export type IframeMessage =
  */
 export interface IframeReadyResponse {
   /** Response type identifier */
-  type: 'IFRAME_READY';
+  type: "IFRAME_READY";
 }
 
 /**
@@ -143,7 +143,7 @@ export interface IframeReadyResponse {
  */
 export interface WalletsAddedResponse {
   /** Response type identifier */
-  type: 'WALLETS_ADDED';
+  type: "WALLETS_ADDED";
   /** Whether operation was successful */
   success: boolean;
   /** Number of wallets added */
@@ -155,7 +155,7 @@ export interface WalletsAddedResponse {
  */
 export interface WalletsClearedResponse {
   /** Response type identifier */
-  type: 'WALLETS_CLEARED';
+  type: "WALLETS_CLEARED";
   /** Whether operation was successful */
   success: boolean;
 }
@@ -165,7 +165,7 @@ export interface WalletsClearedResponse {
  */
 export interface CurrentWalletsResponse {
   /** Response type identifier */
-  type: 'CURRENT_WALLETS';
+  type: "CURRENT_WALLETS";
   /** List of current wallets */
   wallets: Array<{ address: string; label?: string }>;
 }
@@ -175,7 +175,7 @@ export interface CurrentWalletsResponse {
  */
 export interface WhitelistTradingStatsResponse {
   /** Response type identifier */
-  type: 'WHITELIST_TRADING_STATS';
+  type: "WHITELIST_TRADING_STATS";
   /** Trading statistics data */
   data: {
     /** Total bought in SOL */
@@ -198,7 +198,7 @@ export interface WhitelistTradingStatsResponse {
  */
 export interface SolPriceUpdateResponse {
   /** Response type identifier */
-  type: 'SOL_PRICE_UPDATE';
+  type: "SOL_PRICE_UPDATE";
   /** Price data */
   data: {
     /** SOL price in USD */
@@ -213,11 +213,11 @@ export interface SolPriceUpdateResponse {
  */
 export interface WhitelistTradeResponse {
   /** Response type identifier */
-  type: 'WHITELIST_TRADE';
+  type: "WHITELIST_TRADE";
   /** Trade data */
   data: {
     /** Trade type */
-    type: 'buy' | 'sell';
+    type: "buy" | "sell";
     /** Wallet address */
     address: string;
     /** Amount of tokens */
@@ -238,7 +238,7 @@ export interface WhitelistTradeResponse {
  */
 export interface TokenPriceUpdateResponse {
   /** Response type identifier */
-  type: 'TOKEN_PRICE_UPDATE';
+  type: "TOKEN_PRICE_UPDATE";
   /** Price data */
   data: {
     /** Token price in SOL */
@@ -248,7 +248,7 @@ export interface TokenPriceUpdateResponse {
     /** Unix timestamp */
     timestamp: number;
     /** Trade type that caused update */
-    tradeType: 'buy' | 'sell';
+    tradeType: "buy" | "sell";
     /** Trade volume */
     volume: number;
   };
@@ -259,7 +259,7 @@ export interface TokenPriceUpdateResponse {
  */
 export interface TokenSelectedResponse {
   /** Response type identifier */
-  type: 'TOKEN_SELECTED';
+  type: "TOKEN_SELECTED";
   /** Selected token address */
   tokenAddress: string;
 }
@@ -269,11 +269,11 @@ export interface TokenSelectedResponse {
  */
 export interface NonWhitelistedTradeResponse {
   /** Response type identifier */
-  type: 'NON_WHITELIST_TRADE';
+  type: "NON_WHITELIST_TRADE";
   /** Trade data */
   data: {
     /** Trade type */
-    type: 'buy' | 'sell';
+    type: "buy" | "sell";
     /** Wallet address */
     address: string;
     /** Amount of tokens */
@@ -298,7 +298,7 @@ export interface NonWhitelistedTradeResponse {
  */
 export interface HoldingsOpenedResponse {
   /** Response type identifier */
-  type: 'HOLDINGS_OPENED';
+  type: "HOLDINGS_OPENED";
 }
 
 /**
@@ -306,7 +306,7 @@ export interface HoldingsOpenedResponse {
  */
 export interface TokenClearedResponse {
   /** Response type identifier */
-  type: 'TOKEN_CLEARED';
+  type: "TOKEN_CLEARED";
 }
 
 /**
@@ -314,7 +314,7 @@ export interface TokenClearedResponse {
  */
 export interface NavigationCompleteResponse {
   /** Response type identifier */
-  type: 'NAVIGATION_COMPLETE';
+  type: "NAVIGATION_COMPLETE";
   /** Current view */
   view: string;
   /** Current token mint */
@@ -324,7 +324,7 @@ export interface NavigationCompleteResponse {
 /**
  * Union type of all responses FROM iframe
  */
-export type IframeResponse = 
+export type IframeResponse =
   | IframeReadyResponse
   | WalletsAddedResponse
   | WalletsClearedResponse
@@ -378,7 +378,7 @@ export interface IframeWallet {
  */
 export interface IframeRecentTrade {
   /** Trade type */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Wallet address */
   address: string;
   /** Amount of tokens */
@@ -404,7 +404,7 @@ export interface IframeTokenPrice {
   /** Unix timestamp */
   timestamp: number;
   /** Trade type that caused update */
-  tradeType: 'buy' | 'sell';
+  tradeType: "buy" | "sell";
   /** Trade volume */
   volume: number;
 }
@@ -458,7 +458,11 @@ export interface IframeStateContextType {
   /** Get cached view state */
   getViewState: (view: ViewType, tokenMint?: string) => ViewState | null;
   /** Set view state */
-  setViewState: (view: ViewType, state: Partial<ViewState>, tokenMint?: string) => void;
+  setViewState: (
+    view: ViewType,
+    state: Partial<ViewState>,
+    tokenMint?: string,
+  ) => void;
   /** Clear view state */
   clearViewState: (view: ViewType, tokenMint?: string) => void;
   /** Clear all cached states */
@@ -477,20 +481,6 @@ export interface QueuedMessage {
   message: IframeMessage;
   /** Queue timestamp */
   timestamp: number;
-}
-
-/**
- * Iframe manager state
- */
-export interface IframeManagerState {
-  /** Whether iframe is ready */
-  isReady: boolean;
-  /** Queued messages */
-  messageQueue: QueuedMessage[];
-  /** Last navigate message sent */
-  lastNavigateMessage: NavigateMessage | null;
-  /** Last wallet message sent */
-  lastWalletMessage: WalletMessage | null;
 }
 
 // ============================================================================
@@ -516,7 +506,7 @@ export interface FrameProps {
   /** Callback when token is selected */
   onTokenSelect?: (tokenAddress: string) => void;
   /** Callback when non-whitelisted trade occurs */
-  onNonWhitelistedTrade?: (trade: NonWhitelistedTradeResponse['data']) => void;
+  onNonWhitelistedTrade?: (trade: NonWhitelistedTradeResponse["data"]) => void;
   /** Whether quick buy is enabled */
   quickBuyEnabled?: boolean;
   /** Quick buy amount */
