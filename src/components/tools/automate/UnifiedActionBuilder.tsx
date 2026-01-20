@@ -173,20 +173,20 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
     isAutomate && (action as TradingAction).amountType === "lastTrade";
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 hover:border-zinc-700 transition-colors">
+    <div className="bg-app-accent border border-app-primary-40 rounded-lg p-4 hover:border-app-primary-60 transition-colors">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-md bg-emerald-500/20 flex items-center justify-center text-xs font-mono text-emerald-400">
+          <span className="w-6 h-6 rounded-md bg-success-20 flex items-center justify-center text-xs font-mono text-success">
             {index + 1}
           </span>
-          <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
+          <span className="text-xs font-mono text-app-secondary-60 uppercase tracking-wider">
             Action
           </span>
         </div>
         <button
           onClick={onRemove}
-          className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+          className="p-1.5 rounded-md text-app-secondary-60 hover:text-error-alt hover:bg-error-alt-20 transition-colors"
           title="Remove action"
         >
           <Trash2 className="w-4 h-4" />
@@ -197,7 +197,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Action Type */}
         <div>
-          <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
             Action
           </label>
           <select
@@ -209,8 +209,8 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
                   | TradingAction["type"],
               })
             }
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                       focus:outline-none focus:border-emerald-500/50 transition-colors"
+            className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                       focus:outline-none focus:border-app-primary-60 transition-colors"
           >
             {actionTypes.map((type) => (
               <option key={type.value} value={type.value}>
@@ -222,7 +222,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
 
         {/* Amount Type */}
         <div>
-          <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
             Amount Type
           </label>
           <select
@@ -234,8 +234,8 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
                   | TradingAction["amountType"],
               })
             }
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                       focus:outline-none focus:border-emerald-500/50 transition-colors"
+            className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                       focus:outline-none focus:border-app-primary-60 transition-colors"
           >
             {amountTypes.map((type) => (
               <option key={type.value} value={type.value}>
@@ -248,7 +248,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
         {/* Amount Value */}
         {showBasicAmount && (
           <div>
-            <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
               {getAmountLabel()}
             </label>
             <input
@@ -279,9 +279,9 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
                     ? "0.1"
                     : "10"
               }
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                         focus:outline-none focus:border-emerald-500/50 transition-colors
-                         placeholder:text-zinc-600"
+              className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors
+                         placeholder:text-app-secondary-60"
             />
           </div>
         )}
@@ -289,7 +289,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
         {/* Last Trade Multiplier */}
         {showLastTradeMultiplier && (
           <div>
-            <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
               Multiplier
             </label>
             <input
@@ -301,16 +301,16 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
                 onUpdate({ amount: parseFloat(e.target.value) || 0 })
               }
               placeholder="1.0"
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                         focus:outline-none focus:border-emerald-500/50 transition-colors
-                         placeholder:text-zinc-600"
+              className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors
+                         placeholder:text-app-secondary-60"
             />
           </div>
         )}
 
         {/* Slippage */}
         <div>
-          <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
             Slippage (%)
           </label>
           <input
@@ -323,9 +323,9 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
               onUpdate({ slippage: parseFloat(e.target.value) || 5 })
             }
             placeholder="5"
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                       focus:outline-none focus:border-emerald-500/50 transition-colors
-                       placeholder:text-zinc-600"
+            className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                       focus:outline-none focus:border-app-primary-60 transition-colors
+                       placeholder:text-app-secondary-60"
           />
         </div>
       </div>
@@ -334,7 +334,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
       {showVolumeType && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
               Volume Type
             </label>
             <select
@@ -344,8 +344,8 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
                   volumeType: e.target.value as TradingAction["volumeType"],
                 })
               }
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                         focus:outline-none focus:border-emerald-500/50 transition-colors"
+              className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors"
             >
               {VOLUME_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -361,7 +361,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
       {showWhitelistVolume && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
               Whitelist Address
             </label>
             <input
@@ -369,13 +369,13 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
               value={(action as TradingAction).whitelistAddress || ""}
               onChange={(e) => onUpdate({ whitelistAddress: e.target.value })}
               placeholder="Enter wallet address..."
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                         focus:outline-none focus:border-emerald-500/50 transition-colors
-                         placeholder:text-zinc-600"
+              className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors
+                         placeholder:text-app-secondary-60"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
               Activity Type
             </label>
             <select
@@ -388,8 +388,8 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
                     .value as TradingAction["whitelistActivityType"],
                 })
               }
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                         focus:outline-none focus:border-emerald-500/50 transition-colors"
+              className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors"
             >
               {VOLUME_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -404,7 +404,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
       {/* Volume Multiplier */}
       {showVolumeMultiplier && (
         <div className="mt-3">
-          <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
             Volume Multiplier
           </label>
           <input
@@ -417,9 +417,9 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
               onUpdate({ volumeMultiplier: parseFloat(e.target.value) || 0.1 })
             }
             placeholder="0.1"
-            className="w-full md:w-48 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                       focus:outline-none focus:border-emerald-500/50 transition-colors
-                       placeholder:text-zinc-600"
+            className="w-full md:w-48 px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                       focus:outline-none focus:border-app-primary-60 transition-colors
+                       placeholder:text-app-secondary-60"
           />
         </div>
       )}
@@ -427,7 +427,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
       {/* Third Row - Priority */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
         <div>
-          <label className="block text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-[11px] font-mono text-app-secondary-60 uppercase tracking-wider mb-1.5">
             Priority
           </label>
           <select
@@ -435,8 +435,8 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
             onChange={(e) =>
               onUpdate({ priority: e.target.value as ActionPriority })
             }
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md font-mono text-sm text-zinc-200
-                       focus:outline-none focus:border-emerald-500/50 transition-colors"
+            className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                       focus:outline-none focus:border-app-primary-60 transition-colors"
           >
             {PRIORITIES.map((p) => (
               <option key={p.value} value={p.value}>
@@ -449,7 +449,7 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
         {/* Helper text */}
         {getAmountHelp() && (
           <div className="flex items-end">
-            <div className="text-[11px] text-zinc-500 font-mono py-2">
+            <div className="text-[11px] text-app-secondary-60 font-mono py-2">
               {getAmountHelp()}
             </div>
           </div>
@@ -458,9 +458,9 @@ const UnifiedActionBuilder: React.FC<UnifiedActionBuilderProps> = ({
 
       {/* Action Description */}
       {isCopyTrade && getActionDescription() && (
-        <div className="mt-3 p-3 bg-zinc-800/50 rounded-md border border-zinc-700/50">
-          <div className="flex items-start gap-2 text-[11px] text-zinc-400 font-mono">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-zinc-500" />
+        <div className="mt-3 p-3 bg-app-primary-10 rounded-md border border-app-primary-20">
+          <div className="flex items-start gap-2 text-[11px] text-app-secondary-60 font-mono">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-app-secondary-40" />
             <span>{getActionDescription()}</span>
           </div>
         </div>

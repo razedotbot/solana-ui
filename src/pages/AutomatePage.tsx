@@ -575,12 +575,8 @@ export const AutomatePage: React.FC = () => {
             <div
               className="absolute inset-0"
               style={{
-                backgroundImage: `
-                  linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
-                `,
+                backgroundImage: `linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)`,
                 backgroundSize: "20px 20px",
-                backgroundPosition: "center center",
               }}
             ></div>
           </div>

@@ -546,8 +546,8 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="My Profile"
-                  className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary
-                             focus:outline-none focus:border-app-primary-color transition-colors placeholder:text-app-secondary-60"
+                  className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                             focus:outline-none focus:border-app-primary-60 transition-colors placeholder:text-app-secondary-60"
                 />
               </div>
               <div>
@@ -559,8 +559,8 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Optional description..."
-                  className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary
-                             focus:outline-none focus:border-app-primary-color transition-colors placeholder:text-app-secondary-60"
+                  className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                             focus:outline-none focus:border-app-primary-60 transition-colors placeholder:text-app-secondary-60"
                 />
               </div>
             </div>
@@ -660,7 +660,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                     onChange={(e) =>
                       setBuyAmountType(e.target.value as BuyAmountType)
                     }
-                    className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                    className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                   >
                     <option value="fixed">Fixed (SOL)</option>
                     <option value="percentage">Percentage</option>
@@ -678,7 +678,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                     onChange={(e) =>
                       setBuyAmount(parseFloat(e.target.value) || 0)
                     }
-                    className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                    className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                   />
                 </div>
                 <div>
@@ -694,7 +694,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                     onChange={(e) =>
                       setSniperSlippage(parseFloat(e.target.value) || 15)
                     }
-                    className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                    className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                   />
                 </div>
                 <div>
@@ -706,7 +706,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                     onChange={(e) =>
                       setSniperPriority(e.target.value as PriorityLevel)
                     }
-                    className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                    className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                   >
                     {PRIORITIES.map((p) => (
                       <option key={p.value} value={p.value}>
@@ -789,7 +789,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                             amountMultiplier: parseFloat(e.target.value) || 1,
                           })
                         }
-                        className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                        className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                       />
                       <p className="text-[10px] text-app-secondary-60 mt-1">
                         {(simpleConfig.amountMultiplier * 100).toFixed(0)}% of
@@ -812,7 +812,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                             slippage: parseFloat(e.target.value) || 5,
                           })
                         }
-                        className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                        className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                       />
                     </div>
                     <div>
@@ -827,7 +827,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                             priority: e.target.value as ActionPriority,
                           })
                         }
-                        className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                        className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                       >
                         {PRIORITIES.slice(0, 3).map((p) => (
                           <option key={p.value} value={p.value}>
@@ -1009,7 +1009,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                       value={walletSearchTerm}
                       onChange={(e) => setWalletSearchTerm(e.target.value)}
                       placeholder="Search wallets..."
-                      className="w-full pl-9 pr-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-xs text-app-primary"
+                      className="w-full pl-9 pr-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-xs text-app-primary focus:outline-none focus:border-app-primary-60"
                     />
                   </div>
                   <button
@@ -1216,14 +1216,14 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                   min="0"
                   value={cooldown}
                   onChange={(e) => setCooldown(parseInt(e.target.value) || 0)}
-                  className="flex-1 px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                  className="flex-1 px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                 />
                 <select
                   value={cooldownUnit}
                   onChange={(e) =>
                     setCooldownUnit(e.target.value as CooldownUnit)
                   }
-                  className="px-2 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary"
+                  className="px-2 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60"
                 >
                   {COOLDOWN_UNITS.map((u) => (
                     <option key={u.value} value={u.value}>
@@ -1247,7 +1247,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({
                   )
                 }
                 placeholder="Unlimited"
-                className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary placeholder:text-app-secondary-60"
+                className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary focus:outline-none focus:border-app-primary-60 placeholder:text-app-secondary-60"
               />
             </div>
           </div>,

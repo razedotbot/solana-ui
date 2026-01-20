@@ -2,22 +2,22 @@
  * SniperFilterBuilder - Filter configuration for Sniper Bot
  */
 
-import React from 'react';
-import { Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
-import type { SniperFilter, SniperEventType, FilterMatchType } from './types';
+import React from "react";
+import { Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import type { SniperFilter, SniperEventType, FilterMatchType } from "./types";
 
 const PLATFORMS = [
-  { value: '', label: 'Any Platform' },
-  { value: 'Pumpfun', label: 'Pumpfun' },
-  { value: 'Bonk', label: 'Bonk' },
-  { value: 'Raydium', label: 'Raydium' },
-  { value: 'Moonshot', label: 'Moonshot' },
+  { value: "", label: "Any Platform" },
+  { value: "Pumpfun", label: "Pumpfun" },
+  { value: "Bonk", label: "Bonk" },
+  { value: "Raydium", label: "Raydium" },
+  { value: "Moonshot", label: "Moonshot" },
 ];
 
 const MATCH_TYPES = [
-  { value: 'contains', label: 'Contains' },
-  { value: 'exact', label: 'Exact' },
-  { value: 'regex', label: 'Regex' },
+  { value: "contains", label: "Contains" },
+  { value: "exact", label: "Exact" },
+  { value: "regex", label: "Regex" },
 ];
 
 interface SniperFilterBuilderProps {
@@ -42,23 +42,28 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
   onRemove,
   onToggle,
 }) => {
-  const showCreatorFilter = eventType === 'deploy' || eventType === 'both';
+  const showCreatorFilter = eventType === "deploy" || eventType === "both";
 
   return (
-    <div className={`
+    <div
+      className={`
       bg-app-accent border rounded-lg p-4 transition-all duration-200
-      ${filter.enabled 
-        ? 'border-app-primary-color/30 bg-app-primary-10' 
-        : 'border-app-primary-40 opacity-60'
+      ${
+        filter.enabled
+          ? "border-app-primary-color/30 bg-app-primary-10"
+          : "border-app-primary-40 opacity-60"
       }
-    `}>
+    `}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <span className={`
+          <span
+            className={`
             w-6 h-6 rounded-md flex items-center justify-center text-xs font-mono
-            ${filter.enabled ? 'bg-app-primary-10 color-primary' : 'bg-app-primary-20 text-app-secondary-60'}
-          `}>
+            ${filter.enabled ? "bg-app-primary-10 color-primary" : "bg-app-primary-20 text-app-secondary-60"}
+          `}
+          >
             {index + 1}
           </span>
           <span className="text-xs font-mono text-app-secondary-60 uppercase tracking-wider">
@@ -68,14 +73,19 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
             onClick={onToggle}
             className={`
               p-1 rounded-md transition-colors
-              ${filter.enabled 
-                ? 'text-success hover:bg-success-20' 
-                : 'text-app-secondary-60 hover:bg-app-primary-20'
+              ${
+                filter.enabled
+                  ? "text-success hover:bg-success-20"
+                  : "text-app-secondary-60 hover:bg-app-primary-20"
               }
             `}
-            title={filter.enabled ? 'Disable filter' : 'Enable filter'}
+            title={filter.enabled ? "Disable filter" : "Enable filter"}
           >
-            {filter.enabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+            {filter.enabled ? (
+              <ToggleRight className="w-5 h-5" />
+            ) : (
+              <ToggleLeft className="w-5 h-5" />
+            )}
           </button>
         </div>
         <button
@@ -95,13 +105,17 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
             Platform
           </label>
           <select
-            value={filter.platform || ''}
-            onChange={(e) => onUpdate({ platform: e.target.value || undefined })}
-            className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary 
-                       focus:outline-none focus:border-app-primary-color transition-colors"
+            value={filter.platform || ""}
+            onChange={(e) =>
+              onUpdate({ platform: e.target.value || undefined })
+            }
+            className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                       focus:outline-none focus:border-app-primary-60 transition-colors"
           >
-            {PLATFORMS.map(p => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+            {PLATFORMS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
             ))}
           </select>
         </div>
@@ -113,14 +127,16 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
           </label>
           <input
             type="text"
-            value={filter.mint || ''}
+            value={filter.mint || ""}
             onChange={(e) => onUpdate({ mint: e.target.value || undefined })}
             placeholder="Specific mint address..."
-            className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary 
-                       focus:outline-none focus:border-app-primary-color transition-colors placeholder:text-app-secondary-60"
+            className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                       focus:outline-none focus:border-app-primary-60 transition-colors placeholder:text-app-secondary-60"
           />
           {filter.mint && (
-            <p className="mt-1 text-xs text-app-secondary-60 font-mono">{formatAddress(filter.mint)}</p>
+            <p className="mt-1 text-xs text-app-secondary-60 font-mono">
+              {formatAddress(filter.mint)}
+            </p>
           )}
         </div>
 
@@ -132,14 +148,18 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
             </label>
             <input
               type="text"
-              value={filter.signer || ''}
-              onChange={(e) => onUpdate({ signer: e.target.value || undefined })}
+              value={filter.signer || ""}
+              onChange={(e) =>
+                onUpdate({ signer: e.target.value || undefined })
+              }
               placeholder="Creator wallet address..."
-              className="w-full px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary 
-                         focus:outline-none focus:border-warning/50 transition-colors placeholder:text-app-secondary-60"
+              className="w-full px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors placeholder:text-app-secondary-60"
             />
             {filter.signer && (
-              <p className="mt-1 text-xs text-app-secondary-60 font-mono">{formatAddress(filter.signer)}</p>
+              <p className="mt-1 text-xs text-app-secondary-60 font-mono">
+                {formatAddress(filter.signer)}
+              </p>
             )}
           </div>
         )}
@@ -152,20 +172,26 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
           <div className="flex gap-2">
             <input
               type="text"
-              value={filter.namePattern || ''}
-              onChange={(e) => onUpdate({ namePattern: e.target.value || undefined })}
+              value={filter.namePattern || ""}
+              onChange={(e) =>
+                onUpdate({ namePattern: e.target.value || undefined })
+              }
               placeholder="Name pattern..."
-              className="flex-1 px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary 
-                         focus:outline-none focus:border-warning/50 transition-colors placeholder:text-app-secondary-60"
+              className="flex-1 px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors placeholder:text-app-secondary-60"
             />
             <select
-              value={filter.nameMatchType || 'contains'}
-              onChange={(e) => onUpdate({ nameMatchType: e.target.value as FilterMatchType })}
-              className="px-2 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-xs text-app-secondary-80 
-                         focus:outline-none focus:border-app-primary-color transition-colors"
+              value={filter.nameMatchType || "contains"}
+              onChange={(e) =>
+                onUpdate({ nameMatchType: e.target.value as FilterMatchType })
+              }
+              className="px-2 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-xs text-app-secondary-80
+                         focus:outline-none focus:border-app-primary-60 transition-colors"
             >
-              {MATCH_TYPES.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
+              {MATCH_TYPES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
               ))}
             </select>
           </div>
@@ -179,20 +205,26 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
           <div className="flex gap-2">
             <input
               type="text"
-              value={filter.symbolPattern || ''}
-              onChange={(e) => onUpdate({ symbolPattern: e.target.value || undefined })}
+              value={filter.symbolPattern || ""}
+              onChange={(e) =>
+                onUpdate({ symbolPattern: e.target.value || undefined })
+              }
               placeholder="Symbol pattern..."
-              className="flex-1 px-3 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-sm text-app-primary 
-                         focus:outline-none focus:border-warning/50 transition-colors placeholder:text-app-secondary-60"
+              className="flex-1 px-3 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-sm text-app-primary
+                         focus:outline-none focus:border-app-primary-60 transition-colors placeholder:text-app-secondary-60"
             />
             <select
-              value={filter.symbolMatchType || 'contains'}
-              onChange={(e) => onUpdate({ symbolMatchType: e.target.value as FilterMatchType })}
-              className="px-2 py-2 bg-app-accent border border-app-primary-40 rounded font-mono text-xs text-app-secondary-80 
-                         focus:outline-none focus:border-app-primary-color transition-colors"
+              value={filter.symbolMatchType || "contains"}
+              onChange={(e) =>
+                onUpdate({ symbolMatchType: e.target.value as FilterMatchType })
+              }
+              className="px-2 py-2 bg-app-quaternary border border-app-primary-30 rounded font-mono text-xs text-app-secondary-80
+                         focus:outline-none focus:border-app-primary-60 transition-colors"
             >
-              {MATCH_TYPES.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
+              {MATCH_TYPES.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
               ))}
             </select>
           </div>
@@ -203,8 +235,14 @@ const SniperFilterBuilder: React.FC<SniperFilterBuilderProps> = ({
       {filter.enabled && (
         <div className="mt-4 p-3 bg-app-primary rounded-md border border-app-primary-40">
           <div className="text-[11px] font-mono text-app-secondary-60">
-            {!filter.platform && !filter.mint && !filter.signer && !filter.namePattern && !filter.symbolPattern ? (
-              <span className="color-primary opacity-70">⚠ No filters set - will match all {eventType} events</span>
+            {!filter.platform &&
+            !filter.mint &&
+            !filter.signer &&
+            !filter.namePattern &&
+            !filter.symbolPattern ? (
+              <span className="color-primary opacity-70">
+                ⚠ No filters set - will match all {eventType} events
+              </span>
             ) : (
               <span className="text-success/70">
                 ✓ Filter active

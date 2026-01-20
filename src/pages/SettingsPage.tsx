@@ -9,6 +9,18 @@ import {
   AlertCircle,
   RefreshCw,
   BookOpen,
+  Settings,
+  Shield,
+  Activity,
+  ChevronRight,
+  Check,
+  Gauge,
+  Network,
+  Timer,
+  Percent,
+  Coins,
+  Layers,
+  Radio,
 } from "lucide-react";
 import { useAppContext } from "../contexts";
 import { useToast } from "../utils/hooks";
@@ -19,10 +31,53 @@ import { RPCEndpointManager } from "../components/RPCEndpointManager";
 import { createDefaultEndpoints, type RPCEndpoint } from "../utils/rpcManager";
 import { OnboardingTutorial } from "../components/OnboardingTutorial";
 
+type SettingsTab = "network" | "server" | "execution" | "api" | "help";
+
+interface TabConfig {
+  id: SettingsTab;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+}
+
+const TABS: TabConfig[] = [
+  {
+    id: "network",
+    label: "Network",
+    icon: <Globe size={18} />,
+    description: "RPC Endpoints",
+  },
+  {
+    id: "server",
+    label: "Server",
+    icon: <Server size={18} />,
+    description: "Trading Server",
+  },
+  {
+    id: "execution",
+    label: "Execution",
+    icon: <Zap size={18} />,
+    description: "Trade Settings",
+  },
+  {
+    id: "api",
+    label: "API",
+    icon: <Key size={18} />,
+    description: "Access Keys",
+  },
+  {
+    id: "help",
+    label: "Help",
+    icon: <BookOpen size={18} />,
+    description: "Tutorial",
+  },
+];
+
 export const SettingsPage: React.FC = () => {
   const { showToast } = useToast();
   const { config, setConfig } = useAppContext();
 
+  const [activeTab, setActiveTab] = useState<SettingsTab>("network");
   const [currentRegion, setCurrentRegion] = useState<string>("US");
   const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
   const [isChangingServer, setIsChangingServer] = useState(false);
@@ -46,7 +101,6 @@ export const SettingsPage: React.FC = () => {
     if (window.serverRegion) {
       setCurrentRegion(window.serverRegion);
     }
-
     if (window.availableServers && window.availableServers.length > 0) {
       setAvailableServers(window.availableServers);
       setIsLoadingServers(false);
@@ -55,40 +109,27 @@ export const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     updateServerData();
-
-    const handleServerUpdate = (): void => {
-      updateServerData();
-    };
-
+    const handleServerUpdate = (): void => updateServerData();
     window.addEventListener("serverChanged", handleServerUpdate);
-
-    return (): void => {
+    return (): void =>
       window.removeEventListener("serverChanged", handleServerUpdate);
-    };
   }, [updateServerData]);
 
   const handleServerSwitch = async (serverId: string): Promise<void> => {
-    if (!window.switchServer) {
-      console.error("Server switching not available");
-      return;
-    }
-
+    if (!window.switchServer) return;
     setIsChangingServer(true);
-
     try {
       const success = await window.switchServer(serverId);
       if (success) {
-        const server = availableServers.find((s): boolean => s.id === serverId);
+        const server = availableServers.find((s) => s.id === serverId);
         if (server) {
           setCurrentRegion(server.region);
           showToast(`Switched to ${server.name} (${server.region})`, "success");
         }
       } else {
-        console.error("Failed to switch server");
         showToast("Failed to switch trading server", "error");
       }
-    } catch (error) {
-      console.error("Error switching server:", error);
+    } catch {
       showToast("Error switching trading server", "error");
     } finally {
       setIsChangingServer(false);
@@ -109,663 +150,773 @@ export const SettingsPage: React.FC = () => {
     return "bg-ping-poor-10";
   };
 
-  return (
-    <div className="h-screen bg-app-primary text-app-tertiary flex flex-col overflow-hidden">
-      {/* Horizontal Header */}
-      <HorizontalHeader />
+  // ========== TAB CONTENT RENDERERS ==========
 
-      {/* Main Content - full width with top padding */}
-      <div className="relative flex-1 overflow-hidden w-full pt-16 bg-app-primary flex flex-col">
-        {/* Background effects */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute inset-0 bg-app-primary opacity-90">
-            <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `
-                  linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
-                `,
-                backgroundSize: "20px 20px",
-              }}
-            ></div>
+  const renderNetworkTab = (): JSX.Element => (
+    <div className="space-y-6 animate-fade-in-down">
+      {/* Section Header */}
+      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+          <Network size={24} className="color-primary" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-app-primary font-mono">
+            RPC Configuration
+          </h2>
+          <p className="text-xs text-app-secondary-60 font-mono">
+            Manage RPC endpoints with weighted load balancing
+          </p>
+        </div>
+      </div>
+
+      {/* Info Card */}
+      <div className="p-4 rounded-xl bg-gradient-to-r from-app-primary-color/5 to-transparent border border-app-primary-color/20">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-app-primary-color/20 flex items-center justify-center flex-shrink-0">
+            <Gauge size={16} className="color-primary" />
+          </div>
+          <div>
+            <p className="text-sm text-app-primary font-mono font-medium">
+              Weighted Distribution
+            </p>
+            <p className="text-xs text-app-secondary-60 font-mono mt-1">
+              Configure weights (0-100%) for each endpoint. Higher weights
+              increase selection probability. Total must equal 100%.
+            </p>
           </div>
         </div>
+      </div>
 
-        {/* Content container - scrollable area */}
-        <div className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            {/* Header Title */}
-            <div className="mb-6 flex items-center justify-between border-b border-app-primary-20 pb-4">
-              <div className="flex items-center gap-3">
-                <div>
-                  <h1 className="text-xl font-bold text-app-primary font-mono tracking-wide">
-                    SYSTEM SETTINGS
-                  </h1>
-                  <p className="text-xs text-app-secondary-80 font-mono">
-                    Configure trading engine parameters
-                  </p>
-                </div>
+      {/* RPC Manager */}
+      <div className="bg-app-tertiary/50 rounded-xl border border-app-primary-20 p-4">
+        <RPCEndpointManager
+          endpoints={
+            config.rpcEndpoints
+              ? (JSON.parse(config.rpcEndpoints) as RPCEndpoint[])
+              : createDefaultEndpoints()
+          }
+          onChange={(endpoints) =>
+            handleConfigChange("rpcEndpoints", JSON.stringify(endpoints))
+          }
+        />
+      </div>
+    </div>
+  );
+
+  const renderServerTab = (): JSX.Element => (
+    <div className="space-y-6 animate-fade-in-down">
+      {/* Section Header */}
+      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 border border-blue-500/30 flex items-center justify-center">
+          <Server size={24} className="text-blue-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-app-primary font-mono">
+            Trading Server
+          </h2>
+          <p className="text-xs text-app-secondary-60 font-mono">
+            Configure server connection for trade execution
+          </p>
+        </div>
+      </div>
+
+      {/* Self-Hosted Toggle Card */}
+      <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-app-tertiary to-app-quaternary border border-app-primary-20 hover:border-app-primary-40 transition-all duration-300">
+        <div className="absolute inset-0 bg-gradient-to-r from-app-primary-color/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="relative p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-lg bg-app-primary-color/10 border border-app-primary-color/20 flex items-center justify-center">
+              <Shield size={20} className="color-primary" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-app-primary font-mono">
+                Self-Hosted Mode
+              </div>
+              <div className="text-xs text-app-secondary-60 font-mono mt-0.5">
+                Use your own local or remote trading server
               </div>
             </div>
+          </div>
+          <button
+            onClick={() =>
+              handleConfigChange(
+                "tradingServerEnabled",
+                config.tradingServerEnabled === "true" ? "false" : "true",
+              )
+            }
+            className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+              config.tradingServerEnabled === "true"
+                ? "bg-app-primary-color shadow-[0_0_15px_rgba(2,179,109,0.4)]"
+                : "bg-app-quaternary border border-app-primary-30"
+            }`}
+          >
+            <span
+              className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${
+                config.tradingServerEnabled === "true" ? "left-8" : "left-1"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
 
-            <div className="space-y-6">
-              {/* Network Configuration Section */}
-              <div className="bg-app-secondary border border-app-primary-20 rounded-lg p-5 sm:p-6 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Globe size={80} />
-                </div>
-
-                <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-2 flex items-center gap-2 uppercase tracking-wider">
-                  <Globe size={16} className="color-primary" />
-                  Network RPC
-                </h3>
-                <p className="text-[10px] text-app-secondary-80 font-mono mb-4">
-                  Configure RPC endpoints with custom weights (0-100%). Higher
-                  weights increase selection probability. Total must equal 100%.
-                </p>
-
-                <div className="space-y-4 relative z-10">
-                  <RPCEndpointManager
-                    endpoints={
-                      config.rpcEndpoints
-                        ? (JSON.parse(config.rpcEndpoints) as RPCEndpoint[])
-                        : createDefaultEndpoints()
-                    }
-                    onChange={(endpoints) => {
-                      handleConfigChange(
-                        "rpcEndpoints",
-                        JSON.stringify(endpoints),
-                      );
-                    }}
-                  />
-                </div>
+      {config.tradingServerEnabled === "true" ? (
+        <div className="space-y-4 animate-fade-in-down">
+          <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+            <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+              <Wifi size={14} className="color-primary" />
+              Server URL
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={config.tradingServerUrl || "http://localhost:4444"}
+                onChange={(e) =>
+                  handleConfigChange("tradingServerUrl", e.target.value)
+                }
+                className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all"
+                placeholder="http://localhost:4444"
+              />
+              <div className="absolute right-4 top-3.5">
+                <div className="w-2 h-2 rounded-full bg-app-primary-color animate-pulse" />
               </div>
+            </div>
+            <div className="flex items-center gap-2 mt-3 text-[10px] text-app-secondary-40 font-mono">
+              <AlertCircle size={10} />
+              <span>Ensure your server is running and accessible</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 animate-fade-in-down">
+          <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+            <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+              <Radio size={14} className="color-primary" />
+              Regional Server Selection
+            </label>
 
-              {/* Trading Server Configuration Section */}
-              <div className="bg-app-secondary border border-app-primary-20 rounded-lg p-5 sm:p-6 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Server size={80} />
+            {/* Current Region Badge */}
+            <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-app-quaternary border border-app-primary-20">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-2.5 h-2.5 rounded-full ${isLoadingServers ? "bg-yellow-500 animate-pulse" : "bg-app-primary-color"}`}
+                />
+                <span className="text-sm font-mono text-app-primary font-bold">
+                  {isLoadingServers
+                    ? "DETECTING..."
+                    : `REGION: ${currentRegion}`}
+                </span>
+              </div>
+              {isChangingServer && (
+                <div className="flex items-center gap-2">
+                  <RefreshCw size={14} className="animate-spin color-primary" />
+                  <span className="text-xs font-mono color-primary">
+                    SWITCHING
+                  </span>
                 </div>
+              )}
+            </div>
 
-                <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-4 flex items-center gap-2 uppercase tracking-wider">
-                  <Server size={16} className="color-primary" />
-                  Trading Server
-                </h3>
-
-                <div className="space-y-4 relative z-10">
-                  <div className="flex items-center justify-between p-3 bg-app-tertiary border border-app-primary-20 rounded-lg gap-4 transition-colors hover:border-app-primary-40">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-app-primary font-mono">
-                        Self-Hosted Mode
-                      </div>
-                      <div className="text-xs text-app-secondary-80 font-mono mt-0.5">
-                        Use your own local or remote trading server instance
+            {/* Server List */}
+            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+              {isLoadingServers ? (
+                <div className="p-6 text-center">
+                  <RefreshCw
+                    size={24}
+                    className="animate-spin color-primary mx-auto mb-2"
+                  />
+                  <span className="text-xs text-app-secondary-60 font-mono">
+                    Checking server availability...
+                  </span>
+                </div>
+              ) : availableServers.length > 0 ? (
+                availableServers.map((server) => (
+                  <button
+                    key={server.id}
+                    type="button"
+                    onClick={() => void handleServerSwitch(server.id)}
+                    disabled={isChangingServer}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all duration-200 group ${
+                      server.region === currentRegion
+                        ? "bg-app-primary-color/10 border-2 border-app-primary-color/50 shadow-[0_0_15px_rgba(2,179,109,0.15)]"
+                        : "bg-app-quaternary/50 border border-app-primary-20 hover:border-app-primary-40 hover:bg-app-quaternary"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{server.flag}</span>
+                      <div>
+                        <div
+                          className={`text-sm font-mono font-bold ${server.region === currentRegion ? "color-primary" : "text-app-primary"}`}
+                        >
+                          {server.name}
+                        </div>
+                        <div className="text-[10px] font-mono text-app-secondary-40 truncate max-w-[180px]">
+                          {server.url}
+                        </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() =>
-                        handleConfigChange(
-                          "tradingServerEnabled",
-                          config.tradingServerEnabled === "true"
-                            ? "false"
-                            : "true",
-                        )
-                      }
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors touch-manipulation flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-app-primary-color focus:ring-offset-app-secondary ${
-                        config.tradingServerEnabled === "true"
-                          ? "bg-app-primary-color"
-                          : "bg-app-quaternary border border-app-primary-30"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          config.tradingServerEnabled === "true"
-                            ? "translate-x-6"
-                            : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {config.tradingServerEnabled === "true" ? (
-                    <div className="animate-fade-in-down">
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Trading Server URL
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={
-                            config.tradingServerUrl || "http://localhost:4444"
-                          }
-                          onChange={(e) =>
-                            handleConfigChange(
-                              "tradingServerUrl",
-                              e.target.value,
-                            )
-                          }
-                          className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
-                          placeholder="http://localhost:4444"
-                        />
-                        <div className="absolute right-3 top-2.5">
-                          <Wifi size={16} className="text-app-secondary-60" />
+                    <div className="flex items-center gap-3">
+                      {server.ping && server.ping < Infinity && (
+                        <div
+                          className={`text-xs font-mono px-2 py-1 rounded-full border ${getPingBg(server.ping)} ${getPingColor(server.ping)} border-current/20`}
+                        >
+                          {server.ping}ms
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-2 text-[10px] text-app-secondary-60 font-mono">
-                        <AlertCircle size={10} />
-                        Ensure your local server is running and accessible
-                      </div>
+                      )}
+                      {server.region === currentRegion && (
+                        <div className="w-6 h-6 rounded-full bg-app-primary-color flex items-center justify-center">
+                          <Check size={14} className="text-black" />
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="mt-3 animate-fade-in-down">
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Regional Server Selection
-                      </label>
-                      <div className="bg-app-tertiary border border-app-primary-20 rounded-lg p-1">
-                        <div className="flex items-center justify-between px-3 py-2 border-b border-app-primary-20 mb-1">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`w-2 h-2 rounded-full ${isLoadingServers ? "bg-yellow-500 animate-pulse" : "bg-app-primary-color"}`}
-                            ></div>
-                            <span className="text-xs font-mono text-app-primary font-bold">
-                              {isLoadingServers
-                                ? "DETECTING..."
-                                : `REGION: ${currentRegion}`}
-                            </span>
-                          </div>
-                          {isChangingServer && (
-                            <div className="flex items-center gap-2">
-                              <RefreshCw
-                                size={12}
-                                className="animate-spin color-primary"
-                              />
-                              <span className="text-[10px] font-mono color-primary">
-                                SWITCHING
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                  </button>
+                ))
+              ) : (
+                <div className="p-6 text-center text-error font-mono text-sm">
+                  No servers reachable. Check your connection.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
-                        <div className="max-h-56 overflow-y-auto space-y-1 p-1 custom-scrollbar">
-                          {isLoadingServers ? (
-                            <div className="p-4 text-center text-xs text-app-secondary-60 font-mono italic">
-                              Checking server availability...
-                            </div>
-                          ) : availableServers.length > 0 ? (
-                            availableServers.map((server) => (
-                              <button
-                                key={server.id}
-                                type="button"
-                                onClick={(): void =>
-                                  void handleServerSwitch(server.id)
-                                }
-                                disabled={isChangingServer}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded text-left transition-all duration-200 group ${
-                                  server.region === currentRegion
-                                    ? "bg-app-primary-color/10 border border-app-primary-color/40"
-                                    : "bg-transparent hover:bg-app-quaternary border border-transparent hover:border-app-primary-20"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <span className="text-lg">{server.flag}</span>
-                                  <div>
-                                    <div
-                                      className={`text-xs font-mono font-bold ${server.region === currentRegion ? "color-primary" : "text-app-primary"}`}
-                                    >
-                                      {server.name}
-                                    </div>
-                                    <div className="text-[10px] font-mono text-app-secondary-60 truncate max-w-[150px] sm:max-w-[200px]">
-                                      {server.url}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  {server.ping && server.ping < Infinity && (
-                                    <div
-                                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded border border-transparent ${getPingBg(server.ping)} ${getPingColor(server.ping)}`}
-                                    >
-                                      {server.ping}ms
-                                    </div>
-                                  )}
-                                  {server.region === currentRegion && (
-                                    <div className="w-1.5 h-1.5 bg-app-primary-color rounded-full shadow-[0_0_5px_rgba(2,179,109,0.8)]" />
-                                  )}
-                                </div>
-                              </button>
-                            ))
-                          ) : (
-                            <div className="p-4 text-center text-xs text-error font-mono">
-                              No servers reachable. Check connection.
-                            </div>
-                          )}
-                        </div>
-                      </div>
+  const renderExecutionTab = (): JSX.Element => (
+    <div className="space-y-6 animate-fade-in-down">
+      {/* Section Header */}
+      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-500/5 border border-purple-500/30 flex items-center justify-center">
+          <Zap size={24} className="text-purple-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-app-primary font-mono">
+            Execution Engine
+          </h2>
+          <p className="text-xs text-app-secondary-60 font-mono">
+            Configure trading execution and balance refresh settings
+          </p>
+        </div>
+      </div>
+
+      {/* Bundle Strategy */}
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+          <Layers size={14} className="text-purple-400" />
+          Bundle Strategy
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            {
+              value: "single",
+              label: "Single",
+              icon: "🔄",
+              desc: "Sequential",
+              color: "blue",
+            },
+            {
+              value: "batch",
+              label: "Batch",
+              icon: "📦",
+              desc: "5 per block",
+              color: "purple",
+            },
+            {
+              value: "all-in-one",
+              label: "All-In-One",
+              icon: "🚀",
+              desc: "Max speed",
+              color: "green",
+            },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleConfigChange("bundleMode", opt.value)}
+              className={`relative group p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                config.bundleMode === opt.value
+                  ? "border-app-primary-color bg-app-primary-color/10 shadow-[0_0_20px_rgba(2,179,109,0.15)]"
+                  : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
+              }`}
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-app-primary-color/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">{opt.icon}</span>
+                  {config.bundleMode === opt.value && (
+                    <div className="w-5 h-5 rounded-full bg-app-primary-color flex items-center justify-center">
+                      <Check size={12} className="text-black" />
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* API Configuration Section */}
-              <div className="bg-app-secondary border border-app-primary-20 rounded-lg p-5 sm:p-6 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Key size={80} />
+                <div
+                  className={`text-sm font-bold font-mono ${config.bundleMode === opt.value ? "color-primary" : "text-app-primary"}`}
+                >
+                  {opt.label}
                 </div>
-
-                <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-4 flex items-center gap-2 uppercase tracking-wider">
-                  <Key size={16} className="color-primary" />
-                  API Access
-                </h3>
-
-                <div className="space-y-4 relative z-10">
-                  <div>
-                    <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                      Data Stream Key
-                    </label>
-                    <input
-                      type="password"
-                      value={config.streamApiKey || ""}
-                      onChange={(e) =>
-                        handleConfigChange("streamApiKey", e.target.value)
-                      }
-                      className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono placeholder-app-secondary-40"
-                      placeholder="sk_live_xxxxxxxxxxxxxxxxxxxxx"
-                    />
-                    <div className="text-[10px] text-app-secondary-60 font-mono mt-1.5 flex justify-between">
-                      <span>
-                        Required for real-time market data websockets.
-                      </span>
-                      <a
-                        href="https://my.raze.bot"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="color-primary hover:text-app-primary-light hover:underline transition-colors"
-                      >
-                        Get API Key →
-                      </a>
-                    </div>
-                  </div>
+                <div className="text-[10px] font-mono text-app-secondary-40 mt-1">
+                  {opt.desc}
                 </div>
               </div>
+            </button>
+          ))}
+        </div>
+      </div>
 
-              {/* Trading Engine Configuration Section */}
-              <div className="bg-app-secondary border border-app-primary-20 rounded-lg p-5 sm:p-6 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Zap size={80} />
-                </div>
+      {/* Timing Settings */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+            <Timer size={14} className="text-blue-400" />
+            Single Delay
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min="50"
+              max="5000"
+              step="50"
+              value={config.singleDelay || "200"}
+              onChange={(e) =>
+                handleConfigChange("singleDelay", e.target.value)
+              }
+              className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all"
+            />
+            <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">
+              ms
+            </span>
+          </div>
+        </div>
 
-                <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-4 flex items-center gap-2 uppercase tracking-wider">
-                  <Zap size={16} className="color-primary" />
-                  Execution Engine
-                </h3>
+        <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+            <Timer size={14} className="text-purple-400" />
+            Batch Delay
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min="100"
+              max="10000"
+              step="100"
+              value={config.batchDelay || "1000"}
+              onChange={(e) => handleConfigChange("batchDelay", e.target.value)}
+              className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all"
+            />
+            <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">
+              ms
+            </span>
+          </div>
+        </div>
+      </div>
 
-                <div className="space-y-5 relative z-10">
-                  <div>
-                    <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                      Bundle Strategy
-                    </label>
-                    <div className="grid grid-cols-1 gap-2">
-                      {[
-                        {
-                          value: "single",
-                          label: "Single Thread",
-                          icon: "🔄",
-                          description: "Sequential execution. Safest, slowest.",
-                        },
-                        {
-                          value: "batch",
-                          label: "Batch Mode",
-                          icon: "📦",
-                          description: "Process 5 wallets per block.",
-                        },
-                        {
-                          value: "all-in-one",
-                          label: "All-In-One",
-                          icon: "🚀",
-                          description: "Concurrent execution. Maximum speed.",
-                        },
-                      ].map((option) => (
-                        <div
-                          key={option.value}
-                          className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 touch-manipulation group/item ${
-                            config.bundleMode === option.value
-                              ? "bg-app-primary-color/10 border-app-primary-color/50 shadow-[inset_0_0_10px_rgba(2,179,109,0.1)]"
-                              : "bg-app-quaternary border-app-primary-20 hover:border-app-primary-40 hover:bg-app-tertiary"
-                          }`}
-                          onClick={() =>
-                            handleConfigChange("bundleMode", option.value)
-                          }
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <span className="text-xl filter grayscale group-hover/item:grayscale-0 transition-all">
-                                {option.icon}
-                              </span>
-                              <div className="min-w-0">
-                                <div
-                                  className={`text-sm font-bold font-mono ${config.bundleMode === option.value ? "color-primary" : "text-app-primary"}`}
-                                >
-                                  {option.label}
-                                </div>
-                                <div className="text-[10px] text-app-secondary-80 font-mono truncate">
-                                  {option.description}
-                                </div>
-                              </div>
-                            </div>
-                            <div
-                              className={`w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors ${
-                                config.bundleMode === option.value
-                                  ? "border-app-primary-color bg-app-primary-color"
-                                  : "border-app-primary-40 bg-transparent"
-                              }`}
-                            >
-                              {config.bundleMode === option.value && (
-                                <div className="w-1.5 h-1.5 rounded-full bg-black"></div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+      {/* Fee Settings */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+            <Coins size={14} className="text-yellow-400" />
+            Priority Fee
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={config.transactionFee}
+              onChange={(e) =>
+                handleConfigChange("transactionFee", e.target.value)
+              }
+              className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all"
+            />
+            <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">
+              SOL
+            </span>
+          </div>
+        </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Single Delay (ms)
-                      </label>
-                      <input
-                        type="number"
-                        min="50"
-                        max="5000"
-                        step="50"
-                        value={config.singleDelay || "200"}
-                        onChange={(e) =>
-                          handleConfigChange("singleDelay", e.target.value)
-                        }
-                        className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
-                      />
-                    </div>
+        <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+            <Percent size={14} className="text-orange-400" />
+            Max Slippage
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min="0.1"
+              max="100"
+              step="0.1"
+              value={
+                config.slippageBps
+                  ? (parseFloat(config.slippageBps) / 100).toString()
+                  : "99"
+              }
+              onChange={(e) => {
+                const percentage = parseFloat(e.target.value) || 99;
+                const bps = Math.round(percentage * 100).toString();
+                handleConfigChange("slippageBps", bps);
+              }}
+              className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all"
+            />
+            <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">
+              %
+            </span>
+          </div>
+        </div>
+      </div>
 
-                    <div>
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Batch Delay (ms)
-                      </label>
-                      <input
-                        type="number"
-                        min="100"
-                        max="10000"
-                        step="100"
-                        value={config.batchDelay || "1000"}
-                        onChange={(e) =>
-                          handleConfigChange("batchDelay", e.target.value)
-                        }
-                        className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
-                      />
-                    </div>
-                  </div>
+      {/* Balance Refresh Section */}
+      <div className="p-5 rounded-xl bg-gradient-to-br from-app-tertiary to-app-quaternary/50 border border-app-primary-20">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+            <RefreshCw size={18} className="text-cyan-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-app-primary font-mono">
+              Balance Refresh
+            </h3>
+            <p className="text-[10px] text-app-secondary-40 font-mono">
+              Configure how wallet balances are refreshed
+            </p>
+          </div>
+        </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-app-primary-20 pt-4">
-                    <div>
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Priority Fee (SOL)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={config.transactionFee}
-                          onChange={(e) =>
-                            handleConfigChange("transactionFee", e.target.value)
-                          }
-                          className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
-                        />
-                        <span className="absolute right-3 top-2.5 text-xs text-app-secondary-60 font-mono">
-                          SOL
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Max Slippage (%)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="0.1"
-                          max="100"
-                          step="0.1"
-                          value={
-                            config.slippageBps
-                              ? (
-                                  parseFloat(config.slippageBps) / 100
-                                ).toString()
-                              : "99"
-                          }
-                          onChange={(e) => {
-                            const percentage = parseFloat(e.target.value) || 99;
-                            const bps = Math.round(percentage * 100).toString();
-                            handleConfigChange("slippageBps", bps);
-                          }}
-                          className="w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono"
-                        />
-                        <span className="absolute right-3 top-2.5 text-xs text-app-secondary-60 font-mono">
-                          %
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          {[
+            {
+              value: "sequential",
+              label: "Sequential",
+              icon: "🔄",
+              desc: "Safest",
+            },
+            { value: "batch", label: "Batch", icon: "📦", desc: "Balanced" },
+            {
+              value: "parallel",
+              label: "Parallel",
+              icon: "⚡",
+              desc: "Fastest",
+            },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() =>
+                handleConfigChange("balanceRefreshStrategy", opt.value)
+              }
+              className={`p-3 rounded-lg border transition-all duration-200 text-left ${
+                (config.balanceRefreshStrategy || "batch") === opt.value
+                  ? "border-cyan-500/50 bg-cyan-500/10"
+                  : "border-app-primary-20 bg-app-quaternary/50 hover:border-app-primary-40"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-lg">{opt.icon}</span>
+                {(config.balanceRefreshStrategy || "batch") === opt.value && (
+                  <Check size={14} className="text-cyan-400" />
+                )}
               </div>
-
-              {/* Balance Refresh Configuration Section */}
-              <div className="bg-app-secondary border border-app-primary-20 rounded-lg p-5 sm:p-6 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <RefreshCw size={80} />
-                </div>
-
-                <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-4 flex items-center gap-2 uppercase tracking-wider">
-                  <RefreshCw size={16} className="color-primary" />
-                  Balance Refresh
-                </h3>
-
-                <div className="space-y-5 relative z-10">
-                  <div>
-                    <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                      Refresh Strategy
-                    </label>
-                    <div className="grid grid-cols-1 gap-2">
-                      {[
-                        {
-                          value: "sequential",
-                          label: "One at a Time",
-                          icon: "🔄",
-                          description:
-                            "Safest option. Refreshes wallets sequentially.",
-                        },
-                        {
-                          value: "batch",
-                          label: "Batch Mode",
-                          icon: "📦",
-                          description:
-                            "Balanced. Processes wallets in configurable batches.",
-                        },
-                        {
-                          value: "parallel",
-                          label: "All at Once",
-                          icon: "⚡",
-                          description:
-                            "Fastest. May hit RPC rate limits with many wallets.",
-                        },
-                      ].map((option) => (
-                        <div
-                          key={option.value}
-                          className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 touch-manipulation group/item ${
-                            (config.balanceRefreshStrategy || "batch") ===
-                            option.value
-                              ? "bg-app-primary-color/10 border-app-primary-color/50 shadow-[inset_0_0_10px_rgba(2,179,109,0.1)]"
-                              : "bg-app-quaternary border-app-primary-20 hover:border-app-primary-40 hover:bg-app-tertiary"
-                          }`}
-                          onClick={() =>
-                            handleConfigChange(
-                              "balanceRefreshStrategy",
-                              option.value,
-                            )
-                          }
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <span className="text-xl filter grayscale group-hover/item:grayscale-0 transition-all">
-                                {option.icon}
-                              </span>
-                              <div className="min-w-0">
-                                <div
-                                  className={`text-sm font-bold font-mono ${(config.balanceRefreshStrategy || "batch") === option.value ? "color-primary" : "text-app-primary"}`}
-                                >
-                                  {option.label}
-                                </div>
-                                <div className="text-[10px] text-app-secondary-80 font-mono truncate">
-                                  {option.description}
-                                </div>
-                              </div>
-                            </div>
-                            <div
-                              className={`w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors ${
-                                (config.balanceRefreshStrategy || "batch") ===
-                                option.value
-                                  ? "border-app-primary-color bg-app-primary-color"
-                                  : "border-app-primary-40 bg-transparent"
-                              }`}
-                            >
-                              {(config.balanceRefreshStrategy || "batch") ===
-                                option.value && (
-                                <div className="w-1.5 h-1.5 rounded-full bg-black"></div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-app-primary-20 pt-4">
-                    <div>
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Batch Size
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="50"
-                        step="1"
-                        value={config.balanceRefreshBatchSize || "5"}
-                        onChange={(e) =>
-                          handleConfigChange(
-                            "balanceRefreshBatchSize",
-                            e.target.value,
-                          )
-                        }
-                        disabled={
-                          (config.balanceRefreshStrategy || "batch") !== "batch"
-                        }
-                        className={`w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono ${(config.balanceRefreshStrategy || "batch") !== "batch" ? "opacity-50 cursor-not-allowed" : ""}`}
-                      />
-                      <div className="text-[10px] text-app-secondary-60 font-mono mt-1">
-                        Wallets per batch (batch mode only)
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-app-secondary-80 font-mono mb-2 uppercase tracking-wider">
-                        Delay (ms)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="5000"
-                        step="10"
-                        value={config.balanceRefreshDelay || "50"}
-                        onChange={(e) =>
-                          handleConfigChange(
-                            "balanceRefreshDelay",
-                            e.target.value,
-                          )
-                        }
-                        disabled={
-                          (config.balanceRefreshStrategy || "batch") ===
-                          "parallel"
-                        }
-                        className={`w-full bg-app-quaternary border border-app-primary-30 rounded px-3 py-2.5 text-sm text-app-primary focus:border-app-primary-60 focus:outline-none font-mono ${(config.balanceRefreshStrategy || "batch") === "parallel" ? "opacity-50 cursor-not-allowed" : ""}`}
-                      />
-                      <div className="text-[10px] text-app-secondary-60 font-mono mt-1">
-                        Delay between operations
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-app-tertiary border border-app-primary-10 rounded-lg">
-                    <div className="flex items-start gap-2 text-[10px] text-app-secondary-80 font-mono">
-                      <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
-                      <span>
-                        <strong className="color-primary">Tip:</strong> Use
-                        &quot;Batch Mode&quot; for optimal balance between speed
-                        and reliability. &quot;All at Once&quot; is faster but
-                        may fail with many wallets due to RPC rate limits.
-                      </span>
-                    </div>
-                  </div>
-                </div>
+              <div
+                className={`text-xs font-bold font-mono ${(config.balanceRefreshStrategy || "batch") === opt.value ? "text-cyan-400" : "text-app-primary"}`}
+              >
+                {opt.label}
               </div>
+              <div className="text-[10px] font-mono text-app-secondary-40">
+                {opt.desc}
+              </div>
+            </button>
+          ))}
+        </div>
 
-              {/* Help & Tutorial Section */}
-              <div className="bg-app-secondary border border-app-primary-20 rounded-lg p-5 sm:p-6 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <BookOpen size={80} />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] text-app-secondary-40 font-mono uppercase mb-2 block">
+              Batch Size
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={config.balanceRefreshBatchSize || "5"}
+              onChange={(e) =>
+                handleConfigChange("balanceRefreshBatchSize", e.target.value)
+              }
+              disabled={(config.balanceRefreshStrategy || "batch") !== "batch"}
+              className={`w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary font-mono transition-all ${(config.balanceRefreshStrategy || "batch") !== "batch" ? "opacity-40" : "focus:border-cyan-500"}`}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-app-secondary-40 font-mono uppercase mb-2 block">
+              Delay (ms)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="5000"
+              value={config.balanceRefreshDelay || "50"}
+              onChange={(e) =>
+                handleConfigChange("balanceRefreshDelay", e.target.value)
+              }
+              disabled={
+                (config.balanceRefreshStrategy || "batch") === "parallel"
+              }
+              className={`w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary font-mono transition-all ${(config.balanceRefreshStrategy || "batch") === "parallel" ? "opacity-40" : "focus:border-cyan-500"}`}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderApiTab = (): JSX.Element => (
+    <div className="space-y-6 animate-fade-in-down">
+      {/* Section Header */}
+      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border border-yellow-500/30 flex items-center justify-center">
+          <Key size={24} className="text-yellow-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-app-primary font-mono">
+            API Configuration
+          </h2>
+          <p className="text-xs text-app-secondary-60 font-mono">
+            Configure API keys for data streams and services
+          </p>
+        </div>
+      </div>
+
+      {/* API Key Input */}
+      <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+        <div className="flex items-center justify-between mb-4">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+            <Activity size={14} className="text-yellow-400" />
+            Data Stream API Key
+          </label>
+          <a
+            href="https://my.raze.bot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs font-mono color-primary hover:text-app-primary-light transition-colors"
+          >
+            Get API Key
+            <ChevronRight size={14} />
+          </a>
+        </div>
+        <input
+          type="password"
+          value={config.streamApiKey || ""}
+          onChange={(e) => handleConfigChange("streamApiKey", e.target.value)}
+          className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/50 focus:outline-none font-mono transition-all"
+          placeholder="sk_live_xxxxxxxxxxxxxxxxxxxxx"
+        />
+        <p className="text-[10px] text-app-secondary-40 font-mono mt-3">
+          Required for real-time market data websockets and automated trading
+          features.
+        </p>
+      </div>
+
+      {/* API Status Card */}
+      <div className="p-4 rounded-xl bg-gradient-to-r from-yellow-500/5 to-transparent border border-yellow-500/20">
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-3 h-3 rounded-full ${config.streamApiKey ? "bg-app-primary-color" : "bg-app-secondary-40"}`}
+          />
+          <span className="text-sm font-mono text-app-primary">
+            {config.streamApiKey ? "API Key Configured" : "No API Key Set"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderHelpTab = (): JSX.Element => (
+    <div className="space-y-6 animate-fade-in-down">
+      {/* Section Header */}
+      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-500/5 border border-pink-500/30 flex items-center justify-center">
+          <BookOpen size={24} className="text-pink-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-app-primary font-mono">
+            Help & Resources
+          </h2>
+          <p className="text-xs text-app-secondary-60 font-mono">
+            Access tutorials and documentation
+          </p>
+        </div>
+      </div>
+
+      {/* Tutorial Card */}
+      <button
+        onClick={() => setShowTutorial(true)}
+        className="w-full group relative overflow-hidden p-6 rounded-xl bg-gradient-to-br from-app-tertiary to-app-quaternary border border-app-primary-20 hover:border-pink-500/40 transition-all duration-300 text-left"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-pink-500/20 border border-pink-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <BookOpen size={28} className="text-pink-400" />
+            </div>
+            <div>
+              <div className="text-base font-bold text-app-primary font-mono group-hover:text-pink-400 transition-colors">
+                Onboarding Tutorial
+              </div>
+              <div className="text-xs text-app-secondary-60 font-mono mt-1">
+                Take a guided tour of the application features
+              </div>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-pink-500/20 border border-pink-500/30 flex items-center justify-center group-hover:bg-pink-500 transition-all">
+            <ChevronRight
+              size={20}
+              className="text-pink-400 group-hover:text-white transition-colors"
+            />
+          </div>
+        </div>
+      </button>
+    </div>
+  );
+
+  const renderTabContent = (): JSX.Element | null => {
+    switch (activeTab) {
+      case "network":
+        return renderNetworkTab();
+      case "server":
+        return renderServerTab();
+      case "execution":
+        return renderExecutionTab();
+      case "api":
+        return renderApiTab();
+      case "help":
+        return renderHelpTab();
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-app-primary text-app-tertiary flex flex-col">
+      <HorizontalHeader />
+
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
+        {/* Background */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 bg-app-primary opacity-90">
+            <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent" />
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `linear-gradient(rgba(2, 179, 109, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(2, 179, 109, 0.03) 1px, transparent 1px)`,
+                backgroundSize: "40px 40px",
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
+          {/* Page Header */}
+          <div className="mb-6 flex flex-wrap items-center gap-4 justify-between pb-4 border-b border-app-primary-20">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-app-primary-color/30 to-app-primary-color/10 border border-app-primary-color/40 flex items-center justify-center shadow-[0_0_30px_rgba(2,179,109,0.2)]">
+                <Settings size={28} className="color-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-app-primary font-mono tracking-wide">
+                  SETTINGS
+                </h1>
+                <p className="text-xs text-app-secondary-60 font-mono">
+                  Configure your trading environment
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Status */}
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex items-center gap-6 px-4 py-2 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+                <div className="text-center">
+                  <div className="text-xs font-mono color-primary font-bold">
+                    {config.bundleMode?.toUpperCase() || "BATCH"}
+                  </div>
+                  <div className="text-[10px] text-app-secondary-40 font-mono">
+                    MODE
+                  </div>
                 </div>
-
-                <h3 className="text-sm sm:text-base font-bold text-app-primary font-mono mb-4 flex items-center gap-2 uppercase tracking-wider">
-                  <BookOpen size={16} className="color-primary" />
-                  Help & Tutorial
-                </h3>
-
-                <div className="space-y-4 relative z-10">
-                  <div className="flex items-center justify-between p-3 bg-app-tertiary border border-app-primary-20 rounded-lg gap-4 transition-colors hover:border-app-primary-40">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-app-primary font-mono">
-                        Onboarding Tutorial
-                      </div>
-                      <div className="text-xs text-app-secondary-80 font-mono mt-0.5">
-                        Take a guided tour of the application features
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowTutorial(true)}
-                      className="px-4 py-2 bg-app-primary-color/20 border border-app-primary-color/40 text-app-primary-color rounded-lg font-mono text-xs font-bold hover:bg-app-primary-color/30 hover:border-app-primary-color/60 transition-all flex items-center gap-2"
-                    >
-                      <BookOpen size={14} />
-                      START TUTORIAL
-                    </button>
+                <div className="w-px h-8 bg-app-primary-20" />
+                <div className="text-center">
+                  <div className="text-xs font-mono color-primary font-bold">
+                    {currentRegion}
+                  </div>
+                  <div className="text-[10px] text-app-secondary-40 font-mono">
+                    REGION
+                  </div>
+                </div>
+                <div className="w-px h-8 bg-app-primary-20" />
+                <div className="text-center">
+                  <div
+                    className={`text-xs font-mono font-bold ${config.tradingServerEnabled === "true" ? "color-primary" : "text-app-secondary-60"}`}
+                  >
+                    {config.tradingServerEnabled === "true" ? "SELF" : "CLOUD"}
+                  </div>
+                  <div className="text-[10px] text-app-secondary-40 font-mono">
+                    SERVER
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Bottom Action Bar */}
-            <div className="sticky bottom-0 mt-8 pt-4 pb-4 bg-app-primary/95 backdrop-blur-sm border-t border-app-primary-20 flex flex-col sm:flex-row justify-end gap-3 z-20">
-              <button
-                onClick={handleSaveAndClose}
-                className="px-8 py-3 bg-app-primary-color hover:bg-app-primary-dark text-black font-bold font-mono tracking-wide rounded shadow-[0_0_15px_rgba(2,179,109,0.4)] hover:shadow-[0_0_20px_rgba(2,179,109,0.6)] flex items-center justify-center gap-2 text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Save size={16} />
-                SAVE CONFIGURATION
-              </button>
+          {/* Main Layout */}
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Sidebar Tabs */}
+            <div className="lg:w-56 flex-shrink-0">
+              <div className="lg:sticky lg:top-6 space-y-1">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-mono text-sm transition-all duration-200 group ${
+                      activeTab === tab.id
+                        ? "bg-app-primary-color text-black font-bold shadow-[0_0_20px_rgba(2,179,109,0.3)]"
+                        : "bg-app-tertiary/50 hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-40 text-app-primary"
+                    }`}
+                  >
+                    <span
+                      className={`${activeTab === tab.id ? "text-black" : "color-primary group-hover:text-app-primary-light"} transition-colors`}
+                    >
+                      {tab.icon}
+                    </span>
+                    <div className="text-left">
+                      <div className="font-bold">{tab.label}</div>
+                      <div
+                        className={`text-[10px] ${activeTab === tab.id ? "text-black/60" : "text-app-secondary-40"}`}
+                      >
+                        {tab.description}
+                      </div>
+                    </div>
+                    {activeTab === tab.id && (
+                      <ChevronRight size={16} className="ml-auto text-black" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 min-w-0">
+              <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-6 shadow-xl">
+                {renderTabContent()}
+              </div>
+
+              {/* Save Button */}
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleSaveAndClose}
+                  className="group relative px-8 py-3 bg-app-primary-color hover:bg-app-primary-dark text-black font-bold font-mono tracking-wide rounded-xl shadow-[0_0_20px_rgba(2,179,109,0.4)] hover:shadow-[0_0_30px_rgba(2,179,109,0.6)] flex items-center gap-3 text-sm transition-all duration-300 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                  <Save size={18} />
+                  <span>SAVE CONFIGURATION</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Onboarding Tutorial */}
       <OnboardingTutorial
         forceShow={showTutorial}
         onClose={() => setShowTutorial(false)}
