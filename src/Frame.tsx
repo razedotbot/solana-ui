@@ -54,6 +54,7 @@ interface FrameProps {
   quickBuyMinAmount?: number;
   quickBuyMaxAmount?: number;
   useQuickBuyRange?: boolean;
+  isMultichartMode?: boolean;
 }
 
 // Iframe communication types
@@ -62,7 +63,7 @@ interface Wallet {
   label?: string;
 }
 
-type IframeMessage = 
+type IframeMessage =
   | AddWalletsMessage
   | ClearWalletsMessage
   | GetWalletsMessage
@@ -96,7 +97,7 @@ interface GetWalletsMessage {
   type: 'GET_WALLETS';
 }
 
-type IframeResponse = 
+type IframeResponse =
   | IframeReadyResponse
   | WalletsAddedResponse
   | WalletsClearedResponse
@@ -222,7 +223,7 @@ const IconButton: React.FC<{
     secondary: 'bg-app-secondary hover:bg-app-tertiary text-app-primary',
     solid: 'bg-app-primary-color hover:bg-primary-90 text-app-primary shadow-app-primary-20'
   };
-  
+
   return (
       <button
         className={`p-2 rounded-md transition-colors ${variants[variant]} ${className} hover:scale-105 active:scale-95`}
@@ -245,12 +246,13 @@ export const Frame: React.FC<FrameProps> = ({
   quickBuyAmount: _quickBuyAmount = 0.01,
   quickBuyMinAmount: _quickBuyMinAmount = 0.01,
   quickBuyMaxAmount: _quickBuyMaxAmount = 0.05,
-  useQuickBuyRange: _useQuickBuyRange = false
+  useQuickBuyRange: _useQuickBuyRange = false,
+  isMultichartMode = false
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { tokenAddress: tokenAddressParam } = useParams<{ tokenAddress?: string }>();
-  
+
   const [frameLoading, setFrameLoading] = useState(true);
   // Use static key to maintain iframe instance across navigations (postMessage handles routing)
   const [iframeKey] = useState(Date.now());
@@ -260,25 +262,36 @@ export const Frame: React.FC<FrameProps> = ({
   const previousViewRef = useRef<{ view: ViewType; tokenMint?: string } | null>(null);
   const lastNavigationSentRef = useRef<{ view: string; tokenMint?: string } | null>(null);
   const quickBuyMessageSentRef = useRef(false);
-  
+
   // Calculate iframe src ONCE on mount based on initial route
   // After initial load, ALL navigation uses postMessage (no iframe reloads)
   const initialIframeSrc = useRef<string | null>(null);
   if (!initialIframeSrc.current) {
     const urlParams = new URLSearchParams();
     urlParams.set('theme', brand.theme.name);
-    
+
     // Determine the correct iframe params based on INITIAL route
-    if (location.pathname === '/holdings') {
+    // In multichart mode, start with monitor view (no params) - tokens are added via onTokenSelect
+    if (isMultichartMode) {
+      // Multichart mode - if we have a token, show simple view; otherwise show monitor
+      if (tokenAddress) {
+        urlParams.set('tokenMint', tokenAddress);
+        urlParams.set('view', 'simple');
+      }
+      // No params = monitor view
+    } else if (location.pathname === '/holdings') {
       urlParams.set('view', 'holdings');
     } else if (location.pathname.startsWith('/tokens/') && tokenAddressParam) {
       urlParams.set('tokenMint', tokenAddressParam);
+    } else if (tokenAddress) {
+      // Non-multichart mode with tokenAddress prop (e.g., single token view)
+      urlParams.set('tokenMint', tokenAddress);
     }
     // For monitor view, no additional params needed (will show homepage)
-    
+
     initialIframeSrc.current = `https://frame.raze.sh/sol/?${urlParams.toString()}`;
   }
-  
+
   // State for iframe data
   const [tradingStats, setTradingStats] = useState<{
     bought: number;
@@ -311,17 +324,17 @@ export const Frame: React.FC<FrameProps> = ({
     if (!tokenPriceData || !solPriceData) {
       return null;
     }
-    
+
     // Assuming 1 billion token supply (standard for many Solana tokens)
     const tokenSupply = 1000000000;
-    
+
     // Market cap = token price (in SOL) * token supply * SOL price (in USD)
     const marketCapInUSD = tokenPriceData.tokenPrice * tokenSupply * solPriceData;
-    
+
     return marketCapInUSD;
   }, []);
 
-  // Memoize iframe data object to prevent unnecessary parent re-renders
+  // Memoize iframe data object - each Frame maintains its own data for its token
   const iframeDataObject = useMemo(() => {
     const marketCap = calculateMarketCap(tokenPrice, solPrice);
     return {
@@ -332,16 +345,14 @@ export const Frame: React.FC<FrameProps> = ({
       tokenPrice,
       marketCap
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice]);
+  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, calculateMarketCap]);
 
-  // Notify parent component of data updates (excluding currentWallets to prevent balance updates on selection)
+  // Notify parent component of data updates
+  // Skip in multichart mode - not needed for basic chart display
   useEffect(() => {
-    if (onDataUpdate) {
-      onDataUpdate(iframeDataObject);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iframeDataObject]);
+    if (isMultichartMode || !onDataUpdate) return;
+    onDataUpdate(iframeDataObject);
+  }, [iframeDataObject, onDataUpdate, isMultichartMode]);
 
   // Helper to send messages to iframe directly
   const sendMessageToIframe = useCallback((message: IframeMessage): void => {
@@ -350,26 +361,36 @@ export const Frame: React.FC<FrameProps> = ({
     }
   }, []);
 
-  
+
   // Determine current view and token mint - using stable primitives
+  // In multichart mode (when tokenAddress prop is provided), always treat as token view
   const currentViewType: ViewType = useMemo(() => {
+    // If tokenAddress prop is provided (multichart mode), always use 'token' view type
+    if (tokenAddress) {
+      return 'token';
+    }
     const pathname = location.pathname;
     if (pathname === '/holdings') {
       return 'holdings';
-    } else if (pathname.startsWith('/tokens/') || tokenAddress) {
+    } else if (pathname.startsWith('/tokens/')) {
       return 'token';
     }
     return 'monitor';
   }, [location.pathname, tokenAddress]);
 
   const currentTokenMint = useMemo(() => {
-    if (tokenAddressParam) return tokenAddressParam;
+    // In multichart mode, tokenAddress prop takes priority over URL param
+    // This ensures each Frame instance uses its own token address for caching
     if (tokenAddress) return tokenAddress;
+    if (tokenAddressParam) return tokenAddressParam;
     return undefined;
-  }, [tokenAddressParam, tokenAddress]);
+  }, [tokenAddress, tokenAddressParam]);
 
   // Restore cached state when view changes (using primitive dependencies)
+  // Skip in multichart mode - Frame remounts with key so no caching needed
   useEffect(() => {
+    if (isMultichartMode) return;
+
     const cachedState = getViewState(currentViewType, currentTokenMint);
     if (cachedState) {
       setTradingStats(cachedState.tradingStats);
@@ -393,11 +414,13 @@ export const Frame: React.FC<FrameProps> = ({
       }
     }
     previousViewRef.current = { view: currentViewType, tokenMint: currentTokenMint };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentViewType, currentTokenMint]);
+  }, [currentViewType, currentTokenMint, getViewState, isMultichartMode]);
 
   // Save state to cache whenever it changes (using primitive dependencies)
+  // Skip in multichart mode - Frame remounts with key so no caching needed
   useEffect(() => {
+    if (isMultichartMode) return;
+
     const marketCap = calculateMarketCap(tokenPrice, solPrice);
     setViewState(currentViewType, {
       tradingStats,
@@ -407,8 +430,7 @@ export const Frame: React.FC<FrameProps> = ({
       tokenPrice,
       marketCap,
     }, currentTokenMint);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, currentViewType, currentTokenMint]);
+  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, currentViewType, currentTokenMint, calculateMarketCap, setViewState, isMultichartMode]);
 
   // Memoize wallet data with labels for iframe communication
   const walletData = useMemo(() => {
@@ -429,20 +451,33 @@ export const Frame: React.FC<FrameProps> = ({
     }
 
     const pathname = location.pathname;
-    
+
     // Determine which view and token to use for postMessage navigation
-    // Priority: route params > monitor/holdings routes
-    // Note: We rely ONLY on route params to avoid race conditions with state updates
+    // Priority: multichart mode (prop) > route params > tokenAddress prop > monitor/holdings routes
     let targetView: 'holdings' | 'token' | 'monitor';
     let targetTokenMint: string | undefined;
-    
-    if (pathname === '/holdings') {
+
+    if (isMultichartMode) {
+      // Multichart mode - use simple view if we have a token, otherwise monitor
+      // tokenAddress prop is the source of truth in multichart mode
+      if (tokenAddress) {
+        targetView = 'token';
+        targetTokenMint = tokenAddress;
+      } else {
+        targetView = 'monitor';
+        targetTokenMint = undefined;
+      }
+    } else if (pathname === '/holdings') {
       targetView = 'holdings';
       targetTokenMint = undefined;
     } else if (pathname.startsWith('/tokens/') && tokenAddressParam) {
       // Route-based token view - use route param directly
       targetView = 'token';
       targetTokenMint = tokenAddressParam;
+    } else if (tokenAddress) {
+      // Prop-based token view
+      targetView = 'token';
+      targetTokenMint = tokenAddress;
     } else if (pathname === '/monitor' || pathname === '/') {
       targetView = 'monitor';
       targetTokenMint = undefined;
@@ -451,23 +486,26 @@ export const Frame: React.FC<FrameProps> = ({
       targetView = 'monitor';
       targetTokenMint = undefined;
     }
-    
+
     // Check if we're sending the same navigation message as last time
+    // In multichart mode, always navigate when tokenAddress changes (even if lastSent matches)
     const lastSent = lastNavigationSentRef.current;
-    if (lastSent && 
-        lastSent.view === targetView && 
-        lastSent.tokenMint === targetTokenMint) {
+    const shouldSkip = lastSent &&
+        lastSent.view === targetView &&
+        lastSent.tokenMint === targetTokenMint;
+
+    if (shouldSkip) {
       return;
     }
-    
+
     // Set the ref IMMEDIATELY to prevent duplicate sends from concurrent effect runs
     lastNavigationSentRef.current = { view: targetView, tokenMint: targetTokenMint };
-    
+
     // Add a small delay to ensure iframe components are ready
     // This prevents race conditions and duplicate initializations
     const timeoutId = setTimeout(() => {
       if (!iframeRef.current?.contentWindow) return;
-      
+
       // Send navigation message
       if (targetView === 'holdings') {
         iframeRef.current.contentWindow.postMessage({
@@ -476,9 +514,10 @@ export const Frame: React.FC<FrameProps> = ({
           wallets: walletData
         }, '*');
       } else if (targetView === 'token' && targetTokenMint) {
+        // In multichart mode, use simple view
         iframeRef.current.contentWindow.postMessage({
           type: 'NAVIGATE',
-          view: 'token',
+          view: isMultichartMode ? 'simple' : 'token',
           tokenMint: targetTokenMint,
           wallets: walletData
         }, '*');
@@ -489,35 +528,40 @@ export const Frame: React.FC<FrameProps> = ({
         }, '*');
       }
     }, 100);
-    
+
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, tokenAddressParam, isIframeReady]);
+  }, [location.pathname, tokenAddressParam, tokenAddress, isIframeReady, isMultichartMode]);
 
   // Setup iframe message listener
   useEffect(() => {
     const handleMessage = (event: MessageEvent<IframeMessage | IframeResponse>): void => {
+      // Only process messages from our own iframe to prevent cross-talk in multichart mode
+      if (iframeRef.current?.contentWindow && event.source !== iframeRef.current.contentWindow) {
+        return;
+      }
+
       switch (event.data.type) {
         case 'IFRAME_READY': {
           setIsIframeReady(true);
           // Navigation will be triggered by the navigation effect when isIframeReady becomes true
           break;
         }
-        
+
         case 'CURRENT_WALLETS':
           setCurrentWallets(event.data.wallets);
           break;
-        
+
         case 'WHITELIST_TRADING_STATS': {
           setTradingStats(event.data.data);
           break;
         }
-        
+
         case 'SOL_PRICE_UPDATE': {
           setSolPrice(event.data.data.solPrice);
           break;
         }
-        
+
         case 'WHITELIST_TRADE': {
           const tradeData = event.data.data;
           setRecentTrades((prev) => {
@@ -534,18 +578,20 @@ export const Frame: React.FC<FrameProps> = ({
           });
           break;
         }
-        
+
         case 'TOKEN_PRICE_UPDATE': {
           setTokenPrice(event.data.data);
           break;
         }
-        
+
         case 'TOKEN_SELECTED': {
           if (onTokenSelect) {
             const selectedToken = event.data.tokenAddress;
             // Only navigate if we're not already on this token page
             // This prevents redirect loops when iframe confirms navigation
-            if (tokenAddressParam !== selectedToken) {
+            // In multichart mode, always allow selection (parent handles navigation)
+            const currentToken = tokenAddress || tokenAddressParam;
+            if (isMultichartMode || currentToken !== selectedToken) {
               // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
               // This fixes the issue where selecting a token from iframe doesn't update iframe view
               lastNavigationSentRef.current = null;
@@ -554,19 +600,19 @@ export const Frame: React.FC<FrameProps> = ({
           }
           break;
         }
-        
+
         case 'NON_WHITELIST_TRADE': {
           onNonWhitelistedTrade?.(event.data.data);
           break;
         }
-        
+
         case 'HOLDINGS_OPENED': {
           // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
           lastNavigationSentRef.current = null;
           navigate('/holdings');
           break;
         }
-        
+
         case 'TOKEN_CLEARED': {
           // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
           lastNavigationSentRef.current = null;
@@ -576,12 +622,12 @@ export const Frame: React.FC<FrameProps> = ({
           }
           break;
         }
-        
+
         case 'GET_WALLETS': {
           // Iframe is requesting wallet data - send it back
           if (iframeRef.current?.contentWindow) {
             const currentPath = location.pathname;
-            
+
             // Send wallet data in the format the iframe expects
             if (currentPath === '/holdings') {
               // Holdings needs wallet addresses
@@ -599,13 +645,13 @@ export const Frame: React.FC<FrameProps> = ({
           }
           break;
         }
-        
+
         case 'WALLETS_ADDED':
         case 'WALLETS_CLEARED':
         case 'NAVIGATION_COMPLETE':
           // These are acknowledgment messages, no action needed
           break;
-        
+
         case 'ADD_WALLETS':
         case 'CLEAR_WALLETS':
         case 'TOGGLE_NON_WHITELISTED_TRADES':
@@ -619,11 +665,11 @@ export const Frame: React.FC<FrameProps> = ({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname, tokenAddressParam]);
+  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname, tokenAddressParam, isMultichartMode, tokenAddress]);
 
   // Note: Wallet syncing is now handled in the navigation message
   // No separate wallet sync effect needed since NAVIGATE includes wallets
-  
+
   // Send quickbuy activation/deactivation to iframe when ready or when settings change
   useEffect(() => {
     if (!isIframeReady || !iframeRef.current?.contentWindow) {
@@ -634,7 +680,7 @@ export const Frame: React.FC<FrameProps> = ({
     // For subsequent changes, send immediately since iframe is already ready
     const sendMessage = (): void => {
       if (!iframeRef.current?.contentWindow) return;
-      
+
       // Send quickbuy activation or deactivation message to iframe
       const quickBuyMessage = {
         type: quickBuyEnabled ? 'QUICKBUY_ACTIVATE' : 'QUICKBUY_DEACTIVATE'
@@ -649,51 +695,51 @@ export const Frame: React.FC<FrameProps> = ({
       const timeoutId = setTimeout(sendMessage, 150);
       return () => clearTimeout(timeoutId);
     }
-    
+
     // Subsequent changes: send immediately
     sendMessage();
     return undefined;
   }, [isIframeReady, quickBuyEnabled, sendMessageToIframe]);
-  
+
   // Handle iframe load completion
   const handleFrameLoad = (): void => {
     setFrameLoading(false);
   };
 
 
-  
+
   // Render loader
   const renderLoader = (loading: boolean): React.JSX.Element => {
     if (!loading) return <></>;
     return (
-      <div 
+      <div
         className="absolute inset-0 flex flex-col items-center justify-center bg-app-primary-90 z-10 animate-fade-in"
       >
-        <div 
+        <div
           className="w-12 h-12 rounded-full border-2 border-t-transparent border-app-primary-30 animate-spin"
           style={{ animationDuration: '1.5s' }}
         />
       </div>
     );
   };
-  
 
-  
+
+
   // Render iframe with single frame (SPA - no URL changes after initial load)
   const renderFrame = (): React.JSX.Element => {
     return (
-      <div 
+      <div
         className="relative flex-1 overflow-hidden iframe-container border-0"
       >
         {renderLoader(frameLoading || isLoadingChart)}
-        
+
         <div className="absolute inset-0 overflow-hidden border-0">
-          <iframe 
+          <iframe
             ref={iframeRef}
             key={`frame-${iframeKey}`}
             src={initialIframeSrc.current || 'https://frame.raze.sh/sol/'}
             className="absolute inset-0 w-full h-full border-0 outline-none"
-            style={{ 
+            style={{
               WebkitOverflowScrolling: 'touch',
               minHeight: '100%',
               border: 'none',
@@ -712,7 +758,7 @@ export const Frame: React.FC<FrameProps> = ({
   };
 
   return (
-    <div 
+    <div
       className="relative w-full rounded-lg overflow-hidden h	full md:h-full min-h-[calc(100vh-8rem)] md:min-h-full bg-gradient-to-br from-app-primary to-app-secondary border-0 animate-fade-in"
       style={{
         touchAction: 'manipulation',
@@ -724,11 +770,11 @@ export const Frame: React.FC<FrameProps> = ({
     >
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-app-secondary-80 to-transparent pointer-events-none" />
-      
-      
+
+
       {isLoadingChart ? (
         <div className="h-full flex items-center justify-center">
-          <div 
+          <div
             className="animate-spin"
             style={{ animationDuration: '1.5s' }}
           >
@@ -736,7 +782,7 @@ export const Frame: React.FC<FrameProps> = ({
           </div>
         </div>
       ) : (
-        <div 
+        <div
           className="flex flex-1 h-full animate-fade-in"
         >
           {renderFrame()}
@@ -747,5 +793,3 @@ export const Frame: React.FC<FrameProps> = ({
 };
 
 export default Frame;
-
-

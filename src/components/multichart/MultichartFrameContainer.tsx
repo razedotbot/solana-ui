@@ -1,8 +1,8 @@
-import React, { useCallback } from 'react';
-import { useMultichart } from '../../contexts/MultichartContext';
-import Frame from '../../Frame';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useMultichart } from '../../contexts/useMultichart';
+import { brand } from '../../utils/brandConfig';
 import type { WalletType } from '../../utils/types';
-import type { MultichartTokenStats } from '../../utils/types/multichart';
 
 interface MultichartFrameContainerProps {
   wallets: WalletType[];
@@ -26,33 +26,80 @@ interface MultichartFrameContainerProps {
   useQuickBuyRange?: boolean;
 }
 
+// Build iframe URL for a token
+const buildIframeUrl = (tokenAddress: string): string => {
+  const params = new URLSearchParams();
+  params.set('theme', brand.theme.name);
+  if (tokenAddress) {
+    params.set('tokenMint', tokenAddress);
+    params.set('view', 'simple');
+  }
+  return `https://frame.raze.sh/sol/?${params.toString()}`;
+};
+
 export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> = ({
   wallets,
   isLoadingChart,
   onTokenSelect,
   onNonWhitelistedTrade,
-  quickBuyEnabled,
-  quickBuyAmount,
-  quickBuyMinAmount,
-  quickBuyMaxAmount,
-  useQuickBuyRange,
 }) => {
-  const { tokens, activeTokenIndex, updateTokenStats } = useMultichart();
+  const navigate = useNavigate();
+  const { tokenAddress: routeTokenAddress } = useParams<{ tokenAddress?: string }>();
+  const { addToken, tokens, setActiveToken, activeTokenIndex } = useMultichart();
 
-  const handleDataUpdate = useCallback(
-    (
-      tokenAddress: string,
-      data: {
-        tradingStats: {
-          bought: number;
-          sold: number;
-          net: number;
-          trades: number;
-          timestamp: number;
-        } | null;
-        solPrice: number | null;
-        currentWallets: { address: string; label?: string }[];
-        recentTrades: {
+  // Refs for all iframes - keyed by token address
+  const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
+
+  // Get the current token address from route ONLY - don't fallback to context
+  // On /monitor route, no token should be active
+  const currentTokenAddress = routeTokenAddress || '';
+
+  // Sync activeTokenIndex with route when URL changes
+  useEffect(() => {
+    if (routeTokenAddress) {
+      const tokenIndex = tokens.findIndex(t => t.address === routeTokenAddress);
+      if (tokenIndex !== -1 && tokenIndex !== activeTokenIndex) {
+        setActiveToken(tokenIndex);
+      }
+    } else {
+      // On /monitor - set activeTokenIndex to -1 (no active token)
+      if (activeTokenIndex !== -1) {
+        setActiveToken(-1);
+      }
+    }
+  }, [routeTokenAddress, tokens, activeTokenIndex, setActiveToken]);
+
+  // Handle token selection from iframe (when user clicks a token in monitor view)
+  const handleTokenSelect = useCallback((tokenAddress: string) => {
+    if (tokenAddress) {
+      addToken(tokenAddress);
+      navigate(`/tokens/${tokenAddress}`);
+    }
+    onTokenSelect?.(tokenAddress);
+  }, [addToken, navigate, onTokenSelect]);
+
+  // Handle messages from iframes
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent<{ type: string; tokenAddress?: string; data?: unknown }>): void => {
+      const msgData = event.data;
+      if (!msgData?.type) return;
+
+      // Check if message is from one of our iframes
+      let isFromOurIframe = false;
+      iframeRefs.current.forEach((iframe) => {
+        if (iframe?.contentWindow === event.source) {
+          isFromOurIframe = true;
+        }
+      });
+
+      if (!isFromOurIframe) return;
+
+      if (msgData.type === 'TOKEN_SELECTED' && typeof msgData.tokenAddress === 'string') {
+        handleTokenSelect(msgData.tokenAddress);
+      }
+
+      if (msgData.type === 'NON_WHITELIST_TRADE' && onNonWhitelistedTrade && msgData.data) {
+        onNonWhitelistedTrade(msgData.data as {
           type: 'buy' | 'sell';
           address: string;
           tokensAmount: number;
@@ -60,66 +107,84 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
           solAmount: number;
           timestamp: number;
           signature: string;
-        }[];
-        tokenPrice: {
-          tokenPrice: number;
           tokenMint: string;
-          timestamp: number;
-          tradeType: 'buy' | 'sell';
-          volume: number;
-        } | null;
-        marketCap: number | null;
+          marketCap: number;
+        });
       }
-    ) => {
-      // Update token stats in context
-      const stats: MultichartTokenStats = {
-        address: tokenAddress,
-        price: data.tokenPrice?.tokenPrice || null,
-        marketCap: data.marketCap,
-        pnl: data.tradingStats,
-      };
-      updateTokenStats(tokenAddress, stats);
-    },
-    [updateTokenStats]
-  );
+    };
 
-  if (tokens.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-app-primary">
-        <div className="text-center color-secondary">
-          <div className="text-4xl mb-4">📊</div>
-          <div className="text-lg mb-2">No tokens added</div>
-          <div className="text-sm">Click the + button above to add your first token</div>
-        </div>
-      </div>
-    );
-  }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [handleTokenSelect, onNonWhitelistedTrade]);
+
+  // Send wallets to iframes when they're ready
+  useEffect(() => {
+    const handleIframeReady = (event: MessageEvent<{ type: string }>): void => {
+      if (event.data?.type === 'IFRAME_READY') {
+        // Find which iframe sent this and send wallets to it
+        iframeRefs.current.forEach((iframe) => {
+          if (iframe?.contentWindow === event.source) {
+            const walletData = wallets.map(w => ({
+              address: w.address,
+              label: w.label || `${w.address.slice(0, 3)}...${w.address.slice(-3)}`
+            }));
+            iframe.contentWindow?.postMessage({
+              type: 'ADD_WALLETS',
+              wallets: walletData
+            }, '*');
+          }
+        });
+      }
+    };
+
+    window.addEventListener('message', handleIframeReady);
+    return () => window.removeEventListener('message', handleIframeReady);
+  }, [wallets]);
+
+  // Set iframe ref
+  const setIframeRef = useCallback((address: string, el: HTMLIFrameElement | null) => {
+    if (el) {
+      iframeRefs.current.set(address, el);
+    } else {
+      iframeRefs.current.delete(address);
+    }
+  }, []);
 
   return (
     <div className="flex-1 relative">
-      {tokens.map((token, index) => (
-        <div
-          key={token.address}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            visibility: index === activeTokenIndex ? 'visible' : 'hidden',
-          }}
-        >
-          <Frame
-            tokenAddress={token.address}
-            wallets={wallets}
-            isLoadingChart={isLoadingChart}
-            onDataUpdate={(data) => handleDataUpdate(token.address, data)}
-            onTokenSelect={onTokenSelect}
-            onNonWhitelistedTrade={onNonWhitelistedTrade}
-            quickBuyEnabled={quickBuyEnabled}
-            quickBuyAmount={quickBuyAmount}
-            quickBuyMinAmount={quickBuyMinAmount}
-            quickBuyMaxAmount={quickBuyMaxAmount}
-            useQuickBuyRange={useQuickBuyRange}
-          />
+      {isLoadingChart && (
+        <div className="absolute inset-0 flex items-center justify-center bg-app-primary-90 z-10">
+          <div className="w-12 h-12 rounded-full border-2 border-t-transparent border-app-primary-30 animate-spin" />
         </div>
+      )}
+
+      {/* Monitor iframe - shown when no token selected */}
+      <iframe
+        ref={(el) => setIframeRef('monitor', el)}
+        src={buildIframeUrl('')}
+        className="absolute inset-0 w-full h-full border-0"
+        style={{
+          visibility: !currentTokenAddress ? 'visible' : 'hidden',
+          zIndex: !currentTokenAddress ? 1 : 0
+        }}
+        allow="clipboard-read; clipboard-write; fullscreen"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
+      />
+
+      {/* Token iframes - all loaded, only active visible */}
+      {tokens.map((token) => (
+        <iframe
+          key={token.address}
+          ref={(el) => setIframeRef(token.address, el)}
+          src={buildIframeUrl(token.address)}
+          className="absolute inset-0 w-full h-full border-0"
+          style={{
+            visibility: currentTokenAddress === token.address ? 'visible' : 'hidden',
+            zIndex: currentTokenAddress === token.address ? 1 : 0
+          }}
+          allow="clipboard-read; clipboard-write; fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
+        />
       ))}
     </div>
   );

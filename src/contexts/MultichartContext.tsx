@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { MultichartToken, MultichartTokenStats } from '../utils/types/multichart';
 import {
   saveMultichartTokens,
@@ -7,28 +7,16 @@ import {
   loadMultichartActiveIndex,
   getMaxMultichartTokens,
 } from '../utils/storage';
-
-interface MultichartContextType {
-  tokens: MultichartToken[];
-  activeTokenIndex: number;
-  tokenStats: Map<string, MultichartTokenStats>;
-  addToken: (address: string, metadata?: Partial<MultichartToken>) => boolean;
-  removeToken: (address: string) => void;
-  setActiveToken: (index: number) => void;
-  updateTokenStats: (address: string, stats: MultichartTokenStats) => void;
-  updateTokenMetadata: (address: string, metadata: Partial<MultichartToken>) => void;
-  maxTokens: number;
-}
-
-const MultichartContext = createContext<MultichartContextType | undefined>(undefined);
+import { MultichartContext } from './MultichartContextDef';
 
 export function MultichartProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [tokens, setTokens] = useState<MultichartToken[]>(() => loadMultichartTokens());
   const [activeTokenIndex, setActiveTokenIndex] = useState<number>(() => {
     const savedIndex = loadMultichartActiveIndex();
     const loadedTokens = loadMultichartTokens();
-    // Ensure index is valid
-    return savedIndex < loadedTokens.length ? savedIndex : 0;
+    // Ensure index is valid, -1 means no active token (monitor view)
+    if (savedIndex === -1) return -1;
+    return savedIndex < loadedTokens.length ? savedIndex : -1;
   });
   const [tokenStats, setTokenStats] = useState<Map<string, MultichartTokenStats>>(new Map());
 
@@ -88,8 +76,8 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
       });
 
       // Adjust active index if needed
-      if (activeTokenIndex >= indexToRemove) {
-        const newIndex = Math.max(0, activeTokenIndex - 1);
+      if (activeTokenIndex !== -1 && activeTokenIndex >= indexToRemove) {
+        const newIndex = Math.max(-1, activeTokenIndex - 1);
         setActiveTokenIndex(newIndex);
       }
     },
@@ -98,7 +86,8 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
 
   const setActiveToken = useCallback(
     (index: number) => {
-      if (index >= 0 && index < tokens.length) {
+      // Allow -1 for "no active token" (monitor view)
+      if (index === -1 || (index >= 0 && index < tokens.length)) {
         setActiveTokenIndex(index);
       }
     },
@@ -107,6 +96,17 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
 
   const updateTokenStats = useCallback((address: string, stats: MultichartTokenStats) => {
     setTokenStats((prev) => {
+      const existing = prev.get(address);
+      // Only update if data actually changed to prevent infinite loops
+      if (existing &&
+          existing.price === stats.price &&
+          existing.marketCap === stats.marketCap &&
+          existing.pnl?.bought === stats.pnl?.bought &&
+          existing.pnl?.sold === stats.pnl?.sold &&
+          existing.pnl?.net === stats.pnl?.net &&
+          existing.pnl?.trades === stats.pnl?.trades) {
+        return prev; // Return same reference to prevent re-render
+      }
       const newStats = new Map(prev);
       newStats.set(address, stats);
       return newStats;
@@ -121,7 +121,7 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
     );
   }, []);
 
-  const value: MultichartContextType = {
+  const value = {
     tokens,
     activeTokenIndex,
     tokenStats,
@@ -134,12 +134,4 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
   };
 
   return <MultichartContext.Provider value={value}>{children}</MultichartContext.Provider>;
-}
-
-export function useMultichart(): MultichartContextType {
-  const context = useContext(MultichartContext);
-  if (context === undefined) {
-    throw new Error('useMultichart must be used within a MultichartProvider');
-  }
-  return context;
 }

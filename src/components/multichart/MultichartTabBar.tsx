@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Plus } from 'lucide-react';
-import { useMultichart } from '../../contexts/MultichartContext';
+import { useMultichart } from '../../contexts/useMultichart';
 import { WalletTooltip } from '../Styles';
 
 interface MultichartTabBarProps {

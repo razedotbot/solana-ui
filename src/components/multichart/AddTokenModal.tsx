@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Clock, Plus } from 'lucide-react';
-import { useMultichart } from '../../contexts/MultichartContext';
+import { useMultichart } from '../../contexts/useMultichart';
 import { getRecentTokens, formatTimeAgo } from '../../utils/recentTokens';
 import type { RecentToken } from '../../utils/types';
 
