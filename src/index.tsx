@@ -585,7 +585,7 @@ export const Root = (): JSX.Element => {
     <div className="h-screen w-screen">
       <ErrorBoundary>
         <BrowserRouter
-          future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+          future={{ v7_relativeSplatPath: true, v7_startTransition: false }}
         >
           <ToastProvider>
             <ToastWrapper>

@@ -1,7 +1,8 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { loadConfigFromCookies } from "./storage";
-import type { ApiResponse, BundleResult as SharedBundleResult } from "./types";
+import { sendTransactions } from "./transactionService";
+import type { BundleResult as SharedBundleResult } from "./types";
 
 // ============================================================================
 // Constants
@@ -167,43 +168,25 @@ const getBaseUrl = (): string => {
 };
 
 /**
- * Send bundle to Jito block engine through backend proxy
+ * Send transactions and wrap result with success/error handling
  */
-const sendBundle = async (
-  encodedBundle: string[],
+const sendTransactionsWithResult = async (
+  transactions: string[],
 ): Promise<SendBundleResult> => {
   try {
-    const baseUrl = getBaseUrl();
-
-    const response = await fetch(`${baseUrl}/v2/sol/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        transactions: encodedBundle,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    const data = (await response.json()) as ApiResponse<BundleResult>;
-
-    if (data.error) {
-      throw new Error(data.error || "Unknown error from bundle server");
-    }
+    const result = await sendTransactions(transactions);
 
     // Extract bundle ID from result
-    const resultWithId = data.result as BundleResultWithId | undefined;
+    const resultWithId = result as BundleResultWithId | undefined;
     const bundleId = resultWithId?.jito || resultWithId?.bundleId;
 
     return {
       success: true,
-      result: data.result as BundleResult,
+      result: result,
       bundleId,
     };
   } catch (error) {
-    console.error("Error sending bundle:", error);
+    console.error("Error sending transactions:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -240,7 +223,7 @@ const sendFirstBundle = async (
     attempt < MAX_RETRY_ATTEMPTS &&
     consecutiveErrors < MAX_CONSECUTIVE_ERRORS
   ) {
-    const result = await sendBundle(transactions);
+    const result = await sendTransactionsWithResult(transactions);
 
     if (result.success) {
       console.info(`First bundle sent successfully on attempt ${attempt + 1}`);
@@ -821,7 +804,9 @@ export const executeCreate = async (
     for (let i = 1; i < validSignedBundles.length; i++) {
       await new Promise((resolve) => setTimeout(resolve, 100 * i));
 
-      const result = await sendBundle(validSignedBundles[i].transactions);
+      const result = await sendTransactionsWithResult(
+        validSignedBundles[i].transactions,
+      );
       if (result.success && result.result) {
         results.push(result.result);
         successCount++;

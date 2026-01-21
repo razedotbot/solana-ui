@@ -3,35 +3,35 @@
  * Handles encrypted wallet storage and IndexedDB operations.
  */
 
-import Cookies from 'js-cookie';
-import { encryptData, decryptData } from './encryption';
-import { createDefaultEndpoints } from './rpcManager';
+import Cookies from "js-cookie";
+import { encryptData, decryptData } from "./encryption";
+import { createDefaultEndpoints } from "./rpcManager";
 import type {
   WalletType,
   ConfigType,
   MasterWallet,
   QuickBuyPreferences,
   TradingStrategy,
-} from './types';
-import type { MultichartToken } from './types/multichart';
+} from "./types";
+import type { MultichartToken } from "./types/multichart";
 
 // Storage keys
 export const STORAGE_KEYS = {
-  CONFIG: 'config',
-  QUICK_BUY: 'quickBuyPreferences',
-  TRADING_STRATEGIES: 'tradingStrategies',
-  ENCRYPTED_WALLETS: 'encrypted_wallets',
-  ENCRYPTED_MASTER_WALLETS: 'encrypted_master_wallets',
-  SPLIT_SIZES: 'splitSizes',
-  VIEW_MODE: 'viewMode',
-  MULTICHART_TOKENS: 'multichart_tokens',
-  MULTICHART_ACTIVE_INDEX: 'multichartActiveIndex',
+  CONFIG: "config",
+  QUICK_BUY: "quickBuyPreferences",
+  TRADING_STRATEGIES: "tradingStrategies",
+  ENCRYPTED_WALLETS: "encrypted_wallets",
+  ENCRYPTED_MASTER_WALLETS: "encrypted_master_wallets",
+  SPLIT_SIZES: "splitSizes",
+  VIEW_MODE: "viewMode",
+  MULTICHART_TOKENS: "multichart_tokens",
+  MULTICHART_ACTIVE_INDEX: "multichartActiveIndex",
 } as const;
 
 // Database constants
-const DB_NAME = 'WalletDB';
+const DB_NAME = "WalletDB";
 const DB_VERSION = 1;
-const WALLET_STORE = 'wallets';
+const WALLET_STORE = "wallets";
 
 // Database instance
 let db: IDBDatabase | null = null;
@@ -40,7 +40,7 @@ let db: IDBDatabase | null = null;
 const request = indexedDB.open(DB_NAME, DB_VERSION);
 
 request.onerror = (): void => {
-  console.error('Error opening database:', request.error);
+  console.error("Error opening database:", request.error);
 };
 
 request.onsuccess = (): void => {
@@ -50,7 +50,7 @@ request.onsuccess = (): void => {
 request.onupgradeneeded = (): void => {
   db = request.result;
   if (!db.objectStoreNames.contains(WALLET_STORE)) {
-    db.createObjectStore(WALLET_STORE, { keyPath: 'id' });
+    db.createObjectStore(WALLET_STORE, { keyPath: "id" });
   }
 };
 
@@ -66,33 +66,33 @@ export function saveWalletsToCookies(wallets: WalletType[]): void {
 
     if (!db) {
       localStorage.setItem(STORAGE_KEYS.ENCRYPTED_WALLETS, encryptedData);
-      localStorage.removeItem('wallets');
+      localStorage.removeItem("wallets");
       return;
     }
 
-    const transaction = db.transaction(WALLET_STORE, 'readwrite');
+    const transaction = db.transaction(WALLET_STORE, "readwrite");
     const store = transaction.objectStore(WALLET_STORE);
 
     store.clear();
     const encryptedWallet = {
-      id: 'encrypted_wallets',
+      id: "encrypted_wallets",
       data: encryptedData,
     };
     store.add(encryptedWallet);
 
     // Backup to localStorage
     localStorage.setItem(STORAGE_KEYS.ENCRYPTED_WALLETS, encryptedData);
-    localStorage.removeItem('wallets');
+    localStorage.removeItem("wallets");
   } catch (error) {
-    console.error('Error saving encrypted wallets:', error);
+    console.error("Error saving encrypted wallets:", error);
     try {
       const walletData = JSON.stringify(wallets);
       const encryptedData = encryptData(walletData);
       localStorage.setItem(STORAGE_KEYS.ENCRYPTED_WALLETS, encryptedData);
-      localStorage.removeItem('wallets');
+      localStorage.removeItem("wallets");
     } catch (encryptError) {
-      console.error('Error with encryption fallback:', encryptError);
-      localStorage.setItem('wallets', JSON.stringify(wallets));
+      console.error("Error with encryption fallback:", encryptError);
+      localStorage.setItem("wallets", JSON.stringify(wallets));
     }
   }
 }
@@ -108,10 +108,10 @@ export function loadWalletsFromCookies(): WalletType[] {
         const decryptedData = decryptData(encryptedData);
         return JSON.parse(decryptedData) as WalletType[];
       } catch {
-        console.error('Error decrypting wallet data');
-        const oldWallets = localStorage.getItem('wallets');
+        console.error("Error decrypting wallet data");
+        const oldWallets = localStorage.getItem("wallets");
         if (oldWallets) {
-          console.info('Loading from old unencrypted storage and migrating...');
+          console.info("Loading from old unencrypted storage and migrating...");
           const parsedWallets = JSON.parse(oldWallets) as WalletType[];
           saveWalletsToCookies(parsedWallets);
           return parsedWallets;
@@ -120,9 +120,9 @@ export function loadWalletsFromCookies(): WalletType[] {
     }
 
     // Fallback to old unencrypted data
-    const oldWallets = localStorage.getItem('wallets');
+    const oldWallets = localStorage.getItem("wallets");
     if (oldWallets) {
-      console.info('Migrating from unencrypted to encrypted storage...');
+      console.info("Migrating from unencrypted to encrypted storage...");
       const parsedWallets = JSON.parse(oldWallets) as WalletType[];
       saveWalletsToCookies(parsedWallets);
       return parsedWallets;
@@ -130,7 +130,7 @@ export function loadWalletsFromCookies(): WalletType[] {
 
     return [];
   } catch (error) {
-    console.error('Error loading wallets:', error);
+    console.error("Error loading wallets:", error);
     return [];
   }
 }
@@ -140,7 +140,7 @@ export function loadWalletsFromCookies(): WalletType[] {
  */
 export function isWalletDataEncrypted(): boolean {
   const encryptedData = localStorage.getItem(STORAGE_KEYS.ENCRYPTED_WALLETS);
-  const unencryptedData = localStorage.getItem('wallets');
+  const unencryptedData = localStorage.getItem("wallets");
   return !!encryptedData && !unencryptedData;
 }
 
@@ -149,16 +149,16 @@ export function isWalletDataEncrypted(): boolean {
  */
 export function migrateToEncryptedStorage(): boolean {
   try {
-    const unencryptedData = localStorage.getItem('wallets');
+    const unencryptedData = localStorage.getItem("wallets");
     if (unencryptedData) {
       const wallets = JSON.parse(unencryptedData) as WalletType[];
       saveWalletsToCookies(wallets);
-      console.info('Successfully migrated wallet data to encrypted storage');
+      console.info("Successfully migrated wallet data to encrypted storage");
       return true;
     }
     return false;
   } catch (error) {
-    console.error('Error migrating to encrypted storage:', error);
+    console.error("Error migrating to encrypted storage:", error);
     return false;
   }
 }
@@ -174,8 +174,8 @@ export function saveMasterWallets(masterWallets: MasterWallet[]): void {
     const encrypted = encryptData(data);
     localStorage.setItem(STORAGE_KEYS.ENCRYPTED_MASTER_WALLETS, encrypted);
   } catch (error) {
-    console.error('Error saving master wallets:', error);
-    throw new Error('Failed to save master wallets');
+    console.error("Error saving master wallets:", error);
+    throw new Error("Failed to save master wallets");
   }
 }
 
@@ -184,14 +184,16 @@ export function saveMasterWallets(masterWallets: MasterWallet[]): void {
  */
 export function loadMasterWallets(): MasterWallet[] {
   try {
-    const encrypted = localStorage.getItem(STORAGE_KEYS.ENCRYPTED_MASTER_WALLETS);
+    const encrypted = localStorage.getItem(
+      STORAGE_KEYS.ENCRYPTED_MASTER_WALLETS,
+    );
     if (!encrypted) {
       return [];
     }
     const decrypted = decryptData(encrypted);
     return JSON.parse(decrypted) as MasterWallet[];
   } catch (error) {
-    console.error('Error loading master wallets:', error);
+    console.error("Error loading master wallets:", error);
     return [];
   }
 }
@@ -216,33 +218,53 @@ export function loadConfigFromCookies(): ConfigType | null {
 
       // Handle backward compatibility defaults
       if (config.slippageBps === undefined) {
-        config.slippageBps = '9900';
+        config.slippageBps = "9900";
       }
       if (config.bundleMode === undefined) {
-        config.bundleMode = 'batch';
+        config.bundleMode = "batch";
       }
       if (config.singleDelay === undefined) {
-        config.singleDelay = '200';
+        config.singleDelay = "200";
       }
       if (config.batchDelay === undefined) {
-        config.batchDelay = '1000';
+        config.batchDelay = "1000";
       }
       if (config.tradingServerEnabled === undefined) {
-        config.tradingServerEnabled = 'false';
+        config.tradingServerEnabled = "false";
       }
       if (config.tradingServerUrl === undefined) {
-        config.tradingServerUrl = 'localhost:4444';
+        config.tradingServerUrl = "localhost:4444";
       }
       if (config.rpcEndpoints === undefined) {
         config.rpcEndpoints = JSON.stringify(createDefaultEndpoints());
       }
       if (config.streamApiKey === undefined) {
-        config.streamApiKey = '';
+        config.streamApiKey = "";
+      }
+
+      // Transaction sending config defaults
+      if (config.sendingMode === undefined) {
+        config.sendingMode = "server";
+      }
+      if (config.customRpcEndpoint === undefined) {
+        config.customRpcEndpoint = "";
+      }
+      if (config.customJitoSingleEndpoint === undefined) {
+        config.customJitoSingleEndpoint = "";
+      }
+      if (config.customJitoBundleEndpoint === undefined) {
+        config.customJitoBundleEndpoint = "";
+      }
+      if (config.singleTxMode === undefined) {
+        config.singleTxMode = "rpc";
+      }
+      if (config.multiTxMode === undefined) {
+        config.multiTxMode = "bundle";
       }
 
       return config as ConfigType;
     } catch (error) {
-      console.error('Error parsing saved config:', error);
+      console.error("Error parsing saved config:", error);
       return null;
     }
   }
@@ -254,8 +276,12 @@ export function loadConfigFromCookies(): ConfigType | null {
 /**
  * Save quick buy preferences to cookies.
  */
-export function saveQuickBuyPreferencesToCookies(preferences: QuickBuyPreferences): void {
-  Cookies.set(STORAGE_KEYS.QUICK_BUY, JSON.stringify(preferences), { expires: 30 });
+export function saveQuickBuyPreferencesToCookies(
+  preferences: QuickBuyPreferences,
+): void {
+  Cookies.set(STORAGE_KEYS.QUICK_BUY, JSON.stringify(preferences), {
+    expires: 30,
+  });
 }
 
 /**
@@ -267,7 +293,7 @@ export function loadQuickBuyPreferencesFromCookies(): QuickBuyPreferences | null
     try {
       return JSON.parse(savedPreferences) as QuickBuyPreferences;
     } catch (error) {
-      console.error('Error parsing saved quick buy preferences:', error);
+      console.error("Error parsing saved quick buy preferences:", error);
       return null;
     }
   }
@@ -279,8 +305,12 @@ export function loadQuickBuyPreferencesFromCookies(): QuickBuyPreferences | null
 /**
  * Save trading strategies to cookies.
  */
-export function saveTradingStrategiesToCookies(strategies: TradingStrategy[]): void {
-  Cookies.set(STORAGE_KEYS.TRADING_STRATEGIES, JSON.stringify(strategies), { expires: 30 });
+export function saveTradingStrategiesToCookies(
+  strategies: TradingStrategy[],
+): void {
+  Cookies.set(STORAGE_KEYS.TRADING_STRATEGIES, JSON.stringify(strategies), {
+    expires: 30,
+  });
 }
 
 /**
@@ -293,10 +323,10 @@ export function loadTradingStrategiesFromCookies(): TradingStrategy[] {
       const strategies = JSON.parse(savedStrategies) as TradingStrategy[];
       return strategies.map((strategy) => ({
         ...strategy,
-        cooldownUnit: strategy.cooldownUnit || 'minutes',
+        cooldownUnit: strategy.cooldownUnit || "minutes",
       }));
     } catch (error) {
-      console.error('Error parsing saved trading strategies:', error);
+      console.error("Error parsing saved trading strategies:", error);
       return [];
     }
   }
@@ -305,7 +335,7 @@ export function loadTradingStrategiesFromCookies(): TradingStrategy[] {
 
 // ============= UI Preferences =============
 
-export type ViewMode = 'simple' | 'advanced' | 'multichart';
+export type ViewMode = "simple" | "advanced" | "multichart";
 
 /**
  * Save view mode to cookies.
@@ -314,7 +344,7 @@ export function saveViewModeToCookies(mode: ViewMode): void {
   try {
     Cookies.set(STORAGE_KEYS.VIEW_MODE, mode, { expires: 365 });
   } catch (error) {
-    console.error('Error saving view mode to cookies:', error);
+    console.error("Error saving view mode to cookies:", error);
   }
 }
 
@@ -324,13 +354,17 @@ export function saveViewModeToCookies(mode: ViewMode): void {
 export function loadViewModeFromCookies(): ViewMode {
   try {
     const savedMode = Cookies.get(STORAGE_KEYS.VIEW_MODE);
-    if (savedMode === 'simple' || savedMode === 'advanced' || savedMode === 'multichart') {
+    if (
+      savedMode === "simple" ||
+      savedMode === "advanced" ||
+      savedMode === "multichart"
+    ) {
       return savedMode;
     }
   } catch (error) {
-    console.error('Error loading view mode from cookies:', error);
+    console.error("Error loading view mode from cookies:", error);
   }
-  return 'advanced';
+  return "advanced";
 }
 
 /**
@@ -338,9 +372,11 @@ export function loadViewModeFromCookies(): ViewMode {
  */
 export function saveSplitSizesToCookies(sizes: number[]): void {
   try {
-    Cookies.set(STORAGE_KEYS.SPLIT_SIZES, JSON.stringify(sizes), { expires: 365 });
+    Cookies.set(STORAGE_KEYS.SPLIT_SIZES, JSON.stringify(sizes), {
+      expires: 365,
+    });
   } catch (error) {
-    console.error('Error saving split sizes to cookies:', error);
+    console.error("Error saving split sizes to cookies:", error);
   }
 }
 
@@ -355,13 +391,15 @@ export function loadSplitSizesFromCookies(): number[] | null {
       if (
         Array.isArray(sizes) &&
         sizes.length === 2 &&
-        sizes.every((size) => typeof size === 'number' && size > 0 && size < 100)
+        sizes.every(
+          (size) => typeof size === "number" && size > 0 && size < 100,
+        )
       ) {
         return sizes;
       }
     }
   } catch (error) {
-    console.error('Error loading split sizes from cookies:', error);
+    console.error("Error loading split sizes from cookies:", error);
   }
   return null;
 }
@@ -376,9 +414,12 @@ const MAX_MULTICHART_TOKENS = 8;
 export function saveMultichartTokens(tokens: MultichartToken[]): void {
   try {
     const tokensToSave = tokens.slice(0, MAX_MULTICHART_TOKENS);
-    localStorage.setItem(STORAGE_KEYS.MULTICHART_TOKENS, JSON.stringify(tokensToSave));
+    localStorage.setItem(
+      STORAGE_KEYS.MULTICHART_TOKENS,
+      JSON.stringify(tokensToSave),
+    );
   } catch (error) {
-    console.error('Error saving multichart tokens:', error);
+    console.error("Error saving multichart tokens:", error);
   }
 }
 
@@ -395,7 +436,7 @@ export function loadMultichartTokens(): MultichartToken[] {
       }
     }
   } catch (error) {
-    console.error('Error loading multichart tokens:', error);
+    console.error("Error loading multichart tokens:", error);
   }
   return [];
 }
@@ -405,9 +446,11 @@ export function loadMultichartTokens(): MultichartToken[] {
  */
 export function saveMultichartActiveIndex(index: number): void {
   try {
-    Cookies.set(STORAGE_KEYS.MULTICHART_ACTIVE_INDEX, String(index), { expires: 365 });
+    Cookies.set(STORAGE_KEYS.MULTICHART_ACTIVE_INDEX, String(index), {
+      expires: 365,
+    });
   } catch (error) {
-    console.error('Error saving multichart active index:', error);
+    console.error("Error saving multichart active index:", error);
   }
 }
 
@@ -424,7 +467,7 @@ export function loadMultichartActiveIndex(): number {
       }
     }
   } catch (error) {
-    console.error('Error loading multichart active index:', error);
+    console.error("Error loading multichart active index:", error);
   }
   return 0;
 }

@@ -180,6 +180,20 @@ export interface ConfigType {
   balanceRefreshBatchSize: string;
   /** Delay between balance refresh operations (milliseconds) */
   balanceRefreshDelay: string;
+
+  // Transaction Sending Configuration
+  /** Sending mode: 'server' (use trading server), 'custom' (use custom endpoints) */
+  sendingMode: string;
+  /** Custom RPC endpoint for sendTransaction */
+  customRpcEndpoint: string;
+  /** Custom Jito endpoint for single transactions (/api/v1/transactions) */
+  customJitoSingleEndpoint: string;
+  /** Custom Jito endpoint for bundle transactions (/api/v1/bundles) */
+  customJitoBundleEndpoint: string;
+  /** How to send single transaction: 'rpc', 'jito' */
+  singleTxMode: string;
+  /** How to send multiple transactions: 'bundle' (Jito bundle), 'parallel' (RPC parallel), 'sequential' (RPC sequential) */
+  multiTxMode: string;
 }
 
 // ============================================================================

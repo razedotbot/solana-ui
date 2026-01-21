@@ -21,6 +21,7 @@ import {
   Coins,
   Layers,
   Radio,
+  Send,
 } from "lucide-react";
 import { useAppContext } from "../contexts";
 import { useToast } from "../utils/hooks";
@@ -31,7 +32,13 @@ import { RPCEndpointManager } from "../components/RPCEndpointManager";
 import { createDefaultEndpoints, type RPCEndpoint } from "../utils/rpcManager";
 import { OnboardingTutorial } from "../components/OnboardingTutorial";
 
-type SettingsTab = "network" | "server" | "execution" | "api" | "help";
+type SettingsTab =
+  | "network"
+  | "server"
+  | "sending"
+  | "execution"
+  | "api"
+  | "help";
 
 interface TabConfig {
   id: SettingsTab;
@@ -52,6 +59,12 @@ const TABS: TabConfig[] = [
     label: "Server",
     icon: <Server size={18} />,
     description: "Trading Server",
+  },
+  {
+    id: "sending",
+    label: "Sending",
+    icon: <Send size={18} />,
+    description: "Transaction Routing",
   },
   {
     id: "execution",
@@ -381,6 +394,432 @@ export const SettingsPage: React.FC = () => {
       )}
     </div>
   );
+
+  const renderSendingTab = (): JSX.Element => {
+    // Check which endpoints are configured
+    const hasRpcEndpoint = !!config.customRpcEndpoint?.trim();
+    const hasJitoSingleEndpoint = !!config.customJitoSingleEndpoint?.trim();
+    const hasJitoBundleEndpoint = !!config.customJitoBundleEndpoint?.trim();
+
+    // Determine if current selections are valid
+    const singleTxMode = config.singleTxMode || "rpc";
+    const multiTxMode = config.multiTxMode || "bundle";
+
+    const isSingleModeValid =
+      singleTxMode === "rpc" ? hasRpcEndpoint : hasJitoSingleEndpoint;
+    const isMultiModeValid =
+      multiTxMode === "bundle" ? hasJitoBundleEndpoint : hasRpcEndpoint;
+
+    // Handler that validates before changing mode
+    const handleSingleTxModeChange = (value: string): void => {
+      if (value === "rpc" && !hasRpcEndpoint) {
+        showToast("Please configure RPC Endpoint first", "error");
+        return;
+      }
+      if (value === "jito" && !hasJitoSingleEndpoint) {
+        showToast("Please configure Jito Single TX Endpoint first", "error");
+        return;
+      }
+      handleConfigChange("singleTxMode", value);
+    };
+
+    const handleMultiTxModeChange = (value: string): void => {
+      if (value === "bundle" && !hasJitoBundleEndpoint) {
+        showToast("Please configure Jito Bundle Endpoint first", "error");
+        return;
+      }
+      if ((value === "parallel" || value === "sequential") && !hasRpcEndpoint) {
+        showToast("Please configure RPC Endpoint first", "error");
+        return;
+      }
+      handleConfigChange("multiTxMode", value);
+    };
+
+    return (
+      <div className="space-y-6 animate-fade-in-down">
+        {/* Section Header */}
+        <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-500/5 border border-orange-500/30 flex items-center justify-center">
+            <Send size={24} className="text-orange-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-app-primary font-mono">
+              Transaction Sending
+            </h2>
+            <p className="text-xs text-app-secondary-60 font-mono">
+              Configure how transactions are sent to the network
+            </p>
+          </div>
+        </div>
+
+        {/* Sending Mode Toggle */}
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+            <Radio size={14} className="text-orange-400" />
+            Sending Mode
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              {
+                value: "server",
+                label: "Trading Server",
+                icon: <Server size={20} />,
+                desc: "Use configured trading server",
+              },
+              {
+                value: "custom",
+                label: "Custom Endpoints",
+                icon: <Wifi size={20} />,
+                desc: "Use your own RPC/Jito endpoints",
+              },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleConfigChange("sendingMode", opt.value)}
+                className={`relative group p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                  (config.sendingMode || "server") === opt.value
+                    ? "border-orange-500/50 bg-orange-500/10 shadow-[0_0_20px_rgba(249,115,22,0.15)]"
+                    : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
+                }`}
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <span
+                      className={`${(config.sendingMode || "server") === opt.value ? "text-orange-400" : "text-app-secondary-60"}`}
+                    >
+                      {opt.icon}
+                    </span>
+                    {(config.sendingMode || "server") === opt.value && (
+                      <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
+                        <Check size={12} className="text-black" />
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    className={`text-sm font-bold font-mono ${(config.sendingMode || "server") === opt.value ? "text-orange-400" : "text-app-primary"}`}
+                  >
+                    {opt.label}
+                  </div>
+                  <div className="text-[10px] font-mono text-app-secondary-40 mt-1">
+                    {opt.desc}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Custom Endpoints - Only shown when custom mode is selected */}
+        {(config.sendingMode || "server") === "custom" && (
+          <div className="space-y-4 animate-fade-in-down">
+            {/* RPC Endpoint */}
+            <div
+              className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasRpcEndpoint ? "border-app-primary-20" : "border-red-500/30"}`}
+            >
+              <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+                <Globe size={14} className="text-blue-400" />
+                RPC Endpoint
+                {hasRpcEndpoint && (
+                  <Check size={12} className="text-green-500 ml-auto" />
+                )}
+              </label>
+              <input
+                type="text"
+                value={config.customRpcEndpoint || ""}
+                onChange={(e) =>
+                  handleConfigChange("customRpcEndpoint", e.target.value)
+                }
+                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 focus:outline-none font-mono transition-all ${hasRpcEndpoint ? "border-app-primary-30" : "border-red-500/50"}`}
+                placeholder="https://your-rpc.solana-mainnet.quiknode.pro/..."
+              />
+              <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
+                Required for RPC single TX and RPC parallel/sequential modes
+              </p>
+            </div>
+
+            {/* Jito Single TX Endpoint */}
+            <div
+              className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasJitoSingleEndpoint ? "border-app-primary-20" : "border-yellow-500/30"}`}
+            >
+              <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+                <Zap size={14} className="text-yellow-400" />
+                Jito Single TX Endpoint
+                {hasJitoSingleEndpoint && (
+                  <Check size={12} className="text-green-500 ml-auto" />
+                )}
+              </label>
+              <input
+                type="text"
+                value={config.customJitoSingleEndpoint || ""}
+                onChange={(e) =>
+                  handleConfigChange("customJitoSingleEndpoint", e.target.value)
+                }
+                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/50 focus:outline-none font-mono transition-all ${hasJitoSingleEndpoint ? "border-app-primary-30" : "border-yellow-500/50"}`}
+                placeholder="https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/transactions?uuid=..."
+              />
+              <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
+                Required for Jito single transaction mode
+              </p>
+            </div>
+
+            {/* Jito Bundle Endpoint */}
+            <div
+              className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasJitoBundleEndpoint ? "border-app-primary-20" : "border-purple-500/30"}`}
+            >
+              <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+                <Layers size={14} className="text-purple-400" />
+                Jito Bundle Endpoint
+                {hasJitoBundleEndpoint && (
+                  <Check size={12} className="text-green-500 ml-auto" />
+                )}
+              </label>
+              <input
+                type="text"
+                value={config.customJitoBundleEndpoint || ""}
+                onChange={(e) =>
+                  handleConfigChange("customJitoBundleEndpoint", e.target.value)
+                }
+                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 focus:outline-none font-mono transition-all ${hasJitoBundleEndpoint ? "border-app-primary-30" : "border-purple-500/50"}`}
+                placeholder="https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/bundles?uuid=..."
+              />
+              <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
+                Required for Jito bundle mode (multiple transactions)
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Transaction Routing Options - Only shown when custom mode is selected */}
+        {(config.sendingMode || "server") === "custom" && (
+          <>
+            {/* Single Transaction Mode */}
+            <div className="space-y-3 animate-fade-in-down">
+              <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+                <Send size={14} className="text-yellow-400" />
+                Single Transaction Mode
+                {!isSingleModeValid && (
+                  <span className="text-red-400 text-[10px] ml-2">
+                    (endpoint not configured)
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    value: "rpc",
+                    label: "RPC",
+                    icon: <Globe size={18} />,
+                    desc: "Send via RPC sendTransaction",
+                    disabled: !hasRpcEndpoint,
+                  },
+                  {
+                    value: "jito",
+                    label: "Jito",
+                    icon: <Zap size={18} />,
+                    desc: "Send via Jito with tip",
+                    disabled: !hasJitoSingleEndpoint,
+                  },
+                ].map((opt) => {
+                  const isSelected = singleTxMode === opt.value;
+                  const isDisabled = opt.disabled && !isSelected;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleSingleTxModeChange(opt.value)}
+                      disabled={isDisabled}
+                      className={`relative group p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                        isSelected
+                          ? opt.value === "rpc"
+                            ? "border-blue-500/50 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.15)]"
+                            : "border-yellow-500/50 bg-yellow-500/10 shadow-[0_0_20px_rgba(234,179,8,0.15)]"
+                          : isDisabled
+                            ? "border-app-primary-10 bg-app-tertiary/30 opacity-50 cursor-not-allowed"
+                            : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
+                      }`}
+                    >
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-2">
+                          <span
+                            className={`${isSelected ? (opt.value === "rpc" ? "text-blue-400" : "text-yellow-400") : "text-app-secondary-60"}`}
+                          >
+                            {opt.icon}
+                          </span>
+                          {isSelected && (
+                            <div
+                              className={`w-5 h-5 rounded-full flex items-center justify-center ${opt.value === "rpc" ? "bg-blue-500" : "bg-yellow-500"}`}
+                            >
+                              <Check size={12} className="text-black" />
+                            </div>
+                          )}
+                          {isDisabled && (
+                            <AlertCircle size={14} className="text-red-400" />
+                          )}
+                        </div>
+                        <div
+                          className={`text-sm font-bold font-mono ${isSelected ? (opt.value === "rpc" ? "text-blue-400" : "text-yellow-400") : "text-app-primary"}`}
+                        >
+                          {opt.label}
+                        </div>
+                        <div className="text-[10px] font-mono text-app-secondary-40 mt-1">
+                          {opt.desc}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-app-secondary-40 font-mono">
+                How to send when there's only 1 transaction
+              </p>
+            </div>
+
+            {/* Multiple Transactions Mode */}
+            <div className="space-y-3 animate-fade-in-down">
+              <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+                <Layers size={14} className="text-cyan-400" />
+                Multiple Transactions Mode
+                {!isMultiModeValid && (
+                  <span className="text-red-400 text-[10px] ml-2">
+                    (endpoint not configured)
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  {
+                    value: "bundle",
+                    label: "Jito Bundle",
+                    icon: "📦",
+                    desc: "Atomic bundle via Jito",
+                    disabled: !hasJitoBundleEndpoint,
+                  },
+                  {
+                    value: "parallel",
+                    label: "RPC Parallel",
+                    icon: "⚡",
+                    desc: "All at once via RPC",
+                    disabled: !hasRpcEndpoint,
+                  },
+                  {
+                    value: "sequential",
+                    label: "RPC Sequential",
+                    icon: "🔄",
+                    desc: "One by one via RPC",
+                    disabled: !hasRpcEndpoint,
+                  },
+                ].map((opt) => {
+                  const isSelected = multiTxMode === opt.value;
+                  const isDisabled = opt.disabled && !isSelected;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleMultiTxModeChange(opt.value)}
+                      disabled={isDisabled}
+                      className={`relative group p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                        isSelected
+                          ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.15)]"
+                          : isDisabled
+                            ? "border-app-primary-10 bg-app-tertiary/30 opacity-50 cursor-not-allowed"
+                            : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
+                      }`}
+                    >
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-cyan-500/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-2xl">{opt.icon}</span>
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center">
+                              <Check size={12} className="text-black" />
+                            </div>
+                          )}
+                          {isDisabled && (
+                            <AlertCircle size={14} className="text-red-400" />
+                          )}
+                        </div>
+                        <div
+                          className={`text-sm font-bold font-mono ${isSelected ? "text-cyan-400" : "text-app-primary"}`}
+                        >
+                          {opt.label}
+                        </div>
+                        <div className="text-[10px] font-mono text-app-secondary-40 mt-1">
+                          {opt.desc}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-app-secondary-40 font-mono">
+                How to send when there are 2+ transactions
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* Info Card */}
+        <div
+          className={`p-4 rounded-xl bg-gradient-to-r border ${
+            (config.sendingMode || "server") === "custom" &&
+            (!isSingleModeValid || !isMultiModeValid)
+              ? "from-red-500/5 to-transparent border-red-500/20"
+              : "from-orange-500/5 to-transparent border-orange-500/20"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                (config.sendingMode || "server") === "custom" &&
+                (!isSingleModeValid || !isMultiModeValid)
+                  ? "bg-red-500/20"
+                  : "bg-orange-500/20"
+              }`}
+            >
+              <AlertCircle
+                size={16}
+                className={
+                  (config.sendingMode || "server") === "custom" &&
+                  (!isSingleModeValid || !isMultiModeValid)
+                    ? "text-red-400"
+                    : "text-orange-400"
+                }
+              />
+            </div>
+            <div>
+              <p className="text-sm text-app-primary font-mono font-medium">
+                Transaction Routing Summary
+              </p>
+              <p className="text-xs text-app-secondary-60 font-mono mt-1">
+                {(config.sendingMode || "server") === "server" ? (
+                  "Transactions are sent through the configured trading server."
+                ) : !isSingleModeValid || !isMultiModeValid ? (
+                  <span className="text-red-400">
+                    Warning: Some selected modes don't have their required
+                    endpoints configured. Please add the missing endpoints
+                    above.
+                  </span>
+                ) : (
+                  <>
+                    Single TX:{" "}
+                    {singleTxMode === "jito"
+                      ? "Jito sendTransaction"
+                      : "RPC sendTransaction"}
+                    {" | "}
+                    Multi TX:{" "}
+                    {multiTxMode === "bundle"
+                      ? "Jito Bundle"
+                      : multiTxMode === "parallel"
+                        ? "RPC Parallel"
+                        : "RPC Sequential"}
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderExecutionTab = (): JSX.Element => (
     <div className="space-y-6 animate-fade-in-down">
@@ -777,6 +1216,8 @@ export const SettingsPage: React.FC = () => {
         return renderNetworkTab();
       case "server":
         return renderServerTab();
+      case "sending":
+        return renderSendingTab();
       case "execution":
         return renderExecutionTab();
       case "api":

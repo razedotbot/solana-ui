@@ -1,6 +1,7 @@
-import type { FormattedWallet } from './trading';
-import { Keypair, VersionedTransaction } from '@solana/web3.js';
-import bs58 from 'bs58';
+import type { FormattedWallet } from "./trading";
+import { Keypair, VersionedTransaction } from "@solana/web3.js";
+import bs58 from "bs58";
+import { sendTransactions } from "./transactionService";
 
 // Type definition for config to avoid circular dependency
 interface AppConfig {
@@ -14,16 +15,16 @@ const getDefaultConfig = (): AppConfig | null => {
   try {
     // Get config from cookies directly to avoid circular dependency
     const configCookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('tradingConfig='));
-    
+      .split("; ")
+      .find((row) => row.startsWith("tradingConfig="));
+
     if (configCookie) {
-      const configValue = configCookie.split('=')[1];
+      const configValue = configCookie.split("=")[1];
       return JSON.parse(decodeURIComponent(configValue)) as AppConfig;
     }
     return null;
   } catch (error) {
-    console.error('Error loading config:', error);
+    console.error("Error loading config:", error);
     return null;
   }
 };
@@ -32,11 +33,14 @@ const getDefaultConfig = (): AppConfig | null => {
 const getFirstActiveRpcUrl = (rpcEndpoints?: string): string | undefined => {
   if (!rpcEndpoints) return undefined;
   try {
-    const endpoints = JSON.parse(rpcEndpoints) as Array<{ url: string; isActive: boolean }>;
-    const activeEndpoint = endpoints.find(e => e.isActive);
+    const endpoints = JSON.parse(rpcEndpoints) as Array<{
+      url: string;
+      isActive: boolean;
+    }>;
+    const activeEndpoint = endpoints.find((e) => e.isActive);
     return activeEndpoint?.url;
   } catch (error) {
-    console.error('Error parsing rpcEndpoints:', error);
+    console.error("Error parsing rpcEndpoints:", error);
     return undefined;
   }
 };
@@ -48,7 +52,7 @@ export interface LimitOrderConfig {
   takingAmount: string;
   slippageBps?: number;
   expiredAt?: number; // Unix timestamp
-  base?: 'input' | 'output';
+  base?: "input" | "output";
 }
 
 export interface CreateMultipleLimitOrdersRequest {
@@ -77,7 +81,7 @@ export interface OrderConfig {
   takingAmount: string;
   slippageBps?: number;
   expiredAt?: number;
-  base?: 'input' | 'output';
+  base?: "input" | "output";
 }
 
 export interface LimitOrderResponse {
@@ -116,7 +120,7 @@ export interface ActiveOrdersResponse {
         takingAmount: string;
         rawTakingAmount: string;
         expiredAt: number | null;
-        base: 'input' | 'output';
+        base: "input" | "output";
       };
     }>;
   };
@@ -155,53 +159,61 @@ interface WindowWithConfig {
 }
 
 // API Base URL - This should be configured based on your backend
-const getBaseUrl = (): string => (window as unknown as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, '') || '';
+const getBaseUrl = (): string =>
+  (window as unknown as WindowWithConfig).tradingServerUrl?.replace(
+    /\/+$/,
+    "",
+  ) || "";
 
 // Create multiple limit orders
 export const createMultipleLimitOrders = async (
   wallets: FormattedWallet[],
-  orderConfig: Omit<LimitOrderConfig, 'maker'>,
+  orderConfig: Omit<LimitOrderConfig, "maker">,
   options?: {
     rpcUrl?: string;
     includeTip?: boolean;
     jitoTipLamports?: number;
     affiliateAddress?: string;
     affiliateFee?: number;
-  }
+  },
 ): Promise<MultipleLimitOrdersResponse> => {
   try {
     const appConfig = getDefaultConfig();
-    
+
     // Create orders for each wallet
-    const orders: LimitOrderConfig[] = wallets.map(wallet => ({
+    const orders: LimitOrderConfig[] = wallets.map((wallet) => ({
       ...orderConfig,
-      maker: wallet.address
+      maker: wallet.address,
     }));
 
     const requestConfig: CreateMultipleLimitOrdersRequest = {
       orders,
       rpcUrl: options?.rpcUrl || getFirstActiveRpcUrl(appConfig?.rpcEndpoints),
       includeTip: options?.includeTip ?? true,
-      jitoTipLamports: options?.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000),
+      jitoTipLamports:
+        options?.jitoTipLamports ??
+        (appConfig?.transactionFee
+          ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000)
+          : 5000000),
       affiliateAddress: options?.affiliateAddress,
-      affiliateFee: options?.affiliateFee
+      affiliateFee: options?.affiliateFee,
     };
 
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/v2/sol/limit/create`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestConfig)
+      body: JSON.stringify(requestConfig),
     });
 
-    const data = await response.json() as MultipleLimitOrdersResponse;
-    
+    const data = (await response.json()) as MultipleLimitOrdersResponse;
+
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`
+        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -209,7 +221,7 @@ export const createMultipleLimitOrders = async (
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
@@ -220,35 +232,38 @@ export const getActiveOrders = async (
   filters?: {
     inputMint?: string;
     outputMint?: string;
-  }
+  },
 ): Promise<ActiveOrdersResponse> => {
   try {
     const params = new URLSearchParams({
-      userAddress
+      userAddress,
     });
 
     if (filters?.inputMint) {
-      params.append('inputMint', filters.inputMint);
+      params.append("inputMint", filters.inputMint);
     }
 
     if (filters?.outputMint) {
-      params.append('outputMint', filters.outputMint);
+      params.append("outputMint", filters.outputMint);
     }
 
     const baseUrl = getBaseUrl();
-    const response = await fetch(`${baseUrl}/v2/sol/limit/active?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await fetch(
+      `${baseUrl}/v2/sol/limit/active?${params.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-    const data = await response.json() as ActiveOrdersResponse;
-    
+    const data = (await response.json()) as ActiveOrdersResponse;
+
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`
+        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -256,41 +271,45 @@ export const getActiveOrders = async (
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
 
 // Cancel a specific order
 export const cancelOrder = async (
-  config: CancelOrderRequest
+  config: CancelOrderRequest,
 ): Promise<CancelOrderResponse> => {
   try {
     const appConfig = getDefaultConfig();
-    
+
     const requestConfig: CancelOrderRequest = {
       ...config,
-      computeUnitPrice: config.computeUnitPrice || 'auto',
+      computeUnitPrice: config.computeUnitPrice || "auto",
       rpcUrl: config.rpcUrl || getFirstActiveRpcUrl(appConfig?.rpcEndpoints),
       includeTip: config.includeTip ?? true,
-      jitoTipLamports: config.jitoTipLamports ?? (appConfig?.transactionFee ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000) : 5000000)
+      jitoTipLamports:
+        config.jitoTipLamports ??
+        (appConfig?.transactionFee
+          ? Math.floor(parseFloat(appConfig.transactionFee) * 1_000_000_000)
+          : 5000000),
     };
 
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/v2/sol/limit/cancel`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestConfig)
+      body: JSON.stringify(requestConfig),
     });
 
-    const data = await response.json() as CancelOrderResponse;
-    
+    const data = (await response.json()) as CancelOrderResponse;
+
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`
+        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
       };
     }
 
@@ -298,7 +317,7 @@ export const cancelOrder = async (
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
@@ -310,52 +329,56 @@ export const cancelAllOrders = async (
     rpcUrl?: string;
     includeTip?: boolean;
     jitoTipLamports?: number;
-  }
-): Promise<{ success: boolean; results: CancelOrderResponse[]; error?: string }> => {
+  },
+): Promise<{
+  success: boolean;
+  results: CancelOrderResponse[];
+  error?: string;
+}> => {
   try {
     // First, get all active orders for the user
     const activeOrdersResponse = await getActiveOrders(userAddress);
-    
+
     if (!activeOrdersResponse.success || !activeOrdersResponse.orders?.orders) {
       return {
         success: false,
         results: [],
-        error: activeOrdersResponse.error || 'Failed to fetch active orders'
+        error: activeOrdersResponse.error || "Failed to fetch active orders",
       };
     }
 
     const orders = activeOrdersResponse.orders.orders;
-    
+
     if (orders.length === 0) {
       return {
         success: true,
         results: [],
-        error: 'No active orders to cancel'
+        error: "No active orders to cancel",
       };
     }
 
     // Cancel each order
-    const cancelPromises = orders.map(order =>
+    const cancelPromises = orders.map((order) =>
       cancelOrder({
         maker: userAddress,
         order: order.publicKey,
-        ...options
-      })
+        ...options,
+      }),
     );
 
     const results = await Promise.all(cancelPromises);
-    const hasErrors = results.some(result => !result.success);
+    const hasErrors = results.some((result) => !result.success);
 
     return {
       success: !hasErrors,
       results,
-      error: hasErrors ? 'Some orders failed to cancel' : undefined
+      error: hasErrors ? "Some orders failed to cancel" : undefined,
     };
   } catch (error) {
     return {
       success: false,
       results: [],
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
@@ -377,120 +400,115 @@ export const formatTokenAmount = (amount: string, decimals: number): string => {
 };
 
 // Utility function to calculate price from making and taking amounts
-export const calculatePrice = (makingAmount: string, takingAmount: string): number => {
+export const calculatePrice = (
+  makingAmount: string,
+  takingAmount: string,
+): number => {
   const making = parseFloat(makingAmount);
   const taking = parseFloat(takingAmount);
   return taking / making;
 };
 
 // Utility function to validate limit order configuration
-export const validateLimitOrderConfig = (config: LimitOrderConfig): { valid: boolean; errors: string[] } => {
+export const validateLimitOrderConfig = (
+  config: LimitOrderConfig,
+): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (!config.inputMint || config.inputMint.trim() === '') {
-    errors.push('Input mint is required');
+  if (!config.inputMint || config.inputMint.trim() === "") {
+    errors.push("Input mint is required");
   }
 
-  if (!config.outputMint || config.outputMint.trim() === '') {
-    errors.push('Output mint is required');
+  if (!config.outputMint || config.outputMint.trim() === "") {
+    errors.push("Output mint is required");
   }
 
-  if (!config.maker || config.maker.trim() === '') {
-    errors.push('Maker address is required');
+  if (!config.maker || config.maker.trim() === "") {
+    errors.push("Maker address is required");
   }
 
   if (!config.makingAmount || parseFloat(config.makingAmount) <= 0) {
-    errors.push('Making amount must be greater than 0');
+    errors.push("Making amount must be greater than 0");
   }
 
   if (!config.takingAmount || parseFloat(config.takingAmount) <= 0) {
-    errors.push('Taking amount must be greater than 0');
+    errors.push("Taking amount must be greater than 0");
   }
 
-  if (config.slippageBps !== undefined && (config.slippageBps < 0 || config.slippageBps > 10000)) {
-    errors.push('Slippage must be between 0 and 10000 basis points');
+  if (
+    config.slippageBps !== undefined &&
+    (config.slippageBps < 0 || config.slippageBps > 10000)
+  ) {
+    errors.push("Slippage must be between 0 and 10000 basis points");
   }
 
   if (config.expiredAt !== undefined && config.expiredAt <= Date.now() / 1000) {
-    errors.push('Expiration time must be in the future');
+    errors.push("Expiration time must be in the future");
   }
 
   return {
     valid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
 /**
  * Create a map of wallet addresses to Keypair objects from FormattedWallet array
  */
-export const createKeypairMap = (wallets: FormattedWallet[]): Map<string, Keypair> => {
+export const createKeypairMap = (
+  wallets: FormattedWallet[],
+): Map<string, Keypair> => {
   console.info(`Creating keypair map for ${wallets.length} wallets`);
   const keypairMap = new Map<string, Keypair>();
-  
+
   wallets.forEach((wallet, index) => {
     try {
       // Decode the private key from base58
       const privateKeyBytes = bs58.decode(wallet.privateKey);
       const keypair = Keypair.fromSecretKey(privateKeyBytes);
-      
+
       // Map both the address and public key string to the keypair
       keypairMap.set(wallet.address, keypair);
       keypairMap.set(keypair.publicKey.toBase58(), keypair);
-      
-      console.info(`✅ Wallet ${index + 1}: ${wallet.address} -> keypair created`);
+
+      console.info(
+        `✅ Wallet ${index + 1}: ${wallet.address} -> keypair created`,
+      );
     } catch (error) {
-      console.error(`❌ Error creating keypair for wallet ${index + 1} (${wallet.address}):`, error);
+      console.error(
+        `❌ Error creating keypair for wallet ${index + 1} (${wallet.address}):`,
+        error,
+      );
     }
   });
-  
+
   console.info(`Keypair map created with ${keypairMap.size} entries`);
   return keypairMap;
 };
 
 /**
- * Send bundle to Jito block engine through backend proxy
+ * Send transactions and wrap result with success/error handling
  */
-const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
+const sendTransactionsWithResult = async (
+  transactions: string[],
+): Promise<BundleResult> => {
   try {
-    const baseUrl = getBaseUrl();
-    
-    if (!baseUrl) {
-      return {
-        success: false,
-        error: 'Trading server URL not configured'
-      };
-    }
+    console.info(`Sending ${transactions.length} transactions`);
 
-    console.info(`Sending bundle with ${encodedBundle.length} transactions to ${baseUrl}/v2/sol/send`);
-    
-    const response = await fetch(`${baseUrl}/v2/sol/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        transactions: encodedBundle
-      })
-    });
+    const result = await sendTransactions(transactions);
+    console.info("Send response:", result);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Bundle send failed with status ${response.status}:`, errorText);
-      return {
-        success: false,
-        error: `HTTP ${response.status}: ${errorText}`
-      };
-    }
-
-    const data = await response.json() as BundleResult;
-    console.info('Bundle send response:', data);
-    return data;
+    return {
+      success: true,
+      bundleId:
+        (result as { jito?: string; bundleId?: string })?.jito ||
+        (result as { jito?: string; bundleId?: string })?.bundleId,
+    };
   } catch (error) {
-    console.error('Error sending bundle:', error);
+    console.error("Error sending transactions:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
@@ -500,13 +518,18 @@ const sendBundle = async (encodedBundle: string[]): Promise<BundleResult> => {
  */
 export const completeBundleSigning = (
   bundleData: BundleSigningRequest,
-  walletKeypairs: Map<string, Keypair>
+  walletKeypairs: Map<string, Keypair>,
 ): LimitOrderBundle => {
-  console.info(`Starting bundle signing with ${bundleData.transactions?.length || 0} transactions and ${walletKeypairs.size} wallet keypairs`);
-  
+  console.info(
+    `Starting bundle signing with ${bundleData.transactions?.length || 0} transactions and ${walletKeypairs.size} wallet keypairs`,
+  );
+
   // Check if the bundle has valid transactions array
   if (!bundleData.transactions || !Array.isArray(bundleData.transactions)) {
-    console.error("Invalid bundle format, transactions property is missing or not an array:", bundleData);
+    console.error(
+      "Invalid bundle format, transactions property is missing or not an array:",
+      bundleData,
+    );
     return { transactions: [] };
   }
 
@@ -523,21 +546,24 @@ export const completeBundleSigning = (
         transactionBuffer = bs58.decode(txBase58);
       } catch {
         // If base58 fails, try base64
-        transactionBuffer = new Uint8Array(Buffer.from(txBase58, 'base64'));
+        transactionBuffer = new Uint8Array(Buffer.from(txBase58, "base64"));
       }
-      
+
       // Deserialize as VersionedTransaction (this is what the API returns)
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
-      
+
       // Find required signers from the transaction's static account keys
       const signers: Keypair[] = [];
-      
+
       // Check each account key to see if we have a matching keypair
-      transaction.message.staticAccountKeys.forEach(accountKey => {
+      transaction.message.staticAccountKeys.forEach((accountKey) => {
         const accountKeyStr = accountKey.toBase58();
         const matchingKeypair = walletKeypairs.get(accountKeyStr);
-        
-        if (matchingKeypair && !signers.some(s => s.publicKey.equals(matchingKeypair.publicKey))) {
+
+        if (
+          matchingKeypair &&
+          !signers.some((s) => s.publicKey.equals(matchingKeypair.publicKey))
+        ) {
           signers.push(matchingKeypair);
         }
       });
@@ -549,7 +575,7 @@ export const completeBundleSigning = (
 
       // Sign the versioned transaction
       transaction.sign(signers);
-      
+
       // Return the signed transaction as base58 (expected by the API)
       return bs58.encode(transaction.serialize());
     } catch (error) {
@@ -566,43 +592,49 @@ export const completeBundleSigning = (
  */
 export const sendBundleWithOrders = async (
   bundleData: BundleSigningRequest,
-  walletKeypairs: Map<string, Keypair>
+  walletKeypairs: Map<string, Keypair>,
 ): Promise<BundleResult> => {
   try {
-    console.info(`Processing bundle with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`);
-    
+    console.info(
+      `Processing bundle with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`,
+    );
+
     // Complete the bundle signing using the internal function
     const signedBundle = completeBundleSigning(bundleData, walletKeypairs);
-    
+
     if (signedBundle.transactions.length === 0) {
       return {
         success: false,
-        error: 'Failed to sign any transactions in the bundle'
+        error: "Failed to sign any transactions in the bundle",
       };
     }
 
-    console.info(`Successfully signed ${signedBundle.transactions.length} transactions`);
-    
+    console.info(
+      `Successfully signed ${signedBundle.transactions.length} transactions`,
+    );
+
     // Send the signed bundle
-    const result = await sendBundle(signedBundle.transactions);
-    
+    const result = await sendTransactionsWithResult(signedBundle.transactions);
+
     if (result.success) {
-      console.info('✅ Bundle sent successfully!');
-      
+      console.info("✅ Bundle sent successfully!");
+
       // Log order details for confirmation
       bundleData.orders.forEach((order, index) => {
-        console.info(`Order ${index + 1}: ${order.order} (Request ID: ${order.requestId})`);
+        console.info(
+          `Order ${index + 1}: ${order.order} (Request ID: ${order.requestId})`,
+        );
       });
     } else {
-      console.error('❌ Bundle failed to send:', result.error);
+      console.error("❌ Bundle failed to send:", result.error);
     }
-    
+
     return result;
   } catch (error) {
-    console.error('Error in sendBundleWithOrders:', error);
+    console.error("Error in sendBundleWithOrders:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
@@ -613,19 +645,19 @@ export const sendBundleWithOrders = async (
  */
 export const completeBundleSigningAndSend = async (
   bundleData: BundleSigningRequest,
-  wallets: FormattedWallet[]
+  wallets: FormattedWallet[],
 ): Promise<BundleResult> => {
   try {
     // Create keypair map from wallets
     const walletKeypairs = createKeypairMap(wallets);
-    
+
     // Send bundle with orders
     return await sendBundleWithOrders(bundleData, walletKeypairs);
   } catch (error) {
-    console.error('Error in completeBundleSigningAndSend:', error);
+    console.error("Error in completeBundleSigningAndSend:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
@@ -636,23 +668,27 @@ export const completeBundleSigningAndSend = async (
  */
 export const processLimitOrderBundle = async (
   limitOrderResponse: MultipleLimitOrdersResponse,
-  wallets: FormattedWallet[]
+  wallets: FormattedWallet[],
 ): Promise<BundleResult> => {
   try {
-    console.info('🚀 Starting processLimitOrderBundle...');
-    console.info('Response:', limitOrderResponse);
-    console.info('Wallets count:', wallets.length);
-    
+    console.info("🚀 Starting processLimitOrderBundle...");
+    console.info("Response:", limitOrderResponse);
+    console.info("Wallets count:", wallets.length);
+
     // Validate the response
-    if (!limitOrderResponse.success || !limitOrderResponse.orders || !limitOrderResponse.transactions) {
-      console.error('❌ Invalid limit order response format:', {
+    if (
+      !limitOrderResponse.success ||
+      !limitOrderResponse.orders ||
+      !limitOrderResponse.transactions
+    ) {
+      console.error("❌ Invalid limit order response format:", {
         success: limitOrderResponse.success,
         hasOrders: !!limitOrderResponse.orders,
-        hasTransactions: !!limitOrderResponse.transactions
+        hasTransactions: !!limitOrderResponse.transactions,
       });
       return {
         success: false,
-        error: 'Invalid limit order response format'
+        error: "Invalid limit order response format",
       };
     }
 
@@ -660,51 +696,54 @@ export const processLimitOrderBundle = async (
     const bundleData: BundleSigningRequest = {
       orders: limitOrderResponse.orders,
       transactions: limitOrderResponse.transactions,
-      errors: limitOrderResponse.errors || []
+      errors: limitOrderResponse.errors || [],
     };
 
-    console.info(`📦 Created bundle data with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`);
+    console.info(
+      `📦 Created bundle data with ${bundleData.orders.length} orders and ${bundleData.transactions.length} transactions`,
+    );
 
     // Complete bundle signing and send
     const result = await completeBundleSigningAndSend(bundleData, wallets);
-    
+
     if (result.success) {
-      console.info(`✅ Successfully processed limit order bundle with ${bundleData.orders.length} orders`);
+      console.info(
+        `✅ Successfully processed limit order bundle with ${bundleData.orders.length} orders`,
+      );
     } else {
       console.error(`❌ Failed to process limit order bundle: ${result.error}`);
     }
-    
+
     return result;
   } catch (error) {
-    console.error('Error in processLimitOrderBundle:', error);
+    console.error("Error in processLimitOrderBundle:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
-
 
 /**
  * Process cancel order transaction - sign and send as bundle
  */
 export const processCancelOrderTransaction = async (
   cancelResponse: CancelOrderResponse,
-  wallet: FormattedWallet
+  wallet: FormattedWallet,
 ): Promise<BundleResult> => {
   try {
-    console.info('🚀 Processing cancel order transaction...');
-    console.info('Cancel response:', cancelResponse);
-    
+    console.info("🚀 Processing cancel order transaction...");
+    console.info("Cancel response:", cancelResponse);
+
     // Validate the response
     if (!cancelResponse.success || !cancelResponse.transaction) {
-      console.error('❌ Invalid cancel order response format:', {
+      console.error("❌ Invalid cancel order response format:", {
         success: cancelResponse.success,
-        hasTransaction: !!cancelResponse.transaction
+        hasTransaction: !!cancelResponse.transaction,
       });
       return {
         success: false,
-        error: 'Invalid cancel order response format'
+        error: "Invalid cancel order response format",
       };
     }
 
@@ -713,30 +752,35 @@ export const processCancelOrderTransaction = async (
     try {
       // Try to decode as base58 first
       bs58.decode(cancelResponse.transaction);
-      console.info('Transaction is already in base58 format');
+      console.info("Transaction is already in base58 format");
     } catch {
       // If base58 decode fails, assume it's base64 and convert to base58
       try {
-        console.info('Converting transaction from base64 to base58...');
-        const transactionBuffer = new Uint8Array(Buffer.from(cancelResponse.transaction, 'base64'));
+        console.info("Converting transaction from base64 to base58...");
+        const transactionBuffer = new Uint8Array(
+          Buffer.from(cancelResponse.transaction, "base64"),
+        );
         transactionBase58 = bs58.encode(transactionBuffer);
-        console.info('✅ Successfully converted transaction to base58');
+        console.info("✅ Successfully converted transaction to base58");
       } catch (conversionError) {
-        console.error('❌ Failed to convert transaction encoding:', conversionError);
+        console.error(
+          "❌ Failed to convert transaction encoding:",
+          conversionError,
+        );
         return {
           success: false,
-          error: 'Failed to convert transaction encoding from base64 to base58'
+          error: "Failed to convert transaction encoding from base64 to base58",
         };
       }
     }
 
     // Create keypair from wallet
     const walletKeypairs = createKeypairMap([wallet]);
-    
+
     if (walletKeypairs.size === 0) {
       return {
         success: false,
-        error: 'Failed to create wallet keypair'
+        error: "Failed to create wallet keypair",
       };
     }
 
@@ -744,26 +788,30 @@ export const processCancelOrderTransaction = async (
     const bundleData: BundleSigningRequest = {
       orders: [], // No orders for cancel operation
       transactions: [transactionBase58],
-      errors: []
+      errors: [],
     };
 
-    console.info(`📦 Created bundle data with 1 cancel transaction (base58 encoded)`);
+    console.info(
+      `📦 Created bundle data with 1 cancel transaction (base58 encoded)`,
+    );
 
     // Complete bundle signing and send
     const result = await sendBundleWithOrders(bundleData, walletKeypairs);
-    
+
     if (result.success) {
       console.info(`✅ Successfully processed cancel order transaction`);
     } else {
-      console.error(`❌ Failed to process cancel order transaction: ${result.error}`);
+      console.error(
+        `❌ Failed to process cancel order transaction: ${result.error}`,
+      );
     }
-    
+
     return result;
   } catch (error) {
-    console.error('Error in processCancelOrderTransaction:', error);
+    console.error("Error in processCancelOrderTransaction:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };
@@ -773,28 +821,28 @@ export const processCancelOrderTransaction = async (
  */
 export const cancelOrderWithBundle = async (
   config: CancelOrderRequest,
-  wallet: FormattedWallet
+  wallet: FormattedWallet,
 ): Promise<BundleResult> => {
   try {
-    console.info('🚀 Starting cancel order with bundle processing...');
-    
+    console.info("🚀 Starting cancel order with bundle processing...");
+
     // First, get the cancel transaction from the API
     const cancelResponse = await cancelOrder(config);
-    
+
     if (!cancelResponse.success) {
       return {
         success: false,
-        error: cancelResponse.error || 'Failed to get cancel transaction'
+        error: cancelResponse.error || "Failed to get cancel transaction",
       };
     }
 
     // Process the transaction (sign and send as bundle)
     return await processCancelOrderTransaction(cancelResponse, wallet);
   } catch (error) {
-    console.error('Error in cancelOrderWithBundle:', error);
+    console.error("Error in cancelOrderWithBundle:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };

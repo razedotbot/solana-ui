@@ -39,6 +39,13 @@ const defaultConfig: ConfigType = {
   balanceRefreshStrategy: "batch",
   balanceRefreshBatchSize: "5",
   balanceRefreshDelay: "50",
+  // Transaction sending config
+  sendingMode: "server",
+  customRpcEndpoint: "",
+  customJitoSingleEndpoint: "",
+  customJitoBundleEndpoint: "",
+  singleTxMode: "rpc",
+  multiTxMode: "bundle",
 };
 
 interface AppContextProviderProps {

@@ -14,7 +14,7 @@ import { useToast } from "../../utils/hooks";
 import { loadConfigFromCookies } from "../../utils/storage";
 import * as web3 from "@solana/web3.js";
 import bs58 from "bs58";
-import { sendToJitoBundleService } from "../../utils/jitoService";
+import { sendTransactions } from "../../utils/transactionService";
 import type { ApiResponse } from "../../utils/types";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 
@@ -339,9 +339,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       const signedTransactionBs58 = bs58.encode(signedTransactionBuffer);
       // 3. Submit the signed transaction to Jito via the bundle service
       try {
-        const submitResult = await sendToJitoBundleService(
-          signedTransactionBs58,
-        );
+        const submitResult = await sendTransactions([signedTransactionBs58]);
         console.info(
           "Transaction successfully submitted to Jito:",
           submitResult,

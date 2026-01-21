@@ -388,8 +388,16 @@ export const Frame: React.FC<FrameProps> = ({
 
   // Restore cached state when view changes (using primitive dependencies)
   // Skip in multichart mode - Frame remounts with key so no caching needed
+  // Only run when view or token actually changes, not on every render
   useEffect(() => {
     if (isMultichartMode) return;
+
+    const prevView = previousViewRef.current;
+    const viewChanged = !prevView || prevView.view !== currentViewType || prevView.tokenMint !== currentTokenMint;
+
+    if (!viewChanged) return;
+
+    previousViewRef.current = { view: currentViewType, tokenMint: currentTokenMint };
 
     const cachedState = getViewState(currentViewType, currentTokenMint);
     if (cachedState) {
@@ -398,28 +406,24 @@ export const Frame: React.FC<FrameProps> = ({
       setCurrentWallets(cachedState.currentWallets);
       setRecentTrades(cachedState.recentTrades);
       setTokenPrice(cachedState.tokenPrice);
-    } else {
-      // Only clear state if switching to a different view (not just re-mounting)
-      const prevView = previousViewRef.current;
-      if (prevView && (prevView.view !== currentViewType || prevView.tokenMint !== currentTokenMint)) {
-        // Clear state when switching views (but cache will preserve it)
-        if (currentViewType === 'token' && currentTokenMint) {
-          // Only clear token-specific data when switching tokens
-          setTradingStats(null);
-          setSolPrice(null);
-          setCurrentWallets([]);
-          setRecentTrades([]);
-          setTokenPrice(null);
-        }
-      }
+    } else if (currentViewType === 'token' && currentTokenMint) {
+      // Only clear token-specific data when switching to a new token without cache
+      setTradingStats(null);
+      setSolPrice(null);
+      setCurrentWallets([]);
+      setRecentTrades([]);
+      setTokenPrice(null);
     }
-    previousViewRef.current = { view: currentViewType, tokenMint: currentTokenMint };
   }, [currentViewType, currentTokenMint, getViewState, isMultichartMode]);
 
   // Save state to cache whenever it changes (using primitive dependencies)
   // Skip in multichart mode - Frame remounts with key so no caching needed
   useEffect(() => {
     if (isMultichartMode) return;
+    // Don't save if there's nothing meaningful to save
+    if (!tradingStats && !solPrice && !tokenPrice && currentWallets.length === 0 && recentTrades.length === 0) {
+      return;
+    }
 
     const marketCap = calculateMarketCap(tokenPrice, solPrice);
     setViewState(currentViewType, {

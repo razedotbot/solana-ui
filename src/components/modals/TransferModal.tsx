@@ -28,7 +28,7 @@ import {
   formatTokenBalance,
 } from "../../utils/formatting";
 import { Buffer } from "buffer";
-import { sendToJitoBundleService } from "../../utils/jitoService";
+import { sendTransactions } from "../../utils/transactionService";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 
 interface WindowWithConfig {
@@ -417,9 +417,12 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
           // Step 4: Send the signed transaction via Jito Bundle Service
           const serializedTransaction = bs58.encode(transaction.serialize());
-          const jitoResult = (await sendToJitoBundleService(
+          const jitoResult = (await sendTransactions([
             serializedTransaction,
-          )) as { signature?: string; txid?: string };
+          ])) as {
+            signature?: string;
+            txid?: string;
+          };
 
           // Extract signature from Jito result
           const signature =

@@ -19,7 +19,6 @@ import {
   checkRateLimit,
   getServerBaseUrl,
   isSelfHostedServer,
-  sendBundle,
   completeBundleSigning,
   splitLargeBundles,
   createKeypairs,
@@ -28,6 +27,7 @@ import {
   processBatchResults,
   createBatchErrorMessage,
 } from "./trading";
+import { sendTransactions } from "./transactionService";
 
 export type {
   WalletSell,
@@ -190,7 +190,7 @@ const executeSellSingleMode = async (
 
         if (signedBundle.transactions.length > 0) {
           await checkRateLimit();
-          const result = await sendBundle(signedBundle.transactions);
+          const result = await sendTransactions(signedBundle.transactions);
           results.push(result);
         }
       }
@@ -257,7 +257,7 @@ const executeSellBatchMode = async (
       for (const bundle of signedBundles) {
         if (bundle.transactions.length > 0) {
           await checkRateLimit();
-          const result = await sendBundle(bundle.transactions);
+          const result = await sendTransactions(bundle.transactions);
           results.push(result);
         }
       }
@@ -344,7 +344,7 @@ const executeSellAllInOneMode = async (
     );
 
     try {
-      const result = await sendBundle(bundle.transactions);
+      const result = await sendTransactions(bundle.transactions);
       return { success: true, result };
     } catch {
       return { success: false };

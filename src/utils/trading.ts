@@ -3,10 +3,13 @@ import bs58 from "bs58";
 import type { WalletType } from "./types";
 import { loadConfigFromCookies } from "./storage";
 import { TRADING, RATE_LIMIT } from "./constants";
-import type { ApiResponse, BundleResult } from "./types";
+import type { BundleResult } from "./types";
 import { executeBuy, createBuyConfig } from "./buy";
 import type { BundleMode } from "./buy";
 import { executeSell, createSellConfig } from "./sell";
+
+// Re-export sendTransactions from transactionService for convenience
+export { sendTransactions } from "./transactionService";
 
 // ============================================================================
 // Shared Trading Types
@@ -91,35 +94,6 @@ export const getServerBaseUrl = (): string => {
 export const isSelfHostedServer = (): boolean => {
   const config = loadConfigFromCookies();
   return config?.tradingServerEnabled === "true";
-};
-
-// ============================================================================
-// Bundle Sending
-// ============================================================================
-
-/**
- * Send bundle to Jito block engine through backend proxy
- */
-export const sendBundle = async (
-  encodedBundle: string[],
-): Promise<BundleResult> => {
-  try {
-    const baseUrl = getServerBaseUrl();
-
-    const response = await fetch(`${baseUrl}/v2/sol/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        transactions: encodedBundle,
-      }),
-    });
-
-    const data = (await response.json()) as ApiResponse<BundleResult>;
-    return data.result as BundleResult;
-  } catch (error) {
-    console.error("[Trading] Error sending bundle:", error);
-    throw error;
-  }
 };
 
 // ============================================================================
