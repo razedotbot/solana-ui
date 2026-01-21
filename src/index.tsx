@@ -9,6 +9,7 @@ import logoImage from "./logo.png";
 import type { WindowWithToast, ServerInfo } from "./utils/types";
 import { AppContextProvider } from "./contexts";
 import { IframeStateProvider } from "./contexts/IframeStateContext";
+import { MultichartProvider } from "./contexts/MultichartContext";
 
 // Dynamic CSS loading based on brand configuration using Vite's import
 const loadBrandCSS = async (): Promise<void> => {
@@ -592,7 +593,8 @@ export const Root = (): JSX.Element => {
                 showToast={(window as WindowWithToast).showToast || (() => {})}
               >
                 <IframeStateProvider>
-                  {serverUrl ? (
+                  <MultichartProvider>
+                    {serverUrl ? (
                     <Suspense fallback={<ServerCheckLoading />}>
                       <Routes>
                         {/* Homepage */}
@@ -621,6 +623,7 @@ export const Root = (): JSX.Element => {
                       }}
                     />
                   )}
+                  </MultichartProvider>
                 </IframeStateProvider>
               </AppContextProvider>
             </ToastWrapper>

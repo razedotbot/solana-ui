@@ -46,6 +46,7 @@ import Split from "./components/Split";
 import { addRecentToken } from "./utils/recentTokens";
 import { useAppContext } from "./contexts";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
+import { MultichartLayout } from "./components/multichart/MultichartLayout";
 
 // Extend Window interface to include server-related properties
 declare global {
@@ -367,8 +368,11 @@ const WalletManager: React.FC = () => {
       // Switch to advanced: restore saved sizes
       setViewMode("advanced");
       setSplitSizes(savedAdvancedSizes);
+    } else if (viewMode === "advanced") {
+      // Switch to multichart
+      setViewMode("multichart");
     } else {
-      // Switch to simple: save current sizes and collapse left panel
+      // Switch back to simple: save current sizes and collapse left panel
       setSavedAdvancedSizes(splitSizes);
       saveSplitSizesToCookies(splitSizes);
       setViewMode("simple");
@@ -1104,7 +1108,34 @@ const WalletManager: React.FC = () => {
         {/* Desktop Layout - Only render when not mobile */}
         {!isMobile && (
           <div className="w-full h-full relative flex">
-            <Split
+            {viewMode === "multichart" ? (
+              <MultichartLayout
+                wallets={state.wallets}
+                setWallets={memoizedCallbacks.setWallets}
+                isLoadingChart={state.isLoadingChart}
+                transactionFee={state.config.transactionFee}
+                handleRefresh={handleRefresh}
+                solBalances={state.solBalances}
+                tokenBalances={state.tokenBalances}
+                currentMarketCap={state.currentMarketCap}
+                setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
+                isAutomateCardOpen={state.automateCard.isOpen}
+                automateCardPosition={state.automateCard.position}
+                setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
+                isAutomateCardDragging={state.automateCard.isDragging}
+                setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
+                iframeData={state.iframeData}
+                onTokenSelect={memoizedCallbacks.setTokenAddress}
+                onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                quickBuyEnabled={state.quickBuyEnabled}
+                quickBuyAmount={state.quickBuyAmount}
+                quickBuyMinAmount={state.quickBuyMinAmount}
+                quickBuyMaxAmount={state.quickBuyMaxAmount}
+                useQuickBuyRange={state.useQuickBuyRange}
+              />
+            ) : (
+              <>
+              <Split
               key={viewMode} // Force remount when switching modes to recreate gutter
               className="flex flex-1 h-full split-custom"
               sizes={splitSizes}
@@ -1258,6 +1289,8 @@ const WalletManager: React.FC = () => {
                         title={
                           viewMode === "simple"
                             ? "Switch to Advanced mode"
+                            : viewMode === "advanced"
+                            ? "Switch to Multichart mode"
                             : "Switch to Simple mode"
                         }
                       >
@@ -1266,7 +1299,7 @@ const WalletManager: React.FC = () => {
                           className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
                         />
                         <span className="text-xs font-mono color-primary font-medium tracking-wider">
-                          {viewMode === "simple" ? "SIMPLE" : "ADVANCED"}
+                          {viewMode === "simple" ? "SIMPLE" : viewMode === "advanced" ? "ADVANCED" : "MULTI"}
                         </span>
                       </button>
                     )}
@@ -1327,6 +1360,8 @@ const WalletManager: React.FC = () => {
                 iframeData={state.iframeData}
               />
             </div>
+            </>
+            )}
           </div>
         )}
 
