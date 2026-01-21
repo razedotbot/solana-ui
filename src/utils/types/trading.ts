@@ -55,9 +55,11 @@ export interface WalletSell {
 export interface BuyConfig {
   /** Token mint address to buy (base58 encoded) */
   tokenAddress: string;
-  /** Amount of SOL to spend per wallet */
-  solAmount: number;
-  /** Optional custom amounts per wallet (overrides solAmount) */
+  /** Amount of base currency to spend per wallet (SOL, USDC, or USD1) */
+  amount: number;
+  /** Input mint address for base currency (SOL, USDC, USD1) */
+  inputMint?: string;
+  /** Optional custom amounts per wallet (overrides amount) */
   amounts?: number[];
   /** Slippage tolerance in basis points (e.g., 100 = 1%) */
   slippageBps?: number;
@@ -193,10 +195,12 @@ export interface TradeHistoryEntry {
   tokenAddress: string;
   /** Number of wallets involved */
   walletsCount: number;
-  /** Amount traded (SOL for buy, percentage or tokens for sell) */
+  /** Amount traded (base currency for buy, percentage or tokens for sell) */
   amount: number;
-  /** Type of amount ('sol' or 'percentage') */
-  amountType: "sol" | "percentage";
+  /** Type of amount ('base-currency' or 'percentage') */
+  amountType: "base-currency" | "percentage";
+  /** Base currency mint used for the trade */
+  baseCurrencyMint?: string;
   /** Whether the trade was successful */
   success: boolean;
   /** Error message if trade failed */
@@ -220,7 +224,9 @@ export interface AddTradeHistoryInput {
   /** Amount traded */
   amount: number;
   /** Type of amount */
-  amountType: "sol" | "percentage";
+  amountType: "base-currency" | "percentage";
+  /** Base currency mint used */
+  baseCurrencyMint?: string;
   /** Whether the trade was successful */
   success: boolean;
   /** Error message if trade failed */
@@ -267,7 +273,7 @@ export interface TradingState {
 export interface TradingFormValues {
   /** Token address to trade */
   tokenAddress: string;
-  /** Amount for buy (in SOL) */
+  /** Amount for buy (in base currency) */
   buyAmount: string;
   /** Percentage for sell (0-100) */
   sellPercentage: string;

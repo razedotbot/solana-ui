@@ -7,7 +7,7 @@
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 import { loadConfigFromCookies } from "./storage";
-import { TRADING } from "./constants";
+import { TRADING, BASE_CURRENCIES } from "./constants";
 import type { ApiResponse } from "./types";
 import type {
   WalletBuy,
@@ -57,10 +57,22 @@ const getPartiallyPreparedTransactions = async (
     const baseUrl = getServerBaseUrl();
     const selfHosted = isSelfHostedServer();
 
+    // Determine if using SOL or stablecoin as input
+    const inputMint =
+      config.inputMint ||
+      appConfig?.baseCurrencyMint ||
+      BASE_CURRENCIES.SOL.mint;
+    const isNativeSOL = inputMint === BASE_CURRENCIES.SOL.mint;
+
     const requestBody: Record<string, unknown> = {
       tokenAddress: config.tokenAddress,
-      solAmount: config.solAmount,
+      amount: config.amount,
     };
+
+    // Add inputMint for non-SOL base currencies
+    if (!isNativeSOL) {
+      requestBody["inputMint"] = inputMint;
+    }
 
     if (selfHosted) {
       requestBody["walletPrivateKeys"] = wallets.map(
@@ -83,7 +95,12 @@ const getPartiallyPreparedTransactions = async (
     );
     Object.assign(requestBody, fees);
 
-    const response = await fetch(`${baseUrl}/v2/sol/buy`, {
+    // Use /v2/swap/buy for stablecoins, /v2/sol/buy for SOL
+    const endpoint = isNativeSOL
+      ? `${baseUrl}/v2/sol/buy`
+      : `${baseUrl}/v2/swap/buy`;
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
@@ -363,6 +380,12 @@ export const executeBuy = async (
       bundleMode = "all-in-one";
     }
 
+    // Get the input mint for trade history
+    const inputMint =
+      config.inputMint ||
+      appConfig?.baseCurrencyMint ||
+      BASE_CURRENCIES.SOL.mint;
+
     let result: BuyResult;
     switch (bundleMode) {
       case "single":
@@ -382,8 +405,9 @@ export const executeBuy = async (
       type: "buy",
       tokenAddress: config.tokenAddress,
       walletsCount: wallets.length,
-      amount: config.solAmount,
-      amountType: "sol",
+      amount: config.amount,
+      amountType: "base-currency",
+      baseCurrencyMint: inputMint,
       success: result.success,
       error: result.error,
       bundleMode,
@@ -391,6 +415,11 @@ export const executeBuy = async (
 
     return result;
   } catch (error) {
+    const appConfig = loadConfigFromCookies();
+    const inputMint =
+      config.inputMint ||
+      appConfig?.baseCurrencyMint ||
+      BASE_CURRENCIES.SOL.mint;
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error executing buy";
 
@@ -398,8 +427,9 @@ export const executeBuy = async (
       type: "buy",
       tokenAddress: config.tokenAddress,
       walletsCount: wallets.length,
-      amount: config.solAmount,
-      amountType: "sol",
+      amount: config.amount,
+      amountType: "base-currency",
+      baseCurrencyMint: inputMint,
       success: false,
       error: errorMessage,
       bundleMode: config.bundleMode || "batch",
@@ -420,13 +450,14 @@ export const validateBuyInputs = (
   wallets: WalletBuy[],
   config: BuyConfig,
   walletBalances: Map<string, number>,
+  baseCurrencySymbol: string = "SOL",
 ): { valid: boolean; error?: string } => {
   if (!config.tokenAddress) {
     return { valid: false, error: "Invalid token address" };
   }
 
-  if (isNaN(config.solAmount) || config.solAmount <= 0) {
-    return { valid: false, error: "Invalid SOL amount" };
+  if (isNaN(config.amount) || config.amount <= 0) {
+    return { valid: false, error: `Invalid ${baseCurrencySymbol} amount` };
   }
 
   if (config.amounts) {
@@ -466,12 +497,12 @@ export const validateBuyInputs = (
     const balance = walletBalances.get(wallet.address) || 0;
     const requiredAmount = config.amounts
       ? config.amounts[wallets.indexOf(wallet)]
-      : config.solAmount;
+      : config.amount;
 
     if (balance < requiredAmount) {
       return {
         valid: false,
-        error: `Wallet ${wallet.address.substring(0, 6)}... has insufficient balance`,
+        error: `Wallet ${wallet.address.substring(0, 6)}... has insufficient ${baseCurrencySymbol} balance`,
       };
     }
   }
@@ -484,7 +515,8 @@ export const validateBuyInputs = (
  */
 export const createBuyConfig = (config: {
   tokenAddress: string;
-  solAmount: number;
+  amount: number;
+  inputMint?: string;
   amounts?: number[];
   slippageBps?: number;
   jitoTipLamports?: number;
@@ -494,7 +526,8 @@ export const createBuyConfig = (config: {
   singleDelay?: number;
 }): BuyConfig => ({
   tokenAddress: config.tokenAddress,
-  solAmount: config.solAmount,
+  amount: config.amount,
+  inputMint: config.inputMint,
   amounts: config.amounts,
   slippageBps: config.slippageBps,
   jitoTipLamports: config.jitoTipLamports,

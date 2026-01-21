@@ -15,10 +15,12 @@ import { useToast } from "../../utils/hooks";
 import { getWalletDisplayName } from "../../utils/wallet";
 import type { WalletType, ComponentWalletAmount } from "../../utils/types";
 import {
-  batchDistributeSOL,
+  batchDistributeBaseCurrency,
   validateDistributionInputs,
 } from "../../utils/distribute";
-import { batchMixSOL, validateMixingInputs } from "../../utils/mixer";
+import { batchMixBaseCurrency, validateMixingInputs } from "../../utils/mixer";
+import type { BaseCurrencyConfig } from "../../utils/constants";
+import { BASE_CURRENCIES } from "../../utils/constants";
 
 type FundingMode = "distribute" | "mixer";
 
@@ -26,9 +28,10 @@ interface FundModalProps {
   isOpen: boolean;
   onClose: () => void;
   wallets: WalletType[];
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   connection: Connection;
   initialMode?: FundingMode;
+  baseCurrency?: BaseCurrencyConfig;
 }
 
 // Using ComponentWalletAmount from types (alias for modal form handling)
@@ -37,8 +40,9 @@ export const FundModal: React.FC<FundModalProps> = ({
   isOpen,
   onClose,
   wallets,
-  solBalances,
+  baseCurrencyBalances,
   initialMode = "distribute",
+  baseCurrency = BASE_CURRENCIES.SOL,
 }) => {
   // States for the modal
   const [currentStep, setCurrentStep] = useState(0);
@@ -64,12 +68,14 @@ export const FundModal: React.FC<FundModalProps> = ({
   const [sortDirection, setSortDirection] = useState("asc");
   const [balanceFilter, setBalanceFilter] = useState("all");
 
-  // Get wallet SOL balance by address
+  // Get wallet base currency balance by address
   const getWalletBalance = useCallback(
     (address: string): number => {
-      return solBalances.has(address) ? solBalances.get(address) || 0 : 0;
+      return baseCurrencyBalances.has(address)
+        ? baseCurrencyBalances.get(address) || 0
+        : 0;
     },
-    [solBalances],
+    [baseCurrencyBalances],
   );
 
   // Calculate total amount for all recipients
@@ -161,9 +167,9 @@ export const FundModal: React.FC<FundModalProps> = ({
     updateWalletAmounts();
   }, [useCustomAmounts, commonAmount, updateWalletAmounts]);
 
-  // Format SOL balance for display
-  const formatSolBalance = (balance: number): string => {
-    return balance.toFixed(4);
+  // Format base currency balance for display
+  const formatBalance = (balance: number): string => {
+    return baseCurrency.isNative ? balance.toFixed(4) : balance.toFixed(2);
   };
 
   // Get wallet by address
@@ -228,12 +234,14 @@ export const FundModal: React.FC<FundModalProps> = ({
           senderWallet,
           recipientWallets,
           senderBalance,
+          baseCurrency.symbol,
         );
       } else {
         validation = validateMixingInputs(
           senderWallet,
           recipientWallets,
           senderBalance,
+          baseCurrency.symbol,
         );
       }
 
@@ -246,14 +254,22 @@ export const FundModal: React.FC<FundModalProps> = ({
       // Execute the operation based on mode
       let result;
       if (fundingMode === "distribute") {
-        result = await batchDistributeSOL(senderWallet, recipientWallets);
+        result = await batchDistributeBaseCurrency(
+          senderWallet,
+          recipientWallets,
+          baseCurrency,
+        );
       } else {
-        result = await batchMixSOL(senderWallet, recipientWallets);
+        result = await batchMixBaseCurrency(
+          senderWallet,
+          recipientWallets,
+          baseCurrency,
+        );
       }
 
       if (result.success) {
         const modeText = fundingMode === "distribute" ? "distributed" : "mixed";
-        showToast(`SOL ${modeText} successfully`, "success");
+        showToast(`${baseCurrency.symbol} ${modeText} successfully`, "success");
         resetForm();
         onClose();
       } else {
@@ -390,8 +406,14 @@ export const FundModal: React.FC<FundModalProps> = ({
     infoTip: string;
   } => {
     return {
-      title: fundingMode === "distribute" ? "DISTRIBUTE SOL" : "SOL MIXER",
-      action: fundingMode === "distribute" ? "DISTRIBUTE SOL" : "MIX SOL",
+      title:
+        fundingMode === "distribute"
+          ? `DISTRIBUTE ${baseCurrency.symbol}`
+          : `${baseCurrency.symbol} MIXER`,
+      action:
+        fundingMode === "distribute"
+          ? `DISTRIBUTE ${baseCurrency.symbol}`
+          : `MIX ${baseCurrency.symbol}`,
       summaryTitle:
         fundingMode === "distribute"
           ? "DISTRIBUTION SUMMARY"
@@ -644,7 +666,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                       <div className="flex items-center gap-1 text-xs">
                         <DollarSign size={10} className="text-app-secondary" />
                         <span className="color-primary font-medium font-mono">
-                          {formatSolBalance(senderBalance)} SOL
+                          {formatBalance(senderBalance)} {baseCurrency.symbol}
                         </span>
                       </div>
                     )}
@@ -725,10 +747,10 @@ export const FundModal: React.FC<FundModalProps> = ({
                               {getWalletDisplayName(wallet)}
                             </span>
                             <span className="text-xs text-app-secondary font-mono">
-                              {formatSolBalance(
+                              {formatBalance(
                                 getWalletBalance(wallet.address) || 0,
                               )}{" "}
-                              SOL
+                              {baseCurrency.symbol}
                             </span>
                           </div>
                         </div>
@@ -865,10 +887,10 @@ export const FundModal: React.FC<FundModalProps> = ({
                               </div>
                             ) : (
                               <span className="text-xs text-app-secondary font-mono">
-                                {formatSolBalance(
+                                {formatBalance(
                                   getWalletBalance(wallet.address) || 0,
                                 )}{" "}
-                                SOL
+                                {baseCurrency.symbol}
                               </span>
                             )}
                           </div>
@@ -896,7 +918,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                         <span className="text-app-secondary font-mono">
                           EACH RECEIVES:{" "}
                           <span className="color-primary font-medium">
-                            {commonAmount} SOL
+                            {commonAmount} {baseCurrency.symbol}
                           </span>
                         </span>
                       )}
@@ -990,7 +1012,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                             <span
                               className={`text-sm font-semibold font-mono ${hasEnoughBalance ? "color-primary" : "text-error-alt"}`}
                             >
-                              {totalAmount.toFixed(4)} SOL
+                              {formatBalance(totalAmount)} {baseCurrency.symbol}
                             </span>
                           </div>
                           <div className="flex justify-between items-center mt-1">
@@ -998,7 +1020,8 @@ export const FundModal: React.FC<FundModalProps> = ({
                               REMAINING BALANCE:
                             </span>
                             <span className="text-sm text-app-primary font-mono">
-                              {(senderBalance - totalAmount).toFixed(4)} SOL
+                              {formatBalance(senderBalance - totalAmount)}{" "}
+                              {baseCurrency.symbol}
                             </span>
                           </div>
                           <div className="flex justify-between items-center mt-1">
@@ -1006,7 +1029,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                               EACH WALLET RECEIVES:
                             </span>
                             <span className="text-sm color-primary font-mono">
-                              {commonAmount} SOL
+                              {commonAmount} {baseCurrency.symbol}
                             </span>
                           </div>
                         </div>
@@ -1063,7 +1086,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                           <span
                             className={`text-sm font-semibold font-mono ${hasEnoughBalance ? "color-primary" : "text-error-alt"}`}
                           >
-                            {totalAmount.toFixed(4)} SOL
+                            {formatBalance(totalAmount)} {baseCurrency.symbol}
                           </span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
@@ -1071,7 +1094,8 @@ export const FundModal: React.FC<FundModalProps> = ({
                             REMAINING BALANCE:
                           </span>
                           <span className="text-sm text-app-primary font-mono">
-                            {(senderBalance - totalAmount).toFixed(4)} SOL
+                            {formatBalance(senderBalance - totalAmount)}{" "}
+                            {baseCurrency.symbol}
                           </span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
@@ -1160,7 +1184,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                         WALLET BALANCE:
                       </span>
                       <span className="text-sm text-app-primary font-mono">
-                        {formatSolBalance(senderBalance)} SOL
+                        {formatBalance(senderBalance)} {baseCurrency.symbol}
                       </span>
                     </div>
 
@@ -1179,7 +1203,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                           AMOUNT PER WALLET:
                         </span>
                         <span className="text-sm color-primary font-medium font-mono">
-                          {commonAmount} SOL
+                          {commonAmount} {baseCurrency.symbol}
                         </span>
                       </div>
                     )}
@@ -1200,7 +1224,7 @@ export const FundModal: React.FC<FundModalProps> = ({
                         {modeText.totalLabel}
                       </span>
                       <span className="text-sm font-semibold color-primary font-mono">
-                        {totalAmount.toFixed(4)} SOL
+                        {formatBalance(totalAmount)} {baseCurrency.symbol}
                       </span>
                     </div>
 
@@ -1209,7 +1233,8 @@ export const FundModal: React.FC<FundModalProps> = ({
                         REMAINING BALANCE:
                       </span>
                       <span className="text-sm text-app-primary font-mono">
-                        {(senderBalance - totalAmount).toFixed(4)} SOL
+                        {formatBalance(senderBalance - totalAmount)}{" "}
+                        {baseCurrency.symbol}
                       </span>
                     </div>
                   </div>
@@ -1276,13 +1301,13 @@ export const FundModal: React.FC<FundModalProps> = ({
                             <div className="flex items-center">
                               <span className="text-xs text-app-secondary mr-2 font-mono">
                                 CURRENT:{" "}
-                                {formatSolBalance(
+                                {formatBalance(
                                   getWalletBalance(wallet.address) || 0,
                                 )}{" "}
-                                SOL
+                                {baseCurrency.symbol}
                               </span>
                               <span className="text-xs color-primary font-mono">
-                                +{amount} SOL
+                                +{amount} {baseCurrency.symbol}
                               </span>
                             </div>
                           </div>

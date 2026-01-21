@@ -198,7 +198,7 @@ TabButton.displayName = "TabButton";
 // Wallet Selector Popup Component for FloatingTradingCard
 interface FloatingWalletSelectorProps {
   wallets: WalletType[];
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
   anchorRef: React.RefObject<HTMLButtonElement>;
   onClose: () => void;
@@ -209,7 +209,7 @@ interface FloatingWalletSelectorProps {
 
 const FloatingWalletSelector: React.FC<FloatingWalletSelectorProps> = ({
   wallets,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
   anchorRef,
   onClose,
@@ -279,7 +279,7 @@ const FloatingWalletSelector: React.FC<FloatingWalletSelectorProps> = ({
           {wallets
             .filter((w) => !w.isArchived)
             .map((wallet) => {
-              const solBal = solBalances.get(wallet.address) || 0;
+              const solBal = baseCurrencyBalances.get(wallet.address) || 0;
               const tokenBal = tokenBalances.get(wallet.address) || 0;
 
               return (
@@ -390,7 +390,7 @@ interface FloatingTradingCardProps {
   isLoading: boolean;
   countActiveWallets: (wallets: WalletType[]) => number;
   currentMarketCap: number | null;
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
 }
 
@@ -409,7 +409,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   handleTradeSubmit,
   isLoading,
   countActiveWallets,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
 }) => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -444,7 +444,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   const handleSelectAllWithBalance = (): void => {
     const walletsWithBalance = wallets.filter((wallet) => {
       if (wallet.isArchived) return false;
-      const solBal = solBalances.get(wallet.address) || 0;
+      const solBal = baseCurrencyBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
       return solBal > 0 || tokenBal > 0;
     });
@@ -456,7 +456,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     const allWithBalanceActive = walletsWithBalance.every((w) => w.isActive);
     const updatedWallets = wallets.map((wallet) => {
       if (wallet.isArchived) return wallet;
-      const solBal = solBalances.get(wallet.address) || 0;
+      const solBal = baseCurrencyBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
       const hasBalance = solBal > 0 || tokenBal > 0;
 
@@ -1009,7 +1009,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
         createPortal(
           <FloatingWalletSelector
             wallets={wallets}
-            solBalances={solBalances}
+            baseCurrencyBalances={baseCurrencyBalances}
             tokenBalances={tokenBalances}
             anchorRef={walletButtonRef}
             onClose={() => setShowWalletSelector(false)}

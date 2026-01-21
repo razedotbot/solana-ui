@@ -64,7 +64,7 @@ interface TokenMetadata {
 export const DeployPage: React.FC = () => {
   const {
     wallets: propWallets,
-    solBalances,
+    baseCurrencyBalances,
     refreshBalances,
   } = useAppContext();
   const { showToast } = useToast();
@@ -175,15 +175,15 @@ export const DeployPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const wallets = propWallets.filter(
-    (wallet) => (solBalances.get(wallet.address) || 0) > 0,
+    (wallet) => (baseCurrencyBalances.get(wallet.address) || 0) > 0,
   );
 
   // Refresh balances when page loads directly
   useEffect(() => {
-    if (propWallets.length > 0 && solBalances.size === 0) {
+    if (propWallets.length > 0 && baseCurrencyBalances.size === 0) {
       void refreshBalances();
     }
-  }, [propWallets, solBalances.size, refreshBalances]);
+  }, [propWallets, baseCurrencyBalances.size, refreshBalances]);
 
   useEffect(() => {
     setCurrentStep(0);
@@ -282,17 +282,19 @@ export const DeployPage: React.FC = () => {
     if (balanceFilter !== "all") {
       if (balanceFilter === "nonZero") {
         filtered = filtered.filter(
-          (wallet: WalletType) => (solBalances.get(wallet.address) || 0) > 0,
+          (wallet: WalletType) =>
+            (baseCurrencyBalances.get(wallet.address) || 0) > 0,
         );
       } else if (balanceFilter === "highBalance") {
         filtered = filtered.filter(
-          (wallet: WalletType) => (solBalances.get(wallet.address) || 0) >= 0.1,
+          (wallet: WalletType) =>
+            (baseCurrencyBalances.get(wallet.address) || 0) >= 0.1,
         );
       } else if (balanceFilter === "lowBalance") {
         filtered = filtered.filter(
           (wallet: WalletType) =>
-            (solBalances.get(wallet.address) || 0) < 0.1 &&
-            (solBalances.get(wallet.address) || 0) > 0,
+            (baseCurrencyBalances.get(wallet.address) || 0) < 0.1 &&
+            (baseCurrencyBalances.get(wallet.address) || 0) > 0,
         );
       }
     }
@@ -303,8 +305,8 @@ export const DeployPage: React.FC = () => {
           ? a.address.localeCompare(b.address)
           : b.address.localeCompare(a.address);
       } else if (sortOption === "balance") {
-        const balanceA = solBalances.get(a.address) || 0;
-        const balanceB = solBalances.get(b.address) || 0;
+        const balanceA = baseCurrencyBalances.get(a.address) || 0;
+        const balanceB = baseCurrencyBalances.get(b.address) || 0;
         return sortDirection === "asc"
           ? balanceA - balanceB
           : balanceB - balanceA;
@@ -1273,7 +1275,7 @@ export const DeployPage: React.FC = () => {
                     {selectedWallets.map((privateKey, index) => {
                       const wallet = getWalletByPrivateKey(privateKey);
                       const solBalance = wallet
-                        ? solBalances.get(wallet.address) || 0
+                        ? baseCurrencyBalances.get(wallet.address) || 0
                         : 0;
 
                       return (
@@ -1389,7 +1391,8 @@ export const DeployPage: React.FC = () => {
                       ),
                       searchTerm,
                     ).map((wallet: WalletType) => {
-                      const solBalance = solBalances.get(wallet.address) || 0;
+                      const solBalance =
+                        baseCurrencyBalances.get(wallet.address) || 0;
 
                       return (
                         <div
@@ -1616,7 +1619,7 @@ export const DeployPage: React.FC = () => {
                   {selectedWallets.map((key, index) => {
                     const wallet = getWalletByPrivateKey(key);
                     const solBalance = wallet
-                      ? solBalances.get(wallet.address) || 0
+                      ? baseCurrencyBalances.get(wallet.address) || 0
                       : 0;
 
                     return (

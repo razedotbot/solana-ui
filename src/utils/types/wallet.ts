@@ -156,10 +156,12 @@ export interface ConfigType {
   selectedDex: string;
   /** UI state for dropdown menu */
   isDropdownOpen: boolean;
-  /** Default buy amount in SOL */
+  /** Default buy amount in base currency */
   buyAmount: string;
   /** Default sell percentage */
   sellAmount: string;
+  /** Base currency mint address for trading (SOL, USDC, USD1) */
+  baseCurrencyMint: string;
   /** Slippage tolerance in basis points (e.g., "100" = 1%) */
   slippageBps: string;
   /** Default bundle mode preference ('single', 'batch', 'all-in-one') */

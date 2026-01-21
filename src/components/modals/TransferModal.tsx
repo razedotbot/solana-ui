@@ -22,14 +22,12 @@ import { useToast } from "../../utils/hooks";
 import type { WalletType } from "../../utils/types";
 import { getWalletDisplayName, fetchTokenBalance } from "../../utils/wallet";
 import { loadConfigFromCookies } from "../../utils/storage";
-import {
-  formatAddress,
-  formatSolBalance,
-  formatTokenBalance,
-} from "../../utils/formatting";
+import { formatAddress, formatTokenBalance } from "../../utils/formatting";
 import { Buffer } from "buffer";
 import { sendTransactions } from "../../utils/transactionService";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
+import type { BaseCurrencyConfig } from "../../utils/constants";
+import { BASE_CURRENCIES } from "../../utils/constants";
 
 interface WindowWithConfig {
   tradingServerUrl?: string;
@@ -39,20 +37,22 @@ interface TransferModalProps {
   isOpen: boolean;
   onClose: () => void;
   wallets: WalletType[];
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   connection: Connection;
   tokenAddress?: string; // Add tokenAddress prop
   tokenBalances?: Map<string, number>; // Add tokenBalances prop
+  baseCurrency?: BaseCurrencyConfig;
 }
 
 export const TransferModal: React.FC<TransferModalProps> = ({
   isOpen,
   onClose,
   wallets,
-  solBalances,
+  baseCurrencyBalances,
   connection: _connection,
   tokenAddress = "",
   tokenBalances = new Map(),
+  baseCurrency = BASE_CURRENCIES.SOL,
 }) => {
   // States for the modal
   const [currentStep, setCurrentStep] = useState(0);
@@ -67,7 +67,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const [selectedToken, setSelectedToken] = useState("");
   const [tokenAddressInput, setTokenAddressInput] = useState(""); // Local token address input
   const [amount, setAmount] = useState("");
-  const [transferType, setTransferType] = useState<"SOL" | "TOKEN">("SOL");
+  const [transferType, setTransferType] = useState<"BASE" | "TOKEN">("BASE");
   const [distributionMode, setDistributionMode] = useState<
     "percentage" | "amount"
   >("amount"); // How to distribute amounts
@@ -114,14 +114,21 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   useEffect(() => {
     if (transferType === "TOKEN" && tokenAddressInput) {
       setSelectedToken(tokenAddressInput);
-    } else if (transferType === "SOL") {
+    } else if (transferType === "BASE") {
       setSelectedToken("");
     }
   }, [transferType, tokenAddressInput]);
 
-  // Get wallet SOL balance by address
+  // Format balance for display
+  const formatBalance = (balance: number): string => {
+    return baseCurrency.isNative ? balance.toFixed(4) : balance.toFixed(2);
+  };
+
+  // Get wallet base currency balance by address
   const getWalletBalance = (address: string): number => {
-    return solBalances.has(address) ? (solBalances.get(address) ?? 0) : 0;
+    return baseCurrencyBalances.has(address)
+      ? (baseCurrencyBalances.get(address) ?? 0)
+      : 0;
   };
 
   // Get wallet token balance by address
@@ -274,7 +281,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         if (!wallet) return "0";
 
         const balance =
-          transferType === "SOL"
+          transferType === "BASE"
             ? getWalletBalance(wallet.address)
             : getWalletTokenBalance(wallet.address);
 
@@ -322,7 +329,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     setSelectedToken("");
     setTokenAddressInput("");
     setAmount("");
-    setTransferType("SOL");
+    setTransferType("BASE");
     setDistributionMode("amount");
     setTransferQueue([]);
     setCurrentTransferIndex(0);
@@ -496,7 +503,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
     // Filter based on transfer type and balance
     let filtered = walletList.filter((wallet) => {
-      if (transferType === "SOL") {
+      if (transferType === "BASE") {
         return (getWalletBalance(wallet.address) || 0) > 0;
       } else {
         // For custom tokens without fetched balances, show all wallets
@@ -517,7 +524,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     // Then apply additional balance filter
     if (balanceFilter !== "all") {
       if (balanceFilter === "highBalance") {
-        if (transferType === "SOL") {
+        if (transferType === "BASE") {
           filtered = filtered.filter(
             (wallet) => (getWalletBalance(wallet.address) || 0) >= 0.1,
           );
@@ -527,7 +534,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           );
         }
       } else if (balanceFilter === "lowBalance") {
-        if (transferType === "SOL") {
+        if (transferType === "BASE") {
           filtered = filtered.filter(
             (wallet) => (getWalletBalance(wallet.address) || 0) < 0.1,
           );
@@ -547,11 +554,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           : b.address.localeCompare(a.address);
       } else if (sortOption === "balance") {
         const balanceA =
-          transferType === "SOL"
+          transferType === "BASE"
             ? getWalletBalance(a.address) || 0
             : getWalletTokenBalance(a.address) || 0;
         const balanceB =
-          transferType === "SOL"
+          transferType === "BASE"
             ? getWalletBalance(b.address) || 0
             : getWalletTokenBalance(b.address) || 0;
         return sortDirection === "asc"
@@ -751,15 +758,15 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                     <div className="flex space-x-3">
                       <button
                         type="button"
-                        onClick={() => setTransferType("SOL")}
+                        onClick={() => setTransferType("BASE")}
                         className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn- ${
-                          transferType === "SOL"
+                          transferType === "BASE"
                             ? "bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40"
                             : "bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary"
                         }`}
                       >
                         <DollarSign size={16} className="mr-2" />
-                        SOL
+                        {baseCurrency.symbol}
                       </button>
                       <button
                         type="button"
@@ -928,17 +935,17 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                                   {getWalletDisplayName(wallet)}
                                 </span>
                                 <div className="flex items-center mt-0.5">
-                                  {transferType === "SOL" ? (
+                                  {transferType === "BASE" ? (
                                     <>
                                       <DollarSign
                                         size={12}
                                         className="text-app-secondary mr-1"
                                       />
                                       <span className="text-xs text-app-secondary font-mono">
-                                        {formatSolBalance(
+                                        {formatBalance(
                                           getWalletBalance(wallet.address) || 0,
                                         )}{" "}
-                                        SOL
+                                        {baseCurrency.symbol}
                                       </span>
                                     </>
                                   ) : (
@@ -1035,18 +1042,18 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                               <span className="font-mono text-sm text-app-primary">
                                 {formatAddress(address)}
                               </span>
-                              {transferType === "SOL" &&
-                                solBalances.has(address) && (
+                              {transferType === "BASE" &&
+                                baseCurrencyBalances.has(address) && (
                                   <div className="flex items-center mt-0.5">
                                     <DollarSign
                                       size={12}
                                       className="text-app-secondary mr-1"
                                     />
                                     <span className="text-xs text-app-secondary font-mono">
-                                      {formatSolBalance(
+                                      {formatBalance(
                                         getWalletBalance(address) || 0,
                                       )}{" "}
-                                      SOL
+                                      {baseCurrency.symbol}
                                     </span>
                                   </div>
                                 )}
@@ -1147,12 +1154,12 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                       placeholder={
                         distributionMode === "percentage"
                           ? "ENTER %"
-                          : `ENTER ${transferType}`
+                          : `ENTER ${transferType === "BASE" ? baseCurrency.symbol : "TOKEN"}`
                       }
                       step={
                         distributionMode === "percentage"
                           ? "0.1"
-                          : transferType === "SOL"
+                          : transferType === "BASE"
                             ? "0.0001"
                             : "1"
                       }
@@ -1173,7 +1180,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                                 const wallet =
                                   getWalletByPrivateKey(privateKey);
                                 if (!wallet) return 0;
-                                return transferType === "SOL"
+                                return transferType === "BASE"
                                   ? getWalletBalance(wallet.address) || 0
                                   : getWalletTokenBalance(wallet.address) || 0;
                               }),

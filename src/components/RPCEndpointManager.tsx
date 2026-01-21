@@ -150,7 +150,9 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
   }, [endpoints, onChange, isCheckingHealth]);
 
   // Check health of a single endpoint
-  const checkSingleEndpointHealth = async (endpointId: string) => {
+  const checkSingleEndpointHealth = async (
+    endpointId: string,
+  ): Promise<void> => {
     setCheckingEndpointId(endpointId);
 
     const endpoint = endpoints.find((e) => e.id === endpointId);
@@ -324,7 +326,9 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
   };
 
   // Get health status color and icon
-  const getHealthIndicator = (endpoint: RPCEndpoint) => {
+  const getHealthIndicator = (
+    endpoint: RPCEndpoint,
+  ): { color: string; bg: string; icon: React.ReactNode } => {
     if (!endpoint.isActive) {
       return {
         color: "text-app-secondary-40",
@@ -360,7 +364,8 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
           bg: "bg-red-500/20",
           icon: <WifiOff size={12} />,
         };
-      default:
+      case "unknown":
+      case undefined:
         return {
           color: "text-app-secondary-40",
           bg: "bg-app-secondary-20",
@@ -369,7 +374,7 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
     }
   };
 
-  const getLatencyColor = (latency?: number) => {
+  const getLatencyColor = (latency?: number): string => {
     if (latency === undefined || latency === Infinity)
       return "text-app-secondary-40";
     if (latency < 100) return "text-green-400";

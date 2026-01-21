@@ -5,7 +5,7 @@
  */
 
 import { loadConfigFromCookies } from "./storage";
-import { TRADING } from "./constants";
+import { TRADING, BASE_CURRENCIES } from "./constants";
 import type {
   WalletSell,
   BundleMode,
@@ -54,6 +54,13 @@ const getPartiallyPreparedSellTransactions = async (
     const baseUrl = getServerBaseUrl();
     const selfHosted = isSelfHostedServer();
 
+    // Determine output mint (what to sell tokens for)
+    const outputMint =
+      sellConfig.outputMint ||
+      config?.baseCurrencyMint ||
+      BASE_CURRENCIES.SOL.mint;
+    const isNativeSOL = outputMint === BASE_CURRENCIES.SOL.mint;
+
     const requestBody: Record<string, unknown> = {
       tokenAddress: sellConfig.tokenAddress,
     };
@@ -81,11 +88,17 @@ const getPartiallyPreparedSellTransactions = async (
     );
     Object.assign(requestBody, fees);
 
-    if (sellConfig.outputMint) {
-      requestBody["outputMint"] = sellConfig.outputMint;
+    // Always include outputMint for non-SOL base currencies
+    if (!isNativeSOL) {
+      requestBody["outputMint"] = outputMint;
     }
 
-    const response = await fetch(`${baseUrl}/v2/sol/sell`, {
+    // Use /v2/swap/sell for stablecoins, /v2/sol/sell for SOL
+    const endpoint = isNativeSOL
+      ? `${baseUrl}/v2/sol/sell`
+      : `${baseUrl}/v2/swap/sell`;
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
@@ -381,6 +394,12 @@ export const executeSell = async (
       bundleMode = "all-in-one";
     }
 
+    // Get the output mint for trade history
+    const outputMint =
+      sellConfig.outputMint ||
+      config?.baseCurrencyMint ||
+      BASE_CURRENCIES.SOL.mint;
+
     let result: SellResult;
     switch (bundleMode) {
       case "single":
@@ -400,8 +419,8 @@ export const executeSell = async (
       sellConfig.tokensAmount !== undefined
         ? sellConfig.tokensAmount
         : sellConfig.sellPercent;
-    const amountType: "sol" | "percentage" =
-      sellConfig.tokensAmount !== undefined ? "sol" : "percentage";
+    const amountType: "base-currency" | "percentage" =
+      sellConfig.tokensAmount !== undefined ? "base-currency" : "percentage";
 
     addTradeHistory({
       type: "sell",
@@ -409,6 +428,7 @@ export const executeSell = async (
       walletsCount: wallets.length,
       amount,
       amountType,
+      baseCurrencyMint: outputMint,
       success: result.success,
       error: result.error,
       bundleMode,
@@ -416,6 +436,11 @@ export const executeSell = async (
 
     return result;
   } catch (error) {
+    const config = loadConfigFromCookies();
+    const outputMint =
+      sellConfig.outputMint ||
+      config?.baseCurrencyMint ||
+      BASE_CURRENCIES.SOL.mint;
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error executing sell";
 
@@ -423,8 +448,8 @@ export const executeSell = async (
       sellConfig.tokensAmount !== undefined
         ? sellConfig.tokensAmount
         : sellConfig.sellPercent;
-    const amountType: "sol" | "percentage" =
-      sellConfig.tokensAmount !== undefined ? "sol" : "percentage";
+    const amountType: "base-currency" | "percentage" =
+      sellConfig.tokensAmount !== undefined ? "base-currency" : "percentage";
 
     addTradeHistory({
       type: "sell",
@@ -432,6 +457,7 @@ export const executeSell = async (
       walletsCount: wallets.length,
       amount,
       amountType,
+      baseCurrencyMint: outputMint,
       success: false,
       error: errorMessage,
       bundleMode: sellConfig.bundleMode || "batch",

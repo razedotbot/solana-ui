@@ -12,6 +12,7 @@ import {
 import { brand } from "./utils/brandConfig";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import type { WalletType, IframeData } from "./utils/types";
+import type { BaseCurrencyConfig } from "./utils/constants";
 import { useToast } from "./utils/hooks";
 import { countActiveWallets } from "./utils/wallet";
 import { toggleWallet, getWalletDisplayName } from "./utils/wallet";
@@ -58,8 +59,9 @@ interface ActionsPageProps {
   handleRefresh: () => void;
   wallets: WalletType[];
   setWallets: (wallets: WalletType[]) => void;
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
+  baseCurrency: BaseCurrencyConfig;
   currentMarketCap: number | null;
   setCalculatePNLModalOpen: (open: boolean) => void;
   // Automate card state props
@@ -472,8 +474,9 @@ LatestTrades.displayName = "LatestTrades";
 // Wallet Selector Popup Component for Actions page
 interface ActionsWalletSelectorProps {
   wallets: WalletType[];
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
+  baseCurrency: BaseCurrencyConfig;
   anchorRef: React.RefObject<HTMLDivElement>;
   onClose: () => void;
   onToggleWallet: (id: number) => void;
@@ -483,8 +486,9 @@ interface ActionsWalletSelectorProps {
 
 const ActionsWalletSelector: React.FC<ActionsWalletSelectorProps> = ({
   wallets,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
+  baseCurrency: _baseCurrency,
   anchorRef,
   onClose,
   onToggleWallet,
@@ -553,7 +557,7 @@ const ActionsWalletSelector: React.FC<ActionsWalletSelectorProps> = ({
           {wallets
             .filter((w) => !w.isArchived)
             .map((wallet) => {
-              const solBal = solBalances.get(wallet.address) || 0;
+              const solBal = baseCurrencyBalances.get(wallet.address) || 0;
               const tokenBal = tokenBalances.get(wallet.address) || 0;
 
               return (
@@ -641,8 +645,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   setTokenAddress,
   wallets,
   setWallets,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
+  baseCurrency,
   currentMarketCap,
   setCalculatePNLModalOpen,
   iframeData,
@@ -702,7 +707,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const handleSelectAllWithBalance = useCallback((): void => {
     const walletsWithBalance = wallets.filter((wallet) => {
       if (wallet.isArchived) return false;
-      const solBal = solBalances.get(wallet.address) || 0;
+      const solBal = baseCurrencyBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
       return solBal > 0 || tokenBal > 0;
     });
@@ -715,7 +720,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     const allWithBalanceActive = walletsWithBalance.every((w) => w.isActive);
     const updatedWallets = wallets.map((wallet) => {
       if (wallet.isArchived) return wallet;
-      const solBal = solBalances.get(wallet.address) || 0;
+      const solBal = baseCurrencyBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
       const hasBalance = solBal > 0 || tokenBal > 0;
 
@@ -728,7 +733,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
 
     setWallets(updatedWallets);
     saveWalletsToCookies(updatedWallets);
-  }, [wallets, solBalances, tokenBalances, setWallets, showToast]);
+  }, [wallets, baseCurrencyBalances, tokenBalances, setWallets, showToast]);
 
   // Handler to open floating card
   const handleOpenFloating = useCallback(() => {
@@ -785,7 +790,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           wallets,
           config,
           isBuyMode,
-          solBalances,
+          baseCurrencyBalances,
         );
 
         if (result.success) {
@@ -808,7 +813,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         setIsLoading(false);
       }
     },
-    [tokenAddress, selectedDex, solBalances, showToast, setIsLoading],
+    [tokenAddress, selectedDex, baseCurrencyBalances, showToast, setIsLoading],
   );
 
   // Wrapper for FloatingTradingCard's handleTradeSubmit signature
@@ -1004,8 +1009,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             isLoading={isLoading}
             countActiveWallets={countActiveWallets}
             currentMarketCap={currentMarketCap}
-            solBalances={solBalances}
+            baseCurrencyBalances={baseCurrencyBalances}
             tokenBalances={tokenBalances}
+            baseCurrency={baseCurrency}
             solPrice={iframeData?.solPrice ?? null}
             onOpenFloating={handleOpenFloating}
             isFloatingCardOpen={isFloatingCardOpen}
@@ -1292,7 +1298,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           isLoading={isLoading}
           countActiveWallets={countActiveWallets}
           currentMarketCap={currentMarketCap}
-          solBalances={solBalances}
+          baseCurrencyBalances={baseCurrencyBalances}
           tokenBalances={tokenBalances}
         />
       )}
@@ -1303,8 +1309,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         createPortal(
           <ActionsWalletSelector
             wallets={wallets}
-            solBalances={solBalances}
+            baseCurrencyBalances={baseCurrencyBalances}
             tokenBalances={tokenBalances}
+            baseCurrency={baseCurrency}
             anchorRef={activeWalletsRef}
             onClose={() => setShowWalletSelector(false)}
             onToggleWallet={handleToggleWallet}

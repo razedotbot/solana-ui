@@ -34,13 +34,13 @@ import type {
   MasterWallet,
   CustomQuickTradeSettings,
 } from "../utils/types";
-import { formatAddress } from "../utils/formatting";
+import { formatAddress, formatBaseCurrencyBalance } from "../utils/formatting";
 import {
   copyToClipboard,
   downloadPrivateKey,
   deleteWallet,
   importWallet,
-  fetchSolBalance,
+  fetchBaseCurrencyBalance,
   downloadAllWallets,
   handleCleanupWallets,
   saveMasterWallets,
@@ -81,8 +81,9 @@ export const WalletsPage: React.FC = () => {
   const {
     wallets,
     setWallets,
-    solBalances,
-    setSolBalances,
+    baseCurrencyBalances,
+    setBaseCurrencyBalances,
+    baseCurrency,
     connection,
     refreshBalances,
     isRefreshing,
@@ -311,10 +312,14 @@ export const WalletsPage: React.FC = () => {
         const newWallets = [...wallets, wallet];
         setWallets(newWallets);
 
-        const solBalance = await fetchSolBalance(connection, wallet.address);
-        const newSolBalances = new Map(solBalances);
-        newSolBalances.set(wallet.address, solBalance);
-        setSolBalances(newSolBalances);
+        const balance = await fetchBaseCurrencyBalance(
+          connection,
+          wallet.address,
+          baseCurrency,
+        );
+        const newBalances = new Map(baseCurrencyBalances);
+        newBalances.set(wallet.address, balance);
+        setBaseCurrencyBalances(newBalances);
 
         showToast("Wallet imported successfully", "success");
       } else {
@@ -333,14 +338,18 @@ export const WalletsPage: React.FC = () => {
 
     try {
       // Fetch balance first
-      const solBalance = await fetchSolBalance(connection, wallet.address);
+      const balance = await fetchBaseCurrencyBalance(
+        connection,
+        wallet.address,
+        baseCurrency,
+      );
 
       // Use functional updates to ensure we're working with the latest state
       // This is critical when creating multiple wallets in sequence
-      setSolBalances((prevBalances) => {
-        const newSolBalances = new Map(prevBalances);
-        newSolBalances.set(wallet.address, solBalance);
-        return newSolBalances;
+      setBaseCurrencyBalances((prevBalances) => {
+        const newBalances = new Map(prevBalances);
+        newBalances.set(wallet.address, balance);
+        return newBalances;
       });
 
       // Add wallet to list using functional update to handle concurrent additions
@@ -472,7 +481,7 @@ export const WalletsPage: React.FC = () => {
     }
 
     const importedWallets: WalletType[] = [];
-    const newSolBalances = new Map(solBalances);
+    const newSolBalances = new Map(baseCurrencyBalances);
 
     // Import private keys
     for (const key of foundKeys) {
@@ -486,8 +495,12 @@ export const WalletsPage: React.FC = () => {
 
         importedWallets.push(wallet);
 
-        const solBalance = await fetchSolBalance(connection, wallet.address);
-        newSolBalances.set(wallet.address, solBalance);
+        const balance = await fetchBaseCurrencyBalance(
+          connection,
+          wallet.address,
+          baseCurrency,
+        );
+        newSolBalances.set(wallet.address, balance);
 
         await new Promise((resolve) => setTimeout(resolve, 10));
       } catch (error) {
@@ -506,7 +519,7 @@ export const WalletsPage: React.FC = () => {
       }
     }
 
-    setSolBalances(newSolBalances);
+    setBaseCurrencyBalances(newSolBalances);
 
     if (importedWallets.length === 0 && foundMnemonics.length === 0) {
       throw new Error("No new wallets could be imported");
@@ -536,13 +549,14 @@ export const WalletsPage: React.FC = () => {
 
       const masterWallet = createHDWalletFromMaster(newMasterWallet, 0);
       const newWallets: WalletType[] = [masterWallet];
-      const newSolBalances = new Map(solBalances);
+      const newSolBalances = new Map(baseCurrencyBalances);
 
-      const solBalance = await fetchSolBalance(
+      const balance = await fetchBaseCurrencyBalance(
         connection,
         masterWallet.address,
+        baseCurrency,
       );
-      newSolBalances.set(masterWallet.address, solBalance);
+      newSolBalances.set(masterWallet.address, balance);
 
       newMasterWallet.accountCount = 1;
 
@@ -552,7 +566,7 @@ export const WalletsPage: React.FC = () => {
 
       const allWallets = [...wallets, ...newWallets];
       setWallets(allWallets);
-      setSolBalances(newSolBalances);
+      setBaseCurrencyBalances(newSolBalances);
 
       showToast("Master wallet created with primary wallet", "success");
     } catch (error) {
@@ -573,13 +587,14 @@ export const WalletsPage: React.FC = () => {
 
       const masterWallet = createHDWalletFromMaster(newMasterWallet, 0);
       const newWallets: WalletType[] = [masterWallet];
-      const newSolBalances = new Map(solBalances);
+      const newSolBalances = new Map(baseCurrencyBalances);
 
-      const solBalance = await fetchSolBalance(
+      const balance = await fetchBaseCurrencyBalance(
         connection,
         masterWallet.address,
+        baseCurrency,
       );
-      newSolBalances.set(masterWallet.address, solBalance);
+      newSolBalances.set(masterWallet.address, balance);
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -606,8 +621,12 @@ export const WalletsPage: React.FC = () => {
           };
           newWallets.push(wallet);
 
-          const solBalance = await fetchSolBalance(connection, wallet.address);
-          newSolBalances.set(wallet.address, solBalance);
+          const walletBalance = await fetchBaseCurrencyBalance(
+            connection,
+            wallet.address,
+            baseCurrency,
+          );
+          newSolBalances.set(wallet.address, walletBalance);
 
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
@@ -623,7 +642,7 @@ export const WalletsPage: React.FC = () => {
 
       const allWallets = [...wallets, ...newWallets];
       setWallets(allWallets);
-      setSolBalances(newSolBalances);
+      setBaseCurrencyBalances(newSolBalances);
 
       const totalWallets = initialWalletCount + 1;
       showToast(
@@ -740,12 +759,12 @@ export const WalletsPage: React.FC = () => {
 
       switch (sortField) {
         case "solBalance":
-          aValue = solBalances.get(a.address) || 0;
-          bValue = solBalances.get(b.address) || 0;
+          aValue = baseCurrencyBalances.get(a.address) || 0;
+          bValue = baseCurrencyBalances.get(b.address) || 0;
           break;
         default:
-          aValue = solBalances.get(a.address) || 0;
-          bValue = solBalances.get(b.address) || 0;
+          aValue = baseCurrencyBalances.get(a.address) || 0;
+          bValue = baseCurrencyBalances.get(b.address) || 0;
       }
 
       return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
@@ -756,7 +775,7 @@ export const WalletsPage: React.FC = () => {
     sortDirection,
     searchTerm,
     labelSearchTerm,
-    solBalances,
+    baseCurrencyBalances,
     showArchived,
     viewMode,
   ]);
@@ -808,12 +827,12 @@ export const WalletsPage: React.FC = () => {
 
       switch (field) {
         case "solBalance":
-          aValue = solBalances.get(a.address) || 0;
-          bValue = solBalances.get(b.address) || 0;
+          aValue = baseCurrencyBalances.get(a.address) || 0;
+          bValue = baseCurrencyBalances.get(b.address) || 0;
           break;
         default:
-          aValue = solBalances.get(a.address) || 0;
-          bValue = solBalances.get(b.address) || 0;
+          aValue = baseCurrencyBalances.get(a.address) || 0;
+          bValue = baseCurrencyBalances.get(b.address) || 0;
       }
 
       return newDirection === "asc" ? aValue - bValue : bValue - aValue;
@@ -1068,11 +1087,11 @@ export const WalletsPage: React.FC = () => {
   // Calculate totals excluding archived wallets
   const nonArchivedWallets = wallets.filter((w) => !w.isArchived);
   const totalSOL = nonArchivedWallets.reduce(
-    (sum, wallet) => sum + (solBalances.get(wallet.address) || 0),
+    (sum, wallet) => sum + (baseCurrencyBalances.get(wallet.address) || 0),
     0,
   );
   const activeWallets = nonArchivedWallets.filter(
-    (w) => (solBalances.get(w.address) || 0) > 0,
+    (w) => (baseCurrencyBalances.get(w.address) || 0) > 0,
   ).length;
   const archivedCount = wallets.filter((w) => w.isArchived).length;
 
@@ -1117,10 +1136,10 @@ export const WalletsPage: React.FC = () => {
                 </div>
                 <div className="text-center">
                   <div className="color-primary font-bold text-xs sm:text-sm">
-                    {totalSOL.toFixed(4)}
+                    {formatBaseCurrencyBalance(totalSOL, baseCurrency)}
                   </div>
                   <div className="text-app-secondary-80 text-[10px] sm:text-xs">
-                    TOTAL SOL
+                    TOTAL {baseCurrency.symbol}
                   </div>
                 </div>
                 <div className="text-center">
@@ -1185,7 +1204,7 @@ export const WalletsPage: React.FC = () => {
                     try {
                       await refreshBalances();
                       // Force a re-render by creating a new Map reference
-                      setSolBalances((prev) => new Map(prev));
+                      setBaseCurrencyBalances((prev) => new Map(prev));
                       showToast("Balances refreshed", "success");
                     } catch (error) {
                       console.error("Error refreshing balances:", error);
@@ -1258,10 +1277,13 @@ export const WalletsPage: React.FC = () => {
                           </WalletTooltip>
                           <span>
                             (
-                            {(
-                              solBalances.get(masterWalletAccount.address) || 0
-                            ).toFixed(4)}{" "}
-                            SOL)
+                            {formatBaseCurrencyBalance(
+                              baseCurrencyBalances.get(
+                                masterWalletAccount.address,
+                              ) || 0,
+                              baseCurrency,
+                            )}{" "}
+                            {baseCurrency.symbol})
                           </span>
                         </div>
                       ) : null;
@@ -1328,10 +1350,11 @@ export const WalletsPage: React.FC = () => {
                               {formatAddress(wallet.address)}
                             </span>
                             <span className="text-app-secondary-80">
-                              {(solBalances.get(wallet.address) || 0).toFixed(
-                                3,
+                              {formatBaseCurrencyBalance(
+                                baseCurrencyBalances.get(wallet.address) || 0,
+                                baseCurrency,
                               )}{" "}
-                              SOL
+                              {baseCurrency.symbol}
                             </span>
                           </div>
                         );
@@ -1441,7 +1464,7 @@ export const WalletsPage: React.FC = () => {
                   onClick={() =>
                     handleCleanupWallets(
                       wallets,
-                      solBalances,
+                      baseCurrencyBalances,
                       new Map<string, number>(),
                       setWallets,
                       showToast,
@@ -1494,7 +1517,10 @@ export const WalletsPage: React.FC = () => {
                   </button>
                 </WalletTooltip>
 
-                <WalletTooltip content="Consolidate SOL" position="bottom">
+                <WalletTooltip
+                  content={`Consolidate ${baseCurrency.symbol}`}
+                  position="bottom"
+                >
                   <button
                     onClick={() => setActiveModal("consolidate")}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
@@ -1530,7 +1556,10 @@ export const WalletsPage: React.FC = () => {
                   </button>
                 </WalletTooltip>
 
-                <WalletTooltip content="Deposit SOL" position="bottom">
+                <WalletTooltip
+                  content={`Deposit ${baseCurrency.symbol}`}
+                  position="bottom"
+                >
                   <button
                     onClick={() => setActiveModal("deposit")}
                     className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
@@ -1696,7 +1725,7 @@ export const WalletsPage: React.FC = () => {
                         onClick={() => handleSort("solBalance")}
                         className="flex items-center gap-1 sm:gap-2 text-app-secondary-80 hover:color-primary transition-colors touch-manipulation text-[10px] sm:text-xs"
                       >
-                        SOL BALANCE
+                        {baseCurrency.symbol} BALANCE
                         <SortIcon field="solBalance" />
                       </button>
                     </th>
@@ -1713,7 +1742,8 @@ export const WalletsPage: React.FC = () => {
                 <tbody>
                   {filteredAndSortedWallets.map((wallet) => {
                     const isSelected = selectedWallets.has(wallet.id);
-                    const solBalance = solBalances.get(wallet.address) || 0;
+                    const solBalance =
+                      baseCurrencyBalances.get(wallet.address) || 0;
                     const isDragging = draggedWalletId === wallet.id;
                     const isDragOver = dragOverWalletId === wallet.id;
 
@@ -2072,7 +2102,7 @@ export const WalletsPage: React.FC = () => {
               isOpen={activeModal === "distribute" || activeModal === "mixer"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
-              solBalances={solBalances}
+              baseCurrencyBalances={baseCurrencyBalances}
               connection={connection}
               initialMode={activeModal === "mixer" ? "mixer" : "distribute"}
             />
@@ -2081,7 +2111,7 @@ export const WalletsPage: React.FC = () => {
               isOpen={activeModal === "consolidate"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
-              solBalances={solBalances}
+              baseCurrencyBalances={baseCurrencyBalances}
               connection={connection}
             />
 
@@ -2089,7 +2119,7 @@ export const WalletsPage: React.FC = () => {
               isOpen={activeModal === "transfer"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
-              solBalances={solBalances}
+              baseCurrencyBalances={baseCurrencyBalances}
               connection={connection}
             />
 
@@ -2097,8 +2127,8 @@ export const WalletsPage: React.FC = () => {
               isOpen={activeModal === "deposit"}
               onClose={() => setActiveModal(null)}
               wallets={wallets}
-              solBalances={solBalances}
-              setSolBalances={setSolBalances}
+              baseCurrencyBalances={baseCurrencyBalances}
+              setBaseCurrencyBalances={setBaseCurrencyBalances}
               connection={connection}
             />
 
@@ -2109,7 +2139,7 @@ export const WalletsPage: React.FC = () => {
                 setBurnTokenBalances(new Map());
               }}
               tokenAddress={burnTokenAddress}
-              solBalances={solBalances}
+              baseCurrencyBalances={baseCurrencyBalances}
               tokenBalances={burnTokenBalances}
             />
           </>

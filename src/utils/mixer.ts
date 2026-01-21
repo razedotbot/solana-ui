@@ -2,6 +2,8 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
+import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
+import { loadConfigFromCookies } from "./storage";
 
 interface WalletMixing {
   address: string;
@@ -24,18 +26,31 @@ interface WindowWithConfig {
 const getPartiallySignedTransactions = async (
   senderAddress: string,
   recipients: { address: string; amount: string }[],
+  baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
   try {
     const baseUrl =
       (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
 
-    const response = await fetch(`${baseUrl}/v2/sol/mixer`, {
+    const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
+    const endpoint = isNativeSOL
+      ? `${baseUrl}/v2/sol/mixer`
+      : `${baseUrl}/v2/token/mixer`;
+
+    const requestBody: Record<string, unknown> = {
+      sender: senderAddress,
+      recipients: recipients,
+    };
+
+    // Add token mint for non-native currencies
+    if (!isNativeSOL) {
+      requestBody["tokenMint"] = baseCurrency.mint;
+    }
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sender: senderAddress,
-        recipients: recipients,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -151,15 +166,27 @@ const prepareMixingBundles = (signedTransactions: string[]): MixingBundle[] => {
 };
 
 /**
- * Execute SOL mixing to a single recipient
+ * Execute base currency mixing to a single recipient (SOL, USDC, USD1)
  */
-export const mixSOLToSingleRecipient = async (
+export const mixBaseCurrencyToSingleRecipient = async (
   senderWallet: WalletMixing,
   recipientWallet: WalletMixing,
+  baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
+    // Get base currency from config if not provided
+    const config = loadConfigFromCookies();
+    const currency =
+      baseCurrency ||
+      (config?.baseCurrencyMint
+        ? Object.values(BASE_CURRENCIES).find(
+            (c) => c.mint === config.baseCurrencyMint,
+          )
+        : BASE_CURRENCIES.SOL) ||
+      BASE_CURRENCIES.SOL;
+
     console.info(
-      `Preparing to mix ${recipientWallet.amount} SOL from ${senderWallet.address} to ${recipientWallet.address}`,
+      `Preparing to mix ${recipientWallet.amount} ${currency.symbol} from ${senderWallet.address} to ${recipientWallet.address}`,
     );
 
     // Convert single recipient wallet to backend format
@@ -175,6 +202,7 @@ export const mixSOLToSingleRecipient = async (
     const partiallySignedTransactions = await getPartiallySignedTransactions(
       senderWallet.address,
       recipients,
+      currency,
     );
     console.info(
       `Received ${partiallySignedTransactions.length} partially signed transactions from backend`,
@@ -231,7 +259,7 @@ export const mixSOLToSingleRecipient = async (
       result: results,
     };
   } catch (error) {
-    console.error("SOL mixing error:", error);
+    console.error("Mixing error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -240,19 +268,33 @@ export const mixSOLToSingleRecipient = async (
 };
 
 /**
- * Legacy function - Execute SOL mixing (kept for backward compatibility)
+ * @deprecated Use mixBaseCurrencyToSingleRecipient instead
  */
-export const mixSOL = async (
+export const mixSOLToSingleRecipient = mixBaseCurrencyToSingleRecipient;
+
+/**
+ * Execute base currency mixing (kept for backward compatibility)
+ */
+export const mixBaseCurrency = async (
   senderWallet: WalletMixing,
   recipientWallets: WalletMixing[],
+  baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   // If only one recipient, use the optimized single recipient function
   if (recipientWallets.length === 1) {
-    return await mixSOLToSingleRecipient(senderWallet, recipientWallets[0]);
+    return await mixBaseCurrencyToSingleRecipient(
+      senderWallet,
+      recipientWallets[0],
+      baseCurrency,
+    );
   }
 
   // For multiple recipients, delegate to batch processing
-  const batchResult = await batchMixSOL(senderWallet, recipientWallets);
+  const batchResult = await batchMixBaseCurrency(
+    senderWallet,
+    recipientWallets,
+    baseCurrency,
+  );
   return {
     success: batchResult.success,
     result: batchResult.results,
@@ -261,12 +303,18 @@ export const mixSOL = async (
 };
 
 /**
+ * @deprecated Use mixBaseCurrency instead
+ */
+export const mixSOL = mixBaseCurrency;
+
+/**
  * Validate mixing inputs for single recipient
  */
 export const validateSingleMixingInputs = (
   senderWallet: WalletMixing,
   recipientWallet: WalletMixing,
   senderBalance: number,
+  baseCurrencySymbol: string = "SOL",
 ): { valid: boolean; error?: string } => {
   // Check if sender wallet is valid
   if (!senderWallet.address || !senderWallet.privateKey) {
@@ -293,11 +341,11 @@ export const validateSingleMixingInputs = (
   const amount = parseFloat(recipientWallet.amount);
 
   // Check if sender has enough balance (including some extra for fees)
-  const estimatedFee = 0.01; // Rough estimate for fees in SOL
+  const estimatedFee = 0.01; // Rough estimate for fees
   if (amount + estimatedFee > senderBalance) {
     return {
       valid: false,
-      error: `Insufficient balance. Need at least ${amount + estimatedFee} SOL, but have ${senderBalance} SOL`,
+      error: `Insufficient balance. Need at least ${amount + estimatedFee} ${baseCurrencySymbol}, but have ${senderBalance} ${baseCurrencySymbol}`,
     };
   }
 
@@ -311,6 +359,7 @@ export const validateMixingInputs = (
   senderWallet: WalletMixing,
   recipientWallets: WalletMixing[],
   senderBalance: number,
+  baseCurrencySymbol: string = "SOL",
 ): { valid: boolean; error?: string } => {
   // Check if sender wallet is valid
   if (!senderWallet.address || !senderWallet.privateKey) {
@@ -339,11 +388,11 @@ export const validateMixingInputs = (
   );
 
   // Check if sender has enough balance (including some extra for fees)
-  const estimatedFee = 0.01 * recipientWallets.length; // Rough estimate for fees in SOL
+  const estimatedFee = 0.01 * recipientWallets.length; // Rough estimate for fees
   if (totalAmount + estimatedFee > senderBalance) {
     return {
       valid: false,
-      error: `Insufficient balance. Need at least ${totalAmount + estimatedFee} SOL, but have ${senderBalance} SOL`,
+      error: `Insufficient balance. Need at least ${totalAmount + estimatedFee} ${baseCurrencySymbol}, but have ${senderBalance} ${baseCurrencySymbol}`,
     };
   }
 
@@ -351,15 +400,27 @@ export const validateMixingInputs = (
 };
 
 /**
- * Batch mix SOL to multiple recipients, processing ONE RECIPIENT AT A TIME
+ * Batch mix base currency to multiple recipients, processing ONE RECIPIENT AT A TIME
  */
-export const batchMixSOL = async (
+export const batchMixBaseCurrency = async (
   senderWallet: WalletMixing,
   recipientWallets: WalletMixing[],
+  baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
+    // Get base currency from config if not provided
+    const config = loadConfigFromCookies();
+    const currency =
+      baseCurrency ||
+      (config?.baseCurrencyMint
+        ? Object.values(BASE_CURRENCIES).find(
+            (c) => c.mint === config.baseCurrencyMint,
+          )
+        : BASE_CURRENCIES.SOL) ||
+      BASE_CURRENCIES.SOL;
+
     console.info(
-      `Starting batch SOL mixing to ${recipientWallets.length} recipients (1 recipient per batch)`,
+      `Starting batch ${currency.symbol} mixing to ${recipientWallets.length} recipients (1 recipient per batch)`,
     );
 
     // Return early if no recipients
@@ -372,13 +433,14 @@ export const batchMixSOL = async (
     for (let i = 0; i < recipientWallets.length; i++) {
       const recipientWallet = recipientWallets[i];
       console.info(
-        `Processing recipient ${i + 1}/${recipientWallets.length}: ${recipientWallet.address} (${recipientWallet.amount} SOL)`,
+        `Processing recipient ${i + 1}/${recipientWallets.length}: ${recipientWallet.address} (${recipientWallet.amount} ${currency.symbol})`,
       );
 
       // Execute mixing to single recipient
-      const result = await mixSOLToSingleRecipient(
+      const result = await mixBaseCurrencyToSingleRecipient(
         senderWallet,
         recipientWallet,
+        currency,
       );
 
       if (!result.success) {
@@ -407,10 +469,15 @@ export const batchMixSOL = async (
       results,
     };
   } catch (error) {
-    console.error("Batch SOL mixing error:", error);
+    console.error("Batch mixing error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
   }
 };
+
+/**
+ * @deprecated Use batchMixBaseCurrency instead
+ */
+export const batchMixSOL = batchMixBaseCurrency;

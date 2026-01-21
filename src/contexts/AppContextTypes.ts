@@ -1,6 +1,7 @@
 import type { Connection } from "@solana/web3.js";
 import type { WalletType, ConfigType } from "../utils/types";
 import type { RPCManager } from "../utils/rpcManager";
+import type { BaseCurrencyConfig } from "../utils/constants";
 
 export interface AppContextType {
   // Wallet state
@@ -20,14 +21,17 @@ export interface AppContextType {
   rpcManager: RPCManager | null;
 
   // Balance state
-  solBalances: Map<string, number>;
-  setSolBalances: (
+  baseCurrencyBalances: Map<string, number>;
+  setBaseCurrencyBalances: (
     balances:
       | Map<string, number>
       | ((prev: Map<string, number>) => Map<string, number>),
   ) => void;
   tokenBalances: Map<string, number>;
   setTokenBalances: (balances: Map<string, number>) => void;
+
+  // Base currency
+  baseCurrency: BaseCurrencyConfig;
 
   // Refresh state
   isRefreshing: boolean;

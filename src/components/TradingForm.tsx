@@ -27,8 +27,12 @@ import {
 import { useToast } from "../utils/hooks";
 import { toggleWallet, getWalletDisplayName } from "../utils/wallet";
 import { saveWalletsToCookies } from "../utils/storage";
-import { formatTokenBalance } from "../utils/formatting";
+import {
+  formatTokenBalance,
+  formatBaseCurrencyBalance,
+} from "../utils/formatting";
 import type { WalletType } from "../utils/types";
+import type { BaseCurrencyConfig } from "../utils/constants";
 
 interface PresetButtonProps {
   value: string;
@@ -398,8 +402,9 @@ CalendarWidget.displayName = "CalendarWidget";
 // Wallet Selector Popup Component - rendered via portal
 interface WalletSelectorPopupProps {
   wallets: WalletType[];
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
+  baseCurrency: BaseCurrencyConfig;
   walletSelectorRef: React.RefObject<HTMLDivElement>;
   onClose: () => void;
   onToggleWallet: (id: number) => void;
@@ -409,8 +414,9 @@ interface WalletSelectorPopupProps {
 
 const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
   wallets,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
+  baseCurrency,
   walletSelectorRef,
   onClose,
   onToggleWallet,
@@ -479,7 +485,8 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
           {wallets
             .filter((w) => !w.isArchived)
             .map((wallet) => {
-              const solBal = solBalances.get(wallet.address) || 0;
+              const baseCurrencyBal =
+                baseCurrencyBalances.get(wallet.address) || 0;
               const tokenBal = tokenBalances.get(wallet.address) || 0;
 
               return (
@@ -533,13 +540,18 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
 
                   {/* Balances */}
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* SOL Balance */}
+                    {/* Base Currency Balance */}
                     <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
+                      <div
+                        className={`w-1.5 h-3 rounded-sm ${baseCurrency.isNative ? "bg-gradient-to-b from-[#9945FF] to-[#14F195]" : "bg-green-500"}`}
+                      ></div>
                       <span
-                        className={`text-xs font-mono ${solBal > 0 ? "text-app-primary" : "text-app-secondary-60"}`}
+                        className={`text-xs font-mono ${baseCurrencyBal > 0 ? "text-app-primary" : "text-app-secondary-60"}`}
                       >
-                        {solBal.toFixed(3)}
+                        {formatBaseCurrencyBalance(
+                          baseCurrencyBal,
+                          baseCurrency,
+                        )}
                       </span>
                     </div>
 
@@ -584,8 +596,9 @@ interface TradingCardProps {
   isLoading: boolean;
   countActiveWallets: (wallets: WalletType[]) => number;
   currentMarketCap: number | null;
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
+  baseCurrency: BaseCurrencyConfig;
   onOpenFloating: () => void;
   isFloatingCardOpen: boolean;
   solPrice: number | null;
@@ -604,8 +617,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
   isLoading,
   countActiveWallets,
   currentMarketCap,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
+  baseCurrency,
   onOpenFloating,
   isFloatingCardOpen,
   solPrice,
@@ -894,9 +908,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
       }, []);
 
       // Filter orders to only include those related to the current token
-      // Buy orders: inputMint is SOL, outputMint is the token
-      // Sell orders: inputMint is the token, outputMint is SOL
-      const SOL_MINT = "So11111111111111111111111111111111111111112";
+      // Buy orders: inputMint is base currency, outputMint is the token
+      // Sell orders: inputMint is the token, outputMint is base currency
+      const baseCurrencyMint = baseCurrency.mint;
 
       const filteredOrders = allOrders.filter(
         (order: {
@@ -909,9 +923,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
 
           // Check if this order is related to the current token
           const isBuyOrder =
-            inputMint === SOL_MINT && outputMint === tokenAddress;
+            inputMint === baseCurrencyMint && outputMint === tokenAddress;
           const isSellOrder =
-            inputMint === tokenAddress && outputMint === SOL_MINT;
+            inputMint === tokenAddress && outputMint === baseCurrencyMint;
 
           return isBuyOrder || isSellOrder;
         },
@@ -1370,9 +1384,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
   const handleSelectAllWithBalance = (): void => {
     const walletsWithBalance = wallets.filter((wallet) => {
       if (wallet.isArchived) return false;
-      const solBal = solBalances.get(wallet.address) || 0;
+      const baseCurrencyBal = baseCurrencyBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
-      return solBal > 0 || tokenBal > 0;
+      return baseCurrencyBal > 0 || tokenBal > 0;
     });
 
     if (walletsWithBalance.length === 0) {
@@ -1383,9 +1397,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
     const allWithBalanceActive = walletsWithBalance.every((w) => w.isActive);
     const updatedWallets = wallets.map((wallet) => {
       if (wallet.isArchived) return wallet;
-      const solBal = solBalances.get(wallet.address) || 0;
+      const baseCurrencyBal = baseCurrencyBalances.get(wallet.address) || 0;
       const tokenBal = tokenBalances.get(wallet.address) || 0;
-      const hasBalance = solBal > 0 || tokenBal > 0;
+      const hasBalance = baseCurrencyBal > 0 || tokenBal > 0;
 
       if (allWithBalanceActive) {
         return { ...wallet, isActive: false };
@@ -1518,8 +1532,9 @@ const TradingCard: React.FC<TradingCardProps> = ({
         createPortal(
           <WalletSelectorPopup
             wallets={wallets}
-            solBalances={solBalances}
+            baseCurrencyBalances={baseCurrencyBalances}
             tokenBalances={tokenBalances}
+            baseCurrency={baseCurrency}
             walletSelectorRef={walletSelectorRef}
             onClose={() => setShowWalletSelector(false)}
             onToggleWallet={handleToggleWallet}

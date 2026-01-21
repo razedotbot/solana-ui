@@ -18,6 +18,7 @@ import type {
   WalletCategory,
   CategoryQuickTradeSettings,
 } from "./utils/types";
+import type { BaseCurrencyConfig } from "./utils/constants";
 import { formatTokenBalance } from "./utils/formatting";
 import { useToast } from "./utils/hooks";
 import { executeBuy, createBuyConfig, validateBuyInputs } from "./utils/buy";
@@ -34,7 +35,8 @@ interface WalletsPageProps {
   tokenAddress: string;
 
   // Balance props
-  solBalances?: Map<string, number>;
+  baseCurrencyBalances?: Map<string, number>;
+  baseCurrency?: BaseCurrencyConfig;
   tokenBalances?: Map<string, number>;
   totalSol?: number;
   setTotalSol?: (total: number) => void;
@@ -64,7 +66,8 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   tokenAddress,
 
   // Balance props with defaults
-  solBalances: externalSolBalances,
+  baseCurrencyBalances: externalBaseCurrencyBalances,
+  baseCurrency: _baseCurrency,
   tokenBalances: externalTokenBalances,
   totalSol: externalTotalSol,
   setTotalSol: setExternalTotalSol,
@@ -108,7 +111,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   const [internalSolBalances] = useState<Map<string, number>>(new Map());
   const [internalTokenBalances] = useState<Map<string, number>>(new Map());
 
-  const solBalances = externalSolBalances || internalSolBalances;
+  const solBalances = externalBaseCurrencyBalances || internalSolBalances;
   const tokenBalances = externalTokenBalances || internalTokenBalances;
 
   const { showToast } = useToast();
@@ -382,7 +385,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
       // Create buy configuration using the unified system
       const buyConfig = createBuyConfig({
         tokenAddress,
-        solAmount: solAmountToUse,
+        amount: solAmountToUse,
         // slippageBps will be automatically set from config in the buy.ts file
       });
 

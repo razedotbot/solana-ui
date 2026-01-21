@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   LayoutGrid,
@@ -10,15 +10,16 @@ import {
   Bot,
   Blocks,
   Settings,
-} from 'lucide-react';
-import { useMultichart } from '../../contexts/useMultichart';
-import { AddTokenModal } from './AddTokenModal';
-import { MultichartTokenList } from './MultichartTokenList';
-import { MultichartFrameContainer } from './MultichartFrameContainer';
-import { brand } from '../../utils/brandConfig';
-import logo from '../../logo.png';
-import type { WalletType } from '../../utils/types';
-import type { ViewMode } from '../../utils/storage';
+} from "lucide-react";
+import { useMultichart } from "../../contexts/useMultichart";
+import { AddTokenModal } from "./AddTokenModal";
+import { MultichartTokenList } from "./MultichartTokenList";
+import { MultichartFrameContainer } from "./MultichartFrameContainer";
+import { brand } from "../../utils/brandConfig";
+import logo from "../../logo.png";
+import type { WalletType } from "../../utils/types";
+import type { ViewMode } from "../../utils/storage";
+import type { BaseCurrencyConfig } from "../../utils/constants";
 
 interface MultichartLayoutProps {
   wallets: WalletType[];
@@ -27,7 +28,8 @@ interface MultichartLayoutProps {
   transactionFee: string;
   handleRefresh: () => void;
   isRefreshing?: boolean;
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
+  baseCurrency: BaseCurrencyConfig;
   tokenBalances: Map<string, number>;
   currentMarketCap: number | null;
   setCalculatePNLModalOpen: (open: boolean) => void;
@@ -39,7 +41,7 @@ interface MultichartLayoutProps {
   iframeData: unknown;
   onTokenSelect?: (tokenAddress: string) => void;
   onNonWhitelistedTrade?: (trade: {
-    type: 'buy' | 'sell';
+    type: "buy" | "sell";
     address: string;
     tokensAmount: number;
     avgPrice: number;
@@ -67,9 +69,9 @@ const ViewModeDropdown: React.FC<{
   const [isOpen, setIsOpen] = useState(false);
 
   const modes: { value: ViewMode; label: string }[] = [
-    { value: 'simple', label: 'SIMPLE' },
-    { value: 'advanced', label: 'ADVANCED' },
-    { value: 'multichart', label: 'MULTI' },
+    { value: "simple", label: "SIMPLE" },
+    { value: "advanced", label: "ADVANCED" },
+    { value: "multichart", label: "MULTI" },
   ];
 
   const handleSelect = (mode: ViewMode): void => {
@@ -77,7 +79,12 @@ const ViewModeDropdown: React.FC<{
     setIsOpen(false);
   };
 
-  const currentLabel = viewMode === 'simple' ? 'SIMPLE' : viewMode === 'advanced' ? 'ADVANCED' : 'MULTI';
+  const currentLabel =
+    viewMode === "simple"
+      ? "SIMPLE"
+      : viewMode === "advanced"
+        ? "ADVANCED"
+        : "MULTI";
 
   return (
     <div className="relative z-40">
@@ -116,14 +123,22 @@ const ViewModeDropdown: React.FC<{
                   key={mode.value}
                   onClick={() => handleSelect(mode.value)}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-all duration-200 hover:bg-primary-05 ${
-                    viewMode === mode.value ? 'bg-primary-10 color-primary' : 'text-app-tertiary'
+                    viewMode === mode.value
+                      ? "bg-primary-10 color-primary"
+                      : "text-app-tertiary"
                   }`}
                 >
                   <Columns2
                     size={14}
-                    className={viewMode === mode.value ? 'color-primary' : 'text-app-secondary-60'}
+                    className={
+                      viewMode === mode.value
+                        ? "color-primary"
+                        : "text-app-secondary-60"
+                    }
                   />
-                  <span className="text-xs font-mono font-medium">{mode.label}</span>
+                  <span className="text-xs font-mono font-medium">
+                    {mode.label}
+                  </span>
                 </button>
               ))}
             </div>
@@ -140,7 +155,7 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
   isLoadingChart,
   handleRefresh,
   isRefreshing,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
   onTokenSelect,
   onNonWhitelistedTrade,
@@ -208,7 +223,10 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
           {/* Right side - View Mode Toggle and Menu */}
           <div className="flex items-center gap-2">
             {/* View Mode Dropdown */}
-            <ViewModeDropdown viewMode={viewMode} onViewModeChange={onViewModeChange} />
+            <ViewModeDropdown
+              viewMode={viewMode}
+              onViewModeChange={onViewModeChange}
+            />
 
             {/* Individual Menu Buttons */}
             <button
@@ -217,7 +235,9 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
               title="Wallets"
             >
               <Wallet size={14} className="color-primary" />
-              <span className="text-xs font-mono color-primary font-medium tracking-wider">WALLETS</span>
+              <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                WALLETS
+              </span>
             </button>
 
             <button
@@ -226,7 +246,9 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
               title="Automate"
             >
               <Bot size={14} className="color-primary" />
-              <span className="text-xs font-mono color-primary font-medium tracking-wider">AUTOMATE</span>
+              <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                AUTOMATE
+              </span>
             </button>
 
             <button
@@ -235,7 +257,9 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
               title="Deploy"
             >
               <Blocks size={14} className="color-primary" />
-              <span className="text-xs font-mono color-primary font-medium tracking-wider">DEPLOY</span>
+              <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                DEPLOY
+              </span>
             </button>
 
             <button
@@ -244,7 +268,9 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
               title="Settings"
             >
               <Settings size={14} className="color-primary" />
-              <span className="text-xs font-mono color-primary font-medium tracking-wider">SETTINGS</span>
+              <span className="text-xs font-mono color-primary font-medium tracking-wider">
+                SETTINGS
+              </span>
             </button>
           </div>
         </div>
@@ -259,8 +285,13 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
             <div className="flex items-center gap-2">
               <LayoutGrid size={16} className="text-app-secondary-60" />
               <span className="text-xs font-mono">
-                <span className="color-primary font-semibold">{tokens.length}</span>
-                <span className="text-app-secondary-60"> / {maxTokens} tokens</span>
+                <span className="color-primary font-semibold">
+                  {tokens.length}
+                </span>
+                <span className="text-app-secondary-60">
+                  {" "}
+                  / {maxTokens} tokens
+                </span>
               </span>
             </div>
 
@@ -281,7 +312,7 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
             <MultichartTokenList
               wallets={wallets}
               setWallets={setWallets}
-              solBalances={solBalances}
+              baseCurrencyBalances={baseCurrencyBalances}
               tokenBalances={tokenBalances}
               onAddToken={() => setIsAddTokenModalOpen(true)}
             />

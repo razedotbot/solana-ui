@@ -2,6 +2,8 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
+import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
+import { loadConfigFromCookies } from "./storage";
 
 // Constants
 const MAX_BUNDLES_PER_SECOND = 2;
@@ -55,19 +57,32 @@ const getPartiallyPreparedTransactions = async (
   sourceAddresses: string[],
   receiverAddress: string,
   percentage: number,
+  baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
   try {
     const baseUrl =
       (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
 
-    const response = await fetch(`${baseUrl}/v2/sol/consolidate`, {
+    const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
+    const endpoint = isNativeSOL
+      ? `${baseUrl}/v2/sol/consolidate`
+      : `${baseUrl}/v2/token/consolidate`;
+
+    const requestBody: Record<string, unknown> = {
+      sourceAddresses,
+      receiverAddress,
+      percentage,
+    };
+
+    // Add token mint for non-native currencies
+    if (!isNativeSOL) {
+      requestBody["tokenMint"] = baseCurrency.mint;
+    }
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sourceAddresses,
-        receiverAddress,
-        percentage,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -168,14 +183,26 @@ const prepareConsolidationBundles = (
 };
 
 /**
- * Execute SOL consolidation
+ * Execute base currency consolidation (SOL, USDC, USD1)
  */
-export const consolidateSOL = async (
+export const consolidateBaseCurrency = async (
   sourceWallets: WalletConsolidation[],
   receiverWallet: WalletConsolidation,
   percentage: number,
+  baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
+    // Get base currency from config if not provided
+    const config = loadConfigFromCookies();
+    const currency =
+      baseCurrency ||
+      (config?.baseCurrencyMint
+        ? Object.values(BASE_CURRENCIES).find(
+            (c) => c.mint === config.baseCurrencyMint,
+          )
+        : BASE_CURRENCIES.SOL) ||
+      BASE_CURRENCIES.SOL;
+
     // Extract source addresses
     const sourceAddresses = sourceWallets.map((wallet) => wallet.address);
 
@@ -185,6 +212,7 @@ export const consolidateSOL = async (
         sourceAddresses,
         receiverWallet.address,
         percentage,
+        currency,
       );
 
     // Step 2: Create keypairs from private keys
@@ -231,13 +259,18 @@ export const consolidateSOL = async (
       result: results,
     };
   } catch (error) {
-    console.error("SOL consolidation error:", error);
+    console.error("Consolidation error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
   }
 };
+
+/**
+ * @deprecated Use consolidateBaseCurrency instead
+ */
+export const consolidateSOL = consolidateBaseCurrency;
 
 /**
  * Validate consolidation inputs
@@ -247,6 +280,7 @@ export const validateConsolidationInputs = (
   receiverWallet: WalletConsolidation,
   percentage: number,
   sourceBalances: Map<string, number>,
+  _currencySymbol?: string,
 ): { valid: boolean; error?: string } => {
   // Check if receiver wallet is valid
   if (!receiverWallet.address || !receiverWallet.privateKey) {

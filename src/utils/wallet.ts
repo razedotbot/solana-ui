@@ -15,6 +15,7 @@ import {
   loadMasterWallets,
 } from "./storage";
 import type { WalletType, WalletCategory, MasterWallet } from "./types";
+import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
 
 // ============= ID Generation =============
 
@@ -298,6 +299,38 @@ export async function fetchSolBalance(
 }
 
 /**
+ * Fetch base currency balance for a wallet.
+ * Supports both native SOL and SPL token base currencies (USDC, USD1).
+ */
+export async function fetchBaseCurrencyBalance(
+  connection: Connection,
+  walletAddress: string,
+  baseCurrency: BaseCurrencyConfig,
+): Promise<number> {
+  try {
+    if (baseCurrency.isNative) {
+      // Native SOL - use getBalance
+      const publicKey = new PublicKey(walletAddress);
+      const balance = await withTimeout(
+        connection.getBalance(publicKey, "processed"),
+        1000,
+      );
+      return balance / Math.pow(10, baseCurrency.decimals);
+    } else {
+      // SPL Token (USDC, USD1) - use token account balance
+      return await fetchTokenBalance(
+        connection,
+        walletAddress,
+        baseCurrency.mint,
+      );
+    }
+  } catch (error) {
+    console.error(`Error fetching ${baseCurrency.symbol} balance:`, error);
+    return 0;
+  }
+}
+
+/**
  * Refresh a wallet's token balance.
  */
 export async function refreshWalletBalance(
@@ -340,7 +373,7 @@ export interface BalanceRefreshOptions {
 }
 
 /**
- * Fetch both SOL and token balances for all wallets with configurable refresh strategy.
+ * Fetch both base currency and token balances for all wallets with configurable refresh strategy.
  */
 export async function fetchWalletBalances(
   connectionOrRpcManager:
@@ -348,13 +381,14 @@ export async function fetchWalletBalances(
     | { createConnection: () => Promise<Connection> },
   wallets: WalletType[],
   tokenAddress: string,
-  setSolBalances: (balances: Map<string, number>) => void,
+  setBaseCurrencyBalances: (balances: Map<string, number>) => void,
   setTokenBalances: (balances: Map<string, number>) => void,
-  currentSolBalances?: Map<string, number>,
+  currentBaseCurrencyBalances?: Map<string, number>,
   currentTokenBalances?: Map<string, number>,
   onlyIfZeroOrNullOrOptions: boolean | BalanceRefreshOptions = false,
+  baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<{
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
 }> {
   const options: BalanceRefreshOptions =
@@ -369,8 +403,8 @@ export async function fetchWalletBalances(
     onlyIfZeroOrNull = false,
   } = options;
 
-  const newSolBalances = new Map(
-    currentSolBalances || new Map<string, number>(),
+  const newBaseCurrencyBalances = new Map(
+    currentBaseCurrencyBalances || new Map<string, number>(),
   );
   const newTokenBalances = new Map(
     currentTokenBalances || new Map<string, number>(),
@@ -393,16 +427,22 @@ export async function fetchWalletBalances(
         connection = connectionOrRpcManager;
       }
 
-      const currentSolBalance = currentSolBalances?.get(wallet.address);
-      const shouldFetchSol =
+      const currentBaseCurrencyBalance = currentBaseCurrencyBalances?.get(
+        wallet.address,
+      );
+      const shouldFetchBaseCurrency =
         !onlyIfZeroOrNull ||
-        currentSolBalance === undefined ||
-        currentSolBalance === null ||
-        currentSolBalance === 0;
+        currentBaseCurrencyBalance === undefined ||
+        currentBaseCurrencyBalance === null ||
+        currentBaseCurrencyBalance === 0;
 
-      if (shouldFetchSol) {
-        const solBalance = await fetchSolBalance(connection, wallet.address);
-        newSolBalances.set(wallet.address, solBalance);
+      if (shouldFetchBaseCurrency) {
+        const balance = await fetchBaseCurrencyBalance(
+          connection,
+          wallet.address,
+          baseCurrency,
+        );
+        newBaseCurrencyBalances.set(wallet.address, balance);
       }
 
       if (tokenAddress) {
@@ -428,7 +468,7 @@ export async function fetchWalletBalances(
   };
 
   const updateState = (): void => {
-    setSolBalances(new Map(newSolBalances));
+    setBaseCurrencyBalances(new Map(newBaseCurrencyBalances));
     if (tokenAddress) {
       setTokenBalances(new Map(newTokenBalances));
     }
@@ -476,7 +516,10 @@ export async function fetchWalletBalances(
     }
   }
 
-  return { solBalances: newSolBalances, tokenBalances: newTokenBalances };
+  return {
+    baseCurrencyBalances: newBaseCurrencyBalances,
+    tokenBalances: newTokenBalances,
+  };
 }
 
 // ============= Wallet Management Utilities =============
@@ -488,15 +531,15 @@ export function handleSortWallets(
   wallets: WalletType[],
   sortDirection: "asc" | "desc",
   setSortDirection: (direction: "asc" | "desc") => void,
-  solBalances: Map<string, number>,
+  baseCurrencyBalances: Map<string, number>,
   setWallets: (wallets: WalletType[]) => void,
 ): void {
   const newDirection = sortDirection === "asc" ? "desc" : "asc";
   setSortDirection(newDirection);
 
   const sortedWallets = [...wallets].sort((a, b) => {
-    const balanceA = solBalances.get(a.address) || 0;
-    const balanceB = solBalances.get(b.address) || 0;
+    const balanceA = baseCurrencyBalances.get(a.address) || 0;
+    const balanceB = baseCurrencyBalances.get(b.address) || 0;
 
     if (newDirection === "asc") {
       return balanceA - balanceB;
@@ -513,7 +556,7 @@ export function handleSortWallets(
  */
 export function handleCleanupWallets(
   wallets: WalletType[],
-  solBalances: Map<string, number>,
+  baseCurrencyBalances: Map<string, number>,
   tokenBalances: Map<string, number>,
   setWallets: (wallets: WalletType[]) => void,
   showToast: (message: string, type: "success" | "error") => void,
@@ -523,10 +566,10 @@ export function handleCleanupWallets(
   let duplicateCount = 0;
 
   const cleanedWallets = wallets.filter((wallet) => {
-    const solBalance = solBalances.get(wallet.address) || 0;
+    const baseCurrencyBalance = baseCurrencyBalances.get(wallet.address) || 0;
     const tokenBalance = tokenBalances.get(wallet.address) || 0;
 
-    if (solBalance <= 0 && tokenBalance <= 0) {
+    if (baseCurrencyBalance <= 0 && tokenBalance <= 0) {
       emptyCount++;
       return false;
     }

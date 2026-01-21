@@ -97,7 +97,7 @@ export const AutomatePage: React.FC = () => {
   const {
     wallets: contextWallets,
     config: contextConfig,
-    solBalances,
+    baseCurrencyBalances,
     showToast: contextShowToast,
   } = useAppContext();
 
@@ -175,10 +175,10 @@ export const AutomatePage: React.FC = () => {
         address: w.address,
         privateKey: w.privateKey,
         name: walletName || formatAddress(w.address),
-        balance: solBalances.get(w.address) ?? 0,
+        balance: baseCurrencyBalances.get(w.address) ?? 0,
       };
     });
-  }, [contextWallets, solBalances]);
+  }, [contextWallets, baseCurrencyBalances]);
 
   // ========== Execute Trade Helper ==========
   const executeTradeAction = useCallback(
@@ -221,7 +221,7 @@ export const AutomatePage: React.FC = () => {
           walletsForTrade,
           tradingConfig,
           actionType === "buy",
-          solBalances,
+          baseCurrencyBalances,
         );
 
         // Log success
@@ -265,7 +265,7 @@ export const AutomatePage: React.FC = () => {
         return false;
       }
     },
-    [contextWallets, contextConfig, solBalances, contextShowToast],
+    [contextWallets, contextConfig, baseCurrencyBalances, contextShowToast],
   );
 
   // ========== Sniper Bot Logic ==========
@@ -335,7 +335,7 @@ export const AutomatePage: React.FC = () => {
           selectedWalletAddresses.length > 0
         ) {
           const firstWalletBalance =
-            solBalances.get(selectedWalletAddresses[0]) ?? 0;
+            baseCurrencyBalances.get(selectedWalletAddresses[0]) ?? 0;
           solAmount = (firstWalletBalance * profile.buyAmount) / 100;
         }
 
@@ -365,7 +365,7 @@ export const AutomatePage: React.FC = () => {
         prev.map((e) => (e.id === recentEvent.id ? recentEvent : e)),
       );
     },
-    [selectedWalletAddresses, solBalances, executeTradeAction],
+    [selectedWalletAddresses, baseCurrencyBalances, executeTradeAction],
   );
 
   // ========== Copy Trade Logic ==========

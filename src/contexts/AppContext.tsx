@@ -21,6 +21,11 @@ import {
 } from "../utils/rpcManager";
 import { AppContext } from "./AppContextInstance";
 import type { AppContextType } from "./AppContextTypes";
+import {
+  BASE_CURRENCIES,
+  getBaseCurrencyByMint,
+  type BaseCurrencyConfig,
+} from "../utils/constants";
 
 const defaultConfig: ConfigType = {
   rpcEndpoints: JSON.stringify(createDefaultEndpoints()),
@@ -29,6 +34,7 @@ const defaultConfig: ConfigType = {
   isDropdownOpen: false,
   buyAmount: "",
   sellAmount: "",
+  baseCurrencyMint: BASE_CURRENCIES.SOL.mint,
   slippageBps: "9900",
   bundleMode: "batch",
   singleDelay: "200",
@@ -61,14 +67,21 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
   const [wallets, setWalletsState] = useState<WalletType[]>([]);
   const [config, setConfigState] = useState<ConfigType>(defaultConfig);
   const [connection, setConnection] = useState<Connection | null>(null);
-  const [solBalances, setSolBalances] = useState<Map<string, number>>(
-    new Map(),
-  );
+  const [baseCurrencyBalances, setBaseCurrencyBalances] = useState<
+    Map<string, number>
+  >(new Map());
   const [tokenBalances, setTokenBalances] = useState<Map<string, number>>(
     new Map(),
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [rpcManager, setRpcManager] = useState<RPCManager | null>(null);
+
+  // Compute current base currency config
+  const baseCurrency = useMemo<BaseCurrencyConfig>(() => {
+    return (
+      getBaseCurrencyByMint(config.baseCurrencyMint) || BASE_CURRENCIES.SOL
+    );
+  }, [config.baseCurrencyMint]);
 
   // Load initial data from cookies
   useEffect(() => {
@@ -148,13 +161,13 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
   );
 
   // Balance setters with functional update support
-  const setSolBalancesWrapper = useCallback(
+  const setBaseCurrencyBalancesWrapper = useCallback(
     (
       newBalances:
         | Map<string, number>
         | ((prev: Map<string, number>) => Map<string, number>),
     ) => {
-      setSolBalances((prev) => {
+      setBaseCurrencyBalances((prev) => {
         return typeof newBalances === "function"
           ? newBalances(prev)
           : newBalances;
@@ -189,9 +202,9 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           rpcManager,
           wallets,
           tokenAddress || "",
-          setSolBalancesWrapper,
+          setBaseCurrencyBalancesWrapper,
           setTokenBalances,
-          solBalances,
+          baseCurrencyBalances,
           tokenBalances,
           {
             strategy:
@@ -202,6 +215,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
             batchSize: parseInt(config.balanceRefreshBatchSize || "5", 10),
             delay: parseInt(config.balanceRefreshDelay || "50", 10),
           },
+          baseCurrency,
         );
       } catch (error) {
         console.error("Error refreshing balances:", error);
@@ -216,10 +230,11 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       config.balanceRefreshStrategy,
       config.balanceRefreshBatchSize,
       config.balanceRefreshDelay,
-      solBalances,
+      baseCurrencyBalances,
       tokenBalances,
       showToast,
-      setSolBalancesWrapper,
+      setBaseCurrencyBalancesWrapper,
+      baseCurrency,
     ],
   );
 
@@ -234,10 +249,11 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       connection,
       setConnection,
       rpcManager,
-      solBalances,
-      setSolBalances: setSolBalancesWrapper,
+      baseCurrencyBalances,
+      setBaseCurrencyBalances: setBaseCurrencyBalancesWrapper,
       tokenBalances,
       setTokenBalances,
+      baseCurrency,
       isRefreshing,
       refreshBalances,
       showToast,
@@ -250,12 +266,13 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       updateConfig,
       connection,
       rpcManager,
-      solBalances,
+      baseCurrencyBalances,
       tokenBalances,
+      baseCurrency,
       isRefreshing,
       refreshBalances,
       showToast,
-      setSolBalancesWrapper,
+      setBaseCurrencyBalancesWrapper,
     ],
   );
 

@@ -17,6 +17,8 @@ import bs58 from "bs58";
 import { sendTransactions } from "../../utils/transactionService";
 import type { ApiResponse } from "../../utils/types";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
+import type { BaseCurrencyConfig } from "../../utils/constants";
+import { BASE_CURRENCIES } from "../../utils/constants";
 
 interface WindowWithConfig {
   tradingServerUrl?: string;
@@ -31,16 +33,18 @@ interface BaseModalProps {
 
 interface BurnModalProps extends BaseModalProps {
   tokenAddress?: string;
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
+  baseCurrency?: BaseCurrencyConfig;
 }
 
 export const BurnModal: React.FC<BurnModalProps> = ({
   isOpen,
   onClose,
   tokenAddress: initialTokenAddress,
-  solBalances,
+  baseCurrencyBalances,
   tokenBalances,
+  baseCurrency = BASE_CURRENCIES.SOL,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [tokenAddress, setTokenAddress] = useState<string>(
@@ -414,20 +418,20 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       if (balanceFilter === "nonZero") {
         filtered = filtered.filter(
           (wallet): boolean =>
-            (solBalances.get(wallet.address) || 0) > 0 ||
+            (baseCurrencyBalances.get(wallet.address) || 0) > 0 ||
             (tokenBalancesForWallets.get(wallet.address) || 0) > 0,
         );
       } else if (balanceFilter === "highBalance") {
         filtered = filtered.filter(
           (wallet): boolean =>
-            (solBalances.get(wallet.address) || 0) >= 0.1 ||
+            (baseCurrencyBalances.get(wallet.address) || 0) >= 0.1 ||
             (tokenBalancesForWallets.get(wallet.address) || 0) >= 10,
         );
       } else if (balanceFilter === "lowBalance") {
         filtered = filtered.filter(
           (wallet): boolean =>
-            ((solBalances.get(wallet.address) || 0) < 0.1 &&
-              (solBalances.get(wallet.address) || 0) > 0) ||
+            ((baseCurrencyBalances.get(wallet.address) || 0) < 0.1 &&
+              (baseCurrencyBalances.get(wallet.address) || 0) > 0) ||
             ((tokenBalancesForWallets.get(wallet.address) || 0) < 10 &&
               (tokenBalancesForWallets.get(wallet.address) || 0) > 0),
         );
@@ -441,8 +445,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
           ? a.address.localeCompare(b.address)
           : b.address.localeCompare(a.address);
       } else if (sortOption === "balance") {
-        const balanceA = solBalances.get(a.address) || 0;
-        const balanceB = solBalances.get(b.address) || 0;
+        const balanceA = baseCurrencyBalances.get(a.address) || 0;
+        const balanceB = baseCurrencyBalances.get(b.address) || 0;
         return sortDirection === "asc"
           ? balanceA - balanceB
           : balanceB - balanceA;
@@ -861,7 +865,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                     onChange={(e) => setSortOption(e.target.value)}
                   >
                     <option value="address">ADDRESS</option>
-                    <option value="balance">SOL BAL</option>
+                    <option value="balance">{baseCurrency.symbol} BAL</option>
                     <option value="tokenBalance">TOKEN BAL</option>
                   </select>
 
@@ -925,10 +929,10 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                             </span>
                             <div className="flex flex-col items-end">
                               <span className="text-xs text-app-secondary font-mono">
-                                {(solBalances.get(wallet.address) || 0).toFixed(
-                                  4,
-                                )}{" "}
-                                SOL
+                                {(
+                                  baseCurrencyBalances.get(wallet.address) || 0
+                                ).toFixed(baseCurrency.isNative ? 4 : 2)}{" "}
+                                {baseCurrency.symbol}
                               </span>
                               {(tokenBalancesForWallets.get(wallet.address) ||
                                 0) > 0 && (
@@ -977,12 +981,12 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                       <div className="flex flex-col items-end">
                         <span className="text-sm text-app-primary font-mono">
                           {(
-                            solBalances.get(
+                            baseCurrencyBalances.get(
                               wallets.find((w) => w.privateKey === sourceWallet)
                                 ?.address || "",
                             ) || 0
-                          ).toFixed(4)}{" "}
-                          SOL
+                          ).toFixed(baseCurrency.isNative ? 4 : 2)}{" "}
+                          {baseCurrency.symbol}
                         </span>
                         <span className="text-sm color-primary font-mono">
                           {(
@@ -1100,13 +1104,13 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                         <div className="flex flex-col items-end">
                           <span className="text-sm text-app-primary font-mono">
                             {(
-                              solBalances.get(
+                              baseCurrencyBalances.get(
                                 wallets.find(
                                   (w) => w.privateKey === sourceWallet,
                                 )?.address || "",
                               ) || 0
-                            ).toFixed(4)}{" "}
-                            SOL
+                            ).toFixed(baseCurrency.isNative ? 4 : 2)}{" "}
+                            {baseCurrency.symbol}
                           </span>
                           <span className="text-sm color-primary font-mono">
                             {(

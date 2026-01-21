@@ -394,7 +394,7 @@ const executeUnifiedBuy = async (
 
     const buyConfig = createBuyConfig({
       tokenAddress: config.tokenAddress,
-      solAmount: config.solAmount!,
+      amount: config.solAmount!,
       slippageBps: finalSlippageBps,
       jitoTipLamports: finalJitoTipLamports,
       transactionsFeeLamports: finalTransactionsFeeLamports,
@@ -540,7 +540,8 @@ export interface TradeHistoryEntry {
   timestamp: number;
   walletsCount: number;
   amount: number;
-  amountType: "sol" | "percentage";
+  amountType: "sol" | "percentage" | "base-currency";
+  baseCurrencyMint?: string;
   success: boolean;
   error?: string;
   bundleMode?: "single" | "batch" | "all-in-one";

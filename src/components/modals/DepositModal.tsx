@@ -19,23 +19,27 @@ import bs58 from "bs58";
 import { useToast } from "../../utils/hooks";
 import type { WalletType } from "../../utils/types";
 import { getWalletDisplayName } from "../../utils/wallet";
+import type { BaseCurrencyConfig } from "../../utils/constants";
+import { BASE_CURRENCIES } from "../../utils/constants";
 
 interface DepositModalProps {
   isOpen: boolean;
   onClose: () => void;
   wallets: WalletType[];
-  solBalances: Map<string, number>;
-  setSolBalances?: (balances: Map<string, number>) => void;
+  baseCurrencyBalances: Map<string, number>;
+  setBaseCurrencyBalances?: (balances: Map<string, number>) => void;
   connection: Connection;
+  baseCurrency?: BaseCurrencyConfig;
 }
 
 export const DepositModal: React.FC<DepositModalProps> = ({
   isOpen,
   onClose,
   wallets,
-  solBalances,
-  setSolBalances,
+  baseCurrencyBalances,
+  setBaseCurrencyBalances,
   connection,
+  baseCurrency = BASE_CURRENCIES.SOL,
 }) => {
   // States for deposit operation
   const [publicKey, setPublicKey] = useState("");
@@ -58,9 +62,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     }
   }, [isOpen]);
 
-  // Format SOL balance for display
-  const formatSolBalance = (balance: number): string => {
-    return balance.toFixed(4);
+  // Format balance for display
+  const formatBalance = (balance: number): string => {
+    return baseCurrency.isNative ? balance.toFixed(4) : balance.toFixed(2);
   };
 
   // Format wallet address for display
@@ -68,9 +72,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
-  // Get wallet SOL balance by address
+  // Get wallet base currency balance by address
   const getWalletBalance = (address: string): number => {
-    const balance = solBalances.get(address);
+    const balance = baseCurrencyBalances.get(address);
     return balance ?? 0;
   };
 
@@ -143,14 +147,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({
           `Fetched balance for connected Phantom wallet ${walletAddress}: ${solBalance} SOL`,
         );
 
-        // Update the solBalances map with the connected wallet's balance
-        if (setSolBalances) {
-          const newSolBalances = new Map(solBalances);
-          newSolBalances.set(walletAddress, solBalance);
-          setSolBalances(newSolBalances);
-          console.info("Updated solBalances map for connected wallet");
+        // Update the baseCurrencyBalances map with the connected wallet's balance
+        if (setBaseCurrencyBalances) {
+          const newBalances = new Map(baseCurrencyBalances);
+          newBalances.set(walletAddress, solBalance);
+          setBaseCurrencyBalances(newBalances);
+          console.info("Updated baseCurrencyBalances map for connected wallet");
         } else {
-          console.info("setSolBalances is not available");
+          console.info("setBaseCurrencyBalances is not available");
         }
       } catch (balanceError) {
         console.error("Error fetching wallet balance:", balanceError);
@@ -172,7 +176,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
     // Check if wallet has sufficient balance before proceeding
     if (hasInsufficientBalance()) {
-      showToast("Insufficient SOL balance for this transaction", "error");
+      showToast(
+        `Insufficient ${baseCurrency.symbol} balance for this transaction`,
+        "error",
+      );
       return;
     }
 
@@ -420,8 +427,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <DollarSign size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> DEPOSIT SOL{" "}
-              <span className="color-primary">/</span>
+              <span className="color-primary">/</span> DEPOSIT{" "}
+              {baseCurrency.symbol} <span className="color-primary">/</span>
             </h2>
           </div>
           <button
@@ -503,7 +510,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     <div className="flex items-center gap-1 text-xs">
                       <DollarSign size={10} className="text-app-secondary" />
                       <span className="color-primary font-medium font-mono">
-                        {formatSolBalance(getWalletBalance(selectedWallet))} SOL
+                        {formatBalance(getWalletBalance(selectedWallet))}{" "}
+                        {baseCurrency.symbol}
                       </span>
                     </div>
                   )}
@@ -578,10 +586,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                               className="text-app-secondary mr-1"
                             />
                             <span className="text-xs text-app-secondary font-mono">
-                              {formatSolBalance(
+                              {formatBalance(
                                 getWalletBalance(wallet.address) || 0,
                               )}{" "}
-                              SOL
+                              {baseCurrency.symbol}
                             </span>
                           </div>
                         </div>
@@ -599,8 +607,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       CURRENT BALANCE:
                     </span>
                     <span className="color-primary font-semibold font-mono">
-                      {formatSolBalance(getWalletBalance(selectedWallet) || 0)}{" "}
-                      SOL
+                      {formatBalance(getWalletBalance(selectedWallet) || 0)}{" "}
+                      {baseCurrency.symbol}
                     </span>
                   </div>
                 )}
@@ -609,7 +617,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <div className="group mt-5">
                 <div className="flex items-center gap-1 mb-2">
                   <label className="text-sm font-medium text-app-secondary group-hover:color-primary transition-colors duration-200 font-mono uppercase tracking-wider">
-                    <span className="color-primary">&#62;</span> Amount (SOL){" "}
+                    <span className="color-primary">&#62;</span> Amount (
+                    {baseCurrency.symbol}){" "}
                     <span className="color-primary">&#60;</span>
                   </label>
                   <div
@@ -623,7 +632,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     />
                     {showInfoTip && (
                       <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
-                        Enter the amount of SOL to deposit
+                        Enter the amount of {baseCurrency.symbol} to deposit
                       </div>
                     )}
                   </div>
@@ -649,14 +658,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       NEW BALANCE AFTER DEPOSIT:
                     </span>
                     <span className="color-primary font-semibold font-mono">
-                      {(
+                      {formatBalance(
                         parseFloat(
-                          formatSolBalance(
-                            getWalletBalance(selectedWallet) || 0,
-                          ),
-                        ) + parseFloat(amount || "0")
-                      ).toFixed(4)}{" "}
-                      SOL
+                          formatBalance(getWalletBalance(selectedWallet) || 0),
+                        ) + parseFloat(amount || "0"),
+                      )}{" "}
+                      {baseCurrency.symbol}
                     </span>
                   </div>
                 )}
@@ -722,8 +729,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       RECIPIENT BALANCE:
                     </span>
                     <span className="text-sm text-app-primary font-mono">
-                      {formatSolBalance(getWalletBalance(selectedWallet) || 0)}{" "}
-                      SOL
+                      {formatBalance(getWalletBalance(selectedWallet) || 0)}{" "}
+                      {baseCurrency.symbol}
                     </span>
                   </div>
 
@@ -732,7 +739,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       YOUR BALANCE:
                     </span>
                     <span className="text-sm text-app-primary font-mono">
-                      {formatSolBalance(getConnectedWalletBalance())} SOL
+                      {formatBalance(getConnectedWalletBalance())}{" "}
+                      {baseCurrency.symbol}
                     </span>
                   </div>
 
@@ -741,7 +749,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       AMOUNT TO DEPOSIT:
                     </span>
                     <span className="text-sm font-semibold color-primary font-mono">
-                      {parseFloat(amount).toFixed(4)} SOL
+                      {formatBalance(parseFloat(amount))} {baseCurrency.symbol}
                     </span>
                   </div>
 
@@ -750,10 +758,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       NEW BALANCE:
                     </span>
                     <span className="text-sm text-app-primary font-mono">
-                      {(
-                        getWalletBalance(selectedWallet) + parseFloat(amount)
-                      ).toFixed(4)}{" "}
-                      SOL
+                      {formatBalance(
+                        getWalletBalance(selectedWallet) + parseFloat(amount),
+                      )}{" "}
+                      {baseCurrency.symbol}
                     </span>
                   </div>
                 </div>
@@ -808,7 +816,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   ) : hasInsufficientBalance() ? (
                     "INSUFFICIENT BALANCE"
                   ) : (
-                    "DEPOSIT SOL"
+                    `DEPOSIT ${baseCurrency.symbol}`
                   )}
                 </button>
               </div>

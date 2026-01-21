@@ -2,6 +2,8 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
+import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
+import { loadConfigFromCookies } from "./storage";
 
 interface WalletDistribution {
   address: string;
@@ -24,18 +26,31 @@ interface WindowWithConfig {
 const getPartiallySignedTransactions = async (
   senderAddress: string,
   recipients: { address: string; amount: string }[],
+  baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
   try {
     const baseUrl =
       (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
 
-    const response = await fetch(`${baseUrl}/v2/sol/distribute`, {
+    const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
+    const endpoint = isNativeSOL
+      ? `${baseUrl}/v2/sol/distribute`
+      : `${baseUrl}/v2/token/distribute`;
+
+    const requestBody: Record<string, unknown> = {
+      sender: senderAddress,
+      recipients: recipients,
+    };
+
+    // Add token mint for non-native currencies
+    if (!isNativeSOL) {
+      requestBody["tokenMint"] = baseCurrency.mint;
+    }
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sender: senderAddress,
-        recipients: recipients,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -129,15 +144,27 @@ const prepareDistributionBundles = (
 };
 
 /**
- * Execute SOL distribution
+ * Execute base currency distribution (SOL, USDC, USD1)
  */
-export const distributeSOL = async (
+export const distributeBaseCurrency = async (
   senderWallet: WalletDistribution,
   recipientWallets: WalletDistribution[],
+  baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
+    // Get base currency from config if not provided
+    const config = loadConfigFromCookies();
+    const currency =
+      baseCurrency ||
+      (config?.baseCurrencyMint
+        ? Object.values(BASE_CURRENCIES).find(
+            (c) => c.mint === config.baseCurrencyMint,
+          )
+        : BASE_CURRENCIES.SOL) ||
+      BASE_CURRENCIES.SOL;
+
     console.info(
-      `Preparing to distribute SOL from ${senderWallet.address} to ${recipientWallets.length} recipients`,
+      `Preparing to distribute ${currency.symbol} from ${senderWallet.address} to ${recipientWallets.length} recipients`,
     );
 
     // Convert wallet data to recipient format for backend
@@ -151,6 +178,7 @@ export const distributeSOL = async (
     const partiallySignedTransactions = await getPartiallySignedTransactions(
       senderWallet.address,
       recipients,
+      currency,
     );
     console.info(
       `Received ${partiallySignedTransactions.length} partially signed transactions from backend`,
@@ -215,12 +243,18 @@ export const distributeSOL = async (
 };
 
 /**
+ * @deprecated Use distributeBaseCurrency instead
+ */
+export const distributeSOL = distributeBaseCurrency;
+
+/**
  * Validate distribution inputs
  */
 export const validateDistributionInputs = (
   senderWallet: WalletDistribution,
   recipientWallets: WalletDistribution[],
   senderBalance: number,
+  baseCurrencySymbol: string = "SOL",
 ): { valid: boolean; error?: string } => {
   // Check if sender wallet is valid
   if (!senderWallet.address || !senderWallet.privateKey) {
@@ -252,22 +286,34 @@ export const validateDistributionInputs = (
   if (totalAmount > senderBalance) {
     return {
       valid: false,
-      error: `Insufficient balance. Need at least ${totalAmount} SOL, but have ${senderBalance} SOL`,
+      error: `Insufficient balance. Need at least ${totalAmount} ${baseCurrencySymbol}, but have ${senderBalance} ${baseCurrencySymbol}`,
     };
   }
 
   return { valid: true };
 };
 /**
- * Batch distribute SOL to multiple recipients, splitting into groups of max 3 recipients per request
+ * Batch distribute base currency to multiple recipients, splitting into groups of max 3 recipients per request
  */
-export const batchDistributeSOL = async (
+export const batchDistributeBaseCurrency = async (
   senderWallet: WalletDistribution,
   recipientWallets: WalletDistribution[],
+  baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
+    // Get base currency from config if not provided
+    const config = loadConfigFromCookies();
+    const currency =
+      baseCurrency ||
+      (config?.baseCurrencyMint
+        ? Object.values(BASE_CURRENCIES).find(
+            (c) => c.mint === config.baseCurrencyMint,
+          )
+        : BASE_CURRENCIES.SOL) ||
+      BASE_CURRENCIES.SOL;
+
     console.info(
-      `Starting batch SOL distribution to ${recipientWallets.length} recipients`,
+      `Starting batch ${currency.symbol} distribution to ${recipientWallets.length} recipients`,
     );
 
     // Return early if no recipients
@@ -275,9 +321,13 @@ export const batchDistributeSOL = async (
       return { success: true, results: [] };
     }
 
-    // If 3 or fewer recipients, just call distributeSOL directly
+    // If 3 or fewer recipients, just call distributeBaseCurrency directly
     if (recipientWallets.length <= 3) {
-      const result = await distributeSOL(senderWallet, recipientWallets);
+      const result = await distributeBaseCurrency(
+        senderWallet,
+        recipientWallets,
+        currency,
+      );
       return {
         success: result.success,
         results: result.success ? [result.result] : [],
@@ -310,7 +360,11 @@ export const batchDistributeSOL = async (
       );
 
       // Execute this batch
-      const batchResult = await distributeSOL(senderWallet, batch);
+      const batchResult = await distributeBaseCurrency(
+        senderWallet,
+        batch,
+        currency,
+      );
 
       if (!batchResult.success) {
         return {
@@ -334,10 +388,15 @@ export const batchDistributeSOL = async (
       results,
     };
   } catch (error) {
-    console.error("Batch SOL distribution error:", error);
+    console.error("Batch distribution error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
   }
 };
+
+/**
+ * @deprecated Use batchDistributeBaseCurrency instead
+ */
+export const batchDistributeSOL = batchDistributeBaseCurrency;

@@ -13,25 +13,29 @@ import type { Connection } from "@solana/web3.js";
 import { useToast } from "../../utils/hooks";
 import type { WalletType } from "../../utils/types";
 import { getWalletDisplayName } from "../../utils/wallet";
-import { formatAddress, formatSolBalance } from "../../utils/formatting";
+import { formatAddress } from "../../utils/formatting";
 import {
-  consolidateSOL,
+  consolidateBaseCurrency,
   validateConsolidationInputs,
 } from "../../utils/consolidate";
+import type { BaseCurrencyConfig } from "../../utils/constants";
+import { BASE_CURRENCIES } from "../../utils/constants";
 
 interface ConsolidateModalProps {
   isOpen: boolean;
   onClose: () => void;
   wallets: WalletType[];
-  solBalances: Map<string, number>;
+  baseCurrencyBalances: Map<string, number>;
   connection: Connection;
+  baseCurrency?: BaseCurrencyConfig;
 }
 
 export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
   isOpen,
   onClose,
   wallets,
-  solBalances,
+  baseCurrencyBalances,
+  baseCurrency = BASE_CURRENCIES.SOL,
 }) => {
   // States for the modal
   const [currentStep, setCurrentStep] = useState(0);
@@ -59,9 +63,16 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
     }
   }, [isOpen]);
 
-  // Get wallet SOL balance by address
+  // Format balance for display
+  const formatBalance = (balance: number): string => {
+    return baseCurrency.isNative ? balance.toFixed(4) : balance.toFixed(2);
+  };
+
+  // Get wallet base currency balance by address
   const getWalletBalance = (address: string): number => {
-    return solBalances.has(address) ? (solBalances.get(address) ?? 0) : 0;
+    return baseCurrencyBalances.has(address)
+      ? (baseCurrencyBalances.get(address) ?? 0)
+      : 0;
   };
 
   // Get wallet by address
@@ -132,7 +143,8 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
         sourceWallets,
         receiverWallet,
         parseFloat(amount),
-        solBalances,
+        baseCurrencyBalances,
+        baseCurrency.symbol,
       );
 
       if (!validation.valid) {
@@ -142,14 +154,18 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
       }
 
       // Execute the consolidation
-      const result = await consolidateSOL(
+      const result = await consolidateBaseCurrency(
         sourceWallets,
         receiverWallet,
         parseFloat(amount),
+        baseCurrency,
       );
 
       if (result.success) {
-        showToast("SOL consolidated successfully", "success");
+        showToast(
+          `${baseCurrency.symbol} consolidated successfully`,
+          "success",
+        );
         resetForm();
         onClose();
       } else {
@@ -421,8 +437,8 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
               <ArrowDown size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> CONSOLIDATE SOL{" "}
-              <span className="color-primary">/</span>
+              <span className="color-primary">/</span> CONSOLIDATE{" "}
+              {baseCurrency.symbol} <span className="color-primary">/</span>
             </h2>
           </div>
           <button
@@ -462,10 +478,10 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                             className="text-app-secondary"
                           />
                           <span className="color-primary font-medium font-mono">
-                            {formatSolBalance(
+                            {formatBalance(
                               getWalletBalance(selectedRecipientWallet),
                             )}{" "}
-                            SOL
+                            {baseCurrency.symbol}
                           </span>
                         </div>
                       )}
@@ -553,10 +569,10 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                                   className="text-app-secondary mr-1"
                                 />
                                 <span className="text-xs text-app-secondary font-mono">
-                                  {formatSolBalance(
+                                  {formatBalance(
                                     getWalletBalance(wallet.address) || 0,
                                   )}{" "}
-                                  SOL
+                                  {baseCurrency.symbol}
                                 </span>
                               </div>
                             </div>
@@ -666,14 +682,16 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                                 </span>
                                 <div className="flex flex-col items-end">
                                   <span className="text-xs text-app-secondary font-mono">
-                                    {formatSolBalance(balance)} SOL
+                                    {formatBalance(balance)}{" "}
+                                    {baseCurrency.symbol}
                                   </span>
                                   {selectedSourceWallets.includes(
                                     wallet.address,
                                   ) &&
                                     amount && (
                                       <span className="text-xs color-primary font-mono">
-                                        -{transferAmount.toFixed(4)} SOL
+                                        -{formatBalance(transferAmount)}{" "}
+                                        {baseCurrency.symbol}
                                       </span>
                                     )}
                                 </div>
@@ -701,7 +719,8 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                         <span className="text-app-secondary font-mono">
                           TOTAL TO CONSOLIDATE:{" "}
                           <span className="color-primary font-medium">
-                            {getTotalConsolidationAmount().toFixed(4)} SOL
+                            {formatBalance(getTotalConsolidationAmount())}{" "}
+                            {baseCurrency.symbol}
                           </span>
                         </span>
                       )}
@@ -733,8 +752,8 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                           />
                           {showInfoTip && (
                             <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
-                              Percentage of SOL to consolidate from each source
-                              wallet
+                              Percentage of {baseCurrency.symbol} to consolidate
+                              from each source wallet
                             </div>
                           )}
                         </div>
@@ -807,10 +826,10 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                                 RECIPIENT BALANCE:
                               </span>
                               <span className="text-xs text-app-primary font-mono">
-                                {formatSolBalance(
+                                {formatBalance(
                                   getWalletBalance(selectedRecipientWallet),
                                 )}{" "}
-                                SOL
+                                {baseCurrency.symbol}
                               </span>
                             </div>
                           </div>
@@ -823,8 +842,10 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                                     AMOUNT TO MOVE:
                                   </span>
                                   <span className="text-xs font-semibold color-primary font-mono">
-                                    {getTotalConsolidationAmount().toFixed(4)}{" "}
-                                    SOL
+                                    {formatBalance(
+                                      getTotalConsolidationAmount(),
+                                    )}{" "}
+                                    {baseCurrency.symbol}
                                   </span>
                                 </div>
 
@@ -833,12 +854,12 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                                     NEW BALANCE:
                                   </span>
                                   <span className="text-xs text-app-primary font-mono">
-                                    {(
+                                    {formatBalance(
                                       getWalletBalance(
                                         selectedRecipientWallet,
-                                      ) + getTotalConsolidationAmount()
-                                    ).toFixed(4)}{" "}
-                                    SOL
+                                      ) + getTotalConsolidationAmount(),
+                                    )}{" "}
+                                    {baseCurrency.symbol}
                                   </span>
                                 </div>
 
@@ -847,8 +868,11 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                                     CHANGE:
                                   </span>
                                   <span className="text-xs font-semibold color-primary font-mono">
-                                    +{getTotalConsolidationAmount().toFixed(4)}{" "}
-                                    SOL
+                                    +
+                                    {formatBalance(
+                                      getTotalConsolidationAmount(),
+                                    )}{" "}
+                                    {baseCurrency.symbol}
                                   </span>
                                 </div>
                               </>
@@ -927,10 +951,10 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                         CURRENT BALANCE:
                       </span>
                       <span className="text-sm text-app-primary font-mono">
-                        {formatSolBalance(
+                        {formatBalance(
                           getWalletBalance(selectedRecipientWallet) || 0,
                         )}{" "}
-                        SOL
+                        {baseCurrency.symbol}
                       </span>
                     </div>
 
@@ -957,7 +981,8 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                         TOTAL TO CONSOLIDATE:
                       </span>
                       <span className="text-sm font-semibold color-primary font-mono">
-                        {getTotalConsolidationAmount().toFixed(4)} SOL
+                        {formatBalance(getTotalConsolidationAmount())}{" "}
+                        {baseCurrency.symbol}
                       </span>
                     </div>
 
@@ -966,11 +991,11 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                         NEW BALANCE (ESTIMATED):
                       </span>
                       <span className="text-sm text-app-primary font-mono">
-                        {(
+                        {formatBalance(
                           getWalletBalance(selectedRecipientWallet) +
-                          getTotalConsolidationAmount()
-                        ).toFixed(4)}{" "}
-                        SOL
+                            getTotalConsolidationAmount(),
+                        )}{" "}
+                        {baseCurrency.symbol}
                       </span>
                     </div>
                   </div>
@@ -1037,10 +1062,12 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                             </div>
                             <div className="flex items-center">
                               <span className="text-xs text-app-secondary mr-2 font-mono">
-                                CURRENT: {formatSolBalance(balance)} SOL
+                                CURRENT: {formatBalance(balance)}{" "}
+                                {baseCurrency.symbol}
                               </span>
                               <span className="text-xs color-primary font-mono">
-                                -{transferAmount.toFixed(4)} SOL
+                                -{formatBalance(transferAmount)}{" "}
+                                {baseCurrency.symbol}
                               </span>
                             </div>
                           </div>
@@ -1082,7 +1109,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                     PROCESSING...
                   </>
                 ) : (
-                  "CONSOLIDATE SOL"
+                  `CONSOLIDATE ${baseCurrency.symbol}`
                 )}
               </button>
             </div>
