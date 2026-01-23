@@ -58,6 +58,7 @@ import {
 import {
   SniperBotWebSocketManager,
   CopyTradeWebSocketManager,
+  createBatchedTradeHandler,
 } from "../utils/websocket";
 import type { MultiTokenWebSocketManager } from "../utils/websocket";
 
@@ -105,6 +106,14 @@ export const AutomatePage: React.FC = () => {
   const sniperWsRef = useRef<SniperBotWebSocketManager | null>(null);
   const copyTradeWsRef = useRef<CopyTradeWebSocketManager | null>(null);
   const automateWsRef = useRef<MultiTokenWebSocketManager | null>(null);
+
+  // Refs for batched trade handlers (to avoid recreating on each render)
+  const batchedSniperHandlerRef = useRef<ReturnType<
+    typeof createBatchedTradeHandler<SniperEvent>
+  > | null>(null);
+  const batchedCopyTradeHandlerRef = useRef<ReturnType<
+    typeof createBatchedTradeHandler<CopyTradeData>
+  > | null>(null);
 
   // Connection states
   const [sniperConnected, setSniperConnected] = useState(false);
@@ -461,6 +470,11 @@ export const AutomatePage: React.FC = () => {
     const activeSniper = sniperProfiles.some((p) => p.isActive);
 
     if (!activeSniper) {
+      // Clean up batched handler
+      if (batchedSniperHandlerRef.current) {
+        batchedSniperHandlerRef.current.clear();
+        batchedSniperHandlerRef.current = null;
+      }
       if (sniperWsRef.current) {
         sniperWsRef.current.disconnect();
         sniperWsRef.current = null;
@@ -469,14 +483,27 @@ export const AutomatePage: React.FC = () => {
       return;
     }
 
+    // Create batched handler if not exists
+    if (!batchedSniperHandlerRef.current) {
+      batchedSniperHandlerRef.current = createBatchedTradeHandler<SniperEvent>(
+        (events) => {
+          // Process all batched events
+          events.forEach((event) => void handleSniperEvent(event));
+        },
+        100, // 100ms debounce
+      );
+    }
+
     if (!sniperWsRef.current) {
       sniperWsRef.current = new SniperBotWebSocketManager();
     }
 
+    const batchedHandler = batchedSniperHandlerRef.current;
+
     sniperWsRef.current.connect({
       apiKey: contextConfig?.streamApiKey || undefined,
-      onDeploy: (event: DeployEvent) => void handleSniperEvent(event),
-      onMigration: (event: MigrationEvent) => void handleSniperEvent(event),
+      onDeploy: (event: DeployEvent) => batchedHandler.add(event),
+      onMigration: (event: MigrationEvent) => batchedHandler.add(event),
       onConnect: () => {
         setSniperConnected(true);
         setWsError(null);
@@ -490,7 +517,8 @@ export const AutomatePage: React.FC = () => {
     });
 
     return () => {
-      // Don't disconnect on cleanup, let it stay connected
+      // Flush pending events on cleanup
+      batchedHandler.flush();
     };
   }, [sniperProfiles, contextConfig?.streamApiKey, handleSniperEvent]);
 
@@ -502,6 +530,11 @@ export const AutomatePage: React.FC = () => {
     ];
 
     if (walletsToMonitor.length === 0) {
+      // Clean up batched handler
+      if (batchedCopyTradeHandlerRef.current) {
+        batchedCopyTradeHandlerRef.current.clear();
+        batchedCopyTradeHandlerRef.current = null;
+      }
       if (copyTradeWsRef.current) {
         copyTradeWsRef.current.disconnect();
         copyTradeWsRef.current = null;
@@ -510,14 +543,28 @@ export const AutomatePage: React.FC = () => {
       return;
     }
 
+    // Create batched handler if not exists
+    if (!batchedCopyTradeHandlerRef.current) {
+      batchedCopyTradeHandlerRef.current =
+        createBatchedTradeHandler<CopyTradeData>(
+          (trades) => {
+            // Process all batched trades
+            trades.forEach((trade) => void handleCopyTrade(trade));
+          },
+          100, // 100ms debounce
+        );
+    }
+
     if (!copyTradeWsRef.current) {
       copyTradeWsRef.current = new CopyTradeWebSocketManager();
     }
 
+    const batchedHandler = batchedCopyTradeHandlerRef.current;
+
     copyTradeWsRef.current.connect({
       signers: walletsToMonitor,
       apiKey: contextConfig?.streamApiKey || undefined,
-      onTrade: (trade: CopyTradeData) => void handleCopyTrade(trade),
+      onTrade: (trade: CopyTradeData) => batchedHandler.add(trade),
       onConnect: () => {
         setCopyTradeConnected(true);
         setWsError(null);
@@ -531,7 +578,8 @@ export const AutomatePage: React.FC = () => {
     });
 
     return () => {
-      // Don't disconnect on cleanup
+      // Flush pending trades on cleanup
+      batchedHandler.flush();
     };
   }, [copyTradeProfiles, contextConfig?.streamApiKey, handleCopyTrade]);
 
@@ -540,7 +588,15 @@ export const AutomatePage: React.FC = () => {
     const sniperWs = sniperWsRef.current;
     const copyTradeWs = copyTradeWsRef.current;
     const automateWs = automateWsRef.current;
+    const batchedSniper = batchedSniperHandlerRef.current;
+    const batchedCopyTrade = batchedCopyTradeHandlerRef.current;
     return () => {
+      // Flush and clear batched handlers
+      batchedSniper?.flush();
+      batchedSniper?.clear();
+      batchedCopyTrade?.flush();
+      batchedCopyTrade?.clear();
+      // Disconnect WebSockets
       sniperWs?.disconnect();
       copyTradeWs?.disconnect();
       automateWs?.disconnect();

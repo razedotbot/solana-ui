@@ -16,7 +16,7 @@ import type {
   MultiTokenWebSocketConfig,
   WebSocketCopyTradeData as CopyTradeData,
   CopyTradeWebSocketConfig,
-} from './types';
+} from "./types";
 
 // Re-export types for backward compatibility
 export type {
@@ -32,7 +32,7 @@ export type {
   MultiTokenWebSocketConfig,
   CopyTradeWebSocketConfig,
 };
-export type { WebSocketCopyTradeData as CopyTradeData } from './types';
+export type { WebSocketCopyTradeData as CopyTradeData } from "./types";
 
 // ============================================================================
 // Shared Constants
@@ -40,6 +40,59 @@ export type { WebSocketCopyTradeData as CopyTradeData } from './types';
 
 export const RECONNECT_DELAY = 3000; // 3 seconds
 export const MAX_RECONNECT_ATTEMPTS = 10;
+export const TRADE_BATCH_DELAY = 100; // 100ms debounce for batching trades
+
+// ============================================================================
+// Trade Batching Utility
+// ============================================================================
+
+/**
+ * Creates a batched trade handler that collects trades and dispatches them
+ * in batches to reduce re-renders from rapid WebSocket updates.
+ */
+export function createBatchedTradeHandler<T>(
+  onBatch: (trades: T[]) => void,
+  delay: number = TRADE_BATCH_DELAY,
+): {
+  add: (trade: T) => void;
+  flush: () => void;
+  clear: () => void;
+} {
+  let pendingTrades: T[] = [];
+  let timeoutId: NodeJS.Timeout | null = null;
+
+  const flush = (): void => {
+    if (pendingTrades.length > 0) {
+      const trades = [...pendingTrades];
+      pendingTrades = [];
+      onBatch(trades);
+    }
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  const add = (trade: T): void => {
+    pendingTrades.push(trade);
+
+    // Reset the timer on each new trade (debounce behavior)
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(flush, delay);
+  };
+
+  const clear = (): void => {
+    pendingTrades = [];
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  return { add, flush, clear };
+}
 
 // ============================================================================
 // Shared Utility Functions
@@ -51,8 +104,9 @@ export const MAX_RECONNECT_ATTEMPTS = 10;
  */
 function getWebSocketUrl(): string {
   // Get the trading server URL from window (set in index.tsx)
-  const tradingServerUrl = (window as { tradingServerUrl?: string }).tradingServerUrl;
-  
+  const tradingServerUrl = (window as { tradingServerUrl?: string })
+    .tradingServerUrl;
+
   if (tradingServerUrl) {
     try {
       // Convert HTTPS URL to WSS URL
@@ -60,77 +114,97 @@ function getWebSocketUrl(): string {
       const wsUrl = `wss://${url.hostname}/ws/sol`;
       return wsUrl;
     } catch (error) {
-      console.warn('[WebSocket] Failed to parse trading server URL, using default:', error);
+      console.warn(
+        "[WebSocket] Failed to parse trading server URL, using default:",
+        error,
+      );
     }
   }
-  
+
   // Fallback to default if trading server URL is not available
-  return 'wss://de.raze.sh/ws/sol';
+  return "wss://de.raze.sh/ws/sol";
 }
 
 export function buildWebSocketUrl(apiKey?: string): string {
   const wsUrl = getWebSocketUrl();
-  
+
   if (!apiKey) {
     return wsUrl;
   }
-  
-  const separator = wsUrl.includes('?') ? '&' : '?';
+
+  const separator = wsUrl.includes("?") ? "&" : "?";
   return `${wsUrl}${separator}apiKey=${encodeURIComponent(apiKey)}`;
 }
 
 export function isAuthenticationError(event: CloseEvent): boolean {
   const isAuthClose = event.code === 1008 || event.code === 1003;
-  
+
   if (isAuthClose) {
     return true;
   }
-  
+
   if (event.reason) {
     const reason = event.reason.toLowerCase();
-    return reason.includes('authentication') ||
-           reason.includes('api key') ||
-           reason.includes('unauthorized');
+    return (
+      reason.includes("authentication") ||
+      reason.includes("api key") ||
+      reason.includes("unauthorized")
+    );
   }
-  
+
   return false;
 }
 
 export function isAuthenticationErrorMessage(errorMessage: string): boolean {
   const msg = errorMessage.toLowerCase();
-  return msg.includes('authentication') || 
-         msg.includes('api key') ||
-         msg.includes('unauthorized') ||
-         (msg.includes('connection') && msg.includes('exceeded'));
+  return (
+    msg.includes("authentication") ||
+    msg.includes("api key") ||
+    msg.includes("unauthorized") ||
+    (msg.includes("connection") && msg.includes("exceeded"))
+  );
 }
 
-export function extractTransactionType(txData: TradeTransactionData): 'buy' | 'sell' {
-  const transactionType = txData.type || txData.transactionType || txData.tradeType || 'buy';
-  
-  if (typeof transactionType === 'string') {
+export function extractTransactionType(
+  txData: TradeTransactionData,
+): "buy" | "sell" {
+  const transactionType =
+    txData.type || txData.transactionType || txData.tradeType || "buy";
+
+  if (typeof transactionType === "string") {
     const normalized = transactionType.toLowerCase();
-    if (normalized === 'buy' || normalized === 'sell') {
+    if (normalized === "buy" || normalized === "sell") {
       return normalized;
     }
   }
-  
-  return 'buy';
+
+  return "buy";
 }
 
-export function parseNumericValue(value: string | number | undefined, defaultValue = 0): number {
+export function parseNumericValue(
+  value: string | number | undefined,
+  defaultValue = 0,
+): number {
   if (value === undefined || value === null) {
     return defaultValue;
   }
-  
-  const parsed = typeof value === 'string' ? parseFloat(value) : value;
+
+  const parsed = typeof value === "string" ? parseFloat(value) : value;
   return isNaN(parsed) ? defaultValue : parsed;
 }
 
-export function extractTokenMint(message: WebSocketTradeMessage, txData: TradeTransactionData): string | null {
-  return txData.tokenMint || txData.mint || message.tokenMint || message.mint || null;
+export function extractTokenMint(
+  message: WebSocketTradeMessage,
+  txData: TradeTransactionData,
+): string | null {
+  return (
+    txData.tokenMint || txData.mint || message.tokenMint || message.mint || null
+  );
 }
 
-export function extractSignerAddress(txData: TradeTransactionData): string | null {
+export function extractSignerAddress(
+  txData: TradeTransactionData,
+): string | null {
   return txData.signer || txData.trader || null;
 }
 
@@ -173,19 +247,23 @@ export class AutomateWebSocketManager {
 
     try {
       const wsUrl = buildWebSocketUrl(this.config?.apiKey);
-      
+
       if (this.config?.apiKey) {
         // eslint-disable-next-line no-console
-        console.log('[AutomateWebSocket] Connecting with API key authentication');
+        console.log(
+          "[AutomateWebSocket] Connecting with API key authentication",
+        );
       } else {
-        console.warn('[AutomateWebSocket] Connecting without API key - connection may be rejected');
+        console.warn(
+          "[AutomateWebSocket] Connecting without API key - connection may be rejected",
+        );
       }
-      
+
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         // eslint-disable-next-line no-console
-        console.log('[AutomateWebSocket] Connected to WebSocket');
+        console.log("[AutomateWebSocket] Connected to WebSocket");
         this.reconnectAttempts = 0;
         this.config?.onConnect?.();
 
@@ -199,41 +277,60 @@ export class AutomateWebSocketManager {
           const data = JSON.parse(event.data as string) as WebSocketMessage;
           this.handleMessage(data);
         } catch (error) {
-          this.config?.onError?.(error instanceof Error ? error : new Error('Failed to parse WebSocket message'));
+          this.config?.onError?.(
+            error instanceof Error
+              ? error
+              : new Error("Failed to parse WebSocket message"),
+          );
         }
       };
 
       this.ws.onerror = () => {
-        this.config?.onError?.(new Error('WebSocket connection error'));
+        this.config?.onError?.(new Error("WebSocket connection error"));
       };
 
       this.ws.onclose = (event) => {
         // eslint-disable-next-line no-console
-        console.log('[AutomateWebSocket] WebSocket closed', { code: event.code, reason: event.reason });
+        console.log("[AutomateWebSocket] WebSocket closed", {
+          code: event.code,
+          reason: event.reason,
+        });
         this.ws = null;
         this.config?.onDisconnect?.();
 
         if (isAuthenticationError(event)) {
           this.isManualClose = true;
-          const errorMsg = event.reason || 'Authentication failed. Please check your API key.';
+          const errorMsg =
+            event.reason || "Authentication failed. Please check your API key.";
           this.config?.onError?.(new Error(errorMsg));
           return;
         }
 
-        if (!this.isManualClose && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        if (
+          !this.isManualClose &&
+          this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+        ) {
           this.reconnectAttempts++;
           // eslint-disable-next-line no-console
-          console.log(`[AutomateWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-          
+          console.log(
+            `[AutomateWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`,
+          );
+
           this.reconnectTimeout = setTimeout(() => {
             this.attemptConnection();
           }, RECONNECT_DELAY);
         } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          this.config?.onError?.(new Error('Max reconnection attempts reached'));
+          this.config?.onError?.(
+            new Error("Max reconnection attempts reached"),
+          );
         }
       };
     } catch (error) {
-      this.config?.onError?.(error instanceof Error ? error : new Error('Failed to create WebSocket'));
+      this.config?.onError?.(
+        error instanceof Error
+          ? error
+          : new Error("Failed to create WebSocket"),
+      );
     }
   }
 
@@ -241,8 +338,8 @@ export class AutomateWebSocketManager {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     const tokenSubscription = {
-      action: 'subscribe',
-      tokenMint: tokenMint
+      action: "subscribe",
+      tokenMint: tokenMint,
     };
 
     // eslint-disable-next-line no-console
@@ -254,37 +351,46 @@ export class AutomateWebSocketManager {
   private handleMessage(data: WebSocketMessage): void {
     if (!this.config) return;
 
-    if (data.type === 'welcome') {
+    if (data.type === "welcome") {
       // eslint-disable-next-line no-console
-      console.log('[AutomateWebSocket] Welcome message:', 'message' in data ? data.message : undefined);
+      console.log(
+        "[AutomateWebSocket] Welcome message:",
+        "message" in data ? data.message : undefined,
+      );
       return;
     }
 
-    if (data.type === 'connection') {
+    if (data.type === "connection") {
       // eslint-disable-next-line no-console
-      console.log('[AutomateWebSocket] Connection confirmed:', 'clientId' in data ? data.clientId : undefined);
+      console.log(
+        "[AutomateWebSocket] Connection confirmed:",
+        "clientId" in data ? data.clientId : undefined,
+      );
       return;
     }
 
-    if (data.type === 'trade' || data.type === 'transaction') {
+    if (data.type === "trade" || data.type === "transaction") {
       this.processTradeMessage(data);
       return;
     }
 
-    if (data.type === 'event_subscription_confirmed') {
+    if (data.type === "event_subscription_confirmed") {
       // eslint-disable-next-line no-console
-      console.log('[AutomateWebSocket] Subscription confirmed');
+      console.log("[AutomateWebSocket] Subscription confirmed");
       return;
     }
 
-    if (data.type === 'error') {
-      const errorMessage = ('message' in data ? data.message : undefined) || ('error' in data ? data.error : undefined) || 'Unknown server error';
-      
+    if (data.type === "error") {
+      const errorMessage =
+        ("message" in data ? data.message : undefined) ||
+        ("error" in data ? data.error : undefined) ||
+        "Unknown server error";
+
       if (isAuthenticationErrorMessage(errorMessage)) {
         this.isManualClose = true;
         this.ws?.close();
       }
-      
+
       this.config.onError?.(new Error(errorMessage));
       return;
     }
@@ -294,10 +400,15 @@ export class AutomateWebSocketManager {
     if (!this.config) return;
 
     try {
-      const txData: TradeTransactionData = message.transaction || message.data || {};
+      const txData: TradeTransactionData =
+        message.transaction || message.data || {};
       const tokenMint = extractTokenMint(message, txData);
-      
-      if (tokenMint && this.config.tokenMint && tokenMint !== this.config.tokenMint) {
+
+      if (
+        tokenMint &&
+        this.config.tokenMint &&
+        tokenMint !== this.config.tokenMint
+      ) {
         return;
       }
 
@@ -305,18 +416,21 @@ export class AutomateWebSocketManager {
       if (!finalTokenMint) return;
 
       const transactionType = extractTransactionType(txData);
-      const tokensAmount = parseNumericValue(txData.tokenAmount || txData.tokensAmount);
+      const tokensAmount = parseNumericValue(
+        txData.tokenAmount || txData.tokensAmount,
+      );
       const solAmount = parseNumericValue(txData.solAmount);
       const avgPrice = parseNumericValue(txData.avgPrice || txData.avgPriceUsd);
-      const signature = txData.signature || message.signature || '';
-      const signer = extractSignerAddress(txData) || '';
+      const signature = txData.signature || message.signature || "";
+      const signer = extractSignerAddress(txData) || "";
       const timestamp = txData.timestamp || message.timestamp || Date.now();
 
       const solPrice = message.priceInfo?.solPrice || this.config.solPrice;
       const tokenSupply = this.config.tokenSupply;
-      const marketCap = (solPrice > 0 && avgPrice > 0 && tokenSupply > 0)
-        ? avgPrice * solPrice * tokenSupply
-        : 0;
+      const marketCap =
+        solPrice > 0 && avgPrice > 0 && tokenSupply > 0
+          ? avgPrice * solPrice * tokenSupply
+          : 0;
 
       const trade: AutomateTrade = {
         type: transactionType,
@@ -324,16 +438,20 @@ export class AutomateWebSocketManager {
         tokensAmount,
         avgPrice,
         solAmount,
-        timestamp: typeof timestamp === 'number' ? timestamp : Date.now(),
+        timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
         signature,
         tokenMint: finalTokenMint,
         marketCap,
-        walletAddress: signer
+        walletAddress: signer,
       };
 
       this.config.onTrade(trade);
     } catch (error) {
-      this.config.onError?.(error instanceof Error ? error : new Error('Failed to process trade message'));
+      this.config.onError?.(
+        error instanceof Error
+          ? error
+          : new Error("Failed to process trade message"),
+      );
     }
   }
 
@@ -367,8 +485,8 @@ export class AutomateWebSocketManager {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     const unsubscribeMessage = {
-      action: 'unsubscribe',
-      tokenMint: tokenMint
+      action: "unsubscribe",
+      tokenMint: tokenMint,
     };
 
     // eslint-disable-next-line no-console
@@ -378,7 +496,7 @@ export class AutomateWebSocketManager {
 
   disconnect(): void {
     this.isManualClose = true;
-    
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -432,19 +550,23 @@ export class MultiTokenWebSocketManager {
 
     try {
       const wsUrl = buildWebSocketUrl(this.config?.apiKey);
-      
+
       if (this.config?.apiKey) {
         // eslint-disable-next-line no-console
-        console.log('[MultiTokenWebSocket] Connecting with API key authentication');
+        console.log(
+          "[MultiTokenWebSocket] Connecting with API key authentication",
+        );
       } else {
-        console.warn('[MultiTokenWebSocket] Connecting without API key - connection may be rejected');
+        console.warn(
+          "[MultiTokenWebSocket] Connecting without API key - connection may be rejected",
+        );
       }
-      
+
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         // eslint-disable-next-line no-console
-        console.log('[MultiTokenWebSocket] Connected to WebSocket');
+        console.log("[MultiTokenWebSocket] Connected to WebSocket");
         this.reconnectAttempts = 0;
         this.config?.onConnect?.();
 
@@ -452,14 +574,14 @@ export class MultiTokenWebSocketManager {
         if (this.subscribedTokens.size > 0) {
           const tokensToResubscribe = Array.from(this.subscribedTokens);
           this.subscribedTokens.clear();
-          tokensToResubscribe.forEach(token => this.subscribeToToken(token));
+          tokensToResubscribe.forEach((token) => this.subscribeToToken(token));
         }
-        
+
         // Subscribe to any pending subscriptions
         if (this.pendingSubscriptions.size > 0) {
           const pendingTokens = Array.from(this.pendingSubscriptions);
           this.pendingSubscriptions.clear();
-          pendingTokens.forEach(token => this.subscribeToToken(token));
+          pendingTokens.forEach((token) => this.subscribeToToken(token));
         }
       };
 
@@ -468,41 +590,60 @@ export class MultiTokenWebSocketManager {
           const data = JSON.parse(event.data as string) as WebSocketMessage;
           this.handleMessage(data);
         } catch (error) {
-          this.config?.onError?.(error instanceof Error ? error : new Error('Failed to parse WebSocket message'));
+          this.config?.onError?.(
+            error instanceof Error
+              ? error
+              : new Error("Failed to parse WebSocket message"),
+          );
         }
       };
 
       this.ws.onerror = () => {
-        this.config?.onError?.(new Error('WebSocket connection error'));
+        this.config?.onError?.(new Error("WebSocket connection error"));
       };
 
       this.ws.onclose = (event) => {
         // eslint-disable-next-line no-console
-        console.log('[MultiTokenWebSocket] WebSocket closed', { code: event.code, reason: event.reason });
+        console.log("[MultiTokenWebSocket] WebSocket closed", {
+          code: event.code,
+          reason: event.reason,
+        });
         this.ws = null;
         this.config?.onDisconnect?.();
 
         if (isAuthenticationError(event)) {
           this.isManualClose = true;
-          const errorMsg = event.reason || 'Authentication failed. Please check your API key.';
+          const errorMsg =
+            event.reason || "Authentication failed. Please check your API key.";
           this.config?.onError?.(new Error(errorMsg));
           return;
         }
 
-        if (!this.isManualClose && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        if (
+          !this.isManualClose &&
+          this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+        ) {
           this.reconnectAttempts++;
           // eslint-disable-next-line no-console
-          console.log(`[MultiTokenWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-          
+          console.log(
+            `[MultiTokenWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`,
+          );
+
           this.reconnectTimeout = setTimeout(() => {
             this.attemptConnection();
           }, RECONNECT_DELAY);
         } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          this.config?.onError?.(new Error('Max reconnection attempts reached'));
+          this.config?.onError?.(
+            new Error("Max reconnection attempts reached"),
+          );
         }
       };
     } catch (error) {
-      this.config?.onError?.(error instanceof Error ? error : new Error('Failed to create WebSocket'));
+      this.config?.onError?.(
+        error instanceof Error
+          ? error
+          : new Error("Failed to create WebSocket"),
+      );
     }
   }
 
@@ -517,8 +658,8 @@ export class MultiTokenWebSocketManager {
     }
 
     const tokenSubscription = {
-      action: 'subscribe',
-      tokenMint: tokenMint
+      action: "subscribe",
+      tokenMint: tokenMint,
     };
 
     // eslint-disable-next-line no-console
@@ -539,8 +680,8 @@ export class MultiTokenWebSocketManager {
     }
 
     const unsubscribeMessage = {
-      action: 'unsubscribe',
-      tokenMint: tokenMint
+      action: "unsubscribe",
+      tokenMint: tokenMint,
     };
 
     // eslint-disable-next-line no-console
@@ -553,37 +694,46 @@ export class MultiTokenWebSocketManager {
   private handleMessage(data: WebSocketMessage): void {
     if (!this.config) return;
 
-    if (data.type === 'welcome') {
+    if (data.type === "welcome") {
       // eslint-disable-next-line no-console
-      console.log('[MultiTokenWebSocket] Welcome message:', 'message' in data ? data.message : undefined);
+      console.log(
+        "[MultiTokenWebSocket] Welcome message:",
+        "message" in data ? data.message : undefined,
+      );
       return;
     }
 
-    if (data.type === 'connection') {
+    if (data.type === "connection") {
       // eslint-disable-next-line no-console
-      console.log('[MultiTokenWebSocket] Connection confirmed:', 'clientId' in data ? data.clientId : undefined);
+      console.log(
+        "[MultiTokenWebSocket] Connection confirmed:",
+        "clientId" in data ? data.clientId : undefined,
+      );
       return;
     }
 
-    if (data.type === 'trade' || data.type === 'transaction') {
+    if (data.type === "trade" || data.type === "transaction") {
       this.processTradeMessage(data);
       return;
     }
 
-    if (data.type === 'event_subscription_confirmed') {
+    if (data.type === "event_subscription_confirmed") {
       // eslint-disable-next-line no-console
-      console.log('[MultiTokenWebSocket] Subscription confirmed');
+      console.log("[MultiTokenWebSocket] Subscription confirmed");
       return;
     }
 
-    if (data.type === 'error') {
-      const errorMessage = ('message' in data ? data.message : undefined) || ('error' in data ? data.error : undefined) || 'Unknown server error';
-      
+    if (data.type === "error") {
+      const errorMessage =
+        ("message" in data ? data.message : undefined) ||
+        ("error" in data ? data.error : undefined) ||
+        "Unknown server error";
+
       if (isAuthenticationErrorMessage(errorMessage)) {
         this.isManualClose = true;
         this.ws?.close();
       }
-      
+
       this.config.onError?.(new Error(errorMessage));
       return;
     }
@@ -593,29 +743,33 @@ export class MultiTokenWebSocketManager {
     if (!this.config) return;
 
     try {
-      const txData: TradeTransactionData = message.transaction || message.data || {};
+      const txData: TradeTransactionData =
+        message.transaction || message.data || {};
       const tokenMint = extractTokenMint(message, txData);
-      
+
       if (!tokenMint) return;
-      
+
       // Only process trades for subscribed tokens
       if (!this.subscribedTokens.has(tokenMint)) {
         return;
       }
 
       const transactionType = extractTransactionType(txData);
-      const tokensAmount = parseNumericValue(txData.tokenAmount || txData.tokensAmount);
+      const tokensAmount = parseNumericValue(
+        txData.tokenAmount || txData.tokensAmount,
+      );
       const solAmount = parseNumericValue(txData.solAmount);
       const avgPrice = parseNumericValue(txData.avgPrice || txData.avgPriceUsd);
-      const signature = txData.signature || message.signature || '';
-      const signer = extractSignerAddress(txData) || '';
+      const signature = txData.signature || message.signature || "";
+      const signer = extractSignerAddress(txData) || "";
       const timestamp = txData.timestamp || message.timestamp || Date.now();
 
       const solPrice = message.priceInfo?.solPrice || this.config.solPrice;
       const tokenSupply = this.config.defaultTokenSupply;
-      const marketCap = (solPrice > 0 && avgPrice > 0 && tokenSupply > 0)
-        ? avgPrice * solPrice * tokenSupply
-        : 0;
+      const marketCap =
+        solPrice > 0 && avgPrice > 0 && tokenSupply > 0
+          ? avgPrice * solPrice * tokenSupply
+          : 0;
 
       const trade: AutomateTrade = {
         type: transactionType,
@@ -623,16 +777,20 @@ export class MultiTokenWebSocketManager {
         tokensAmount,
         avgPrice,
         solAmount,
-        timestamp: typeof timestamp === 'number' ? timestamp : Date.now(),
+        timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
         signature,
         tokenMint,
         marketCap,
-        walletAddress: signer
+        walletAddress: signer,
       };
 
       this.config.onTrade(trade, tokenMint);
     } catch (error) {
-      this.config.onError?.(error instanceof Error ? error : new Error('Failed to process trade message'));
+      this.config.onError?.(
+        error instanceof Error
+          ? error
+          : new Error("Failed to process trade message"),
+      );
     }
   }
 
@@ -647,12 +805,12 @@ export class MultiTokenWebSocketManager {
   }
 
   subscribeToTokens(tokenMints: string[]): void {
-    tokenMints.forEach(token => this.subscribeToToken(token));
+    tokenMints.forEach((token) => this.subscribeToToken(token));
   }
 
   unsubscribeFromAllTokens(): void {
     const tokens = Array.from(this.subscribedTokens);
-    tokens.forEach(token => this.unsubscribeFromToken(token));
+    tokens.forEach((token) => this.unsubscribeFromToken(token));
   }
 
   getSubscribedTokens(): string[] {
@@ -671,7 +829,7 @@ export class MultiTokenWebSocketManager {
 
   disconnect(): void {
     this.isManualClose = true;
-    
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -708,7 +866,10 @@ export class CopyTradeWebSocketManager {
 
   connect(config: CopyTradeWebSocketConfig): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const signersChanged = !arraysEqual(this.subscribedSigners, config.signers);
+      const signersChanged = !arraysEqual(
+        this.subscribedSigners,
+        config.signers,
+      );
       if (signersChanged) {
         if (this.subscribedSigners.length > 0) {
           this.unsubscribeFromSigners(this.subscribedSigners);
@@ -732,19 +893,23 @@ export class CopyTradeWebSocketManager {
 
     try {
       const wsUrl = buildWebSocketUrl(this.config?.apiKey);
-      
+
       if (this.config?.apiKey) {
         // eslint-disable-next-line no-console
-        console.log('[CopyTradeWebSocket] Connecting with API key authentication');
+        console.log(
+          "[CopyTradeWebSocket] Connecting with API key authentication",
+        );
       } else {
-        console.warn('[CopyTradeWebSocket] Connecting without API key - connection may be rejected');
+        console.warn(
+          "[CopyTradeWebSocket] Connecting without API key - connection may be rejected",
+        );
       }
-      
+
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         // eslint-disable-next-line no-console
-        console.log('[CopyTradeWebSocket] Connected to WebSocket');
+        console.log("[CopyTradeWebSocket] Connected to WebSocket");
         this.reconnectAttempts = 0;
         this.config?.onConnect?.();
 
@@ -758,105 +923,151 @@ export class CopyTradeWebSocketManager {
           const data = JSON.parse(event.data as string) as WebSocketMessage;
           this.handleMessage(data);
         } catch (error) {
-          this.config?.onError?.(error instanceof Error ? error : new Error('Failed to parse WebSocket message'));
+          this.config?.onError?.(
+            error instanceof Error
+              ? error
+              : new Error("Failed to parse WebSocket message"),
+          );
         }
       };
 
       this.ws.onerror = () => {
-        this.config?.onError?.(new Error('WebSocket connection error'));
+        this.config?.onError?.(new Error("WebSocket connection error"));
       };
 
       this.ws.onclose = (event) => {
         // eslint-disable-next-line no-console
-        console.log('[CopyTradeWebSocket] WebSocket closed', { code: event.code, reason: event.reason });
+        console.log("[CopyTradeWebSocket] WebSocket closed", {
+          code: event.code,
+          reason: event.reason,
+        });
         this.ws = null;
         this.config?.onDisconnect?.();
 
         if (isAuthenticationError(event)) {
           this.isManualClose = true;
-          const errorMsg = event.reason || 'Authentication failed. Please check your API key.';
+          const errorMsg =
+            event.reason || "Authentication failed. Please check your API key.";
           this.config?.onError?.(new Error(errorMsg));
           return;
         }
 
-        if (!this.isManualClose && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        if (
+          !this.isManualClose &&
+          this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+        ) {
           this.reconnectAttempts++;
           // eslint-disable-next-line no-console
-          console.log(`[CopyTradeWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-          
+          console.log(
+            `[CopyTradeWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`,
+          );
+
           this.reconnectTimeout = setTimeout(() => {
             this.attemptConnection();
           }, RECONNECT_DELAY);
         } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          this.config?.onError?.(new Error('Max reconnection attempts reached'));
+          this.config?.onError?.(
+            new Error("Max reconnection attempts reached"),
+          );
         }
       };
     } catch (error) {
-      this.config?.onError?.(error instanceof Error ? error : new Error('Failed to create WebSocket'));
+      this.config?.onError?.(
+        error instanceof Error
+          ? error
+          : new Error("Failed to create WebSocket"),
+      );
     }
   }
 
   private subscribeToSigners(signers: string[]): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || signers.length === 0) return;
+    if (
+      !this.ws ||
+      this.ws.readyState !== WebSocket.OPEN ||
+      signers.length === 0
+    )
+      return;
 
     const subscriptionMessage = {
-      action: 'subscribe',
-      signers: signers
+      action: "subscribe",
+      signers: signers,
     };
 
     // eslint-disable-next-line no-console
-    console.log(`[CopyTradeWebSocket] Subscribing to ${signers.length} signers:`, signers.slice(0, 3).join(', ') + (signers.length > 3 ? '...' : ''));
+    console.log(
+      `[CopyTradeWebSocket] Subscribing to ${signers.length} signers:`,
+      signers.slice(0, 3).join(", ") + (signers.length > 3 ? "..." : ""),
+    );
     this.ws.send(JSON.stringify(subscriptionMessage));
     this.subscribedSigners = [...signers];
   }
 
   private unsubscribeFromSigners(signers: string[]): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || signers.length === 0) return;
+    if (
+      !this.ws ||
+      this.ws.readyState !== WebSocket.OPEN ||
+      signers.length === 0
+    )
+      return;
 
     const unsubscribeMessage = {
-      action: 'unsubscribe',
-      signers: signers
+      action: "unsubscribe",
+      signers: signers,
     };
 
     // eslint-disable-next-line no-console
-    console.log(`[CopyTradeWebSocket] Unsubscribing from ${signers.length} signers`);
+    console.log(
+      `[CopyTradeWebSocket] Unsubscribing from ${signers.length} signers`,
+    );
     this.ws.send(JSON.stringify(unsubscribeMessage));
   }
 
   private handleMessage(data: WebSocketMessage): void {
     if (!this.config) return;
 
-    if (data.type === 'welcome') {
+    if (data.type === "welcome") {
       // eslint-disable-next-line no-console
-      console.log('[CopyTradeWebSocket] Welcome message:', 'message' in data ? data.message : undefined);
+      console.log(
+        "[CopyTradeWebSocket] Welcome message:",
+        "message" in data ? data.message : undefined,
+      );
       return;
     }
 
-    if (data.type === 'connection') {
+    if (data.type === "connection") {
       // eslint-disable-next-line no-console
-      console.log('[CopyTradeWebSocket] Connection confirmed:', 'clientId' in data ? data.clientId : undefined);
+      console.log(
+        "[CopyTradeWebSocket] Connection confirmed:",
+        "clientId" in data ? data.clientId : undefined,
+      );
       return;
     }
 
-    if (data.type === 'trade' || data.type === 'transaction') {
+    if (data.type === "trade" || data.type === "transaction") {
       this.processTradeMessage(data);
       return;
     }
 
-    if (data.type === 'subscription_confirmed' || data.type === 'event_subscription_confirmed') {
+    if (
+      data.type === "subscription_confirmed" ||
+      data.type === "event_subscription_confirmed"
+    ) {
       // eslint-disable-next-line no-console
-      console.log('[CopyTradeWebSocket] Subscription confirmed');
+      console.log("[CopyTradeWebSocket] Subscription confirmed");
       return;
     }
 
-    if (data.type === 'error') {
-      const errorMessage = ('message' in data ? data.message : undefined) || ('error' in data ? data.error : undefined) || 'Unknown server error';
-      
+    if (data.type === "error") {
+      const errorMessage =
+        ("message" in data ? data.message : undefined) ||
+        ("error" in data ? data.error : undefined) ||
+        "Unknown server error";
+
       if (isAuthenticationErrorMessage(errorMessage)) {
         this.isManualClose = true;
         this.ws?.close();
       }
-      
+
       this.config.onError?.(new Error(errorMessage));
       return;
     }
@@ -866,9 +1077,10 @@ export class CopyTradeWebSocketManager {
     if (!this.config) return;
 
     try {
-      const txData: TradeTransactionData = message.transaction || message.data || {};
+      const txData: TradeTransactionData =
+        message.transaction || message.data || {};
       const signerAddress = extractSignerAddress(txData);
-      
+
       if (!signerAddress || !this.subscribedSigners.includes(signerAddress)) {
         return;
       }
@@ -877,10 +1089,12 @@ export class CopyTradeWebSocketManager {
       if (!tokenMint) return;
 
       const transactionType = extractTransactionType(txData);
-      const tokenAmount = parseNumericValue(txData.tokenAmount || txData.tokensAmount);
+      const tokenAmount = parseNumericValue(
+        txData.tokenAmount || txData.tokensAmount,
+      );
       const solAmount = parseNumericValue(txData.solAmount);
       const avgPrice = parseNumericValue(txData.avgPrice || txData.avgPriceUsd);
-      const signature = txData.signature || message.signature || '';
+      const signature = txData.signature || message.signature || "";
       const timestamp = txData.timestamp || message.timestamp || Date.now();
       const marketCap = txData.marketCap || 0;
 
@@ -892,13 +1106,17 @@ export class CopyTradeWebSocketManager {
         solAmount,
         avgPrice,
         marketCap,
-        timestamp: typeof timestamp === 'number' ? timestamp : Date.now(),
-        signature
+        timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
+        signature,
       };
 
       this.config.onTrade(trade);
     } catch (error) {
-      this.config.onError?.(error instanceof Error ? error : new Error('Failed to process trade message'));
+      this.config.onError?.(
+        error instanceof Error
+          ? error
+          : new Error("Failed to process trade message"),
+      );
     }
   }
 
@@ -914,7 +1132,11 @@ export class CopyTradeWebSocketManager {
 
     this.config.signers = signers;
 
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && signers.length > 0) {
+    if (
+      this.ws &&
+      this.ws.readyState === WebSocket.OPEN &&
+      signers.length > 0
+    ) {
       this.subscribeToSigners(signers);
     }
   }
@@ -922,7 +1144,9 @@ export class CopyTradeWebSocketManager {
   addSigners(signers: string[]): void {
     if (!this.config) return;
 
-    const newSigners = signers.filter(s => !this.subscribedSigners.includes(s));
+    const newSigners = signers.filter(
+      (s) => !this.subscribedSigners.includes(s),
+    );
     if (newSigners.length === 0) return;
 
     this.config.signers = [...this.config.signers, ...newSigners];
@@ -936,14 +1160,20 @@ export class CopyTradeWebSocketManager {
   removeSigners(signers: string[]): void {
     if (!this.config) return;
 
-    const signersToRemove = signers.filter(s => this.subscribedSigners.includes(s));
+    const signersToRemove = signers.filter((s) =>
+      this.subscribedSigners.includes(s),
+    );
     if (signersToRemove.length === 0) return;
 
-    this.config.signers = this.config.signers.filter(s => !signersToRemove.includes(s));
+    this.config.signers = this.config.signers.filter(
+      (s) => !signersToRemove.includes(s),
+    );
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.unsubscribeFromSigners(signersToRemove);
-      this.subscribedSigners = this.subscribedSigners.filter(s => !signersToRemove.includes(s));
+      this.subscribedSigners = this.subscribedSigners.filter(
+        (s) => !signersToRemove.includes(s),
+      );
     }
   }
 
@@ -953,7 +1183,7 @@ export class CopyTradeWebSocketManager {
 
   disconnect(): void {
     this.isManualClose = true;
-    
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -987,7 +1217,7 @@ import type {
   MigrationEvent,
   DeployEventData,
   MigrationEventData,
-} from '../components/tools/automate/types';
+} from "../components/tools/automate/types";
 
 // Re-export sniper bot types
 export type { SniperBotWebSocketConfig, DeployEvent, MigrationEvent };
@@ -1034,64 +1264,89 @@ export class SniperBotWebSocketManager {
 
     try {
       const wsUrl = buildWebSocketUrl(this.config?.apiKey);
-      
+
       if (this.config?.apiKey) {
         // eslint-disable-next-line no-console
-        console.log('[SniperBotWebSocket] Connecting with API key authentication');
+        console.log(
+          "[SniperBotWebSocket] Connecting with API key authentication",
+        );
       } else {
-        console.warn('[SniperBotWebSocket] Connecting without API key - connection may be rejected');
+        console.warn(
+          "[SniperBotWebSocket] Connecting without API key - connection may be rejected",
+        );
       }
-      
+
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         // eslint-disable-next-line no-console
-        console.log('[SniperBotWebSocket] Connected to WebSocket');
+        console.log("[SniperBotWebSocket] Connected to WebSocket");
         this.reconnectAttempts = 0;
         // Don't call onConnect yet - wait for welcome message and subscription confirmation
       };
 
       this.ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data as string) as SniperWebSocketMessage;
+          const data = JSON.parse(
+            event.data as string,
+          ) as SniperWebSocketMessage;
           this.handleMessage(data);
         } catch (error) {
-          this.config?.onError?.(error instanceof Error ? error : new Error('Failed to parse WebSocket message'));
+          this.config?.onError?.(
+            error instanceof Error
+              ? error
+              : new Error("Failed to parse WebSocket message"),
+          );
         }
       };
 
       this.ws.onerror = () => {
-        this.config?.onError?.(new Error('WebSocket connection error'));
+        this.config?.onError?.(new Error("WebSocket connection error"));
       };
 
       this.ws.onclose = (event) => {
         // eslint-disable-next-line no-console
-        console.log('[SniperBotWebSocket] WebSocket closed', { code: event.code, reason: event.reason });
+        console.log("[SniperBotWebSocket] WebSocket closed", {
+          code: event.code,
+          reason: event.reason,
+        });
         this.ws = null;
         this.isSubscribed = false;
         this.config?.onDisconnect?.();
 
         if (isAuthenticationError(event)) {
           this.isManualClose = true;
-          const errorMsg = event.reason || 'Authentication failed. Please check your API key.';
+          const errorMsg =
+            event.reason || "Authentication failed. Please check your API key.";
           this.config?.onError?.(new Error(errorMsg));
           return;
         }
 
-        if (!this.isManualClose && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        if (
+          !this.isManualClose &&
+          this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+        ) {
           this.reconnectAttempts++;
           // eslint-disable-next-line no-console
-          console.log(`[SniperBotWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-          
+          console.log(
+            `[SniperBotWebSocket] Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`,
+          );
+
           this.reconnectTimeout = setTimeout(() => {
             this.attemptConnection();
           }, RECONNECT_DELAY);
         } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          this.config?.onError?.(new Error('Max reconnection attempts reached'));
+          this.config?.onError?.(
+            new Error("Max reconnection attempts reached"),
+          );
         }
       };
     } catch (error) {
-      this.config?.onError?.(error instanceof Error ? error : new Error('Failed to create WebSocket'));
+      this.config?.onError?.(
+        error instanceof Error
+          ? error
+          : new Error("Failed to create WebSocket"),
+      );
     }
   }
 
@@ -1100,12 +1355,14 @@ export class SniperBotWebSocketManager {
 
     // Subscribe to deploy and migration events
     const subscriptionMessage = {
-      action: 'subscribe',
-      subscriptions: ['deploy', 'migration']
+      action: "subscribe",
+      subscriptions: ["deploy", "migration"],
     };
 
     // eslint-disable-next-line no-console
-    console.log('[SniperBotWebSocket] Subscribing to deploy and migration events');
+    console.log(
+      "[SniperBotWebSocket] Subscribing to deploy and migration events",
+    );
     this.ws.send(JSON.stringify(subscriptionMessage));
   }
 
@@ -1113,80 +1370,95 @@ export class SniperBotWebSocketManager {
     if (!this.config) return;
 
     // Handle welcome message - subscribe after receiving it
-    if (data.type === 'welcome') {
+    if (data.type === "welcome") {
       // eslint-disable-next-line no-console
-      console.log('[SniperBotWebSocket] Welcome message received');
+      console.log("[SniperBotWebSocket] Welcome message received");
       this.subscribeToEvents();
       return;
     }
 
     // Handle connection confirmation
-    if (data.type === 'connection') {
+    if (data.type === "connection") {
       // eslint-disable-next-line no-console
-      console.log('[SniperBotWebSocket] Connection confirmed:', data.clientId);
+      console.log("[SniperBotWebSocket] Connection confirmed:", data.clientId);
       return;
     }
 
     // Handle subscription confirmation
-    if (data.type === 'subscription_confirmed' || data.type === 'event_subscription_confirmed') {
+    if (
+      data.type === "subscription_confirmed" ||
+      data.type === "event_subscription_confirmed"
+    ) {
       // eslint-disable-next-line no-console
-      console.log('[SniperBotWebSocket] Subscription confirmed:', data.subscriptions);
+      console.log(
+        "[SniperBotWebSocket] Subscription confirmed:",
+        data.subscriptions,
+      );
       this.isSubscribed = true;
       this.config.onConnect?.();
       return;
     }
 
     // Handle deploy events
-    if (data.type === 'deploy' && data.data) {
+    if (data.type === "deploy" && data.data) {
       const deployData = data.data as DeployEventData;
-      
+
       // Validate required fields
       if (!deployData.mint || !deployData.platform) {
         return;
       }
 
       const deployEvent: DeployEvent = {
-        type: 'deploy',
+        type: "deploy",
         timestamp: data.timestamp || Date.now(),
-        data: deployData
+        data: deployData,
       };
 
       // eslint-disable-next-line no-console
-      console.log('[SniperBotWebSocket] Deploy event:', deployData.symbol, deployData.name, deployData.platform);
+      console.log(
+        "[SniperBotWebSocket] Deploy event:",
+        deployData.symbol,
+        deployData.name,
+        deployData.platform,
+      );
       this.config.onDeploy(deployEvent);
       return;
     }
 
     // Handle migration events
-    if (data.type === 'migration' && data.data) {
+    if (data.type === "migration" && data.data) {
       const migrationData = data.data as MigrationEventData;
-      
+
       // Validate required fields
       if (!migrationData.mint) {
         return;
       }
 
       const migrationEvent: MigrationEvent = {
-        type: 'migration',
+        type: "migration",
         timestamp: data.timestamp || Date.now(),
-        data: migrationData
+        data: migrationData,
       };
 
       // eslint-disable-next-line no-console
-      console.log('[SniperBotWebSocket] Migration event:', migrationData.mint, migrationData.platform);
+      console.log(
+        "[SniperBotWebSocket] Migration event:",
+        migrationData.mint,
+        migrationData.platform,
+      );
       this.config.onMigration(migrationEvent);
       return;
     }
 
     // Handle error messages
-    if (data.type === 'error') {
-      const errorMessage = data.message || data.error || 'Unknown server error';
-      
+    if (data.type === "error") {
+      const errorMessage = data.message || data.error || "Unknown server error";
+
       if (isAuthenticationErrorMessage(errorMessage)) {
         this.isManualClose = true;
         this.ws?.close();
       }
-      
+
       this.config.onError?.(new Error(errorMessage));
       return;
     }
@@ -1194,7 +1466,7 @@ export class SniperBotWebSocketManager {
 
   disconnect(): void {
     this.isManualClose = true;
-    
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -1204,8 +1476,8 @@ export class SniperBotWebSocketManager {
       // Unsubscribe from events before closing
       if (this.isSubscribed && this.ws.readyState === WebSocket.OPEN) {
         const unsubscribeMessage = {
-          action: 'unsubscribe',
-          subscriptions: ['deploy', 'migration']
+          action: "unsubscribe",
+          subscriptions: ["deploy", "migration"],
         };
         this.ws.send(JSON.stringify(unsubscribeMessage));
       }
@@ -1219,7 +1491,11 @@ export class SniperBotWebSocketManager {
   }
 
   isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN && this.isSubscribed;
+    return (
+      this.ws !== null &&
+      this.ws.readyState === WebSocket.OPEN &&
+      this.isSubscribed
+    );
   }
 
   /**
@@ -1227,9 +1503,9 @@ export class SniperBotWebSocketManager {
    */
   updateApiKey(apiKey: string): void {
     if (!this.config) return;
-    
+
     this.config.apiKey = apiKey;
-    
+
     // Reconnect with new API key
     this.disconnect();
     this.isManualClose = false;

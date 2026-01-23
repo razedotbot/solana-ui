@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
+import { FixedSizeList as List } from "react-window";
 import {
   RefreshCw,
   Zap,
@@ -28,6 +35,383 @@ import {
   validateSellInputs,
 } from "./utils/sell";
 import { Tooltip } from "./components/Tooltip";
+
+// ============================================================================
+// Virtualized Wallet List Component
+// ============================================================================
+
+const WALLET_ROW_HEIGHT = 48; // Height of each wallet row in pixels
+
+interface WalletRowData {
+  wallets: WalletType[];
+  tokenAddress: string;
+  solBalances: Map<string, number>;
+  tokenBalances: Map<string, number>;
+  hoverRow: number | null;
+  setHoverRow: (id: number | null) => void;
+  clickedWalletId: number | null;
+  recentlyUpdatedWallets: Set<string>;
+  copiedAddress: string | null;
+  buyingWalletId: number | null;
+  sellingWalletId: number | null;
+  effectiveCategorySettings?: Record<
+    WalletCategory,
+    CategoryQuickTradeSettings
+  >;
+  quickBuyEnabled: boolean;
+  quickBuyAmount: number;
+  quickBuyMinAmount: number;
+  quickBuyMaxAmount: number;
+  useQuickBuyRange: boolean;
+  quickSellPercentage: number;
+  quickSellMinPercentage: number;
+  quickSellMaxPercentage: number;
+  useQuickSellRange: boolean;
+  onWalletClick: (wallet: WalletType) => void;
+  onCopyAddress: (wallet: WalletType, e: React.MouseEvent) => void;
+  onQuickBuy: (wallet: WalletType, e: React.MouseEvent) => void;
+  onQuickSell: (wallet: WalletType, e: React.MouseEvent) => void;
+}
+
+// Memoized wallet row component for virtualization
+const WalletRow = React.memo(
+  ({
+    index,
+    style,
+    data,
+  }: {
+    index: number;
+    style: React.CSSProperties;
+    data: WalletRowData;
+  }) => {
+    const {
+      wallets,
+      tokenAddress,
+      solBalances,
+      tokenBalances,
+      hoverRow,
+      setHoverRow,
+      clickedWalletId,
+      recentlyUpdatedWallets,
+      copiedAddress,
+      buyingWalletId,
+      sellingWalletId,
+      effectiveCategorySettings,
+      quickBuyEnabled,
+      quickBuyAmount,
+      quickBuyMinAmount,
+      quickBuyMaxAmount,
+      useQuickBuyRange,
+      quickSellPercentage,
+      quickSellMinPercentage,
+      quickSellMaxPercentage,
+      useQuickSellRange,
+      onWalletClick,
+      onCopyAddress,
+      onQuickBuy,
+      onQuickSell,
+    } = data;
+
+    const wallet = wallets[index];
+    if (!wallet) return null;
+
+    // Calculate buy settings
+    let buyEnabled: boolean;
+    let buyAmount: number;
+    let buyMinAmount: number;
+    let buyMaxAmount: number;
+    let useBuyRange: boolean;
+
+    if (wallet.customQuickTradeSettings) {
+      buyEnabled = true;
+      buyAmount = wallet.customQuickTradeSettings.buyAmount ?? 0.01;
+      buyMinAmount = wallet.customQuickTradeSettings.buyMinAmount ?? 0.01;
+      buyMaxAmount = wallet.customQuickTradeSettings.buyMaxAmount ?? 0.05;
+      useBuyRange = wallet.customQuickTradeSettings.useBuyRange ?? false;
+    } else {
+      const walletCategory = wallet.category;
+      let settings: CategoryQuickTradeSettings | null = null;
+      if (effectiveCategorySettings && walletCategory) {
+        settings = effectiveCategorySettings[walletCategory];
+      }
+      buyEnabled = settings?.enabled ?? quickBuyEnabled ?? true;
+      buyAmount = settings?.buyAmount ?? quickBuyAmount ?? 0.01;
+      buyMinAmount = settings?.buyMinAmount ?? quickBuyMinAmount ?? 0.01;
+      buyMaxAmount = settings?.buyMaxAmount ?? quickBuyMaxAmount ?? 0.05;
+      useBuyRange = settings?.useBuyRange ?? useQuickBuyRange ?? false;
+    }
+
+    const minRequired = useBuyRange ? buyMinAmount : buyAmount;
+
+    // Calculate sell settings
+    let sellPercentage: number;
+    let sellMinPercentage: number;
+    let sellMaxPercentage: number;
+    let useSellRange: boolean;
+
+    if (wallet.customQuickTradeSettings) {
+      sellPercentage = wallet.customQuickTradeSettings.sellPercentage ?? 100;
+      sellMinPercentage =
+        wallet.customQuickTradeSettings.sellMinPercentage ?? 25;
+      sellMaxPercentage =
+        wallet.customQuickTradeSettings.sellMaxPercentage ?? 100;
+      useSellRange = wallet.customQuickTradeSettings.useSellRange ?? false;
+    } else {
+      const walletCategory = wallet.category;
+      let settings: CategoryQuickTradeSettings | null = null;
+      if (effectiveCategorySettings && walletCategory) {
+        settings = effectiveCategorySettings[walletCategory];
+      }
+      sellPercentage = settings?.sellPercentage ?? quickSellPercentage ?? 100;
+      sellMinPercentage =
+        settings?.sellMinPercentage ?? quickSellMinPercentage ?? 25;
+      sellMaxPercentage =
+        settings?.sellMaxPercentage ?? quickSellMaxPercentage ?? 100;
+      useSellRange = settings?.useSellRange ?? useQuickSellRange ?? false;
+    }
+
+    const solBalance = solBalances.get(wallet.address) || 0;
+    const tokenBalance = tokenBalances.get(wallet.address) || 0;
+
+    return (
+      <div
+        style={style}
+        onClick={() => onWalletClick(wallet)}
+        onMouseEnter={() => setHoverRow(wallet.id)}
+        onMouseLeave={() => setHoverRow(null)}
+        className={`
+          flex items-center border-b transition-all duration-300 cursor-pointer group text-sm
+          ${
+            wallet.isActive
+              ? "bg-primary-20 border-app-primary-60 border-l-4 border-l-primary shadow-lg shadow-primary-20"
+              : "border-app-primary-15 hover-border-primary-30"
+          }
+          ${hoverRow === wallet.id && !wallet.isActive ? "bg-primary-08 border-app-primary-30" : ""}
+          ${recentlyUpdatedWallets.has(wallet.address) ? "border-l-2 border-l-success" : ""}
+          ${clickedWalletId === wallet.id ? "animate-click" : ""}
+        `}
+      >
+        {/* Quick Buy Button */}
+        <div className="py-3 pl-3 pr-1 w-12 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {buyEnabled && (
+              <Tooltip
+                content={
+                  tokenAddress
+                    ? useBuyRange
+                      ? `Quick buy random ${buyMinAmount.toFixed(3)}-${buyMaxAmount.toFixed(3)} SOL${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} (capped)`
+                      : `Quick buy ${buyAmount} SOL${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} (capped)`
+                    : "No token selected"
+                }
+                position="right"
+              >
+                <button
+                  onClick={(e) => onQuickBuy(wallet, e)}
+                  disabled={
+                    !tokenAddress ||
+                    buyingWalletId === wallet.id ||
+                    solBalance < minRequired + 0.01
+                  }
+                  className={`
+                    w-6 h-6 rounded-full transition-all duration-200 flex items-center justify-center
+                    ${
+                      !tokenAddress || solBalance < minRequired + 0.01
+                        ? "bg-app-tertiary border border-app-primary-20 cursor-not-allowed opacity-50"
+                        : buyingWalletId === wallet.id
+                          ? "bg-app-primary-color border border-app-primary-color shadow-lg shadow-app-primary-40 animate-pulse"
+                          : "bg-primary-30 border border-app-primary-80 hover:bg-app-primary-color hover-border-primary hover:shadow-lg hover:shadow-app-primary-40 cursor-pointer"
+                    }
+                  `}
+                >
+                  {buyingWalletId === wallet.id ? (
+                    <RefreshCw
+                      size={10}
+                      className="text-app-quaternary animate-spin"
+                    />
+                  ) : (
+                    <Zap
+                      size={10}
+                      className={
+                        !tokenAddress || solBalance < minRequired + 0.01
+                          ? "text-app-primary-40"
+                          : "text-app-quaternary group-hover:text-app-quaternary"
+                      }
+                    />
+                  )}
+                </button>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+
+        {/* Address Display */}
+        <div className="py-3 px-2 font-mono flex-1 min-w-0">
+          <div className="flex items-center">
+            <Tooltip content="Click to copy" position="bottom">
+              <span
+                className={`text-sm font-mono cursor-pointer transition-all duration-300 tracking-wide font-medium truncate
+                  ${
+                    wallet.isActive
+                      ? "text-success drop-shadow-sm"
+                      : "text-app-primary hover:color-primary"
+                  }
+                `}
+                onClick={(e) => onCopyAddress(wallet, e)}
+              >
+                {getWalletDisplayName(wallet)}
+                {copiedAddress === wallet.address && (
+                  <span className="ml-2 text-xs color-primary animate-pulse bg-primary-20 px-1 py-0.5 rounded">
+                    ✓
+                  </span>
+                )}
+              </span>
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* SOL Balance */}
+        <div className="py-3 px-2 text-right font-mono w-20 flex-shrink-0">
+          <span
+            className={`font-medium transition-colors duration-300 ${
+              wallet.isActive
+                ? solBalance > 0
+                  ? "text-success"
+                  : "text-warning"
+                : solBalance > 0
+                  ? "text-app-secondary"
+                  : "text-app-secondary-60"
+            }`}
+          >
+            {solBalance.toFixed(3)}
+          </span>
+        </div>
+
+        {/* Token Balance */}
+        {tokenAddress && (
+          <div className="py-3 px-2 text-right font-mono w-24 flex-shrink-0">
+            <span
+              className={`font-medium transition-colors duration-300 ${
+                wallet.isActive
+                  ? tokenBalance > 0
+                    ? "text-success"
+                    : "text-warning-60"
+                  : tokenBalance > 0
+                    ? "color-primary"
+                    : "text-app-primary-40"
+              }`}
+            >
+              {formatTokenBalance(tokenBalance)}
+            </span>
+          </div>
+        )}
+
+        {/* Quick Sell Button */}
+        <div className="py-3 pl-2 pr-3 flex-shrink-0">
+          <Tooltip
+            content={
+              tokenAddress
+                ? tokenBalance > 0
+                  ? useSellRange
+                    ? `Quick sell random ${sellMinPercentage}-${sellMaxPercentage}%${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} of tokens`
+                    : `Quick sell ${sellPercentage}%${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} of tokens`
+                  : "No tokens to sell"
+                : "No token selected"
+            }
+            position="left"
+          >
+            <button
+              onClick={(e) => onQuickSell(wallet, e)}
+              disabled={
+                !tokenAddress ||
+                sellingWalletId === wallet.id ||
+                tokenBalance <= 0
+              }
+              className={`
+                w-6 h-6 rounded-full transition-all duration-200 flex items-center justify-center
+                ${
+                  !tokenAddress || tokenBalance <= 0
+                    ? "bg-app-tertiary border border-app-primary-20 cursor-not-allowed opacity-50"
+                    : sellingWalletId === wallet.id
+                      ? "bg-red-500 border border-red-500 shadow-lg shadow-red-400 animate-pulse"
+                      : "bg-red-400 border border-red-600 hover:bg-red-500 hover:border-red-500 hover:shadow-lg hover:shadow-red-400 cursor-pointer"
+                }
+              `}
+            >
+              {sellingWalletId === wallet.id ? (
+                <RefreshCw size={10} className="text-white animate-spin" />
+              ) : (
+                <TrendingDown
+                  size={10}
+                  className={
+                    !tokenAddress || tokenBalance <= 0
+                      ? "text-app-primary-40"
+                      : "text-white"
+                  }
+                />
+              )}
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+    );
+  },
+);
+
+WalletRow.displayName = "WalletRow";
+
+// Virtualized wallet list component
+const WalletList: React.FC<WalletRowData> = (props) => {
+  const { wallets } = props;
+  const listRef = useRef<List>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [listHeight, setListHeight] = useState(400);
+
+  // Update list height based on container size
+  useEffect(() => {
+    const updateHeight = (): void => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const availableHeight = window.innerHeight - rect.top - 20;
+        setListHeight(Math.max(200, availableHeight));
+      }
+    };
+
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
+
+  // If fewer than 15 wallets, render without virtualization for simplicity
+  if (wallets.length < 15) {
+    return (
+      <div className="min-w-full relative">
+        {wallets.map((wallet, index) => (
+          <WalletRow key={wallet.id} index={index} style={{}} data={props} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="min-w-full relative">
+      <List
+        ref={listRef}
+        height={listHeight}
+        itemCount={wallets.length}
+        itemSize={WALLET_ROW_HEIGHT}
+        width="100%"
+        itemData={props}
+        overscanCount={5}
+      >
+        {WalletRow}
+      </List>
+    </div>
+  );
+};
+
+// ============================================================================
+// Main WalletsPage Component
+// ============================================================================
 
 interface WalletsPageProps {
   wallets: WalletType[];
@@ -644,6 +1028,37 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
     }
   };
 
+  // Filter out archived wallets for display
+  const visibleWallets = useMemo(
+    () => wallets.filter((wallet) => !wallet.isArchived),
+    [wallets],
+  );
+
+  // Handler for wallet row click (toggle selection)
+  const handleWalletClick = useCallback(
+    (wallet: WalletType) => {
+      setClickedWalletId(wallet.id);
+      setTimeout(() => setClickedWalletId(null), 300);
+      const newWallets = toggleWallet(wallets, wallet.id);
+      saveWalletsToCookies(newWallets);
+      setWallets(newWallets);
+    },
+    [wallets, setWallets],
+  );
+
+  // Handler for copying address
+  const handleCopyAddress = useCallback(
+    async (wallet: WalletType, e: React.MouseEvent) => {
+      e.stopPropagation();
+      const success = await copyToClipboard(wallet.address, showToast);
+      if (success) {
+        setCopiedAddress(wallet.address);
+        setTimeout(() => setCopiedAddress(null), 2000);
+      }
+    },
+    [showToast],
+  );
+
   return (
     <div className="relative flex-1 overflow-y-auto overflow-x-hidden bg-app-primary h-full min-h-full">
       {/* Background effects - same as Actions.tsx */}
@@ -817,352 +1232,35 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
         </div>
       </div>
 
-      {/* Wallets table with  visual selection */}
-      <div className="pt-2 relative z-10">
-        <div className="min-w-full relative">
-          <table className="w-full border-separate border-spacing-0">
-            <tbody className="text-sm">
-              {wallets
-                .filter((wallet) => !wallet.isArchived)
-                .map((wallet) => (
-                  <tr
-                    key={wallet.id}
-                    onClick={() => {
-                      setClickedWalletId(wallet.id);
-                      setTimeout(() => setClickedWalletId(null), 300);
-                      const newWallets = toggleWallet(wallets, wallet.id);
-                      saveWalletsToCookies(newWallets);
-                      setWallets(newWallets);
-                    }}
-                    onMouseEnter={() => setHoverRow(wallet.id)}
-                    onMouseLeave={() => setHoverRow(null)}
-                    className={`
-                    border-b transition-all duration-300 cursor-pointer group
-                    ${
-                      wallet.isActive
-                        ? "bg-primary-20 border-app-primary-60 border-l-4 border-l-primary shadow-lg shadow-primary-20"
-                        : "border-app-primary-15 hover-border-primary-30"
-                    }
-                    ${hoverRow === wallet.id && !wallet.isActive ? "bg-primary-08 border-app-primary-30" : ""}
-                    ${recentlyUpdatedWallets.has(wallet.address) ? "border-l-2 border-l-success" : ""}
-                    ${clickedWalletId === wallet.id ? "animate-click" : ""}
-
-                  `}
-                  >
-                    {/*  Selection Indicator */}
-                    <td className="py-3 pl-3 pr-1 w-12">
-                      <div className="flex items-center gap-2">
-                        {/* Quick Buy Button */}
-                        {(() => {
-                          // Priority: 1. Custom wallet settings, 2. Category settings, 3. Global settings
-                          let buyEnabled: boolean;
-                          let buyAmount: number;
-                          let buyMinAmount: number;
-                          let buyMaxAmount: number;
-                          let useBuyRange: boolean;
-
-                          if (wallet.customQuickTradeSettings) {
-                            // Use custom wallet settings (always enabled if custom settings exist)
-                            buyEnabled = true;
-                            buyAmount =
-                              wallet.customQuickTradeSettings.buyAmount ?? 0.01;
-                            buyMinAmount =
-                              wallet.customQuickTradeSettings.buyMinAmount ??
-                              0.01;
-                            buyMaxAmount =
-                              wallet.customQuickTradeSettings.buyMaxAmount ??
-                              0.05;
-                            useBuyRange =
-                              wallet.customQuickTradeSettings.useBuyRange ??
-                              false;
-                          } else {
-                            // Fall back to category or global settings
-                            const walletCategory = wallet.category;
-                            let settings: CategoryQuickTradeSettings | null =
-                              null;
-
-                            if (effectiveCategorySettings && walletCategory) {
-                              settings =
-                                effectiveCategorySettings[walletCategory];
-                            }
-
-                            buyEnabled =
-                              settings?.enabled ?? quickBuyEnabled ?? true;
-                            buyAmount =
-                              settings?.buyAmount ?? quickBuyAmount ?? 0.01;
-                            buyMinAmount =
-                              settings?.buyMinAmount ??
-                              quickBuyMinAmount ??
-                              0.01;
-                            buyMaxAmount =
-                              settings?.buyMaxAmount ??
-                              quickBuyMaxAmount ??
-                              0.05;
-                            useBuyRange =
-                              settings?.useBuyRange ??
-                              useQuickBuyRange ??
-                              false;
-                          }
-
-                          const minRequired = useBuyRange
-                            ? buyMinAmount
-                            : buyAmount;
-
-                          if (!buyEnabled) return null;
-
-                          return (
-                            <Tooltip
-                              content={
-                                tokenAddress
-                                  ? useBuyRange
-                                    ? `Quick buy random ${buyMinAmount.toFixed(3)}-${buyMaxAmount.toFixed(3)} SOL${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} (capped)`
-                                    : `Quick buy ${buyAmount} SOL${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} (capped)`
-                                  : "No token selected"
-                              }
-                              position="right"
-                            >
-                              <button
-                                onClick={(e) => handleQuickBuy(wallet, e)}
-                                disabled={
-                                  !tokenAddress ||
-                                  buyingWalletId === wallet.id ||
-                                  (solBalances.get(wallet.address) || 0) <
-                                    minRequired + 0.01
-                                }
-                                className={`
-                              w-6 h-6 rounded-full transition-all duration-200 flex items-center justify-center
-                                ${
-                                  !tokenAddress ||
-                                  (solBalances.get(wallet.address) || 0) <
-                                    minRequired + 0.01
-                                    ? "bg-app-tertiary border border-app-primary-20 cursor-not-allowed opacity-50"
-                                    : buyingWalletId === wallet.id
-                                      ? "bg-app-primary-color border border-app-primary-color shadow-lg shadow-app-primary-40 animate-pulse"
-                                      : "bg-primary-30 border border-app-primary-80 hover:bg-app-primary-color hover-border-primary hover:shadow-lg hover:shadow-app-primary-40 cursor-pointer"
-                                }
-                            `}
-                              >
-                                {buyingWalletId === wallet.id ? (
-                                  <RefreshCw
-                                    size={10}
-                                    className="text-app-quaternary animate-spin"
-                                  />
-                                ) : (
-                                  <Zap
-                                    size={10}
-                                    className={`
-                                  ${
-                                    !tokenAddress ||
-                                    (solBalances.get(wallet.address) || 0) <
-                                      minRequired + 0.01
-                                      ? "text-app-primary-40"
-                                      : "text-app-quaternary group-hover:text-app-quaternary"
-                                  }
-                              `}
-                                  />
-                                )}
-                              </button>
-                            </Tooltip>
-                          );
-                        })()}
-                      </div>
-                    </td>
-
-                    {/*  Address Display */}
-                    <td className="py-3 px-2 font-mono">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Tooltip content={`Click to copy`} position="bottom">
-                            <span
-                              className={`text-sm font-mono cursor-pointer transition-all duration-300 tracking-wide font-medium
-                              ${
-                                wallet.isActive
-                                  ? "text-success drop-shadow-sm"
-                                  : "text-app-primary hover:color-primary"
-                              }
-                            `}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                const success = await copyToClipboard(
-                                  wallet.address,
-                                  showToast,
-                                );
-                                if (success) {
-                                  setCopiedAddress(wallet.address);
-                                  setTimeout(
-                                    () => setCopiedAddress(null),
-                                    2000,
-                                  );
-                                }
-                              }}
-                            >
-                              {getWalletDisplayName(wallet)}
-                              {copiedAddress === wallet.address && (
-                                <span className="ml-2 text-xs color-primary animate-pulse bg-primary-20 px-1 py-0.5 rounded">
-                                  ✓
-                                </span>
-                              )}
-                            </span>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/*  SOL Balance */}
-                    <td className="py-3 px-2 text-right font-mono">
-                      <div className="flex items-center justify-end gap-1">
-                        <span
-                          className={`font-medium transition-colors duration-300 ${
-                            wallet.isActive
-                              ? (solBalances.get(wallet.address) || 0) > 0
-                                ? "text-success"
-                                : "text-warning"
-                              : (solBalances.get(wallet.address) || 0) > 0
-                                ? "text-app-secondary"
-                                : "text-app-secondary-60"
-                          }`}
-                        >
-                          {(solBalances.get(wallet.address) || 0).toFixed(3)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/*  Token Balance */}
-                    {tokenAddress && (
-                      <td className="py-3 px-2 text-right font-mono">
-                        <div className="flex items-center justify-end gap-1">
-                          <span
-                            className={`font-medium transition-colors duration-300 ${
-                              wallet.isActive
-                                ? (tokenBalances.get(wallet.address) || 0) > 0
-                                  ? "text-success"
-                                  : "text-warning-60"
-                                : (tokenBalances.get(wallet.address) || 0) > 0
-                                  ? "color-primary"
-                                  : "text-app-primary-40"
-                            }`}
-                          >
-                            {formatTokenBalance(
-                              tokenBalances.get(wallet.address) || 0,
-                            )}
-                          </span>
-                        </div>
-                      </td>
-                    )}
-
-                    {/* Quick Sell Button */}
-                    <td className="py-3 pl-2 pr-3 text-right">
-                      {(() => {
-                        // Priority: 1. Custom wallet settings, 2. Category settings, 3. Global settings
-                        let sellPercentage: number;
-                        let sellMinPercentage: number;
-                        let sellMaxPercentage: number;
-                        let useSellRange: boolean;
-
-                        if (wallet.customQuickTradeSettings) {
-                          // Use custom wallet settings
-                          sellPercentage =
-                            wallet.customQuickTradeSettings.sellPercentage ??
-                            100;
-                          sellMinPercentage =
-                            wallet.customQuickTradeSettings.sellMinPercentage ??
-                            25;
-                          sellMaxPercentage =
-                            wallet.customQuickTradeSettings.sellMaxPercentage ??
-                            100;
-                          useSellRange =
-                            wallet.customQuickTradeSettings.useSellRange ??
-                            false;
-                        } else {
-                          // Fall back to category or global settings
-                          const walletCategory = wallet.category;
-                          let settings: CategoryQuickTradeSettings | null =
-                            null;
-
-                          if (effectiveCategorySettings && walletCategory) {
-                            settings =
-                              effectiveCategorySettings[walletCategory];
-                          }
-
-                          sellPercentage =
-                            settings?.sellPercentage ??
-                            quickSellPercentage ??
-                            100;
-                          sellMinPercentage =
-                            settings?.sellMinPercentage ??
-                            quickSellMinPercentage ??
-                            25;
-                          sellMaxPercentage =
-                            settings?.sellMaxPercentage ??
-                            quickSellMaxPercentage ??
-                            100;
-                          useSellRange =
-                            settings?.useSellRange ??
-                            useQuickSellRange ??
-                            false;
-                        }
-
-                        const tokenBalance =
-                          tokenBalances.get(wallet.address) || 0;
-
-                        return (
-                          <Tooltip
-                            content={
-                              tokenAddress
-                                ? tokenBalance > 0
-                                  ? useSellRange
-                                    ? `Quick sell random ${sellMinPercentage}-${sellMaxPercentage}%${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} of tokens`
-                                    : `Quick sell ${sellPercentage}%${wallet.customQuickTradeSettings ? " (Custom)" : wallet.category ? ` (${wallet.category})` : ""} of tokens`
-                                  : "No tokens to sell"
-                                : "No token selected"
-                            }
-                            position="left"
-                          >
-                            <button
-                              onClick={(e) => handleQuickSell(wallet, e)}
-                              disabled={
-                                !tokenAddress ||
-                                sellingWalletId === wallet.id ||
-                                tokenBalance <= 0
-                              }
-                              className={`
-                          w-6 h-6 rounded-full transition-all duration-200 flex items-center justify-center
-                              ${
-                                !tokenAddress || tokenBalance <= 0
-                                  ? "bg-app-tertiary border border-app-primary-20 cursor-not-allowed opacity-50"
-                                  : sellingWalletId === wallet.id
-                                    ? "bg-red-500 border border-red-500 shadow-lg shadow-red-400 animate-pulse"
-                                    : "bg-red-400 border border-red-600 hover:bg-red-500 hover:border-red-500 hover:shadow-lg hover:shadow-red-400 cursor-pointer"
-                              }
-                        `}
-                            >
-                              {sellingWalletId === wallet.id ? (
-                                <RefreshCw
-                                  size={10}
-                                  className="text-white animate-spin"
-                                />
-                              ) : (
-                                <TrendingDown
-                                  size={10}
-                                  className={`
-                                ${
-                                  !tokenAddress || tokenBalance <= 0
-                                    ? "text-app-primary-40"
-                                    : "text-white"
-                                }
-                          `}
-                                />
-                              )}
-                            </button>
-                          </Tooltip>
-                        );
-                      })()}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Wallets list with virtualization */}
+      <div className="pt-2 relative z-10 flex-1">
+        <WalletList
+          wallets={visibleWallets}
+          tokenAddress={tokenAddress}
+          solBalances={solBalances}
+          tokenBalances={tokenBalances}
+          hoverRow={hoverRow}
+          setHoverRow={setHoverRow}
+          clickedWalletId={clickedWalletId}
+          recentlyUpdatedWallets={recentlyUpdatedWallets}
+          copiedAddress={copiedAddress}
+          buyingWalletId={buyingWalletId}
+          sellingWalletId={sellingWalletId}
+          effectiveCategorySettings={effectiveCategorySettings}
+          quickBuyEnabled={quickBuyEnabled}
+          quickBuyAmount={quickBuyAmount}
+          quickBuyMinAmount={quickBuyMinAmount}
+          quickBuyMaxAmount={quickBuyMaxAmount}
+          useQuickBuyRange={useQuickBuyRange}
+          quickSellPercentage={quickSellPercentage}
+          quickSellMinPercentage={quickSellMinPercentage}
+          quickSellMaxPercentage={quickSellMaxPercentage}
+          useQuickSellRange={useQuickSellRange}
+          onWalletClick={handleWalletClick}
+          onCopyAddress={handleCopyAddress}
+          onQuickBuy={handleQuickBuy}
+          onQuickSell={handleQuickSell}
+        />
       </div>
     </div>
   );
