@@ -66,7 +66,7 @@ const getPartiallyPreparedTransactions = async (
 
     const requestBody: Record<string, unknown> = {
       tokenAddress: config.tokenAddress,
-      amount: config.amount,
+      solAmount: config.amount,
     };
 
     // Add inputMint for non-SOL base currencies

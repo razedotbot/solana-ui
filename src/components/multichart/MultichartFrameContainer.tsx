@@ -1,15 +1,15 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useMultichart } from '../../contexts/useMultichart';
-import { brand } from '../../utils/brandConfig';
-import type { WalletType } from '../../utils/types';
+import React, { useCallback, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useMultichart } from "../../contexts/useMultichart";
+import { brand } from "../../utils/brandConfig";
+import type { WalletType } from "../../utils/types";
 
 interface MultichartFrameContainerProps {
   wallets: WalletType[];
   isLoadingChart: boolean;
   onTokenSelect?: (tokenAddress: string) => void;
   onNonWhitelistedTrade?: (trade: {
-    type: 'buy' | 'sell';
+    type: "buy" | "sell";
     address: string;
     tokensAmount: number;
     avgPrice: number;
@@ -29,37 +29,47 @@ interface MultichartFrameContainerProps {
 // Build iframe URL for a token
 const buildIframeUrl = (tokenAddress: string): string => {
   const params = new URLSearchParams();
-  params.set('theme', brand.theme.name);
+  params.set("theme", brand.theme.name);
   if (tokenAddress) {
-    params.set('tokenMint', tokenAddress);
-    params.set('view', 'simple');
+    params.set("tokenMint", tokenAddress);
+    params.set("view", "simple");
   }
   return `https://frame.raze.sh/sol/?${params.toString()}`;
 };
 
-export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> = ({
-  wallets,
-  isLoadingChart,
-  onTokenSelect,
-  onNonWhitelistedTrade,
-}) => {
+export const MultichartFrameContainer: React.FC<
+  MultichartFrameContainerProps
+> = ({ wallets, isLoadingChart, onTokenSelect, onNonWhitelistedTrade }) => {
   const navigate = useNavigate();
-  const { tokenAddress: routeTokenAddress } = useParams<{ tokenAddress?: string }>();
-  const { addToken, tokens, setActiveToken, activeTokenIndex } = useMultichart();
+  const { tokenAddress: routeTokenAddress } = useParams<{
+    tokenAddress?: string;
+  }>();
+  const { addToken, tokens, setActiveToken, activeTokenIndex } =
+    useMultichart();
 
   // Refs for all iframes - keyed by token address
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
 
   // Get the current token address from route ONLY - don't fallback to context
   // On /monitor route, no token should be active
-  const currentTokenAddress = routeTokenAddress || '';
+  const currentTokenAddress = routeTokenAddress || "";
 
   // Sync activeTokenIndex with route when URL changes
+  // Also auto-add token to list if not already present
   useEffect(() => {
     if (routeTokenAddress) {
-      const tokenIndex = tokens.findIndex(t => t.address === routeTokenAddress);
-      if (tokenIndex !== -1 && tokenIndex !== activeTokenIndex) {
-        setActiveToken(tokenIndex);
+      const tokenIndex = tokens.findIndex(
+        (t) => t.address === routeTokenAddress,
+      );
+      if (tokenIndex !== -1) {
+        // Token exists, just switch to it if not already active
+        if (tokenIndex !== activeTokenIndex) {
+          setActiveToken(tokenIndex);
+        }
+      } else {
+        // Token not in list - auto-add it
+        // addToken already sets the active index to the new token
+        addToken(routeTokenAddress);
       }
     } else {
       // On /monitor - set activeTokenIndex to -1 (no active token)
@@ -67,20 +77,29 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
         setActiveToken(-1);
       }
     }
-  }, [routeTokenAddress, tokens, activeTokenIndex, setActiveToken]);
+  }, [routeTokenAddress, tokens, activeTokenIndex, setActiveToken, addToken]);
 
   // Handle token selection from iframe (when user clicks a token in monitor view)
-  const handleTokenSelect = useCallback((tokenAddress: string) => {
-    if (tokenAddress) {
-      addToken(tokenAddress);
-      navigate(`/tokens/${tokenAddress}`);
-    }
-    onTokenSelect?.(tokenAddress);
-  }, [addToken, navigate, onTokenSelect]);
+  const handleTokenSelect = useCallback(
+    (tokenAddress: string) => {
+      if (tokenAddress) {
+        addToken(tokenAddress);
+        navigate(`/tokens/${tokenAddress}`);
+      }
+      onTokenSelect?.(tokenAddress);
+    },
+    [addToken, navigate, onTokenSelect],
+  );
 
   // Handle messages from iframes
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<{ type: string; tokenAddress?: string; data?: unknown }>): void => {
+    const handleMessage = (
+      event: MessageEvent<{
+        type: string;
+        tokenAddress?: string;
+        data?: unknown;
+      }>,
+    ): void => {
       const msgData = event.data;
       if (!msgData?.type) return;
 
@@ -94,61 +113,77 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
 
       if (!isFromOurIframe) return;
 
-      if (msgData.type === 'TOKEN_SELECTED' && typeof msgData.tokenAddress === 'string') {
+      if (
+        msgData.type === "TOKEN_SELECTED" &&
+        typeof msgData.tokenAddress === "string"
+      ) {
         handleTokenSelect(msgData.tokenAddress);
       }
 
-      if (msgData.type === 'NON_WHITELIST_TRADE' && onNonWhitelistedTrade && msgData.data) {
-        onNonWhitelistedTrade(msgData.data as {
-          type: 'buy' | 'sell';
-          address: string;
-          tokensAmount: number;
-          avgPrice: number;
-          solAmount: number;
-          timestamp: number;
-          signature: string;
-          tokenMint: string;
-          marketCap: number;
-        });
+      if (
+        msgData.type === "NON_WHITELIST_TRADE" &&
+        onNonWhitelistedTrade &&
+        msgData.data
+      ) {
+        onNonWhitelistedTrade(
+          msgData.data as {
+            type: "buy" | "sell";
+            address: string;
+            tokensAmount: number;
+            avgPrice: number;
+            solAmount: number;
+            timestamp: number;
+            signature: string;
+            tokenMint: string;
+            marketCap: number;
+          },
+        );
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [handleTokenSelect, onNonWhitelistedTrade]);
 
   // Send wallets to iframes when they're ready
   useEffect(() => {
     const handleIframeReady = (event: MessageEvent<{ type: string }>): void => {
-      if (event.data?.type === 'IFRAME_READY') {
+      if (event.data?.type === "IFRAME_READY") {
         // Find which iframe sent this and send wallets to it
         iframeRefs.current.forEach((iframe) => {
           if (iframe?.contentWindow === event.source) {
-            const walletData = wallets.map(w => ({
+            const walletData = wallets.map((w) => ({
               address: w.address,
-              label: w.label || `${w.address.slice(0, 3)}...${w.address.slice(-3)}`
+              label:
+                w.label || `${w.address.slice(0, 3)}...${w.address.slice(-3)}`,
             }));
-            iframe.contentWindow?.postMessage({
-              type: 'ADD_WALLETS',
-              wallets: walletData
-            }, '*');
+            iframe.contentWindow?.postMessage(
+              {
+                type: "ADD_WALLETS",
+                wallets: walletData,
+              },
+              "*",
+            );
           }
         });
       }
     };
 
-    window.addEventListener('message', handleIframeReady);
-    return () => window.removeEventListener('message', handleIframeReady);
+    window.addEventListener("message", handleIframeReady);
+    return () => window.removeEventListener("message", handleIframeReady);
   }, [wallets]);
 
   // Set iframe ref
-  const setIframeRef = useCallback((address: string, el: HTMLIFrameElement | null) => {
-    if (el) {
-      iframeRefs.current.set(address, el);
-    } else {
-      iframeRefs.current.delete(address);
-    }
-  }, []);
+  const setIframeRef = useCallback(
+    (address: string, el: HTMLIFrameElement | null) => {
+      if (el) {
+        iframeRefs.current.set(address, el);
+      } else {
+        iframeRefs.current.delete(address);
+      }
+    },
+    [],
+  );
 
   return (
     <div className="flex-1 relative">
@@ -160,12 +195,12 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
 
       {/* Monitor iframe - shown when no token selected */}
       <iframe
-        ref={(el) => setIframeRef('monitor', el)}
-        src={buildIframeUrl('')}
+        ref={(el) => setIframeRef("monitor", el)}
+        src={buildIframeUrl("")}
         className="absolute inset-0 w-full h-full border-0"
         style={{
-          visibility: !currentTokenAddress ? 'visible' : 'hidden',
-          zIndex: !currentTokenAddress ? 1 : 0
+          visibility: !currentTokenAddress ? "visible" : "hidden",
+          zIndex: !currentTokenAddress ? 1 : 0,
         }}
         allow="clipboard-read; clipboard-write; fullscreen"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
@@ -179,8 +214,9 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
           src={buildIframeUrl(token.address)}
           className="absolute inset-0 w-full h-full border-0"
           style={{
-            visibility: currentTokenAddress === token.address ? 'visible' : 'hidden',
-            zIndex: currentTokenAddress === token.address ? 1 : 0
+            visibility:
+              currentTokenAddress === token.address ? "visible" : "hidden",
+            zIndex: currentTokenAddress === token.address ? 1 : 0,
           }}
           allow="clipboard-read; clipboard-write; fullscreen"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
