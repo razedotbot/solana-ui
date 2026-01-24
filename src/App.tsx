@@ -47,6 +47,7 @@ import { addRecentToken } from "./utils/recentTokens";
 import { useAppContext } from "./contexts";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
 import { MultichartLayout } from "./components/multichart/MultichartLayout";
+import { useMultichart } from "./contexts/useMultichart";
 
 // Extend Window interface to include server-related properties
 declare global {
@@ -308,6 +309,9 @@ const WalletManager: React.FC = () => {
     setTokenBalances: setContextTokenBalances,
     baseCurrency: contextBaseCurrency,
   } = useAppContext();
+
+  // Multichart context for adding tokens when in multichart mode
+  const { addToken: addMultichartToken, tokens: multichartTokens } = useMultichart();
 
   // Detect if we're on mobile or desktop to conditionally render layouts
   const [isMobile, setIsMobile] = useState(false);
@@ -877,11 +881,23 @@ const WalletManager: React.FC = () => {
   );
 
   // Update token address when route changes
+  // In multichart mode, add token to list and clear URL instead of setting single token
   useEffect(() => {
+    if (viewMode === "multichart" && tokenAddressParam) {
+      // Add token to multichart list if not already there
+      const alreadyInList = multichartTokens.some(t => t.address === tokenAddressParam);
+      if (!alreadyInList) {
+        addMultichartToken(tokenAddressParam);
+      }
+      // Navigate to root to clear the token from URL
+      navigate("/", { replace: true });
+      return;
+    }
+
     if (tokenAddressParam !== state.tokenAddress) {
       dispatch({ type: "SET_TOKEN_ADDRESS", payload: tokenAddressParam || "" });
     }
-  }, [tokenAddressParam, state.tokenAddress]);
+  }, [tokenAddressParam, state.tokenAddress, viewMode, multichartTokens, addMultichartToken, navigate]);
 
   // Track processed trades to avoid infinite loops
   const processedTradesRef = useRef<Set<string>>(new Set());
@@ -1244,33 +1260,12 @@ const WalletManager: React.FC = () => {
                 wallets={state.wallets}
                 setWallets={memoizedCallbacks.setWallets}
                 isLoadingChart={state.isLoadingChart}
-                transactionFee={state.config.transactionFee}
                 handleRefresh={handleRefresh}
                 isRefreshing={state.isRefreshing}
                 baseCurrencyBalances={state.baseCurrencyBalances}
-                baseCurrency={contextBaseCurrency}
                 tokenBalances={state.tokenBalances}
                 currentMarketCap={state.currentMarketCap}
-                setCalculatePNLModalOpen={
-                  memoizedCallbacks.setCalculatePNLModalOpen
-                }
-                isAutomateCardOpen={state.automateCard.isOpen}
-                automateCardPosition={state.automateCard.position}
-                setAutomateCardPosition={
-                  memoizedCallbacks.setAutomateCardPosition
-                }
-                isAutomateCardDragging={state.automateCard.isDragging}
-                setAutomateCardDragging={
-                  memoizedCallbacks.setAutomateCardDragging
-                }
-                iframeData={state.iframeData}
-                onTokenSelect={memoizedCallbacks.setTokenAddress}
                 onNonWhitelistedTrade={handleNonWhitelistedTrade}
-                quickBuyEnabled={state.quickBuyEnabled}
-                quickBuyAmount={state.quickBuyAmount}
-                quickBuyMinAmount={state.quickBuyMinAmount}
-                quickBuyMaxAmount={state.quickBuyMaxAmount}
-                useQuickBuyRange={state.useQuickBuyRange}
                 viewMode={viewMode}
                 onViewModeChange={handleViewModeChange}
                 connection={state.connection}

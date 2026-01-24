@@ -121,6 +121,61 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
     );
   }, []);
 
+  const reorderTokens = useCallback((fromIndex: number, toIndex: number) => {
+    setTokens((prev) => {
+      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) {
+        return prev;
+      }
+      const newTokens = [...prev];
+      const [movedToken] = newTokens.splice(fromIndex, 1);
+      newTokens.splice(toIndex, 0, movedToken);
+      return newTokens;
+    });
+
+    // Adjust activeTokenIndex if needed
+    setActiveTokenIndex((prevIndex) => {
+      if (prevIndex === fromIndex) {
+        return toIndex;
+      }
+      if (fromIndex < prevIndex && toIndex >= prevIndex) {
+        return prevIndex - 1;
+      }
+      if (fromIndex > prevIndex && toIndex <= prevIndex) {
+        return prevIndex + 1;
+      }
+      return prevIndex;
+    });
+  }, []);
+
+  const replaceToken = useCallback((oldAddress: string, newAddress: string) => {
+    // Don't replace if new token already exists
+    if (tokens.some((t) => t.address === newAddress)) {
+      // Just switch to existing token
+      const existingIndex = tokens.findIndex((t) => t.address === newAddress);
+      setActiveTokenIndex(existingIndex);
+      return;
+    }
+
+    setTokens((prev) => {
+      const index = prev.findIndex((t) => t.address === oldAddress);
+      if (index === -1) return prev;
+
+      const newTokens = [...prev];
+      newTokens[index] = {
+        address: newAddress,
+        addedAt: Date.now(),
+      };
+      return newTokens;
+    });
+
+    // Update stats map - remove old, keep new slot empty
+    setTokenStats((prev) => {
+      const newStats = new Map(prev);
+      newStats.delete(oldAddress);
+      return newStats;
+    });
+  }, [tokens]);
+
   const value = {
     tokens,
     activeTokenIndex,
@@ -130,6 +185,8 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
     setActiveToken,
     updateTokenStats,
     updateTokenMetadata,
+    reorderTokens,
+    replaceToken,
     maxTokens,
   };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../contexts";
 import { HorizontalHeader } from "../components/HorizontalHeader";
@@ -9,6 +9,7 @@ import {
   Search,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   DollarSign,
   ArrowUp,
   ArrowDown,
@@ -29,6 +30,7 @@ import {
   Zap,
   Shield,
   Layers,
+  AlertTriangle,
 } from "lucide-react";
 import { getWalletDisplayName } from "../utils/wallet";
 import type { WalletType } from "../utils/types";
@@ -37,19 +39,18 @@ import {
   executeCreate,
   createDeployConfig,
   type WalletForCreate,
-  type MeteoraDBCConfig,
+  type CreateConfig,
   METEORA_DBC_CONFIGS,
-  type MeteoraCPAMMConfig,
   METEORA_CPAMM_CONFIGS,
-  type BonkConfig,
   type PlatformType,
 } from "../utils/create";
 import { loadConfigFromCookies } from "../utils/storage";
 
-const STEPS_DEPLOY = ["Token Setup", "Wallets", "Review"];
 const MIN_WALLETS = 1;
 const MAX_WALLETS_STANDARD = 5;
 const MAX_WALLETS_ADVANCED = 20;
+const MAX_TOKENS_PER_DEPLOY = 5;
+const DELAY_BETWEEN_DEPLOYS_MS = 2000;
 
 interface TokenMetadata {
   name: string;
@@ -59,6 +60,27 @@ interface TokenMetadata {
   twitter: string;
   telegram: string;
   website: string;
+}
+
+// Additional token only stores platform settings (uses main token metadata)
+interface AdditionalToken {
+  platform: PlatformType;
+  pumpType: boolean;
+  pumpMode: "simple" | "advanced";
+  bonkType: "meme" | "tech";
+  bonkMode: "simple" | "advanced";
+  meteoraDBCMode: "simple" | "advanced";
+  meteoraDBCConfigAddress: string;
+  meteoraCPAMMConfigAddress: string;
+  meteoraCPAMMInitialLiquidity: string;
+  meteoraCPAMMInitialTokenPercent: string;
+}
+
+interface DeploymentProgressItem {
+  tokenIndex: number;
+  status: "pending" | "deploying" | "success" | "failed";
+  mintAddress?: string;
+  error?: string;
 }
 
 export const DeployPage: React.FC = () => {
@@ -150,6 +172,19 @@ export const DeployPage: React.FC = () => {
   );
   const [copied, setCopied] = useState(false);
 
+  // Multi-token deployment state
+  const [additionalTokens, setAdditionalTokens] = useState<AdditionalToken[]>(
+    [],
+  );
+  const [additionalWalletConfigs, setAdditionalWalletConfigs] = useState<
+    Record<number, { wallets: string[]; amounts: Record<string, string> }>
+  >({});
+  const [useSharedWallets, setUseSharedWallets] = useState(true);
+  const [deploymentProgress, setDeploymentProgress] = useState<
+    DeploymentProgressItem[]
+  >([]);
+  const [isMultiDeploying, setIsMultiDeploying] = useState(false);
+
   // Token metadata
   const [tokenData, setTokenData] = useState<TokenMetadata>({
     name: "",
@@ -173,6 +208,30 @@ export const DeployPage: React.FC = () => {
   const [balanceFilter, setBalanceFilter] = useState("nonZero");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic steps based on additional tokens
+  const STEPS_DEPLOY = useMemo(() => {
+    const baseSteps = ["Token Setup", "Wallets"];
+    if (additionalTokens.length > 0 && !useSharedWallets) {
+      baseSteps.push("Additional Wallets");
+    }
+    baseSteps.push("Review");
+    return baseSteps;
+  }, [additionalTokens.length, useSharedWallets]);
+
+  // Helper to determine the actual step index for review
+  const getReviewStepIndex = (): number => {
+    return STEPS_DEPLOY.length - 1;
+  };
+
+  // Helper to determine if current step is the additional wallets step
+  const isAdditionalWalletsStep = (): boolean => {
+    return (
+      additionalTokens.length > 0 &&
+      !useSharedWallets &&
+      currentStep === 2
+    );
+  };
 
   const wallets = propWallets.filter(
     (wallet) => (baseCurrencyBalances.get(wallet.address) || 0) > 0,
@@ -340,6 +399,7 @@ export const DeployPage: React.FC = () => {
   const validateStep = (): boolean => {
     switch (currentStep) {
       case 0: {
+        // Validate main token (all tokens share same metadata)
         if (!tokenData.name || !tokenData.symbol || !tokenData.imageUrl) {
           showToast("Name, symbol, and logo image are required", "error");
           return false;
@@ -368,6 +428,32 @@ export const DeployPage: React.FC = () => {
         }
         break;
       }
+      case 2: {
+        // Additional Wallets step (only when !useSharedWallets and additionalTokens.length > 0)
+        if (isAdditionalWalletsStep()) {
+          for (let i = 0; i < additionalTokens.length; i++) {
+            const config = additionalWalletConfigs[i];
+            if (!config || config.wallets.length < MIN_WALLETS) {
+              showToast(
+                `Token #${i + 2}: Please select at least ${MIN_WALLETS} wallet`,
+                "error",
+              );
+              return false;
+            }
+            const hasAllAmounts = config.wallets.every(
+              (wallet) => config.amounts[wallet] && Number(config.amounts[wallet]) > 0,
+            );
+            if (!hasAllAmounts) {
+              showToast(
+                `Token #${i + 2}: Please enter valid amounts for all selected wallets`,
+                "error",
+              );
+              return false;
+            }
+          }
+        }
+        break;
+      }
     }
     return true;
   };
@@ -386,105 +472,258 @@ export const DeployPage: React.FC = () => {
     if (!isConfirmed) return;
 
     setIsSubmitting(true);
+    const hasAdditionalTokens = additionalTokens.length > 0;
+    setIsMultiDeploying(hasAdditionalTokens);
+
+    // Helper to build wallet array for a deployment
+    const buildWalletsForCreate = (
+      walletKeys: string[],
+      amounts: Record<string, string>,
+    ): WalletForCreate[] => {
+      return walletKeys.map((privateKey) => {
+        const wallet = wallets.find((w) => w.privateKey === privateKey);
+        if (!wallet) {
+          throw new Error(`Wallet not found`);
+        }
+        return {
+          address: wallet.address,
+          privateKey: wallet.privateKey,
+          amount: parseFloat(amounts[privateKey]) || 0.1,
+        };
+      });
+    };
+
+    // Helper to build config for a token
+    const buildConfigForToken = (
+      metadata: TokenMetadata,
+      platform: PlatformType,
+      settings: {
+        pumpType?: boolean;
+        pumpMode?: "simple" | "advanced";
+        bonkType?: "meme" | "tech";
+        bonkMode?: "simple" | "advanced";
+        meteoraDBCMode?: "simple" | "advanced";
+        meteoraDBCConfigAddress?: string;
+        meteoraCPAMMConfigAddress?: string;
+        meteoraCPAMMInitialLiquidity?: string;
+        meteoraCPAMMInitialTokenPercent?: string;
+      },
+    ): CreateConfig => {
+      const isAdvanced =
+        (platform === "pumpfun" && settings.pumpMode === "advanced") ||
+        (platform === "bonk" && settings.bonkMode === "advanced") ||
+        (platform === "meteoraDBC" && settings.meteoraDBCMode === "advanced");
+
+      return createDeployConfig({
+        platform,
+        token: {
+          name: metadata.name,
+          symbol: metadata.symbol,
+          description: metadata.description || undefined,
+          imageUrl: metadata.imageUrl,
+          twitter: metadata.twitter || undefined,
+          telegram: metadata.telegram || undefined,
+          website: metadata.website || undefined,
+        },
+        pumpType: platform === "pumpfun" ? settings.pumpType : undefined,
+        pumpAdvanced: platform === "pumpfun" ? isAdvanced : undefined,
+        bonkType: platform === "bonk" ? settings.bonkType : undefined,
+        bonkAdvanced: platform === "bonk" ? isAdvanced : undefined,
+        bonkConfig:
+          platform === "bonk"
+            ? { jitoTipAmountSOL: getJitoTipFromSettings() }
+            : undefined,
+        meteoraDBCConfig:
+          platform === "meteoraDBC"
+            ? {
+                configAddress:
+                  settings.meteoraDBCConfigAddress ||
+                  METEORA_DBC_CONFIGS.standard,
+                jitoTipAmountSOL: getJitoTipFromSettings(),
+              }
+            : undefined,
+        meteoraCPAMMConfig:
+          platform === "meteoraCPAMM"
+            ? {
+                configAddress:
+                  settings.meteoraCPAMMConfigAddress ||
+                  METEORA_CPAMM_CONFIGS.standard,
+                jitoTipAmountSOL: getJitoTipFromSettings(),
+                initialLiquiditySOL:
+                  parseFloat(settings.meteoraCPAMMInitialLiquidity || "1") || 1,
+                initialTokenPercent:
+                  parseFloat(settings.meteoraCPAMMInitialTokenPercent || "80") ||
+                  80,
+              }
+            : undefined,
+      });
+    };
 
     try {
-      const walletsForCreate: WalletForCreate[] = selectedWallets.map(
-        (privateKey) => {
-          const wallet = wallets.find((w) => w.privateKey === privateKey);
-          if (!wallet) {
-            throw new Error(`Wallet not found`);
-          }
-          return {
-            address: wallet.address,
-            privateKey: wallet.privateKey,
-            amount: parseFloat(walletAmounts[privateKey]) || 0.1,
-          };
-        },
-      );
+      // Build all deployments (all tokens share the same metadata)
+      const allDeployments: Array<{
+        tokenIndex: number;
+        wallets: WalletForCreate[];
+        config: ReturnType<typeof createDeployConfig>;
+      }> = [];
 
-      const meteoraDBCConfigObj: MeteoraDBCConfig | undefined =
-        selectedPlatform === "meteoraDBC"
-          ? {
-              configAddress:
-                meteoraDBCConfigAddress || METEORA_DBC_CONFIGS.standard,
-              jitoTipAmountSOL: getJitoTipFromSettings(),
-            }
-          : undefined;
-
-      const meteoraCPAMMConfigObj: MeteoraCPAMMConfig | undefined =
-        selectedPlatform === "meteoraCPAMM"
-          ? {
-              configAddress:
-                meteoraCPAMMConfigAddress || METEORA_CPAMM_CONFIGS.standard,
-              jitoTipAmountSOL: getJitoTipFromSettings(),
-              initialLiquiditySOL:
-                parseFloat(meteoraCPAMMInitialLiquidity) || 1,
-              initialTokenPercent:
-                parseFloat(meteoraCPAMMInitialTokenPercent) || 80,
-            }
-          : undefined;
-
-      const bonkConfigObj: BonkConfig | undefined =
-        selectedPlatform === "bonk"
-          ? {
-              jitoTipAmountSOL: getJitoTipFromSettings(),
-            }
-          : undefined;
-
-      const config = createDeployConfig({
-        platform: selectedPlatform,
-        token: {
-          name: tokenData.name,
-          symbol: tokenData.symbol,
-          description: tokenData.description || undefined,
-          imageUrl: tokenData.imageUrl,
-          twitter: tokenData.twitter || undefined,
-          telegram: tokenData.telegram || undefined,
-          website: tokenData.website || undefined,
-        },
-        pumpType: selectedPlatform === "pumpfun" ? pumpType : undefined,
-        pumpAdvanced:
-          selectedPlatform === "pumpfun" ? isPumpAdvancedMode : undefined,
-        bonkType: selectedPlatform === "bonk" ? bonkType : undefined,
-        bonkAdvanced:
-          selectedPlatform === "bonk" ? isBonkAdvancedMode : undefined,
-        bonkConfig: bonkConfigObj,
-        meteoraDBCConfig: meteoraDBCConfigObj,
-        meteoraCPAMMConfig: meteoraCPAMMConfigObj,
+      // Main token
+      allDeployments.push({
+        tokenIndex: 0,
+        wallets: buildWalletsForCreate(selectedWallets, walletAmounts),
+        config: buildConfigForToken(tokenData, selectedPlatform, {
+          pumpType,
+          pumpMode,
+          bonkType,
+          bonkMode,
+          meteoraDBCMode,
+          meteoraDBCConfigAddress,
+          meteoraCPAMMConfigAddress,
+          meteoraCPAMMInitialLiquidity,
+          meteoraCPAMMInitialTokenPercent,
+        }),
       });
 
-      console.info("Executing create with config:", config);
+      // Additional tokens (use main tokenData for all)
+      additionalTokens.forEach((token, index) => {
+        const walletConfig = useSharedWallets
+          ? { wallets: selectedWallets, amounts: walletAmounts }
+          : additionalWalletConfigs[index] || {
+              wallets: selectedWallets,
+              amounts: walletAmounts,
+            };
 
-      const result = await executeCreate(walletsForCreate, config);
-
-      if (result.success) {
-        setSelectedWallets([]);
-        setWalletAmounts({});
-        setTokenData({
-          name: "",
-          symbol: "",
-          description: "",
-          imageUrl: "",
-          twitter: "",
-          telegram: "",
-          website: "",
+        allDeployments.push({
+          tokenIndex: index + 1,
+          wallets: buildWalletsForCreate(
+            walletConfig.wallets,
+            walletConfig.amounts,
+          ),
+          config: buildConfigForToken(tokenData, token.platform, {
+            pumpType: token.pumpType,
+            pumpMode: token.pumpMode,
+            bonkType: token.bonkType,
+            bonkMode: token.bonkMode,
+            meteoraDBCMode: token.meteoraDBCMode,
+            meteoraDBCConfigAddress: token.meteoraDBCConfigAddress,
+            meteoraCPAMMConfigAddress: token.meteoraCPAMMConfigAddress,
+            meteoraCPAMMInitialLiquidity: token.meteoraCPAMMInitialLiquidity,
+            meteoraCPAMMInitialTokenPercent: token.meteoraCPAMMInitialTokenPercent,
+          }),
         });
-        setIsConfirmed(false);
-        setCurrentStep(0);
+      });
 
-        void refreshBalances();
+      // Single token deployment (original flow)
+      if (allDeployments.length === 1) {
+        console.info("Executing single token create:", allDeployments[0].config);
+        const result = await executeCreate(
+          allDeployments[0].wallets,
+          allDeployments[0].config,
+        );
 
-        if (result.mintAddress) {
-          setDeployedMintAddress(result.mintAddress);
+        if (result.success) {
+          setSelectedWallets([]);
+          setWalletAmounts({});
+          setTokenData({
+            name: "",
+            symbol: "",
+            description: "",
+            imageUrl: "",
+            twitter: "",
+            telegram: "",
+            website: "",
+          });
+          setIsConfirmed(false);
+          setCurrentStep(0);
+          void refreshBalances();
+
+          if (result.mintAddress) {
+            setDeployedMintAddress(result.mintAddress);
+          }
+        } else {
+          throw new Error(result.error ?? "Token deployment failed");
         }
       } else {
-        throw new Error(result.error ?? "Token deployment failed");
+        // Multi-token deployment
+        console.info(
+          `Executing multi-token deploy: ${allDeployments.length} tokens`,
+        );
+
+        // Initialize progress tracking
+        setDeploymentProgress(
+          allDeployments.map((d) => ({
+            tokenIndex: d.tokenIndex,
+            status: "pending" as const,
+          })),
+        );
+
+        // Deploy tokens sequentially with delay
+        for (let i = 0; i < allDeployments.length; i++) {
+          // Update status to deploying
+          setDeploymentProgress((prev) =>
+            prev.map((p, idx) =>
+              idx === i ? { ...p, status: "deploying" as const } : p,
+            ),
+          );
+
+          try {
+            console.info(
+              `Deploying token ${i + 1}/${allDeployments.length}`,
+            );
+            const result = await executeCreate(
+              allDeployments[i].wallets,
+              allDeployments[i].config,
+            );
+
+            // Update status based on result
+            setDeploymentProgress((prev) =>
+              prev.map((p, idx) =>
+                idx === i
+                  ? {
+                      ...p,
+                      status: result.success
+                        ? ("success" as const)
+                        : ("failed" as const),
+                      mintAddress: result.mintAddress,
+                      error: result.error,
+                    }
+                  : p,
+              ),
+            );
+          } catch (error) {
+            // Continue with remaining tokens even on failure
+            console.error(`Token ${i + 1} deployment failed:`, error);
+            setDeploymentProgress((prev) =>
+              prev.map((p, idx) =>
+                idx === i
+                  ? {
+                      ...p,
+                      status: "failed" as const,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    }
+                  : p,
+              ),
+            );
+          }
+
+          // Add delay before next deployment (except for last one)
+          if (i < allDeployments.length - 1) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, DELAY_BETWEEN_DEPLOYS_MS),
+            );
+          }
+        }
+
+        void refreshBalances();
+        // Multi-deploy results will be shown via deploymentProgress state
       }
     } catch (error) {
       console.error("Error during token deployment:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       showToast(`Token deployment failed: ${errorMessage}`, "error");
+      setIsMultiDeploying(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -524,6 +763,88 @@ export const DeployPage: React.FC = () => {
   const handleCloseSuccess = (): void => {
     setDeployedMintAddress(null);
     setCopied(false);
+  };
+
+  const handleCloseMultiDeployResults = (): void => {
+    setDeploymentProgress([]);
+    setIsMultiDeploying(false);
+    setAdditionalTokens([]);
+    setAdditionalWalletConfigs({});
+    setUseSharedWallets(true);
+    setSelectedWallets([]);
+    setWalletAmounts({});
+    setTokenData({
+      name: "",
+      symbol: "",
+      description: "",
+      imageUrl: "",
+      twitter: "",
+      telegram: "",
+      website: "",
+    });
+    setIsConfirmed(false);
+    setCurrentStep(0);
+  };
+
+  // Additional token management functions
+  const addAdditionalToken = (): void => {
+    if (additionalTokens.length >= MAX_TOKENS_PER_DEPLOY - 1) return;
+
+    const newToken: AdditionalToken = {
+      platform: selectedPlatform,
+      pumpType: false,
+      pumpMode: "simple",
+      bonkType: "meme",
+      bonkMode: "simple",
+      meteoraDBCMode: "simple",
+      meteoraDBCConfigAddress: METEORA_DBC_CONFIGS.standard,
+      meteoraCPAMMConfigAddress: METEORA_CPAMM_CONFIGS.standard,
+      meteoraCPAMMInitialLiquidity: "1",
+      meteoraCPAMMInitialTokenPercent: "80",
+    };
+
+    setAdditionalTokens((prev) => [...prev, newToken]);
+  };
+
+  const updateAdditionalToken = (
+    index: number,
+    updates: Partial<AdditionalToken>,
+  ): void => {
+    setAdditionalTokens((prev) =>
+      prev.map((token, i) =>
+        i === index ? { ...token, ...updates } : token,
+      ),
+    );
+  };
+
+  const removeAdditionalToken = (index: number): void => {
+    setAdditionalTokens((prev) => prev.filter((_, i) => i !== index));
+    // Also remove wallet config for this token
+    setAdditionalWalletConfigs((prev) => {
+      const newConfigs = { ...prev };
+      delete newConfigs[index];
+      // Re-index remaining configs
+      const reindexed: Record<
+        number,
+        { wallets: string[]; amounts: Record<string, string> }
+      > = {};
+      Object.entries(newConfigs).forEach(([key, value]) => {
+        const oldIndex = parseInt(key);
+        const newIndex = oldIndex > index ? oldIndex - 1 : oldIndex;
+        reindexed[newIndex] = value;
+      });
+      return reindexed;
+    });
+  };
+
+  const updateAdditionalWalletConfig = (
+    index: number,
+    config: { wallets: string[]; amounts: Record<string, string> },
+  ): void => {
+    setAdditionalWalletConfigs((prev) => ({
+      ...prev,
+      [index]: config,
+    }));
   };
 
   // Platform configs for rendering
@@ -684,6 +1005,585 @@ export const DeployPage: React.FC = () => {
       ),
     },
   ];
+
+  // AdditionalTokenCard component (simplified - only platform settings)
+  const AdditionalTokenCard: React.FC<{
+    token: AdditionalToken;
+    index: number;
+    platforms: typeof platforms;
+    onUpdate: (updates: Partial<AdditionalToken>) => void;
+    onRemove: () => void;
+  }> = ({ token, index, platforms: platformList, onUpdate, onRemove }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const currentPlatform = platformList.find((p) => p.id === token.platform);
+
+    return (
+      <div className="rounded-xl border border-app-primary-30 overflow-hidden">
+        {/* Header - always visible */}
+        <div
+          className="flex items-center justify-between p-3 bg-app-tertiary/50 cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold font-mono color-primary">
+              #{index + 2}
+            </span>
+            <div className="w-7 h-7 [&>svg]:w-5 [&>svg]:h-5 flex items-center justify-center">
+              {currentPlatform?.icon}
+            </div>
+            <span className="text-sm font-bold font-mono text-app-primary">
+              {currentPlatform?.name || token.platform.toUpperCase()}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              className="p-1.5 rounded-lg hover:bg-red-500/20 transition-all"
+            >
+              <X size={16} className="text-red-400" />
+            </button>
+            <ChevronDown
+              size={18}
+              className={`text-app-secondary-40 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            />
+          </div>
+        </div>
+
+        {/* Expanded content - Platform Selection & Options */}
+        {isExpanded && (
+          <div className="p-4 space-y-4 border-t border-app-primary-20">
+            {/* Platform Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Layers size={14} className="color-primary" />
+                <span className="text-xs font-mono font-bold text-app-primary uppercase">
+                  Platform
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {platformList.map((platform) => (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => onUpdate({ platform: platform.id })}
+                    className={`p-3 rounded-lg border transition-all text-center ${
+                      token.platform === platform.id
+                        ? "border-app-primary-color/50 bg-app-primary-color/10"
+                        : "border-app-primary-20 hover:border-app-primary-40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-6 h-6 [&>svg]:w-5 [&>svg]:h-5">
+                        {platform.icon}
+                      </div>
+                      <span
+                        className={`text-xs font-bold font-mono ${token.platform === platform.id ? "color-primary" : "text-app-primary"}`}
+                      >
+                        {platform.name}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Platform-specific options */}
+            {(token.platform === "pumpfun" ||
+              token.platform === "bonk" ||
+              token.platform === "meteoraDBC") && (
+              <div className="space-y-3 pt-4 border-t border-app-primary-20">
+                <div className="flex items-center gap-2">
+                  <Zap size={14} className="color-primary" />
+                  <span className="text-xs font-mono font-bold text-app-primary uppercase">
+                    Deployment Mode
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (token.platform === "pumpfun")
+                        onUpdate({ pumpMode: "simple" });
+                      else if (token.platform === "bonk")
+                        onUpdate({ bonkMode: "simple" });
+                      else onUpdate({ meteoraDBCMode: "simple" });
+                    }}
+                    className={`px-3 py-2 rounded-lg border transition-all flex items-center gap-2 ${
+                      (token.platform === "pumpfun" &&
+                        token.pumpMode === "simple") ||
+                      (token.platform === "bonk" &&
+                        token.bonkMode === "simple") ||
+                      (token.platform === "meteoraDBC" &&
+                        token.meteoraDBCMode === "simple")
+                        ? "border-app-primary-color bg-app-primary-color/10"
+                        : "border-app-primary-20 hover:border-app-primary-40"
+                    }`}
+                  >
+                    <Shield size={14} className="color-primary" />
+                    <span className="text-xs font-bold font-mono text-app-primary">
+                      Simple
+                    </span>
+                    <span className="text-[10px] text-app-secondary-60 font-mono ml-auto">
+                      5 wallets
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (token.platform === "pumpfun")
+                        onUpdate({ pumpMode: "advanced" });
+                      else if (token.platform === "bonk")
+                        onUpdate({ bonkMode: "advanced" });
+                      else onUpdate({ meteoraDBCMode: "advanced" });
+                    }}
+                    className={`px-3 py-2 rounded-lg border transition-all flex items-center gap-2 ${
+                      (token.platform === "pumpfun" &&
+                        token.pumpMode === "advanced") ||
+                      (token.platform === "bonk" &&
+                        token.bonkMode === "advanced") ||
+                      (token.platform === "meteoraDBC" &&
+                        token.meteoraDBCMode === "advanced")
+                        ? "border-emerald-500 bg-emerald-500/10"
+                        : "border-app-primary-20 hover:border-emerald-500/50"
+                    }`}
+                  >
+                    <Sparkles size={14} className="text-emerald-400" />
+                    <span className="text-xs font-bold font-mono text-app-primary">
+                      Advanced
+                    </span>
+                    <span className="text-[10px] text-app-secondary-60 font-mono ml-auto">
+                      20 wallets
+                    </span>
+                  </button>
+                </div>
+
+                {/* Token Type for Pump.fun */}
+                {token.platform === "pumpfun" && (
+                  <div className="pt-3 border-t border-app-primary-20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Zap size={12} className="color-primary" />
+                      <span className="text-xs font-mono font-bold text-app-primary uppercase">
+                        Token Type
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ pumpType: false })}
+                        className={`p-2 rounded-lg border transition-all text-center ${
+                          !token.pumpType
+                            ? "border-app-primary-color bg-app-primary-color/10"
+                            : "border-app-primary-20 hover:border-app-primary-40"
+                        }`}
+                      >
+                        <span className="text-xs font-bold font-mono text-app-primary">
+                          Normal
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ pumpType: true })}
+                        className={`p-2 rounded-lg border transition-all text-center ${
+                          token.pumpType
+                            ? "border-orange-500 bg-orange-500/10"
+                            : "border-app-primary-20 hover:border-orange-500/50"
+                        }`}
+                      >
+                        <span className="text-xs font-bold font-mono text-app-primary">
+                          Mayhem
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Token Type for Bonk */}
+                {token.platform === "bonk" && (
+                  <div className="pt-3 border-t border-app-primary-20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Zap size={12} className="color-primary" />
+                      <span className="text-xs font-mono font-bold text-app-primary uppercase">
+                        Token Type
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ bonkType: "meme" })}
+                        className={`p-2 rounded-lg border transition-all text-center ${
+                          token.bonkType === "meme"
+                            ? "border-app-primary-color bg-app-primary-color/10"
+                            : "border-app-primary-20 hover:border-app-primary-40"
+                        }`}
+                      >
+                        <span className="text-xs font-bold font-mono text-app-primary">
+                          Meme
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ bonkType: "tech" })}
+                        className={`p-2 rounded-lg border transition-all text-center ${
+                          token.bonkType === "tech"
+                            ? "border-app-primary-color bg-app-primary-color/10"
+                            : "border-app-primary-20 hover:border-app-primary-40"
+                        }`}
+                      >
+                        <span className="text-xs font-bold font-mono text-app-primary">
+                          Tech
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MeteoraDBC Config */}
+            {token.platform === "meteoraDBC" && (
+              <div className="pt-4 border-t border-app-primary-20">
+                <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-2 uppercase">
+                  <Link size={12} className="color-primary" />
+                  Pool Config Address
+                </label>
+                <input
+                  type="text"
+                  value={token.meteoraDBCConfigAddress}
+                  onChange={(e) =>
+                    onUpdate({ meteoraDBCConfigAddress: e.target.value })
+                  }
+                  className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-2 text-sm text-app-primary focus:border-app-primary-color focus:outline-none font-mono"
+                  placeholder={METEORA_DBC_CONFIGS.standard}
+                />
+              </div>
+            )}
+
+            {/* MeteoraCPAMM Config */}
+            {token.platform === "meteoraCPAMM" && (
+              <div className="space-y-3 pt-4 border-t border-app-primary-20">
+                <div>
+                  <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-2 uppercase">
+                    <Link size={12} className="color-primary" />
+                    Pool Config Address
+                  </label>
+                  <input
+                    type="text"
+                    value={token.meteoraCPAMMConfigAddress}
+                    onChange={(e) =>
+                      onUpdate({ meteoraCPAMMConfigAddress: e.target.value })
+                    }
+                    className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-2 text-sm text-app-primary focus:border-app-primary-color focus:outline-none font-mono"
+                    placeholder={METEORA_CPAMM_CONFIGS.standard}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-app-secondary-60 font-mono mb-2 block uppercase">
+                      Initial Liquidity (SOL)
+                    </label>
+                    <input
+                      type="text"
+                      value={token.meteoraCPAMMInitialLiquidity}
+                      onChange={(e) => {
+                        if (
+                          e.target.value === "" ||
+                          /^\d*\.?\d*$/.test(e.target.value)
+                        ) {
+                          onUpdate({
+                            meteoraCPAMMInitialLiquidity: e.target.value,
+                          });
+                        }
+                      }}
+                      className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-2 text-sm text-app-primary focus:border-app-primary-color focus:outline-none font-mono"
+                      placeholder="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-app-secondary-60 font-mono mb-2 block uppercase">
+                      Token % for Pool
+                    </label>
+                    <input
+                      type="text"
+                      value={token.meteoraCPAMMInitialTokenPercent}
+                      onChange={(e) => {
+                        if (
+                          e.target.value === "" ||
+                          /^\d*\.?\d*$/.test(e.target.value)
+                        ) {
+                          const val = parseFloat(e.target.value);
+                          if (isNaN(val) || (val >= 0 && val <= 100)) {
+                            onUpdate({
+                              meteoraCPAMMInitialTokenPercent: e.target.value,
+                            });
+                          }
+                        }
+                      }}
+                      className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-2 text-sm text-app-primary focus:border-app-primary-color focus:outline-none font-mono"
+                      placeholder="80"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Calculate total SOL for all tokens
+  const calculateTotalAmountAllTokens = (): number => {
+    let total = calculateTotalAmount(); // Main token
+    if (useSharedWallets) {
+      // Same wallets for all tokens, multiply by token count
+      total = total * (1 + additionalTokens.length);
+    } else {
+      // Sum up additional token wallet amounts
+      additionalTokens.forEach((_, index) => {
+        const config = additionalWalletConfigs[index];
+        if (config) {
+          config.wallets.forEach((privateKey) => {
+            total += parseFloat(config.amounts[privateKey]) || 0;
+          });
+        }
+      });
+    }
+    return total;
+  };
+
+  // Render Review step content
+  const renderReviewStep = (): JSX.Element => {
+    const totalTokens = 1 + additionalTokens.length;
+
+    return (
+      <div className="space-y-6 animate-fade-in-down">
+        {/* Header */}
+        <div className="flex items-center gap-3 pb-3 border-b border-app-primary-20">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+            <CheckCircle size={20} className="color-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-app-primary font-mono">
+              Review Deployment
+            </h3>
+            <p className="text-xs text-app-secondary-60 font-mono">
+              {totalTokens > 1
+                ? `Deploying ${totalTokens} tokens`
+                : "Confirm your token deployment settings"}
+            </p>
+          </div>
+        </div>
+
+        {/* All Tokens List */}
+        <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar">
+          {/* Main Token */}
+          <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-30">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-xs font-bold font-mono text-yellow-400">
+                #1 MAIN
+              </span>
+              {tokenData.imageUrl && (
+                <img
+                  src={tokenData.imageUrl}
+                  alt="Logo"
+                  className="w-10 h-10 rounded-lg object-cover border border-app-primary-color"
+                />
+              )}
+              <div className="flex-1">
+                <div className="text-sm font-bold text-app-primary font-mono">
+                  {tokenData.name}
+                </div>
+                <div className="text-xs text-app-secondary-60 font-mono">
+                  ${tokenData.symbol} • {selectedPlatform.toUpperCase()}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-mono color-primary font-bold">
+                  {calculateTotalAmount().toFixed(4)} SOL
+                </div>
+                <div className="text-[10px] font-mono text-app-secondary-40">
+                  {selectedWallets.length} wallet
+                  {selectedWallets.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+              <span
+                className={`px-2 py-1 rounded ${isAdvancedMode ? "bg-emerald-500/20 text-emerald-400" : "bg-app-quaternary text-app-secondary-60"}`}
+              >
+                {isAdvancedMode ? "Advanced" : "Simple"}
+              </span>
+              {selectedPlatform === "pumpfun" && (
+                <span
+                  className={`px-2 py-1 rounded ${pumpType ? "bg-orange-500/20 text-orange-400" : "bg-app-quaternary text-app-secondary-60"}`}
+                >
+                  {pumpType ? "Mayhem" : "Normal"}
+                </span>
+              )}
+              {selectedPlatform === "bonk" && (
+                <span className="px-2 py-1 rounded bg-app-quaternary text-app-secondary-60">
+                  {bonkType.toUpperCase()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Additional Tokens */}
+          {additionalTokens.map((token, index) => {
+            const walletConfig = useSharedWallets
+              ? { wallets: selectedWallets, amounts: walletAmounts }
+              : additionalWalletConfigs[index] || {
+                  wallets: [],
+                  amounts: {},
+                };
+            const tokenTotal = walletConfig.wallets.reduce(
+              (sum, pk) => sum + (parseFloat(walletConfig.amounts[pk]) || 0),
+              0,
+            );
+            const tokenIsAdvanced =
+              (token.platform === "pumpfun" && token.pumpMode === "advanced") ||
+              (token.platform === "bonk" && token.bonkMode === "advanced") ||
+              (token.platform === "meteoraDBC" &&
+                token.meteoraDBCMode === "advanced") ||
+              (token.platform === "meteoraCPAMM" &&
+                walletConfig.wallets.length > MAX_WALLETS_STANDARD);
+
+            const platformInfo = platforms.find((p) => p.id === token.platform);
+
+            return (
+              <div
+                key={index}
+                className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-xs font-bold font-mono color-primary">
+                    #{index + 2}
+                  </span>
+                  <div className="w-8 h-8 [&>svg]:w-6 [&>svg]:h-6 flex items-center justify-center">
+                    {platformInfo?.icon}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-app-primary font-mono">
+                      {platformInfo?.name || token.platform.toUpperCase()}
+                    </div>
+                    <div className="text-xs text-app-secondary-60 font-mono">
+                      Same token, different platform
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs font-mono color-primary font-bold">
+                      {tokenTotal.toFixed(4)} SOL
+                    </div>
+                    <div className="text-[10px] font-mono text-app-secondary-40">
+                      {walletConfig.wallets.length} wallet
+                      {walletConfig.wallets.length !== 1 ? "s" : ""}
+                      {useSharedWallets && " (shared)"}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                  <span
+                    className={`px-2 py-1 rounded ${tokenIsAdvanced ? "bg-emerald-500/20 text-emerald-400" : "bg-app-quaternary text-app-secondary-60"}`}
+                  >
+                    {tokenIsAdvanced ? "Advanced" : "Simple"}
+                  </span>
+                  {token.platform === "pumpfun" && (
+                    <span
+                      className={`px-2 py-1 rounded ${token.pumpType ? "bg-orange-500/20 text-orange-400" : "bg-app-quaternary text-app-secondary-60"}`}
+                    >
+                      {token.pumpType ? "Mayhem" : "Normal"}
+                    </span>
+                  )}
+                  {token.platform === "bonk" && (
+                    <span className="px-2 py-1 rounded bg-app-quaternary text-app-secondary-60">
+                      {token.bonkType.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Summary */}
+        <div className="p-4 rounded-xl bg-app-quaternary border border-app-primary-20">
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-xs font-mono text-app-secondary-40 uppercase">
+                Total Deployment
+              </div>
+              <div className="text-sm font-mono text-app-primary">
+                {totalTokens} token{totalTokens !== 1 ? "s" : ""} •{" "}
+                {useSharedWallets
+                  ? `${selectedWallets.length} shared wallets`
+                  : "Custom wallets per token"}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold color-primary font-mono">
+                {calculateTotalAmountAllTokens().toFixed(4)} SOL
+              </div>
+              <div className="text-[10px] font-mono text-app-secondary-40">
+                Total SOL required
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Confirmation */}
+        <div className="p-5 rounded-xl bg-gradient-to-r from-app-primary-color/10 to-transparent border border-app-primary-color/30">
+          <div className="flex items-start gap-4">
+            <button
+              type="button"
+              onClick={() => setIsConfirmed(!isConfirmed)}
+              className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                isConfirmed
+                  ? "bg-app-primary-color border-app-primary-color"
+                  : "border-app-primary-40 hover:border-app-primary-color"
+              }`}
+            >
+              {isConfirmed && <Check size={14} className="text-black" />}
+            </button>
+            <label
+              onClick={() => setIsConfirmed(!isConfirmed)}
+              className="text-xs text-app-primary cursor-pointer select-none font-mono leading-relaxed"
+            >
+              I confirm deployment of{" "}
+              <span className="font-bold color-primary">{tokenData.name}</span>
+              {totalTokens > 1 && (
+                <>
+                  {" "}
+                  on{" "}
+                  <span className="font-bold color-primary">
+                    {totalTokens} platforms
+                  </span>
+                </>
+              )}
+              {totalTokens === 1 && (
+                <>
+                  {" "}
+                  on{" "}
+                  <span className="font-bold color-primary">
+                    {selectedPlatform.toUpperCase()}
+                  </span>{" "}
+                  on{" "}
+                  <span className="font-bold color-primary">
+                    {selectedPlatform.toUpperCase()}
+                  </span>
+                </>
+              )}
+              . Tokens will deploy sequentially with a short delay between each.
+              This action cannot be undone.
+            </label>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderStepContent = (): JSX.Element | null => {
     switch (currentStep) {
@@ -1170,6 +2070,57 @@ export const DeployPage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Additional Tokens Section */}
+            <div className="space-y-4 pt-6 border-t border-app-primary-20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+                    <Copy size={20} className="color-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-app-primary font-mono">
+                      Additional Tokens (Optional)
+                    </h3>
+                    <p className="text-xs text-app-secondary-60 font-mono">
+                      Deploy up to {MAX_TOKENS_PER_DEPLOY} tokens at once
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono text-app-secondary-60">
+                  {1 + additionalTokens.length}/{MAX_TOKENS_PER_DEPLOY}
+                </span>
+              </div>
+
+              {/* Additional token cards */}
+              {additionalTokens.map((token, index) => (
+                <AdditionalTokenCard
+                  key={index}
+                  token={token}
+                  index={index}
+                  platforms={platforms}
+                  onUpdate={(updates) => updateAdditionalToken(index, updates)}
+                  onRemove={() => removeAdditionalToken(index)}
+                />
+              ))}
+
+              {/* Add token button */}
+              {additionalTokens.length < MAX_TOKENS_PER_DEPLOY - 1 && (
+                <button
+                  type="button"
+                  onClick={addAdditionalToken}
+                  className="w-full p-4 rounded-xl border border-dashed border-app-primary-30 hover:border-app-primary-color flex items-center justify-center gap-2 transition-all group"
+                >
+                  <PlusCircle
+                    size={18}
+                    className="text-app-secondary-40 group-hover:color-primary"
+                  />
+                  <span className="text-sm font-mono text-app-secondary-40 group-hover:color-primary">
+                    Add Another Token
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
         );
 
@@ -1449,249 +2400,246 @@ export const DeployPage: React.FC = () => {
         );
 
       case 2:
-        return (
-          <div className="space-y-6 animate-fade-in-down">
-            {/* Header */}
-            <div className="flex items-center gap-3 pb-3 border-b border-app-primary-20">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
-                <CheckCircle size={20} className="color-primary" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-app-primary font-mono">
-                  Review Deployment
-                </h3>
-                <p className="text-xs text-app-secondary-60 font-mono">
-                  Confirm your token deployment settings
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Token Details Card */}
-              <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20 space-y-4">
-                <div className="flex items-center gap-3">
-                  {tokenData.imageUrl && (
-                    <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-app-primary-color">
-                      <img
-                        src={tokenData.imageUrl}
-                        alt="Logo"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-lg font-bold text-app-primary font-mono">
-                      {tokenData.name}
-                    </div>
-                    <div className="text-sm text-app-secondary-60 font-mono">
-                      ${tokenData.symbol}
-                    </div>
-                  </div>
+        // Check if this is the Additional Wallets step or Review step
+        if (isAdditionalWalletsStep()) {
+          return (
+            <div className="space-y-6 animate-fade-in-down">
+              {/* Header */}
+              <div className="flex items-center gap-3 pb-3 border-b border-app-primary-20">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+                  <Wallet size={20} className="color-primary" />
                 </div>
-
-                <div className="space-y-2 pt-3 border-t border-app-primary-20">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-app-secondary-40 font-mono">
-                      Platform
-                    </span>
-                    <span className="color-primary font-mono font-bold">
-                      {selectedPlatform.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-app-secondary-40 font-mono">
-                      Mode
-                    </span>
-                    <span
-                      className={`font-mono font-bold ${isAdvancedMode ? "text-emerald-400" : "text-app-primary"}`}
-                    >
-                      {isAdvancedMode ? "Advanced" : "Simple"}
-                    </span>
-                  </div>
-                  {selectedPlatform === "pumpfun" && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-app-secondary-40 font-mono">
-                        Type
-                      </span>
-                      <span className="text-app-primary font-mono">
-                        {pumpType ? "Mayhem" : "Normal"}
-                      </span>
-                    </div>
-                  )}
-                  {selectedPlatform === "bonk" && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-app-secondary-40 font-mono">
-                        Type
-                      </span>
-                      <span className="text-app-primary font-mono">
-                        {bonkType.toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  {(selectedPlatform === "bonk" ||
-                    selectedPlatform === "meteoraDBC" ||
-                    selectedPlatform === "meteoraCPAMM") && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-app-secondary-40 font-mono">
-                        Jito Tip
-                      </span>
-                      <span className="text-yellow-400 font-mono">
-                        {getJitoTipFromSettings().toFixed(4)} SOL
-                      </span>
-                    </div>
-                  )}
-                  {selectedPlatform === "meteoraCPAMM" && (
-                    <>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-app-secondary-40 font-mono">
-                          Init Liquidity
-                        </span>
-                        <span className="text-app-primary font-mono">
-                          {meteoraCPAMMInitialLiquidity} SOL
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-app-secondary-40 font-mono">
-                          Token %
-                        </span>
-                        <span className="text-app-primary font-mono">
-                          {meteoraCPAMMInitialTokenPercent}%
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {(tokenData.twitter ||
-                  tokenData.telegram ||
-                  tokenData.website) && (
-                  <div className="space-y-2 pt-3 border-t border-app-primary-20">
-                    <div className="text-xs font-mono text-app-secondary-40 uppercase">
-                      Socials
-                    </div>
-                    {tokenData.twitter && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Twitter size={12} className="text-blue-400" />
-                        <span className="text-app-primary font-mono truncate">
-                          {tokenData.twitter}
-                        </span>
-                      </div>
-                    )}
-                    {tokenData.telegram && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Send size={12} className="text-blue-400" />
-                        <span className="text-app-primary font-mono truncate">
-                          {tokenData.telegram}
-                        </span>
-                      </div>
-                    )}
-                    {tokenData.website && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <Globe size={12} className="color-primary" />
-                        <span className="text-app-primary font-mono truncate">
-                          {tokenData.website}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="pt-3 border-t border-app-primary-20">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-app-secondary-40 font-mono">
-                      Total SOL
-                    </span>
-                    <span className="text-lg font-bold color-primary font-mono">
-                      {calculateTotalAmount().toFixed(4)} SOL
-                    </span>
-                  </div>
+                <div>
+                  <h3 className="text-sm font-bold text-app-primary font-mono">
+                    Additional Token Wallets
+                  </h3>
+                  <p className="text-xs text-app-secondary-60 font-mono">
+                    Configure wallets for each additional token
+                  </p>
                 </div>
               </div>
 
-              {/* Wallets Card */}
-              <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20 space-y-4">
+              {/* Shared wallets toggle */}
+              <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-app-secondary-40 uppercase">
-                    Wallets ({selectedWallets.length})
-                  </span>
+                  <div>
+                    <span className="text-sm font-bold text-app-primary font-mono">
+                      Use Same Wallets for All Tokens
+                    </span>
+                    <p className="text-xs text-app-secondary-60 font-mono mt-1">
+                      Apply the same wallet configuration to all additional
+                      tokens
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUseSharedWallets(!useSharedWallets)}
+                    className={`w-12 h-6 rounded-full transition-all ${
+                      useSharedWallets
+                        ? "bg-app-primary-color"
+                        : "bg-app-quaternary border border-app-primary-30"
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                        useSharedWallets ? "translate-x-6" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
                 </div>
-                <div className="max-h-64 overflow-y-auto space-y-2 custom-scrollbar">
-                  {selectedWallets.map((key, index) => {
-                    const wallet = getWalletByPrivateKey(key);
-                    const solBalance = wallet
-                      ? baseCurrencyBalances.get(wallet.address) || 0
-                      : 0;
+              </div>
+
+              {/* Per-token wallet configuration */}
+              {!useSharedWallets && (
+                <div className="space-y-4">
+                  {additionalTokens.map((token, tokenIndex) => {
+                    const config = additionalWalletConfigs[tokenIndex] || {
+                      wallets: [],
+                      amounts: {},
+                    };
+                    const platformInfo = platforms.find(
+                      (p) => p.id === token.platform,
+                    );
 
                     return (
                       <div
-                        key={index}
-                        className="flex justify-between items-center p-3 bg-app-quaternary rounded-xl border border-app-primary-20"
+                        key={tokenIndex}
+                        className="rounded-xl border border-app-primary-30 overflow-hidden"
                       >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs font-bold font-mono w-14 ${index === 0 ? "text-yellow-400" : "color-primary"}`}
-                          >
-                            {index === 0 ? "CREATOR" : `#${index + 1}`}
+                        <div className="flex items-center gap-3 p-4 bg-app-tertiary/50">
+                          <span className="text-xs font-bold font-mono color-primary">
+                            #{tokenIndex + 2}
                           </span>
-                          <span className="font-mono text-xs text-app-primary truncate max-w-24">
-                            {wallet ? getWalletDisplayName(wallet) : "UNKNOWN"}
+                          <div className="w-7 h-7 [&>svg]:w-5 [&>svg]:h-5 flex items-center justify-center">
+                            {platformInfo?.icon}
+                          </div>
+                          <span className="text-sm font-bold font-mono text-app-primary">
+                            {platformInfo?.name || token.platform.toUpperCase()}
+                          </span>
+                          <span className="ml-auto text-xs font-mono text-app-secondary-40">
+                            {config.wallets.length} wallets selected
                           </span>
                         </div>
-                        <div className="text-right">
-                          <div className="text-[10px] text-app-secondary-40 font-mono">
-                            {formatSolBalance(solBalance)} SOL
-                          </div>
-                          <div className="text-xs font-bold color-primary font-mono">
-                            {walletAmounts[key]} SOL
-                          </div>
+
+                        <div className="p-4 space-y-3">
+                          {/* Selected wallets for this token */}
+                          {config.wallets.length > 0 && (
+                            <div className="space-y-2">
+                              {config.wallets.map((privateKey, walletIndex) => {
+                                const wallet = getWalletByPrivateKey(privateKey);
+                                const solBalance = wallet
+                                  ? baseCurrencyBalances.get(wallet.address) || 0
+                                  : 0;
+
+                                return (
+                                  <div
+                                    key={privateKey}
+                                    className="flex items-center justify-between p-3 rounded-lg border border-app-primary-20 bg-app-quaternary/50"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`text-xs font-bold font-mono ${walletIndex === 0 ? "text-yellow-400" : "color-primary"}`}
+                                      >
+                                        {walletIndex === 0
+                                          ? "CREATOR"
+                                          : `#${walletIndex + 1}`}
+                                      </span>
+                                      <span className="text-xs font-mono text-app-primary">
+                                        {wallet
+                                          ? getWalletDisplayName(wallet)
+                                          : "UNKNOWN"}
+                                      </span>
+                                      <span className="text-[10px] font-mono text-app-secondary-40">
+                                        ({formatSolBalance(solBalance)} SOL)
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="relative">
+                                        <DollarSign
+                                          size={10}
+                                          className="absolute left-2 top-1/2 -translate-y-1/2 text-app-secondary-40"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={config.amounts[privateKey] || ""}
+                                          onChange={(e) => {
+                                            if (
+                                              e.target.value === "" ||
+                                              /^\d*\.?\d*$/.test(e.target.value)
+                                            ) {
+                                              updateAdditionalWalletConfig(
+                                                tokenIndex,
+                                                {
+                                                  ...config,
+                                                  amounts: {
+                                                    ...config.amounts,
+                                                    [privateKey]: e.target.value,
+                                                  },
+                                                },
+                                              );
+                                            }
+                                          }}
+                                          placeholder="0.1"
+                                          className="w-20 pl-5 pr-2 py-1.5 bg-app-quaternary border border-app-primary-30 rounded text-xs text-app-primary font-mono focus:outline-none focus:border-app-primary-color"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newWallets = config.wallets.filter(
+                                            (w) => w !== privateKey,
+                                          );
+                                          const newAmounts = { ...config.amounts };
+                                          delete newAmounts[privateKey];
+                                          updateAdditionalWalletConfig(
+                                            tokenIndex,
+                                            {
+                                              wallets: newWallets,
+                                              amounts: newAmounts,
+                                            },
+                                          );
+                                        }}
+                                        className="p-1 rounded hover:bg-red-500/20"
+                                      >
+                                        <X size={12} className="text-red-400" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Add wallet button/dropdown */}
+                          {config.wallets.length < MAX_WALLETS && (
+                            <div className="relative">
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    updateAdditionalWalletConfig(tokenIndex, {
+                                      wallets: [...config.wallets, e.target.value],
+                                      amounts: {
+                                        ...config.amounts,
+                                        [e.target.value]: "0.1",
+                                      },
+                                    });
+                                  }
+                                }}
+                                className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-2 text-sm text-app-primary focus:outline-none focus:border-app-primary-color font-mono appearance-none cursor-pointer"
+                              >
+                                <option value="">+ Add wallet...</option>
+                                {wallets
+                                  .filter(
+                                    (w) => !config.wallets.includes(w.privateKey),
+                                  )
+                                  .map((wallet) => (
+                                    <option
+                                      key={wallet.privateKey}
+                                      value={wallet.privateKey}
+                                    >
+                                      {getWalletDisplayName(wallet)} (
+                                      {formatSolBalance(
+                                        baseCurrencyBalances.get(wallet.address) ||
+                                          0,
+                                      )}{" "}
+                                      SOL)
+                                    </option>
+                                  ))}
+                              </select>
+                              <ChevronDown
+                                size={14}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-app-secondary-40 pointer-events-none"
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Confirmation */}
-            <div className="p-5 rounded-xl bg-gradient-to-r from-app-primary-color/10 to-transparent border border-app-primary-color/30">
-              <div className="flex items-start gap-4">
-                <button
-                  type="button"
-                  onClick={() => setIsConfirmed(!isConfirmed)}
-                  className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                    isConfirmed
-                      ? "bg-app-primary-color border-app-primary-color"
-                      : "border-app-primary-40 hover:border-app-primary-color"
-                  }`}
-                >
-                  {isConfirmed && <Check size={14} className="text-black" />}
-                </button>
-                <label
-                  onClick={() => setIsConfirmed(!isConfirmed)}
-                  className="text-xs text-app-primary cursor-pointer select-none font-mono leading-relaxed"
-                >
-                  I confirm deployment of{" "}
-                  <span className="font-bold color-primary">
-                    {tokenData.name}
-                  </span>{" "}
-                  on{" "}
-                  <span className="font-bold color-primary">
-                    {selectedPlatform.toUpperCase()}
-                  </span>
-                  {isAdvancedMode && " (Advanced Mode)"} using{" "}
-                  <span className="font-bold color-primary">
-                    {selectedWallets.length}
-                  </span>{" "}
-                  wallet
-                  {selectedWallets.length !== 1 ? "s" : ""}.
-                  {isAdvancedMode &&
-                    " This will send multiple bundles in sequence."}{" "}
-                  This action cannot be undone.
-                </label>
-              </div>
+              {useSharedWallets && (
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={16} className="text-emerald-400" />
+                    <span className="text-sm font-mono text-app-primary">
+                      All additional tokens will use the same wallets and amounts
+                      as the main token.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        );
+          );
+        }
+        // Fall through to Review step
+        return renderReviewStep();
+
+      case 3:
+        // Review step when Additional Wallets step exists
+        return renderReviewStep();
 
       default:
         return null;
@@ -1759,6 +2707,219 @@ export const DeployPage: React.FC = () => {
                 <span>View Token</span>
                 <ExternalLink size={14} />
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Deploy Progress Modal */}
+      {isMultiDeploying && isSubmitting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-app-secondary border border-app-primary-40 rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <RefreshCw className="color-primary animate-spin" size={24} />
+              <h2 className="text-xl font-bold text-app-primary font-mono">
+                Deploying Tokens...
+              </h2>
+            </div>
+
+            <div className="space-y-3">
+              {deploymentProgress.map((item, index) => {
+                const tokenPlatform =
+                  index === 0
+                    ? selectedPlatform
+                    : additionalTokens[index - 1]?.platform;
+                const platformInfo = platforms.find(
+                  (p) => p.id === tokenPlatform,
+                );
+
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-3 rounded-xl border ${
+                      item.status === "deploying"
+                        ? "border-app-primary-color bg-app-primary-color/10"
+                        : item.status === "success"
+                          ? "border-emerald-500/50 bg-emerald-500/10"
+                          : item.status === "failed"
+                            ? "border-red-500/50 bg-red-500/10"
+                            : "border-app-primary-20 bg-app-tertiary/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold font-mono color-primary">
+                        #{index + 1}
+                      </span>
+                      <div className="w-5 h-5 [&>svg]:w-4 [&>svg]:h-4 flex items-center justify-center">
+                        {platformInfo?.icon}
+                      </div>
+                      <span className="text-sm font-mono text-app-primary">
+                        {platformInfo?.name || tokenPlatform?.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.status === "pending" && (
+                        <span className="text-xs text-app-secondary-40">
+                          Waiting
+                        </span>
+                      )}
+                      {item.status === "deploying" && (
+                        <RefreshCw
+                          className="color-primary animate-spin"
+                          size={14}
+                        />
+                      )}
+                      {item.status === "success" && (
+                        <CheckCircle className="text-emerald-400" size={16} />
+                      )}
+                      {item.status === "failed" && (
+                        <X className="text-red-400" size={16} />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 text-center text-xs text-app-secondary-60 font-mono">
+              {deploymentProgress.filter((p) => p.status === "success").length}{" "}
+              of {deploymentProgress.length} completed
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Deploy Results Modal */}
+      {isMultiDeploying && !isSubmitting && deploymentProgress.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-app-secondary border border-app-primary-40 rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+            {/* Header with success count */}
+            <div className="flex justify-center mb-6">
+              <div
+                className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                  deploymentProgress.every((p) => p.status === "success")
+                    ? "bg-gradient-to-br from-emerald-500/30 to-emerald-500/10"
+                    : "bg-gradient-to-br from-yellow-500/30 to-yellow-500/10"
+                }`}
+              >
+                {deploymentProgress.every((p) => p.status === "success") ? (
+                  <CheckCircle size={40} className="text-emerald-400" />
+                ) : (
+                  <AlertTriangle size={40} className="text-yellow-400" />
+                )}
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-app-primary font-mono text-center mb-2">
+              {deploymentProgress.filter((p) => p.status === "success").length}{" "}
+              of {deploymentProgress.length} Deployed
+            </h2>
+            <p className="text-sm text-app-secondary-60 font-mono text-center mb-6">
+              {deploymentProgress.every((p) => p.status === "success")
+                ? "All tokens deployed successfully!"
+                : "Some tokens failed to deploy"}
+            </p>
+
+            {/* Results list */}
+            <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar mb-6">
+              {deploymentProgress.map((item, index) => {
+                const tokenPlatform =
+                  index === 0
+                    ? selectedPlatform
+                    : additionalTokens[index - 1]?.platform;
+                const platformInfo = platforms.find(
+                  (p) => p.id === tokenPlatform,
+                );
+
+                return (
+                  <div
+                    key={index}
+                    className={`p-4 rounded-xl border ${
+                      item.status === "success"
+                        ? "border-emerald-500/30 bg-emerald-500/5"
+                        : "border-red-500/30 bg-red-500/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold font-mono color-primary">
+                          #{index + 1}
+                        </span>
+                        <div className="w-5 h-5 [&>svg]:w-4 [&>svg]:h-4 flex items-center justify-center">
+                          {platformInfo?.icon}
+                        </div>
+                        <span className="text-sm font-bold font-mono text-app-primary">
+                          {platformInfo?.name || tokenPlatform?.toUpperCase()}
+                        </span>
+                      </div>
+                      {item.status === "success" ? (
+                        <CheckCircle size={16} className="text-emerald-400" />
+                      ) : (
+                        <X size={16} className="text-red-400" />
+                      )}
+                    </div>
+                    {item.mintAddress && (
+                      <div className="flex items-center gap-2">
+                        <code className="text-[10px] text-app-secondary-60 font-mono truncate flex-1">
+                          {item.mintAddress}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(
+                              item.mintAddress!,
+                            );
+                            showToast("Address copied!", "success");
+                          }}
+                          className="p-1.5 rounded hover:bg-app-quaternary transition-all"
+                        >
+                          <Copy size={12} className="color-primary" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/tokens/${item.mintAddress}`)
+                          }
+                          className="p-1.5 rounded hover:bg-app-quaternary transition-all"
+                        >
+                          <ExternalLink size={12} className="color-primary" />
+                        </button>
+                      </div>
+                    )}
+                    {item.error && (
+                      <p className="text-xs text-red-400 font-mono mt-1 truncate">
+                        {item.error}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleCloseMultiDeployResults}
+                className="flex-1 px-4 py-3 rounded-xl font-mono text-sm transition-all bg-app-quaternary text-app-primary border border-app-primary-30 hover:border-app-primary-color"
+              >
+                Close
+              </button>
+              {deploymentProgress.filter((p) => p.status === "success")
+                .length === 1 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/tokens/${deploymentProgress.find((p) => p.status === "success")?.mintAddress}`,
+                    )
+                  }
+                  className="flex-1 px-4 py-3 rounded-xl font-mono text-sm transition-all bg-app-primary-color text-black font-bold hover:shadow-[0_0_20px_rgba(2,179,109,0.4)] flex items-center justify-center gap-2"
+                >
+                  <span>View Token</span>
+                  <ExternalLink size={14} />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1865,7 +3026,9 @@ export const DeployPage: React.FC = () => {
           {/* Form */}
           <form
             onSubmit={
-              currentStep === 2 ? handleDeploy : (e) => e.preventDefault()
+              currentStep === getReviewStepIndex()
+                ? handleDeploy
+                : (e) => e.preventDefault()
             }
           >
             <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-6 shadow-xl min-h-[400px]">
@@ -1889,30 +3052,39 @@ export const DeployPage: React.FC = () => {
               </button>
 
               <button
-                type={currentStep === 2 ? "submit" : "button"}
-                onClick={currentStep === 2 ? undefined : handleNext}
+                type={
+                  currentStep === getReviewStepIndex() ? "submit" : "button"
+                }
+                onClick={
+                  currentStep === getReviewStepIndex() ? undefined : handleNext
+                }
                 disabled={
-                  currentStep === 2
+                  currentStep === getReviewStepIndex()
                     ? isSubmitting || !isConfirmed
                     : isSubmitting
                 }
                 className={`group relative px-8 py-3 rounded-xl flex items-center gap-2 font-mono text-sm font-bold transition-all overflow-hidden ${
-                  currentStep === 2 && (isSubmitting || !isConfirmed)
+                  currentStep === getReviewStepIndex() &&
+                  (isSubmitting || !isConfirmed)
                     ? "bg-app-primary-color/30 text-app-secondary cursor-not-allowed"
                     : "bg-app-primary-color text-black hover:shadow-[0_0_25px_rgba(2,179,109,0.5)]"
                 }`}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                {currentStep === 2 ? (
+                {currentStep === getReviewStepIndex() ? (
                   isSubmitting ? (
                     <>
                       <RefreshCw size={18} className="animate-spin" />
-                      {isAdvancedMode ? "Deploying..." : "Deploying..."}
+                      Deploying...
                     </>
                   ) : (
                     <>
                       <Rocket size={18} />
-                      {isAdvancedMode ? "Deploy (Advanced)" : "Deploy Token"}
+                      {additionalTokens.length > 0
+                        ? `Deploy ${1 + additionalTokens.length} Tokens`
+                        : isAdvancedMode
+                          ? "Deploy (Advanced)"
+                          : "Deploy Token"}
                     </>
                   )
                 ) : (

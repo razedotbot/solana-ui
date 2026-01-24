@@ -10,6 +10,8 @@ export interface MultichartContextType {
   setActiveToken: (index: number) => void;
   updateTokenStats: (address: string, stats: MultichartTokenStats) => void;
   updateTokenMetadata: (address: string, metadata: Partial<MultichartToken>) => void;
+  reorderTokens: (fromIndex: number, toIndex: number) => void;
+  replaceToken: (oldAddress: string, newAddress: string) => void;
   maxTokens: number;
 }
 

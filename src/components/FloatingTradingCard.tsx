@@ -392,6 +392,7 @@ interface FloatingTradingCardProps {
   currentMarketCap: number | null;
   baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
+  embedded?: boolean;
 }
 
 const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
@@ -411,6 +412,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   countActiveWallets,
   baseCurrencyBalances,
   tokenBalances,
+  embedded = false,
 }) => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1000,6 +1002,161 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
       </div>
     </div>
   );
+
+  // Embedded mode: render inline without portal
+  if (embedded) {
+    const embeddedContent = (
+      <div
+        ref={cardRef}
+        className="select-none w-full max-w-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative overflow-hidden p-4 rounded-lg bg-app-primary-99 backdrop-blur-md border border-app-primary-30 shadow-lg shadow-black-80">
+          {/* Header with Edit Button */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 px-2 py-1">
+              <Zap size={14} className="text-app-primary-color" />
+              <span className="text-xs font-mono text-app-secondary-60 uppercase">
+                Quick Trade
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Wallet Selector Button */}
+              <button
+                ref={walletButtonRef}
+                onClick={() => setShowWalletSelector(!showWalletSelector)}
+                className="flex items-center gap-1 px-2 py-1 rounded hover:bg-app-primary-20 transition-colors"
+              >
+                <span className="text-[10px] font-mono color-primary font-semibold">
+                  {countActiveWallets(wallets)}
+                </span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="color-primary"
+                >
+                  <path
+                    d="M21 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18zM3 10v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 4h2v2h-2v-2z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className={`p-1.5 rounded transition-all duration-200
+                          ${
+                            isEditMode
+                              ? "bg-primary-20 border border-app-primary color-primary"
+                              : "hover:bg-primary-20 text-app-secondary-60 hover:color-primary"
+                          }`}
+              >
+                {isEditMode ? <Check size={12} /> : <Edit3 size={12} />}
+              </button>
+
+              <button
+                onClick={onClose}
+                className="p-1 rounded hover:bg-primary-20 transition-colors"
+              >
+                <X
+                  size={14}
+                  className="text-app-secondary-60 hover:color-primary"
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Preset Tabs */}
+          <div className="flex gap-1 mb-4">
+            {presetTabs.map((tab: PresetTab) => (
+              <TabButton
+                key={tab.id}
+                label={tab.label}
+                isActive={activeTabId === tab.id}
+                onClick={() => handleTabSwitch(tab.id)}
+                onEdit={(newLabel) => handleEditTabLabel(tab.id, newLabel)}
+                isEditMode={isEditMode}
+              />
+            ))}
+          </div>
+
+          {/* Trading Interface - Preset Only */}
+          <div className="space-y-4 relative z-10">
+            {/* Buy Section */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-mono color-primary">BUY</span>
+                <span className="text-xs text-app-secondary-60 font-mono">
+                  SOL/wallet
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                {activeTab.buyPresets.map((preset: string, index: number) => (
+                  <PresetButton
+                    key={index}
+                    value={preset}
+                    onExecute={(amount) => handleTrade(amount, true)}
+                    onChange={(newValue) => handleEditBuyPreset(index, newValue)}
+                    isLoading={isLoading}
+                    variant="buy"
+                    isEditMode={isEditMode}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Sell Section */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-mono text-error-alt">SELL</span>
+                <span className="text-xs text-error-alt-60 font-mono">
+                  % tokens
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                {activeTab.sellPresets.map((preset: string, index: number) => (
+                  <PresetButton
+                    key={index}
+                    value={preset}
+                    onExecute={(amount) => handleTrade(amount, false)}
+                    onChange={(newValue) => handleEditSellPreset(index, newValue)}
+                    isLoading={isLoading}
+                    variant="sell"
+                    isEditMode={isEditMode}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Wallet Selector - rendered inline for embedded mode */}
+        {showWalletSelector && (
+          <div className="absolute left-0 right-0 bottom-full mb-2 z-50">
+            <FloatingWalletSelector
+              wallets={wallets}
+              baseCurrencyBalances={baseCurrencyBalances}
+              tokenBalances={tokenBalances}
+              anchorRef={walletButtonRef}
+              onClose={() => setShowWalletSelector(false)}
+              onToggleWallet={handleToggleWallet}
+              onSelectAll={handleSelectAll}
+              onSelectAllWithBalance={handleSelectAllWithBalance}
+            />
+          </div>
+        )}
+      </div>
+    );
+
+    return embeddedContent;
+  }
 
   // Render to document.body using portal to ensure it floats above everything
   return (
