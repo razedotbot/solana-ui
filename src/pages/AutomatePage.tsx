@@ -34,7 +34,7 @@ import type { TradingConfig } from "../utils/trading";
 import type { WalletType } from "../utils/types";
 
 // Import unified components
-import { TradingTools } from "../components/tools";
+import { TradingTools } from "../components/TradingTools";
 import type {
   ToolType,
   SniperProfile,
@@ -44,15 +44,15 @@ import type {
   DeployEvent,
   MigrationEvent,
   CopyTradeData,
-  WalletType as UnifiedWalletType,
-} from "../components/tools/automate/types";
+  AutomationWalletType as UnifiedWalletType,
+} from "../utils/types/automation";
 import {
   loadSniperProfiles,
   loadCopyTradeProfiles,
   loadStrategies,
   updateSniperProfile,
   updateCopyTradeProfile,
-} from "../components/tools/automate/storage";
+} from "../utils/storage/automation";
 
 // Import WebSocket managers
 import {

@@ -1217,7 +1217,7 @@ import type {
   MigrationEvent,
   DeployEventData,
   MigrationEventData,
-} from "../components/tools/automate/types";
+} from "./types/automation";
 
 // Re-export sniper bot types
 export type { SniperBotWebSocketConfig, DeployEvent, MigrationEvent };

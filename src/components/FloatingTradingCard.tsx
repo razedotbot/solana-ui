@@ -393,6 +393,7 @@ interface FloatingTradingCardProps {
   baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
   embedded?: boolean;
+  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
@@ -413,6 +414,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   baseCurrencyBalances,
   tokenBalances,
   embedded = false,
+  containerRef,
 }) => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
@@ -666,19 +668,37 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     (e: MouseEvent): void => {
       if (!isDragging) return;
 
-      const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
+      const cardWidth = cardRef.current?.offsetWidth || 0;
+      const cardHeight = cardRef.current?.offsetHeight || 0;
 
-      // Constrain to viewport
-      const maxX = window.innerWidth - (cardRef.current?.offsetWidth || 0);
-      const maxY = window.innerHeight - (cardRef.current?.offsetHeight || 0);
+      if (embedded && containerRef?.current) {
+        // Constrain to container bounds for embedded mode
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const newX = e.clientX - containerRect.left - dragOffset.x;
+        const newY = e.clientY - containerRect.top - dragOffset.y;
 
-      onPositionChange({
-        x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY)),
-      });
+        const maxX = containerRect.width - cardWidth;
+        const maxY = containerRect.height - cardHeight;
+
+        onPositionChange({
+          x: Math.max(0, Math.min(newX, maxX)),
+          y: Math.max(0, Math.min(newY, maxY)),
+        });
+      } else {
+        // Constrain to viewport for floating mode
+        const newX = e.clientX - dragOffset.x;
+        const newY = e.clientY - dragOffset.y;
+
+        const maxX = window.innerWidth - cardWidth;
+        const maxY = window.innerHeight - cardHeight;
+
+        onPositionChange({
+          x: Math.max(0, Math.min(newX, maxX)),
+          y: Math.max(0, Math.min(newY, maxY)),
+        });
+      }
     },
-    [isDragging, dragOffset.x, dragOffset.y, onPositionChange],
+    [isDragging, dragOffset.x, dragOffset.y, onPositionChange, embedded, containerRef],
   );
 
   const handleMouseUp = React.useCallback((): void => {
@@ -1008,14 +1028,24 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     const embeddedContent = (
       <div
         ref={cardRef}
-        className="select-none w-full max-w-sm"
+        className="select-none w-full max-w-sm absolute"
+        style={{
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          cursor: isDragging ? "grabbing" : "default",
+        }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={handleMouseDown}
       >
         <div className="relative overflow-hidden p-4 rounded-lg bg-app-primary-99 backdrop-blur-md border border-app-primary-30 shadow-lg shadow-black-80">
           {/* Header with Edit Button */}
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 px-2 py-1">
-              <Zap size={14} className="text-app-primary-color" />
+            <div
+              ref={dragHandleRef}
+              className="flex items-center gap-2 cursor-grab active:cursor-grabbing px-2 py-1 hover:bg-app-primary-20 rounded transition-colors"
+              title="Drag to move"
+            >
+              <Move size={14} className="text-app-secondary-60" />
               <span className="text-xs font-mono text-app-secondary-60 uppercase">
                 Quick Trade
               </span>

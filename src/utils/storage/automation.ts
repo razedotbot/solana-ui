@@ -2,7 +2,6 @@
  * Unified Trading Tools Storage
  *
  * LocalStorage management for all trading profiles and execution logs.
- * Uses centralized constants from utils/constants.ts.
  */
 
 import type {
@@ -18,12 +17,12 @@ import type {
   TradingAction,
   WalletList,
   ToolType,
-} from "./types";
+} from "../types/automation";
 import {
   STORAGE_KEYS,
   EXECUTION_LOGS,
   PROFILE_DEFAULTS,
-} from "../../../utils/constants";
+} from "../constants";
 
 const MAX_EXECUTION_LOGS = EXECUTION_LOGS.MAX_ENTRIES;
 
@@ -152,14 +151,12 @@ export const createDefaultSniperFilter = (): SniperFilter => ({
   symbolMatchType: "contains",
 });
 
-// Alias for backwards compatibility
 export const createDefaultFilter = createDefaultSniperFilter;
 
 // Sniper Execution Logs
 export const loadSniperLogs = (): SniperExecutionLog[] =>
   loadFromStorage(STORAGE_KEYS.sniperExecutionLogs, []);
 
-// Alias for backwards compatibility
 export const loadExecutionLogs = loadSniperLogs;
 
 export const saveSniperLogs = (logs: SniperExecutionLog[]): void =>
@@ -168,7 +165,6 @@ export const saveSniperLogs = (logs: SniperExecutionLog[]): void =>
     logs.slice(-MAX_EXECUTION_LOGS),
   );
 
-// Alias for backwards compatibility
 export const saveExecutionLogs = saveSniperLogs;
 
 export const addSniperLog = (log: SniperExecutionLog): SniperExecutionLog[] => {
@@ -177,13 +173,11 @@ export const addSniperLog = (log: SniperExecutionLog): SniperExecutionLog[] => {
   return logs;
 };
 
-// Alias for backwards compatibility
 export const addExecutionLog = addSniperLog;
 
 export const clearSniperLogs = (): void =>
   localStorage.removeItem(STORAGE_KEYS.sniperExecutionLogs);
 
-// Alias for backwards compatibility
 export const clearExecutionLogs = clearSniperLogs;
 
 export const getSniperLogsByProfileId = (
@@ -193,7 +187,6 @@ export const getSniperLogsByProfileId = (
   return logs.filter((log) => log.profileId === profileId);
 };
 
-// Alias for backwards compatibility
 export const getExecutionLogsByProfileId = getSniperLogsByProfileId;
 
 export const getSuccessfulSnipeCount = (): number => {
@@ -303,13 +296,11 @@ export const createDefaultCopyTradeAction = (): CopyTradeAction => ({
 export const loadCopyTradeWalletLists = (): WalletList[] =>
   loadFromStorage(STORAGE_KEYS.copytradeWalletLists, []);
 
-// Alias for backwards compatibility
 export const loadWalletLists = loadCopyTradeWalletLists;
 
 export const saveCopyTradeWalletLists = (lists: WalletList[]): void =>
   saveToStorage(STORAGE_KEYS.copytradeWalletLists, lists);
 
-// Alias for backwards compatibility
 export const saveWalletLists = saveCopyTradeWalletLists;
 
 export const createWalletList = (
@@ -517,50 +508,6 @@ export const exportAllProfiles = (): string => {
   return JSON.stringify(data, null, 2);
 };
 
-export const exportProfilesToJson = (): string => {
-  const profiles = loadSniperProfiles();
-  return JSON.stringify(profiles, null, 2);
-};
-
-export const exportProfileToJson = (profileId: string): string | null => {
-  const profile = getSniperProfileById(profileId);
-  if (!profile) return null;
-  return JSON.stringify(profile, null, 2);
-};
-
-export const importProfilesFromJson = (jsonString: string): number => {
-  try {
-    const importedProfiles = JSON.parse(jsonString) as SniperProfile[];
-
-    if (!Array.isArray(importedProfiles)) {
-      throw new Error("Invalid format: expected an array of profiles");
-    }
-
-    const currentProfiles = loadSniperProfiles();
-    const existingIds = new Set(currentProfiles.map((p) => p.id));
-
-    const newProfiles = importedProfiles.map((profile) => ({
-      ...profile,
-      id: existingIds.has(profile.id)
-        ? generateProfileId("sniper")
-        : profile.id,
-      isActive: false,
-      executionCount: 0,
-      lastExecuted: undefined,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }));
-
-    const mergedProfiles = [...currentProfiles, ...newProfiles];
-    saveSniperProfiles(mergedProfiles);
-
-    return newProfiles.length;
-  } catch (error) {
-    console.error("Error importing profiles:", error);
-    throw error;
-  }
-};
-
 interface ImportData {
   sniperProfiles?: SniperProfile[];
   copytradeProfiles?: CopyTradeProfile[];
@@ -639,28 +586,3 @@ export const duplicateProfile = <T extends { id: string; name: string }>(
   createdAt: Date.now(),
   updatedAt: Date.now(),
 });
-
-export const duplicateSniperProfile = (
-  profileId: string,
-): SniperProfile | null => {
-  const profile = getSniperProfileById(profileId);
-  if (!profile) return null;
-
-  const duplicated: SniperProfile = {
-    ...profile,
-    id: generateProfileId("sniper"),
-    name: `${profile.name} (Copy)`,
-    isActive: false,
-    executionCount: 0,
-    lastExecuted: undefined,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    filters: profile.filters.map((f) => ({
-      ...f,
-      id: generateFilterId(),
-    })),
-  };
-
-  addSniperProfile(duplicated);
-  return duplicated;
-};

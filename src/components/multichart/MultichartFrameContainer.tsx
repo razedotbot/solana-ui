@@ -73,6 +73,9 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
   const [buyAmount, setBuyAmount] = useState("0.1");
   const [sellAmount, setSellAmount] = useState("100");
   const [isTrading, setIsTrading] = useState(false);
+  const [tradingCardPosition, setTradingCardPosition] = useState({ x: 20, y: 40 });
+  const [tradingCardDragging, setTradingCardDragging] = useState(false);
+  const tradingCardContainerRef = useRef<HTMLDivElement>(null);
 
   const isDraggingRef = useRef(false);
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
@@ -244,6 +247,7 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
   const handleOpenTradingCard = useCallback((address: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setTradingCardToken(address);
+    setTradingCardPosition({ x: 20, y: 40 }); // Reset position for new token
     setTradingCardOpen(true);
   }, []);
 
@@ -521,14 +525,17 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
 
               {/* Trading Card - inside the token box */}
               {tradingCardOpen && tradingCardToken === token.address && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-[2px] rounded-lg">
+                <div
+                  ref={tradingCardContainerRef}
+                  className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[2px] rounded-lg overflow-hidden"
+                >
                   <FloatingTradingCard
                     isOpen={true}
                     onClose={() => setTradingCardOpen(false)}
-                    position={{ x: 0, y: 0 }}
-                    onPositionChange={() => {}}
-                    isDragging={false}
-                    onDraggingChange={() => {}}
+                    position={tradingCardPosition}
+                    onPositionChange={setTradingCardPosition}
+                    isDragging={tradingCardDragging}
+                    onDraggingChange={setTradingCardDragging}
                     tokenAddress={token.address}
                     wallets={wallets}
                     setWallets={setWallets}
@@ -547,6 +554,7 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
                     baseCurrencyBalances={baseCurrencyBalances}
                     tokenBalances={tokenBalances}
                     embedded={true}
+                    containerRef={tradingCardContainerRef}
                   />
                 </div>
               )}

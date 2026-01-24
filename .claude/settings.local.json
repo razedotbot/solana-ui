@@ -6,7 +6,8 @@
       "mcp__acp__Edit",
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }
