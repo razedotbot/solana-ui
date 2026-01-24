@@ -81,7 +81,7 @@ interface DeploymentProgressItem {
   error?: string;
 }
 
-type DeployTab = "platform" | "token" | "wallets" | "advanced" | "multi";
+type DeployTab = "platform" | "token" | "wallets";
 
 interface TabConfig {
   id: DeployTab;
@@ -94,8 +94,6 @@ const TABS: TabConfig[] = [
   { id: "platform", label: "Platform", icon: <Zap size={18} />, description: "Select Platform" },
   { id: "token", label: "Token", icon: <Sparkles size={18} />, description: "Token Details" },
   { id: "wallets", label: "Wallets", icon: <Wallet size={18} />, description: "Buy Wallets" },
-  { id: "advanced", label: "Advanced", icon: <Settings size={18} />, description: "Platform Options" },
-  { id: "multi", label: "Multi-Deploy", icon: <Layers size={18} />, description: "Cross-Platform" },
 ];
 
 // Platform icons
@@ -477,38 +475,43 @@ export const DeployPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Platform Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {PLATFORMS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setSelectedPlatform(p.id)}
-            className={`group relative p-5 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
-              selectedPlatform === p.id
-                ? "border-app-primary-color bg-app-primary-color/10 shadow-[0_0_20px_rgba(2,179,109,0.2)]"
-                : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
-            }`}
-          >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-app-primary-color/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-app-quaternary flex items-center justify-center [&>svg]:w-8 [&>svg]:h-8 group-hover:scale-110 transition-transform">
-                {PlatformIcons[p.id]}
-              </div>
-              <div className="flex-1">
-                <div className={`text-base font-bold font-mono ${selectedPlatform === p.id ? "color-primary" : "text-app-primary"}`}>
-                  {p.name}
+      {/* Primary Platform */}
+      <div>
+        <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+          Primary Platform
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {PLATFORMS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setSelectedPlatform(p.id)}
+              className={`group relative p-5 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                selectedPlatform === p.id
+                  ? "border-app-primary-color bg-app-primary-color/10 shadow-[0_0_20px_rgba(2,179,109,0.2)]"
+                  : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
+              }`}
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-app-primary-color/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-app-quaternary flex items-center justify-center [&>svg]:w-8 [&>svg]:h-8 group-hover:scale-110 transition-transform">
+                  {PlatformIcons[p.id]}
                 </div>
-                <div className="text-xs font-mono text-app-secondary-40 mt-0.5">{p.desc}</div>
-              </div>
-              {selectedPlatform === p.id && (
-                <div className="w-6 h-6 rounded-full bg-app-primary-color flex items-center justify-center">
-                  <Check size={14} className="text-black" />
+                <div className="flex-1">
+                  <div className={`text-base font-bold font-mono ${selectedPlatform === p.id ? "color-primary" : "text-app-primary"}`}>
+                    {p.name}
+                  </div>
+                  <div className="text-xs font-mono text-app-secondary-40 mt-0.5">{p.desc}</div>
                 </div>
-              )}
-            </div>
-          </button>
-        ))}
+                {selectedPlatform === p.id && (
+                  <div className="w-6 h-6 rounded-full bg-app-primary-color flex items-center justify-center">
+                    <Check size={14} className="text-black" />
+                  </div>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Advanced Mode Toggle */}
@@ -522,7 +525,7 @@ export const DeployPage: React.FC = () => {
               </div>
               <div>
                 <div className="text-sm font-bold text-app-primary font-mono">Advanced Mode</div>
-                <div className="text-xs text-app-secondary-60 font-mono mt-0.5">Up to 20 wallets with multi-bundle deployment</div>
+                <div className="text-xs text-app-secondary-60 font-mono mt-0.5">Up to 20 wallets bundle deployment</div>
               </div>
             </div>
             <button
@@ -554,6 +557,234 @@ export const DeployPage: React.FC = () => {
         </div>
       )}
 
+      {/* Platform-Specific Advanced Settings */}
+      {selectedPlatform === "pumpfun" && (
+        <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+              <Settings size={20} className="text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-app-primary font-mono">Platform Settings</p>
+              <p className="text-[10px] text-app-secondary-40 font-mono">Pump.fun specific options</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5">
+                {PlatformIcons.pumpfun}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-app-primary font-mono">Mayhem Mode</p>
+                <p className="text-xs text-app-secondary-40 font-mono">Enhanced token type with special features</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPumpType(!pumpType)}
+              className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+                pumpType ? "bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]" : "bg-app-quaternary border border-app-primary-30"
+              }`}
+            >
+              <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${pumpType ? "left-8" : "left-1"}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selectedPlatform === "bonk" && (
+        <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+              <Settings size={20} className="text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-app-primary font-mono">Platform Settings</p>
+              <p className="text-[10px] text-app-secondary-40 font-mono">Bonk.fun specific options</p>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+            Token Category
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { value: "meme", label: "Meme", icon: "🐕", desc: "Fun & community tokens" },
+              { value: "tech", label: "Tech", icon: "⚡", desc: "Utility & infrastructure" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setBonkType(opt.value as "meme" | "tech")}
+                className={`group relative p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
+                  bonkType === opt.value
+                    ? "border-orange-500/50 bg-orange-500/10 shadow-[0_0_20px_rgba(249,115,22,0.15)]"
+                    : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
+                }`}
+              >
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">{opt.icon}</span>
+                    {bonkType === opt.value && (
+                      <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
+                        <Check size={12} className="text-black" />
+                      </div>
+                    )}
+                  </div>
+                  <div className={`text-sm font-bold font-mono ${bonkType === opt.value ? "text-orange-400" : "text-app-primary"}`}>
+                    {opt.label}
+                  </div>
+                  <div className="text-[10px] font-mono text-app-secondary-40 mt-1">{opt.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedPlatform === "meteoraDBC" && (
+        <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+              <Settings size={20} className="text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-app-primary font-mono">Platform Settings</p>
+              <p className="text-[10px] text-app-secondary-40 font-mono">Meteora DBC specific options</p>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+            Pool Config Address
+          </label>
+          <input
+            type="text"
+            value={meteoraDBCConfigAddress}
+            onChange={(e) => setMeteoraDBCConfigAddress(e.target.value)}
+            placeholder={METEORA_DBC_CONFIGS.standard}
+            className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 focus:outline-none font-mono transition-all"
+          />
+          <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
+            Leave default for standard configuration or enter custom pool config
+          </p>
+        </div>
+      )}
+
+      {selectedPlatform === "meteoraCPAMM" && (
+        <div className="space-y-4">
+          <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                <Settings size={20} className="text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-app-primary font-mono">Platform Settings</p>
+                <p className="text-[10px] text-app-secondary-40 font-mono">Meteora CPAMM specific options</p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
+              Pool Config Address
+            </label>
+            <input
+              type="text"
+              value={meteoraCPAMMConfigAddress}
+              onChange={(e) => setMeteoraCPAMMConfigAddress(e.target.value)}
+              placeholder={METEORA_CPAMM_CONFIGS.standard}
+              className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 focus:outline-none font-mono transition-all"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+              <label className="text-[10px] text-app-secondary-40 font-mono uppercase mb-2 block">Initial Liquidity</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={meteoraCPAMMInitialLiquidity}
+                  onChange={(e) => /^\d*\.?\d*$/.test(e.target.value) && setMeteoraCPAMMInitialLiquidity(e.target.value)}
+                  placeholder="1"
+                  className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:outline-none font-mono"
+                />
+                <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">SOL</span>
+              </div>
+            </div>
+            <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+              <label className="text-[10px] text-app-secondary-40 font-mono uppercase mb-2 block">Token % for Pool</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={meteoraCPAMMInitialTokenPercent}
+                  onChange={(e) => {
+                    if (/^\d*\.?\d*$/.test(e.target.value)) {
+                      const val = parseFloat(e.target.value);
+                      if (isNaN(val) || (val >= 0 && val <= 100)) setMeteoraCPAMMInitialTokenPercent(e.target.value);
+                    }
+                  }}
+                  placeholder="80"
+                  className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:outline-none font-mono"
+                />
+                <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Deploy Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+            <Layers size={14} className="text-cyan-400" />
+            Additional Platforms ({additionalTokens.length}/{MAX_TOKENS_PER_DEPLOY - 1})
+          </label>
+        </div>
+
+        {/* Additional Platforms */}
+        {additionalTokens.map((token, i) => (
+          <div key={i} className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-app-quaternary flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6">
+                  {PlatformIcons[token.platform]}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-app-primary font-mono">{PLATFORMS.find((p) => p.id === token.platform)?.name}</p>
+                  <p className="text-[10px] text-app-secondary-40 font-mono">Same token, different platform</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={token.platform}
+                  onChange={(e) => {
+                    const updated = [...additionalTokens];
+                    updated[i] = { ...updated[i], platform: e.target.value as PlatformType };
+                    setAdditionalTokens(updated);
+                  }}
+                  className="bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary focus:outline-none font-mono"
+                >
+                  {PLATFORMS.filter((p) => p.id !== selectedPlatform && !additionalTokens.some((t, j) => j !== i && t.platform === p.id)).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => removeAdditionalToken(i)} className="p-2 rounded-lg hover:bg-red-500/20 transition-colors">
+                  <Trash2 size={16} className="text-red-400" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Add Platform Button */}
+        {additionalTokens.length < MAX_TOKENS_PER_DEPLOY - 1 && (
+          <button
+            type="button"
+            onClick={addAdditionalToken}
+            className="w-full p-5 rounded-xl border-2 border-dashed border-app-primary-20 hover:border-cyan-500/50 flex items-center justify-center gap-3 transition-colors group"
+          >
+            <div className="w-10 h-10 rounded-lg bg-app-tertiary flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
+              <PlusCircle size={20} className="text-app-secondary-40 group-hover:text-cyan-400" />
+            </div>
+            <span className="text-sm text-app-secondary-40 group-hover:text-cyan-400 font-mono">Add Another Platform</span>
+          </button>
+        )}
+      </div>
+
       {/* Info Card */}
       <div className="p-4 rounded-xl bg-gradient-to-r from-app-primary-color/5 to-transparent border border-app-primary-color/20">
         <div className="flex items-start gap-3">
@@ -562,13 +793,16 @@ export const DeployPage: React.FC = () => {
           </div>
           <div>
             <p className="text-sm text-app-primary font-mono font-medium">
-              {PLATFORMS.find((p) => p.id === selectedPlatform)?.name} Selected
+              {additionalTokens.length > 0 ? `Multi-Platform Deploy (${1 + additionalTokens.length} platforms)` : `${PLATFORMS.find((p) => p.id === selectedPlatform)?.name} Selected`}
             </p>
             <p className="text-xs text-app-secondary-60 font-mono mt-1">
-              {selectedPlatform === "pumpfun" && "Launch on the most popular bonding curve platform. Automatic liquidity migration at graduation."}
-              {selectedPlatform === "bonk" && "Launch with Bonk's integrated trading bot ecosystem. MEV protected trading."}
-              {selectedPlatform === "meteoraDBC" && "Dynamic bonding curve with customizable parameters. Professional token launches."}
-              {selectedPlatform === "meteoraCPAMM" && "Constant product AMM with concentrated liquidity. Best for stable trading pairs."}
+              {additionalTokens.length > 0
+                ? "Deploy the same token across multiple platforms sequentially. Each deployment will use the same metadata and wallet configuration."
+                : selectedPlatform === "pumpfun" ? "Launch on the most popular bonding curve platform. Automatic liquidity migration at graduation."
+                : selectedPlatform === "bonk" ? "Launch with Bonk's integrated trading bot ecosystem. MEV protected trading."
+                : selectedPlatform === "meteoraDBC" ? "Dynamic bonding curve with customizable parameters. Professional token launches."
+                : "Constant product AMM with concentrated liquidity. Best for stable trading pairs."
+              }
             </p>
           </div>
         </div>
@@ -884,271 +1118,13 @@ export const DeployPage: React.FC = () => {
     </div>
   );
 
-  const renderAdvancedTab = (): JSX.Element => (
-    <div className="space-y-6 animate-fade-in-down">
-      {/* Section Header */}
-      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 border border-blue-500/30 flex items-center justify-center">
-          <Settings size={24} className="text-blue-400" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-app-primary font-mono">Advanced Settings</h2>
-          <p className="text-xs text-app-secondary-60 font-mono">Platform-specific configuration options</p>
-        </div>
-      </div>
 
-      {/* Pump.fun Settings */}
-      {selectedPlatform === "pumpfun" && (
-        <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5">
-                {PlatformIcons.pumpfun}
-              </div>
-              <div>
-                <p className="text-sm font-bold text-app-primary font-mono">Mayhem Mode</p>
-                <p className="text-xs text-app-secondary-40 font-mono">Enhanced token type with special features</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setPumpType(!pumpType)}
-              className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
-                pumpType ? "bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)]" : "bg-app-quaternary border border-app-primary-30"
-              }`}
-            >
-              <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${pumpType ? "left-8" : "left-1"}`} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Bonk.fun Settings */}
-      {selectedPlatform === "bonk" && (
-        <div className="space-y-4">
-          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
-            Token Category
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { value: "meme", label: "Meme", icon: "🐕", desc: "Fun & community tokens" },
-              { value: "tech", label: "Tech", icon: "⚡", desc: "Utility & infrastructure" },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setBonkType(opt.value as "meme" | "tech")}
-                className={`group relative p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
-                  bonkType === opt.value
-                    ? "border-orange-500/50 bg-orange-500/10 shadow-[0_0_20px_rgba(249,115,22,0.15)]"
-                    : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
-                }`}
-              >
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">{opt.icon}</span>
-                    {bonkType === opt.value && (
-                      <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
-                        <Check size={12} className="text-black" />
-                      </div>
-                    )}
-                  </div>
-                  <div className={`text-sm font-bold font-mono ${bonkType === opt.value ? "text-orange-400" : "text-app-primary"}`}>
-                    {opt.label}
-                  </div>
-                  <div className="text-[10px] font-mono text-app-secondary-40 mt-1">{opt.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Meteora DBC Settings */}
-      {selectedPlatform === "meteoraDBC" && (
-        <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-            Pool Config Address
-          </label>
-          <input
-            type="text"
-            value={meteoraDBCConfigAddress}
-            onChange={(e) => setMeteoraDBCConfigAddress(e.target.value)}
-            placeholder={METEORA_DBC_CONFIGS.standard}
-            className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 focus:outline-none font-mono transition-all"
-          />
-          <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
-            Leave default for standard configuration or enter custom pool config
-          </p>
-        </div>
-      )}
-
-      {/* Meteora CPAMM Settings */}
-      {selectedPlatform === "meteoraCPAMM" && (
-        <div className="space-y-4">
-          <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-            <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-              Pool Config Address
-            </label>
-            <input
-              type="text"
-              value={meteoraCPAMMConfigAddress}
-              onChange={(e) => setMeteoraCPAMMConfigAddress(e.target.value)}
-              placeholder={METEORA_CPAMM_CONFIGS.standard}
-              className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 focus:outline-none font-mono transition-all"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-              <label className="text-[10px] text-app-secondary-40 font-mono uppercase mb-2 block">Initial Liquidity</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={meteoraCPAMMInitialLiquidity}
-                  onChange={(e) => /^\d*\.?\d*$/.test(e.target.value) && setMeteoraCPAMMInitialLiquidity(e.target.value)}
-                  placeholder="1"
-                  className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:outline-none font-mono"
-                />
-                <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">SOL</span>
-              </div>
-            </div>
-            <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-              <label className="text-[10px] text-app-secondary-40 font-mono uppercase mb-2 block">Token % for Pool</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={meteoraCPAMMInitialTokenPercent}
-                  onChange={(e) => {
-                    if (/^\d*\.?\d*$/.test(e.target.value)) {
-                      const val = parseFloat(e.target.value);
-                      if (isNaN(val) || (val >= 0 && val <= 100)) setMeteoraCPAMMInitialTokenPercent(e.target.value);
-                    }
-                  }}
-                  placeholder="80"
-                  className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:outline-none font-mono"
-                />
-                <span className="absolute right-4 top-3 text-xs text-app-secondary-40 font-mono">%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* No Platform-Specific Settings Message */}
-      {selectedPlatform !== "pumpfun" && selectedPlatform !== "bonk" && selectedPlatform !== "meteoraDBC" && selectedPlatform !== "meteoraCPAMM" && (
-        <div className="p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-app-tertiary mx-auto mb-4 flex items-center justify-center">
-            <Settings size={32} className="text-app-secondary-40" />
-          </div>
-          <p className="text-sm text-app-secondary-60 font-mono">No advanced settings available for this platform</p>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderMultiTab = (): JSX.Element => (
-    <div className="space-y-6 animate-fade-in-down">
-      {/* Section Header */}
-      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border border-cyan-500/30 flex items-center justify-center">
-          <Layers size={24} className="text-cyan-400" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-app-primary font-mono">Multi-Platform Deploy</h2>
-          <p className="text-xs text-app-secondary-60 font-mono">
-            Launch on multiple platforms simultaneously ({1 + additionalTokens.length}/{MAX_TOKENS_PER_DEPLOY})
-          </p>
-        </div>
-      </div>
-
-      {/* Primary Platform */}
-      <div className="p-4 rounded-xl bg-app-primary-color/10 border border-app-primary-color/30">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-app-quaternary flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6">
-            {PlatformIcons[selectedPlatform]}
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-app-primary font-mono">{PLATFORMS.find((p) => p.id === selectedPlatform)?.name}</p>
-            <p className="text-[10px] text-app-secondary-40 font-mono">Primary platform</p>
-          </div>
-          <div className="w-6 h-6 rounded-full bg-app-primary-color flex items-center justify-center">
-            <Check size={14} className="text-black" />
-          </div>
-        </div>
-      </div>
-
-      {/* Additional Platforms */}
-      {additionalTokens.map((token, i) => (
-        <div key={i} className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-app-quaternary flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6">
-                {PlatformIcons[token.platform]}
-              </div>
-              <div>
-                <p className="text-sm font-bold text-app-primary font-mono">{PLATFORMS.find((p) => p.id === token.platform)?.name}</p>
-                <p className="text-[10px] text-app-secondary-40 font-mono">Same token, different platform</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={token.platform}
-                onChange={(e) => {
-                  const updated = [...additionalTokens];
-                  updated[i] = { ...updated[i], platform: e.target.value as PlatformType };
-                  setAdditionalTokens(updated);
-                }}
-                className="bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary focus:outline-none font-mono"
-              >
-                {PLATFORMS.filter((p) => p.id !== selectedPlatform && !additionalTokens.some((t, j) => j !== i && t.platform === p.id)).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <button type="button" onClick={() => removeAdditionalToken(i)} className="p-2 rounded-lg hover:bg-red-500/20 transition-colors">
-                <Trash2 size={16} className="text-red-400" />
-              </button>
-            </div>
-          </div>
-        </div>
-      ))}
-
-      {/* Add Platform Button */}
-      {additionalTokens.length < MAX_TOKENS_PER_DEPLOY - 1 && (
-        <button
-          type="button"
-          onClick={addAdditionalToken}
-          className="w-full p-5 rounded-xl border-2 border-dashed border-app-primary-20 hover:border-cyan-500/50 flex items-center justify-center gap-3 transition-colors group"
-        >
-          <div className="w-10 h-10 rounded-lg bg-app-tertiary flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
-            <PlusCircle size={20} className="text-app-secondary-40 group-hover:text-cyan-400" />
-          </div>
-          <span className="text-sm text-app-secondary-40 group-hover:text-cyan-400 font-mono">Add Another Platform</span>
-        </button>
-      )}
-
-      {/* Info Card */}
-      <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-500/5 to-transparent border border-cyan-500/20">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
-            <Zap size={16} className="text-cyan-400" />
-          </div>
-          <div>
-            <p className="text-sm text-app-primary font-mono font-medium">Cross-Platform Launch</p>
-            <p className="text-xs text-app-secondary-60 font-mono mt-1">
-              Deploy the same token across multiple platforms sequentially. Each deployment will use the same metadata and wallet configuration.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   const renderTabContent = (): JSX.Element | null => {
     switch (activeTab) {
       case "platform": return renderPlatformTab();
       case "token": return renderTokenTab();
       case "wallets": return renderWalletsTab();
-      case "advanced": return renderAdvancedTab();
-      case "multi": return renderMultiTab();
       default: return null;
     }
   };
@@ -1291,10 +1267,10 @@ export const DeployPage: React.FC = () => {
           </div>
 
           {/* Main Layout */}
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col xl:flex-row gap-6">
             {/* Sidebar Tabs */}
-            <div className="lg:w-56 flex-shrink-0">
-              <div className="lg:sticky lg:top-6 space-y-1">
+            <div className="xl:w-56 flex-shrink-0">
+              <div className="xl:sticky xl:top-6 space-y-1">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
@@ -1327,9 +1303,11 @@ export const DeployPage: React.FC = () => {
               <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-6 shadow-xl">
                 {renderTabContent()}
               </div>
+            </div>
 
-              {/* Preview & Deploy Card */}
-              <div className="mt-6 bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 overflow-hidden shadow-xl">
+            {/* Preview & Deploy Card - Right Sidebar */}
+            <div className="xl:w-96 flex-shrink-0 order-first xl:order-last">
+              <div className="xl:sticky xl:top-6 bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 overflow-hidden shadow-xl">
                 <div className="px-5 py-3 border-b border-app-primary-20 bg-app-tertiary/30 flex items-center gap-2">
                   <Eye size={14} className="text-app-secondary-40" />
                   <span className="text-xs font-medium text-app-secondary-40 font-mono uppercase tracking-wider">Deploy Preview</span>
