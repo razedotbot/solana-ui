@@ -214,6 +214,9 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
                 | "parallel") || "batch",
             batchSize: parseInt(config.balanceRefreshBatchSize || "5", 10),
             delay: parseInt(config.balanceRefreshDelay || "50", 10),
+            onRateLimitError: () => {
+              showToast("RPC rate limit reached, check settings", "error");
+            },
           },
           baseCurrency,
         );

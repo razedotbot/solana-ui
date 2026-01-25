@@ -45,6 +45,7 @@ import type {
 import Split from "./components/Split";
 import { addRecentToken } from "./utils/recentTokens";
 import { useAppContext } from "./contexts";
+import { useToast } from "./utils/hooks/useToast";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
 import { MultichartLayout } from "./components/multichart/MultichartLayout";
 import { useMultichart } from "./contexts/useMultichart";
@@ -225,16 +226,16 @@ const ToolsDropdown: React.FC = () => {
                   <span className="text-xs font-mono font-medium">Wallets</span>
                 </button>
 
-                {/* Automate */}
+                {/* Tools */}
                 <button
-                  onClick={() => handleItemClick(() => navigate("/automate"))}
+                  onClick={() => handleItemClick(() => navigate("/tools"))}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <Bot size={14} className="color-primary" />
                   </div>
                   <span className="text-xs font-mono font-medium">
-                    Automate
+                    Tools
                   </span>
                 </button>
 
@@ -312,6 +313,9 @@ const WalletManager: React.FC = () => {
 
   // Multichart context for adding tokens when in multichart mode
   const { addToken: addMultichartToken, tokens: multichartTokens } = useMultichart();
+
+  // Toast notifications
+  const { showToast } = useToast();
 
   // Detect if we're on mobile or desktop to conditionally render layouts
   const [isMobile, setIsMobile] = useState(false);
@@ -1148,6 +1152,9 @@ const WalletManager: React.FC = () => {
             10,
           ),
           delay: parseInt(contextConfig?.balanceRefreshDelay || "50", 10),
+          onRateLimitError: () => {
+            showToast("RPC rate limit reached, check settings", "error");
+          },
         },
       );
     }
@@ -1200,6 +1207,9 @@ const WalletManager: React.FC = () => {
             10,
           ),
           delay: parseInt(contextConfig?.balanceRefreshDelay || "50", 10),
+          onRateLimitError: () => {
+            showToast("RPC rate limit reached, check settings", "error");
+          },
         },
       );
     } catch (error) {
@@ -1216,6 +1226,7 @@ const WalletManager: React.FC = () => {
     state.baseCurrencyBalances,
     state.tokenBalances,
     memoizedCallbacks,
+    showToast,
     contextConfig?.balanceRefreshStrategy,
     contextConfig?.balanceRefreshBatchSize,
     contextConfig?.balanceRefreshDelay,

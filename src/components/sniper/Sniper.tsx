@@ -782,7 +782,7 @@ const Sniper: React.FC<SniperProps> = ({ availableWallets: _availableWallets = [
     const profile = profiles.find((p) => p.id === id);
     if (profile) {
       const dup = duplicateProfile(profile, "sniper");
-      setProfiles(addSniperProfile(dup as SniperProfile));
+      setProfiles(addSniperProfile(dup));
     }
   };
 

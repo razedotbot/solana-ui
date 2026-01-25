@@ -45,7 +45,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = ({
 
     const leftNavItems = [
         { path: '/wallets', label: 'Wallets', icon: Wallet },
-        { path: '/automate', label: 'Automate', icon: Bot },
+        { path: '/tools', label: 'Tools', icon: Bot },
     ];
 
     const rightNavItems = [
@@ -55,7 +55,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = ({
     const allNavItems = [
         { path: '/wallets', label: 'Wallets', icon: Wallet, prominent: false },
         { path: '/monitor', label: 'Trade', icon: TrendingUp, prominent: true },
-        { path: '/automate', label: 'Automate', icon: Bot, prominent: false },
+        { path: '/tools', label: 'Tools', icon: Bot, prominent: false },
         { path: '/deploy', label: 'Deploy', icon: Blocks, prominent: false },
     ];
 

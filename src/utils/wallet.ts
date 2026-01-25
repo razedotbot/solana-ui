@@ -252,30 +252,25 @@ export async function fetchTokenBalance(
   walletAddress: string,
   tokenMint: string,
 ): Promise<number> {
-  try {
-    const walletPublicKey = new PublicKey(walletAddress);
-    const tokenMintPublicKey = new PublicKey(tokenMint);
+  const walletPublicKey = new PublicKey(walletAddress);
+  const tokenMintPublicKey = new PublicKey(tokenMint);
 
-    const tokenAccounts = await withTimeout(
-      connection.getParsedTokenAccountsByOwner(
-        walletPublicKey,
-        { mint: tokenMintPublicKey },
-        "processed",
-      ),
-      1000,
-    );
+  const tokenAccounts = await withTimeout(
+    connection.getParsedTokenAccountsByOwner(
+      walletPublicKey,
+      { mint: tokenMintPublicKey },
+      "processed",
+    ),
+    1000,
+  );
 
-    if (tokenAccounts.value.length === 0) return 0;
+  if (tokenAccounts.value.length === 0) return 0;
 
-    const parsedData = tokenAccounts.value[0].account.data.parsed as {
-      info: { tokenAmount: { uiAmount: number | null } };
-    };
-    const balance = parsedData.info.tokenAmount.uiAmount;
-    return balance || 0;
-  } catch (error) {
-    console.error("Error fetching token balance:", error);
-    return 0;
-  }
+  const parsedData = tokenAccounts.value[0].account.data.parsed as {
+    info: { tokenAmount: { uiAmount: number | null } };
+  };
+  const balance = parsedData.info.tokenAmount.uiAmount;
+  return balance || 0;
 }
 
 /**
@@ -285,17 +280,12 @@ export async function fetchSolBalance(
   connection: Connection,
   walletAddress: string,
 ): Promise<number> {
-  try {
-    const publicKey = new PublicKey(walletAddress);
-    const balance = await withTimeout(
-      connection.getBalance(publicKey, "processed"),
-      1000,
-    );
-    return balance / 1e9;
-  } catch (error) {
-    console.error("Error fetching SOL balance:", error);
-    return 0;
-  }
+  const publicKey = new PublicKey(walletAddress);
+  const balance = await withTimeout(
+    connection.getBalance(publicKey, "processed"),
+    1000,
+  );
+  return balance / 1e9;
 }
 
 /**
@@ -307,26 +297,21 @@ export async function fetchBaseCurrencyBalance(
   walletAddress: string,
   baseCurrency: BaseCurrencyConfig,
 ): Promise<number> {
-  try {
-    if (baseCurrency.isNative) {
-      // Native SOL - use getBalance
-      const publicKey = new PublicKey(walletAddress);
-      const balance = await withTimeout(
-        connection.getBalance(publicKey, "processed"),
-        1000,
-      );
-      return balance / Math.pow(10, baseCurrency.decimals);
-    } else {
-      // SPL Token (USDC, USD1) - use token account balance
-      return await fetchTokenBalance(
-        connection,
-        walletAddress,
-        baseCurrency.mint,
-      );
-    }
-  } catch (error) {
-    console.error(`Error fetching ${baseCurrency.symbol} balance:`, error);
-    return 0;
+  if (baseCurrency.isNative) {
+    // Native SOL - use getBalance
+    const publicKey = new PublicKey(walletAddress);
+    const balance = await withTimeout(
+      connection.getBalance(publicKey, "processed"),
+      1000,
+    );
+    return balance / Math.pow(10, baseCurrency.decimals);
+  } else {
+    // SPL Token (USDC, USD1) - use token account balance
+    return await fetchTokenBalance(
+      connection,
+      walletAddress,
+      baseCurrency.mint,
+    );
   }
 }
 
@@ -370,6 +355,7 @@ export interface BalanceRefreshOptions {
   batchSize?: number;
   delay?: number;
   onlyIfZeroOrNull?: boolean;
+  onRateLimitError?: () => void;
 }
 
 /**
@@ -401,7 +387,11 @@ export async function fetchWalletBalances(
     batchSize = 5,
     delay = 50,
     onlyIfZeroOrNull = false,
+    onRateLimitError,
   } = options;
+
+  // Track if we've shown the rate limit toast to avoid flooding
+  let rateLimitToastShown = false;
 
   const newBaseCurrencyBalances = new Map(
     currentBaseCurrencyBalances || new Map<string, number>(),
@@ -463,7 +453,18 @@ export async function fetchWalletBalances(
         }
       }
     } catch (error) {
-      console.error(`Error fetching balances for ${wallet.address}:`, error);
+      // Check for rate limit errors (429 or timeout after retries)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (
+        !rateLimitToastShown &&
+        onRateLimitError &&
+        (errorMessage.includes("429") ||
+          errorMessage.toLowerCase().includes("timeout") ||
+          errorMessage.toLowerCase().includes("rate limit"))
+      ) {
+        rateLimitToastShown = true;
+        onRateLimitError();
+      }
     }
   };
 

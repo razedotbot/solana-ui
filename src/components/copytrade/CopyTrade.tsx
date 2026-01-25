@@ -1423,7 +1423,7 @@ const CopyTrade: React.FC<CopyTradeProps> = ({ availableWallets: _availableWalle
     const profile = profiles.find((p) => p.id === id);
     if (profile) {
       const dup = duplicateProfile(profile, "copytrade");
-      setProfiles(addCopyTradeProfile(dup as CopyTradeProfile));
+      setProfiles(addCopyTradeProfile(dup));
     }
   };
 

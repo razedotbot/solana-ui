@@ -91,7 +91,7 @@ export const TradingTools: React.FC<TradingToolsProps> = ({
     },
   ];
 
-  const getTabColors = (id: ToolType, isActive: boolean) => {
+  const getTabColors = (id: ToolType, isActive: boolean): string => {
     const colors = {
       sniper: {
         active: "bg-yellow-500/10 border-yellow-500/30 text-yellow-400",
@@ -115,7 +115,7 @@ export const TradingTools: React.FC<TradingToolsProps> = ({
     return isActive ? colors[id].active : colors[id].inactive;
   };
 
-  const getBadgeColors = (id: ToolType) => {
+  const getBadgeColors = (id: ToolType): string => {
     const colors = {
       sniper: "bg-yellow-500/20 text-yellow-400",
       copytrade: "bg-emerald-500/20 text-emerald-400",

@@ -606,7 +606,7 @@ export const Root = (): JSX.Element => {
                         <Route path="/tokens/:tokenAddress" element={<App />} />
 
                         {/* Feature pages */}
-                        <Route path="/automate" element={<AutomatePage />} />
+                        <Route path="/tools" element={<AutomatePage />} />
                         <Route path="/deploy" element={<DeployPage />} />
                         <Route path="/wallets" element={<WalletsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />

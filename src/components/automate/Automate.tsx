@@ -1168,7 +1168,7 @@ const Automate: React.FC<AutomateProps> = ({ availableWallets: _availableWallets
     const strategy = strategies.find((s) => s.id === id);
     if (strategy) {
       const dup = duplicateProfile(strategy, "automate");
-      setStrategies(addStrategy(dup as TradingStrategy));
+      setStrategies(addStrategy(dup));
     }
   };
 
@@ -1232,7 +1232,7 @@ const Automate: React.FC<AutomateProps> = ({ availableWallets: _availableWallets
             <Bot className="w-5 h-5 text-purple-400" />
           </div>
           <div>
-            <h2 className="font-mono text-lg font-semibold text-app-primary">Automate</h2>
+            <h2 className="font-mono text-lg font-semibold text-app-primary">Tools</h2>
             <div className="flex items-center gap-3 text-xs font-mono text-app-secondary-60">
               <span className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />

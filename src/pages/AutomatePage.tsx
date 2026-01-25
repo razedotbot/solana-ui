@@ -645,7 +645,7 @@ export const AutomatePage: React.FC = () => {
             <div className="flex items-center gap-3">
               <div>
                 <h1 className="text-xl font-bold text-app-primary font-mono tracking-wide">
-                  AUTOMATE
+                  TOOLS
                 </h1>
                 <p className="text-xs text-app-secondary-80 font-mono">
                   Unified trading tools - Sniper, Copy Trade, and Strategy

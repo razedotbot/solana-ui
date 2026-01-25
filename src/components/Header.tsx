@@ -22,8 +22,8 @@ const VerticalSidebar: React.FC = () => {
     navigate('/monitor');
   };
 
-  const handleAutomateClick = (): void => {
-    navigate('/automate');
+  const handleToolsClick = (): void => {
+    navigate('/tools');
   };
 
 
@@ -81,14 +81,14 @@ const VerticalSidebar: React.FC = () => {
         </span>
       </button>
 
-      {/* Automate */}
+      {/* Tools */}
       <button
-        onClick={handleAutomateClick}
-        className={getButtonClassName('/automate')}
+        onClick={handleToolsClick}
+        className={getButtonClassName('/tools')}
       >
-        <Bot size={24} className={getIconClassName('/automate')} />
+        <Bot size={24} className={getIconClassName('/tools')} />
         <span className="text-xs font-mono font-medium tracking-wider uppercase">
-          AUTOMATE
+          TOOLS
         </span>
       </button>
 
