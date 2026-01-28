@@ -1,65 +1,95 @@
 import React from "react";
-import { Download, Trash2, Archive } from "lucide-react";
-import { WalletTooltip } from "../Styles";
+import { Download, Trash2, Archive, X } from "lucide-react";
 import type { BulkActionsPanelProps } from "./types";
 
-export const BulkActionsPanel: React.FC<BulkActionsPanelProps> = ({
+interface ExtendedBulkActionsPanelProps extends BulkActionsPanelProps {
+  onClearSelection?: () => void;
+}
+
+export const BulkActionsPanel: React.FC<ExtendedBulkActionsPanelProps> = ({
   selectedCount,
   showArchived,
   onDownload,
   onArchive,
   onUnarchive,
   onDelete,
+  onClearSelection,
 }) => {
-  if (selectedCount === 0) return null;
-
   return (
-    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3">
-      <div className="flex flex-col items-center gap-2 bg-app-primary border border-app-primary-30 rounded-lg p-3 shadow-lg">
-        <WalletTooltip content="Download Selected" position="left">
-          <button
-            onClick={onDownload}
-            className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-          >
-            <Download size={16} className="color-primary" />
-          </button>
-        </WalletTooltip>
+    <div
+      className={`fixed bottom-0 left-0 right-0 z-50 transform transition-all duration-300 ease-out ${
+        selectedCount > 0
+          ? "translate-y-0 opacity-100"
+          : "translate-y-full opacity-0 pointer-events-none"
+      }`}
+    >
+      <div className="bg-app-primary/95 backdrop-blur-md border-t border-app-primary-20 shadow-2xl shadow-black/50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left: Selection info */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-app-primary-color rounded-xl flex items-center justify-center">
+                  <span className="text-app-quaternary font-bold text-lg">{selectedCount}</span>
+                </div>
+                <div>
+                  <span className="text-app-primary font-medium">wallet{selectedCount !== 1 ? 's' : ''} selected</span>
+                </div>
+              </div>
 
-        {!showArchived && (
-          <WalletTooltip content="Archive Selected" position="left">
-            <button
-              onClick={onArchive}
-              className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-            >
-              <Archive size={16} className="color-primary" />
-            </button>
-          </WalletTooltip>
-        )}
+              {onClearSelection && (
+                <button
+                  onClick={onClearSelection}
+                  className="flex items-center gap-1.5 text-sm text-app-secondary-60 hover:text-app-primary px-3 py-1.5 hover:bg-app-quaternary rounded-lg transition-colors"
+                >
+                  <X size={14} />
+                  <span>Clear</span>
+                </button>
+              )}
+            </div>
 
-        {showArchived && (
-          <WalletTooltip content="Unarchive Selected" position="left">
-            <button
-              onClick={onUnarchive}
-              className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-app-primary-60 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-            >
-              <Archive size={16} className="text-app-primary-color" />
-            </button>
-          </WalletTooltip>
-        )}
+            {/* Right: Action buttons */}
+            <div className="flex items-center gap-2">
+              {/* Download */}
+              <button
+                onClick={onDownload}
+                className="flex items-center gap-2 px-4 py-2.5 bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-30 rounded-xl transition-all"
+              >
+                <Download size={18} className="color-primary" />
+                <span className="text-sm font-medium text-app-primary">Export Keys</span>
+              </button>
 
-        <WalletTooltip content="Delete Selected" position="left">
-          <button
-            onClick={onDelete}
-            className="p-2 bg-app-quaternary border border-app-primary-20 hover:border-red-500 rounded-lg transition-all duration-300 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-          >
-            <Trash2 size={16} className="text-red-500" />
-          </button>
-        </WalletTooltip>
+              {/* Archive/Unarchive */}
+              {!showArchived ? (
+                <button
+                  onClick={onArchive}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-app-quaternary hover:bg-orange-500/20 border border-app-primary-20 hover:border-orange-500/30 rounded-xl transition-all"
+                >
+                  <Archive size={18} className="text-orange-400" />
+                  <span className="text-sm font-medium text-app-primary">Archive</span>
+                </button>
+              ) : (
+                <button
+                  onClick={onUnarchive}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 hover:border-orange-500/30 rounded-xl transition-all"
+                >
+                  <Archive size={18} className="text-orange-400" />
+                  <span className="text-sm font-medium text-orange-400">Unarchive</span>
+                </button>
+              )}
+
+              {/* Delete */}
+              <button
+                onClick={onDelete}
+                className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 rounded-xl transition-all"
+              >
+                <Trash2 size={18} className="text-red-400" />
+                <span className="text-sm font-medium text-red-400">Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <span className="px-3 py-2 bg-app-primary border border-app-primary-30 rounded-lg text-xs sm:text-sm font-mono color-primary whitespace-nowrap shadow-lg">
-        {selectedCount} selected
-      </span>
     </div>
   );
 };

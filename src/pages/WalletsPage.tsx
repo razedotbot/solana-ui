@@ -45,13 +45,13 @@ import { useAppContext } from "../contexts";
 import { useToast } from "../utils/hooks";
 
 import {
-  WalletQuickStats,
   MasterWalletSection,
   MasterWalletExpandedDetails,
   WalletToolbar,
   WalletTable,
   BulkActionsPanel,
 } from "../components/wallets";
+import { formatBaseCurrencyBalance } from "../utils/formatting";
 import type { SortField, SortDirection, ViewMode, ActiveModal } from "../components/wallets";
 
 export const WalletsPage: React.FC = () => {
@@ -662,13 +662,13 @@ export const WalletsPage: React.FC = () => {
       const matchesArchivedFilter = showArchived
         ? wallet.isArchived === true
         : !wallet.isArchived;
-      const matchesAddressSearch = wallet.address
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const matchesLabelSearch =
-        labelSearchTerm.trim() === "" ||
-        (wallet.label &&
-          wallet.label.toLowerCase().includes(labelSearchTerm.toLowerCase()));
+
+      // Combined search: match address OR label
+      const searchQuery = searchTerm.toLowerCase().trim();
+      const matchesSearch = searchQuery === "" ||
+        wallet.address.toLowerCase().includes(searchQuery) ||
+        (wallet.label && wallet.label.toLowerCase().includes(searchQuery));
+
       const matchesViewMode =
         viewMode === "all"
           ? true
@@ -680,8 +680,7 @@ export const WalletsPage: React.FC = () => {
 
       return (
         matchesArchivedFilter &&
-        matchesAddressSearch &&
-        matchesLabelSearch &&
+        matchesSearch &&
         matchesViewMode
       );
     });
@@ -711,7 +710,6 @@ export const WalletsPage: React.FC = () => {
     sortField,
     sortDirection,
     searchTerm,
-    labelSearchTerm,
     baseCurrencyBalances,
     showArchived,
     viewMode,
@@ -1041,19 +1039,11 @@ export const WalletsPage: React.FC = () => {
         </div>
 
         {/* Content container */}
-        <div className="relative z-10 max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-6 pb-20 md:pb-6 flex flex-col flex-1 min-h-0 overflow-hidden">
-          {/* Quick Stats & Master Wallets Row */}
-          <div className="mb-6 pb-4 border-b border-app-primary-20 flex-shrink-0">
-            <div className="flex flex-wrap items-start gap-3 justify-between">
-              <WalletQuickStats
-                filteredCount={filteredAndSortedWallets.length}
-                totalCount={wallets.length}
-                totalBalance={totalSOL}
-                activeOrArchivedCount={showArchived ? archivedCount : activeWallets}
-                showArchived={showArchived}
-                baseCurrency={baseCurrency}
-              />
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-2 sm:py-3 pb-16 md:pb-3 flex flex-col flex-1 min-h-0 overflow-hidden">
 
+          {/* Master Wallets Section (only if exists) */}
+          {masterWallets.length > 0 && (
+            <div className="mb-2 pb-2 border-b border-app-primary-20 flex-shrink-0">
               <MasterWalletSection
                 masterWallets={masterWallets}
                 wallets={wallets}
@@ -1074,21 +1064,23 @@ export const WalletsPage: React.FC = () => {
                 showToast={showToast}
               />
             </div>
-          </div>
+          )}
 
           {/* Expanded Master Wallet Details */}
-          <MasterWalletExpandedDetails
-            masterWallets={masterWallets}
-            wallets={wallets}
-            expandedMasterWallets={expandedMasterWallets}
-            baseCurrencyBalances={baseCurrencyBalances}
-            baseCurrency={baseCurrency}
-            onExportSeedPhrase={setExportSeedPhraseMasterWallet}
-            onDeleteMasterWallet={handleDeleteMasterWallet}
-            showToast={showToast}
-          />
+          {expandedMasterWallets.size > 0 && (
+            <MasterWalletExpandedDetails
+              masterWallets={masterWallets}
+              wallets={wallets}
+              expandedMasterWallets={expandedMasterWallets}
+              baseCurrencyBalances={baseCurrencyBalances}
+              baseCurrency={baseCurrency}
+              onExportSeedPhrase={setExportSeedPhraseMasterWallet}
+              onDeleteMasterWallet={handleDeleteMasterWallet}
+              showToast={showToast}
+            />
+          )}
 
-          {/* Controls */}
+          {/* Toolbar with integrated stats */}
           <WalletToolbar
             viewMode={viewMode}
             setViewMode={setViewMode}
@@ -1109,7 +1101,8 @@ export const WalletsPage: React.FC = () => {
                 showToast
               )
             }
-            onFund={() => setActiveModal("distribute")}
+            onDistribute={() => setActiveModal("distribute")}
+            onMixer={() => setActiveModal("mixer")}
             onConsolidate={() => setActiveModal("consolidate")}
             onTransfer={() => setActiveModal("transfer")}
             onBurn={() => {
@@ -1120,6 +1113,14 @@ export const WalletsPage: React.FC = () => {
             connection={connection}
             baseCurrency={baseCurrency}
             setSelectedWallets={setSelectedWallets}
+            // Stats props
+            walletsCount={filteredAndSortedWallets.length}
+            totalWallets={nonArchivedWallets.length}
+            totalBalance={formatBaseCurrencyBalance(totalSOL, baseCurrency)}
+            activeCount={showArchived ? archivedCount : activeWallets}
+            // Refresh
+            onRefresh={refreshBalances}
+            isRefreshing={isRefreshing}
           />
 
           {/* Table Container */}
@@ -1174,6 +1175,19 @@ export const WalletsPage: React.FC = () => {
               setIsQuickTradeModalOpen(true);
             }}
             categorySettings={categorySettings}
+            onCreateWallet={() => setIsCreateWalletModalOpen(true)}
+            onImportWallet={() => setIsImportModalOpen(true)}
+          />
+
+          {/* Bulk Actions - Fixed bottom slide-up panel */}
+          <BulkActionsPanel
+            selectedCount={selectedWallets.size}
+            showArchived={showArchived}
+            onDownload={downloadSelectedWallets}
+            onArchive={archiveSelectedWallets}
+            onUnarchive={unarchiveSelectedWallets}
+            onDelete={deleteSelectedWallets}
+            onClearSelection={() => setSelectedWallets(new Set())}
           />
         </div>
 
@@ -1280,16 +1294,6 @@ export const WalletsPage: React.FC = () => {
             />
           </>
         )}
-
-        {/* Bulk Actions */}
-        <BulkActionsPanel
-          selectedCount={selectedWallets.size}
-          showArchived={showArchived}
-          onDownload={downloadSelectedWallets}
-          onArchive={archiveSelectedWallets}
-          onUnarchive={unarchiveSelectedWallets}
-          onDelete={deleteSelectedWallets}
-        />
 
         {/* Quick Trade Modals */}
         {editingWalletQuickTrade ? (

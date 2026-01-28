@@ -122,6 +122,9 @@ export interface WalletTableProps {
   onOpenQuickTradeSettings: () => void;
   onEditWalletQuickTrade: (wallet: WalletType) => void;
   categorySettings: Record<WalletCategory, CategoryQuickTradeSettings>;
+  // Empty state callbacks
+  onCreateWallet?: () => void;
+  onImportWallet?: () => void;
 }
 
 export interface WalletTableRowProps {

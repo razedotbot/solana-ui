@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Download,
   Trash2,
@@ -8,14 +8,118 @@ import {
   ChevronDown,
   Network,
   Send,
-  HandCoins,
   Share,
   Flame,
+  RefreshCw,
+  Shuffle,
+  CircleDollarSign,
+  Wallet,
+  Settings,
 } from "lucide-react";
-import { WalletTooltip } from "../Styles";
 import type { WalletToolbarProps, ViewMode } from "./types";
 
-export const WalletToolbar: React.FC<WalletToolbarProps> = ({
+interface ExtendedWalletToolbarProps extends Omit<WalletToolbarProps, 'onFund'> {
+  walletsCount: number;
+  totalWallets: number;
+  totalBalance: string;
+  activeCount: number;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  onDistribute: () => void;
+  onMixer: () => void;
+}
+
+// Dropdown menu component with hover
+interface DropdownItem {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  variant?: 'default' | 'danger';
+}
+
+interface HoverDropdownProps {
+  label: string;
+  icon: React.ReactNode;
+  items: DropdownItem[];
+}
+
+const HoverDropdown: React.FC<HoverDropdownProps> = ({ label, icon, items }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = (): void => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsOpen(true);
+  };
+
+  const handleMouseLeave = (): void => {
+    timeoutRef.current = setTimeout(() => setIsOpen(false), 150);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+          isOpen
+            ? 'bg-app-primary-15 text-app-primary border-app-primary-30'
+            : 'hover:bg-app-quaternary text-app-secondary-80 hover:text-app-primary'
+        } border border-transparent hover:border-app-primary-20`}
+      >
+        {icon}
+        <span>{label}</span>
+        <ChevronDown
+          size={14}
+          className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {/* Dropdown menu */}
+      <div
+        className={`absolute top-full left-0 mt-1 min-w-[180px] bg-app-primary border border-app-primary-20 rounded-lg shadow-xl shadow-black/40 overflow-hidden z-50 transition-all duration-200 origin-top ${
+          isOpen
+            ? 'opacity-100 scale-100 translate-y-0'
+            : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+        }`}
+      >
+        <div className="py-1">
+          {items.map((item, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                item.onClick();
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                item.variant === 'danger'
+                  ? 'text-red-400 hover:bg-red-500/10'
+                  : 'text-app-primary hover:bg-app-primary-10'
+              }`}
+            >
+              <span className={item.variant === 'danger' ? 'text-red-400' : 'color-primary opacity-70'}>
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const WalletToolbar: React.FC<ExtendedWalletToolbarProps> = ({
   viewMode,
   setViewMode,
   showViewModeDropdown,
@@ -27,206 +131,172 @@ export const WalletToolbar: React.FC<WalletToolbarProps> = ({
   onImportWallet,
   onDownloadAll,
   onCleanup,
-  onFund,
+  onDistribute,
+  onMixer,
   onConsolidate,
   onTransfer,
   onBurn,
   onDeposit,
   connection,
-  baseCurrency,
   setSelectedWallets,
+  walletsCount,
+  totalWallets,
+  totalBalance,
+  activeCount,
+  onRefresh,
+  isRefreshing,
 }) => {
-  return (
-    <div className="mb-4 flex-shrink-0">
-      <div className="flex flex-row flex-wrap items-center gap-0.5 sm:gap-1">
-        {/* View Mode Dropdown */}
-        <div className="relative" ref={viewModeDropdownRef}>
-          <button
-            onClick={() => setShowViewModeDropdown(!showViewModeDropdown)}
-            className="flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300
-                    bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60
-                    text-app-primary whitespace-nowrap"
-          >
-            <span className="hidden sm:inline text-xs sm:text-sm text-app-secondary-80">
-              VIEW:
-            </span>
-            <span className="font-bold">
-              {viewMode === "all"
-                ? "ALL"
-                : viewMode === "hd"
-                  ? "HD"
-                  : "IMP"}
-            </span>
-            <ChevronDown
-              size={12}
-              className={`sm:hidden transition-transform duration-200 ${showViewModeDropdown ? "rotate-180" : ""}`}
-            />
-            <ChevronDown
-              size={14}
-              className={`hidden sm:block transition-transform duration-200 ${showViewModeDropdown ? "rotate-180" : ""}`}
-            />
-          </button>
+  // Fund operations dropdown items
+  const fundItems: DropdownItem[] = [
+    { label: 'Distribute', icon: <CircleDollarSign size={16} />, onClick: onDistribute },
+    { label: 'Deposit', icon: <Send size={16} />, onClick: onDeposit },
+    { label: 'Transfer', icon: <Network size={16} />, onClick: onTransfer },
+    { label: 'Consolidate', icon: <Share size={16} />, onClick: onConsolidate },
+    { label: 'Mixer', icon: <Shuffle size={16} />, onClick: onMixer },
+  ];
 
-          {showViewModeDropdown && (
-            <div className="absolute top-full left-0 mt-1 bg-app-primary border border-app-primary-30 rounded-lg shadow-lg z-20 min-w-full">
-              {(["all", "hd", "imported"] as const).map((mode: ViewMode) => (
-                <button
-                  key={mode}
-                  onClick={() => {
-                    setViewMode(mode);
-                    setShowViewModeDropdown(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 text-xs font-mono transition-colors ${
-                    viewMode === mode
-                      ? "bg-app-primary-color text-black font-bold"
-                      : "text-app-primary hover:bg-app-quaternary"
-                  } ${mode === "all" ? "rounded-t-lg" : mode === "imported" ? "rounded-b-lg" : ""}`}
-                >
-                  {mode === "all"
-                    ? "ALL"
-                    : mode === "hd"
-                      ? "HD WALLETS"
-                      : "IMPORTED"}
-                </button>
-              ))}
+  // Manage dropdown items
+  const manageItems: DropdownItem[] = [
+    { label: 'Export Keys', icon: <Download size={16} />, onClick: onDownloadAll },
+    { label: 'Burn Tokens', icon: <Flame size={16} />, onClick: onBurn },
+    { label: 'Cleanup', icon: <Trash2 size={16} />, onClick: onCleanup, variant: 'danger' },
+  ];
+
+  return (
+    <div className="flex-shrink-0 mb-4 space-y-4">
+      {/* Header Row: Stats + Primary Actions */}
+      <div className="flex items-center justify-between">
+        {/* Left: Stats */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-6 px-4 py-3 rounded-lg bg-app-secondary-90/30 border border-app-primary-10">
+            {/* Wallets */}
+            <div>
+              <div className="text-[10px] font-mono text-app-secondary-60 tracking-wider uppercase">Wallets</div>
+              <div className="text-xl font-bold color-primary font-mono">
+                {walletsCount}<span className="text-app-secondary-60 text-sm font-normal">/{totalWallets}</span>
+              </div>
             </div>
-          )}
+
+            <div className="w-px h-8 bg-app-primary-15" />
+
+            {/* Balance */}
+            <div>
+              <div className="text-[10px] font-mono text-app-secondary-60 tracking-wider uppercase">Balance</div>
+              <div className="text-xl font-bold text-yellow-400 font-mono">{totalBalance}</div>
+            </div>
+
+            <div className="w-px h-8 bg-app-primary-15" />
+
+            {/* Active/Archived */}
+            <div>
+              <div className="text-[10px] font-mono text-app-secondary-60 tracking-wider uppercase">
+                {showArchived ? 'Archived' : 'Active'}
+              </div>
+              <div className={`text-xl font-bold font-mono ${showArchived ? 'text-orange-400' : 'text-green-400'}`}>
+                {activeCount}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Create Single Wallet */}
-        <button
-          onClick={onCreateWallet}
-          disabled={!connection}
-          className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
-            !connection
-              ? "bg-primary-20 cursor-not-allowed text-app-secondary-80"
-              : "bg-app-primary-color hover:bg-app-primary-dark text-black font-bold btn"
-          }`}
-        >
-          <Plus size={12} className="sm:hidden" />
-          <Plus size={14} className="hidden sm:block" />
-          <span className="hidden sm:inline ml-0.5">CREATE</span>
-        </button>
-
-        {/* Import Wallet */}
-        <button
-          onClick={onImportWallet}
-          className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary"
-        >
-          <Key size={12} className="sm:hidden" />
-          <Key size={14} className="hidden sm:block" />
-          <span className="hidden sm:inline ml-0.5">IMPORT</span>
-        </button>
-
-        {/* Quick Actions */}
-        <WalletTooltip content="Export all wallets" position="bottom">
+        {/* Right: Primary Actions */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={onDownloadAll}
-            className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary whitespace-nowrap"
+            onClick={onCreateWallet}
+            disabled={!connection}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-app-primary-color hover:brightness-110 text-app-quaternary transition-all ${!connection ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <Download size={12} className="sm:hidden" />
-            <Download size={14} className="hidden sm:block" />
-            <span className="hidden sm:inline ml-0.5">DOWNLOAD</span>
+            <Plus size={18} strokeWidth={2.5} />
+            <span>Create Wallet</span>
           </button>
-        </WalletTooltip>
 
-        <WalletTooltip content="Remove empty wallets" position="bottom">
           <button
-            onClick={onCleanup}
-            className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary border border-error-alt-40 hover:border-error-alt text-error-alt hover:bg-app-tertiary whitespace-nowrap"
+            onClick={onImportWallet}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary text-app-primary transition-all"
           >
-            <Trash2 size={12} className="sm:hidden" />
-            <Trash2 size={14} className="hidden sm:block" />
-            <span className="hidden sm:inline ml-0.5">CLEANUP</span>
+            <Key size={16} />
+            <span>Import</span>
           </button>
-        </WalletTooltip>
+        </div>
+      </div>
 
-        {/* Archive View Toggle */}
-        <WalletTooltip
-          content={showArchived ? "Show active wallets" : "Show archived wallets"}
-          position="bottom"
-        >
+      {/* Toolbar Row: Operations + Filters */}
+      <div className="flex items-center gap-3 pb-4 border-b border-app-primary-15">
+        {/* Operations */}
+        <HoverDropdown
+          label="Fund"
+          icon={<Wallet size={16} />}
+          items={fundItems}
+        />
+
+        <HoverDropdown
+          label="Manage"
+          icon={<Settings size={16} />}
+          items={manageItems}
+        />
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Filters */}
+        <div className="flex items-center gap-2">
+          {/* View Mode */}
+          <div className="relative" ref={viewModeDropdownRef}>
+            <button
+              onClick={() => setShowViewModeDropdown(!showViewModeDropdown)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary text-app-primary transition-all"
+            >
+              <span>View: {viewMode === "all" ? "All" : viewMode === "hd" ? "HD" : "Imported"}</span>
+              <ChevronDown size={14} className={`transition-transform duration-200 ${showViewModeDropdown ? "rotate-180" : ""}`} />
+            </button>
+            <div
+              className={`absolute top-full right-0 mt-1 bg-app-primary border border-app-primary-20 rounded-lg shadow-xl shadow-black/40 z-50 min-w-[140px] overflow-hidden transition-all duration-200 origin-top ${
+                showViewModeDropdown
+                  ? 'opacity-100 scale-100 translate-y-0'
+                  : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+              }`}
+            >
+              <div className="py-1">
+                {(["all", "hd", "imported"] as const).map((mode: ViewMode) => (
+                  <button
+                    key={mode}
+                    onClick={() => { setViewMode(mode); setShowViewModeDropdown(false); }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                      viewMode === mode
+                        ? "bg-app-primary-color text-app-quaternary font-semibold"
+                        : "text-app-primary hover:bg-app-primary-10"
+                    }`}
+                  >
+                    {mode === "all" ? "All Wallets" : mode === "hd" ? "HD Wallets" : "Imported"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Archive Toggle */}
           <button
-            onClick={() => {
-              setShowArchived(!showArchived);
-              setSelectedWallets(new Set());
-            }}
-            className={`flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation whitespace-nowrap ${
+            onClick={() => { setShowArchived(!showArchived); setSelectedWallets(new Set()); }}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
               showArchived
-                ? "bg-app-primary-color text-black border border-app-primary-60 font-bold"
-                : "bg-app-quaternary text-app-primary border border-app-primary-40 hover:border-app-primary-60 hover:bg-app-tertiary"
+                ? 'bg-orange-500/20 border-orange-500/30 text-orange-400'
+                : 'bg-app-quaternary hover:bg-app-tertiary border-app-primary-20 hover:border-app-primary text-app-primary'
             }`}
           >
-            <Archive size={12} className="sm:hidden" />
-            <Archive size={14} className="hidden sm:block" />
-            <span className="hidden sm:inline ml-0.5">
-              {showArchived ? "ARCHIVED" : "ARCHIVE"}
-            </span>
+            <Archive size={16} />
+            <span>Archived</span>
           </button>
-        </WalletTooltip>
 
-        {/* End Row Buttons */}
-        <div className="flex items-center gap-0.5 sm:gap-1 ml-auto">
-          <WalletTooltip content="Fund Wallets" position="bottom">
+          {/* Refresh */}
+          {onRefresh && (
             <button
-              onClick={onFund}
-              className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className={`p-2 rounded-lg bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary transition-colors ${isRefreshing ? 'opacity-50' : ''}`}
             >
-              <HandCoins size={12} className="sm:hidden" />
-              <HandCoins size={14} className="hidden sm:block" />
-              <span className="hidden sm:inline ml-0.5">FUND</span>
+              <RefreshCw size={16} className={`text-app-secondary-60 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-          </WalletTooltip>
-
-          <WalletTooltip
-            content={`Consolidate ${baseCurrency.symbol}`}
-            position="bottom"
-          >
-            <button
-              onClick={onConsolidate}
-              className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
-            >
-              <Share size={12} className="sm:hidden" />
-              <Share size={14} className="hidden sm:block" />
-              <span className="hidden sm:inline ml-0.5">CONSOLIDATE</span>
-            </button>
-          </WalletTooltip>
-
-          <WalletTooltip content="Transfer Assets" position="bottom">
-            <button
-              onClick={onTransfer}
-              className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
-            >
-              <Network size={12} className="sm:hidden" />
-              <Network size={14} className="hidden sm:block" />
-              <span className="hidden sm:inline ml-0.5">TRANSFER</span>
-            </button>
-          </WalletTooltip>
-
-          <WalletTooltip content="Burn Tokens" position="bottom">
-            <button
-              onClick={onBurn}
-              className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
-            >
-              <Flame size={12} className="sm:hidden" />
-              <Flame size={14} className="hidden sm:block" />
-              <span className="hidden sm:inline ml-0.5">BURN</span>
-            </button>
-          </WalletTooltip>
-
-          <WalletTooltip
-            content={`Deposit ${baseCurrency.symbol}`}
-            position="bottom"
-          >
-            <button
-              onClick={onDeposit}
-              className="flex items-center justify-center px-2 sm:px-3 py-1 sm:py-1.5 rounded font-mono text-xs sm:text-sm transition-all duration-300 touch-manipulation bg-app-quaternary hover:bg-app-tertiary border border-app-primary-40 hover:border-app-primary-60 text-app-primary whitespace-nowrap"
-            >
-              <Send size={12} className="sm:hidden" />
-              <Send size={14} className="hidden sm:block" />
-              <span className="hidden sm:inline ml-0.5">DEPOSIT</span>
-            </button>
-          </WalletTooltip>
+          )}
         </div>
       </div>
     </div>

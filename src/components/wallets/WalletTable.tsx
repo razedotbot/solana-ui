@@ -7,15 +7,19 @@ import {
   CheckSquare,
   Square,
   Wallet,
-  XCircle,
-  GripVertical,
+  X,
   Settings,
+  Plus,
+  Key,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { WalletTooltip } from "../Styles";
 import { WalletTableRow } from "./WalletTableRow";
 import type { WalletTableProps, SortField } from "./types";
 
 export const WalletTable: React.FC<WalletTableProps> = ({
+  wallets,
   filteredAndSortedWallets,
   selectedWallets,
   baseCurrencyBalances,
@@ -24,12 +28,6 @@ export const WalletTable: React.FC<WalletTableProps> = ({
   sortDirection,
   searchTerm,
   setSearchTerm,
-  showAddressSearch,
-  setShowAddressSearch,
-  labelSearchTerm,
-  setLabelSearchTerm,
-  showLabelSearch,
-  setShowLabelSearch,
   editingLabel,
   editLabelValue,
   editingCategory,
@@ -58,10 +56,12 @@ export const WalletTable: React.FC<WalletTableProps> = ({
   onCopyToClipboard,
   onOpenQuickTradeSettings,
   onEditWalletQuickTrade,
+  onCreateWallet,
+  onImportWallet,
 }) => {
   const SortIcon = ({ field }: { field: SortField }): JSX.Element => {
     if (sortField !== field)
-      return <ArrowUpDown size={14} className="text-app-secondary-80" />;
+      return <ArrowUpDown size={14} className="text-app-secondary-40" />;
     return sortDirection === "asc" ? (
       <ArrowUp size={14} className="color-primary" />
     ) : (
@@ -69,162 +69,127 @@ export const WalletTable: React.FC<WalletTableProps> = ({
     );
   };
 
+  const hasSearchActive = searchTerm.trim();
+
   return (
     <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-      <div className="flex-1 overflow-y-auto overflow-x-auto border border-app-primary-20 rounded-lg min-h-0">
-        <table className="w-full text-xs sm:text-sm font-mono">
+      {/* Search Bar */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1 max-w-md">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 color-primary opacity-60" />
+          <input
+            type="text"
+            placeholder="Search by address or label..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-app-tertiary border border-app-primary-20 hover:border-app-primary-30 rounded-lg pl-10 pr-10 py-2.5 text-sm text-app-primary placeholder:text-app-secondary-40 focus:border-app-primary focus:outline-none transition-colors font-mono"
+          />
+          {searchTerm.trim() && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-app-primary-10 rounded-md transition-colors"
+            >
+              <X size={14} className="text-app-secondary-60" />
+            </button>
+          )}
+        </div>
+
+        {/* Select All / Clear */}
+        {filteredAndSortedWallets.length > 0 && (
+          <div className="flex items-center gap-2">
+            {selectedWallets.size > 0 ? (
+              <button
+                onClick={onClearSelection}
+                className="text-xs text-app-secondary-60 hover:text-app-primary px-3 py-2 hover:bg-app-quaternary rounded-lg transition-colors"
+              >
+                Clear ({selectedWallets.size})
+              </button>
+            ) : (
+              <button
+                onClick={onSelectAll}
+                className="text-xs text-app-secondary-60 hover:text-app-primary px-3 py-2 hover:bg-app-quaternary rounded-lg transition-colors"
+              >
+                Select all
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-y-auto overflow-x-auto border border-app-primary-15 rounded-xl min-h-0 bg-app-secondary/30">
+        <table className="w-full table-auto">
           {/* Header */}
-          <thead className="sticky top-0 bg-app-primary border-b border-app-primary-20 z-10">
+          <thead className="sticky top-0 bg-app-primary border-b border-app-primary-15 z-20">
             <tr>
-              <th className="p-2 sm:p-3 text-left bg-app-primary">
-                <div className="flex items-center gap-2">
-                  <GripVertical
-                    size={12}
-                    className="text-app-secondary-60 opacity-40"
-                  />
-                  <button
-                    onClick={
-                      selectedWallets.size === filteredAndSortedWallets.length
-                        ? onClearSelection
-                        : onSelectAll
-                    }
-                    className="color-primary hover-text-app-primary transition-colors touch-manipulation"
-                  >
-                    {selectedWallets.size === filteredAndSortedWallets.length &&
-                    filteredAndSortedWallets.length > 0 ? (
-                      <CheckSquare size={14} className="sm:w-4 sm:h-4" />
-                    ) : (
-                      <Square size={14} className="sm:w-4 sm:h-4" />
-                    )}
-                  </button>
-                </div>
+              {/* Checkbox */}
+              <th className="pl-3 pr-1 py-3 w-12 text-left">
+                <button
+                  onClick={
+                    selectedWallets.size === filteredAndSortedWallets.length
+                      ? onClearSelection
+                      : onSelectAll
+                  }
+                  className="p-1 rounded-md hover:bg-app-quaternary transition-colors"
+                >
+                  {selectedWallets.size === filteredAndSortedWallets.length &&
+                  filteredAndSortedWallets.length > 0 ? (
+                    <CheckSquare size={18} className="color-primary" />
+                  ) : (
+                    <Square size={18} className="text-app-secondary-40 hover:text-app-secondary-60" />
+                  )}
+                </button>
               </th>
-              <th className="p-2 sm:p-3 text-left bg-app-primary">
-                {showLabelSearch ? (
-                  <div className="flex items-center gap-1 text-[10px] sm:text-xs">
-                    <input
-                      type="text"
-                      placeholder="Search label..."
-                      value={labelSearchTerm}
-                      onChange={(e) => setLabelSearchTerm(e.target.value)}
-                      onBlur={() => {
-                        if (!labelSearchTerm.trim()) {
-                          setShowLabelSearch(false);
-                        }
-                      }}
-                      autoFocus
-                      className="bg-app-quaternary border border-app-primary-20 rounded px-2 py-1 text-xs text-app-primary focus:border-app-primary-60 focus:outline-none font-mono w-32"
-                    />
-                    <button
-                      onClick={() => {
-                        setLabelSearchTerm("");
-                        setShowLabelSearch(false);
-                      }}
-                      className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                    >
-                      <XCircle
-                        size={12}
-                        className="text-app-secondary-80 hover:text-app-primary"
-                      />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                    <span className="text-app-secondary-80">LABEL</span>
-                    <button
-                      onClick={() => setShowLabelSearch(true)}
-                      className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                    >
-                      <Search
-                        size={14}
-                        className="text-app-secondary-80 hover:color-primary"
-                      />
-                    </button>
-                  </div>
-                )}
+
+              {/* Label */}
+              <th className="px-2 py-3 text-left">
+                <span className="text-xs font-semibold text-app-secondary-60 uppercase tracking-wider font-mono">
+                  Label
+                </span>
               </th>
-              <th className="hidden sm:table-cell p-2 sm:p-3 text-left bg-app-primary">
-                <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                  <span className="text-app-secondary-80">QUICKMODE</span>
-                  <WalletTooltip
-                    content="Configure Quick Trade Category Settings"
-                    position="bottom"
-                  >
+
+              {/* Address */}
+              <th className="px-2 py-3 text-left">
+                <span className="text-xs font-semibold text-app-secondary-60 uppercase tracking-wider font-mono">
+                  Address
+                </span>
+              </th>
+
+              {/* Balance */}
+              <th className="px-2 py-3 text-right">
+                <button
+                  onClick={() => onSort("solBalance")}
+                  className="flex items-center gap-1.5 hover:text-app-primary transition-colors ml-auto"
+                >
+                  <span className="text-xs font-semibold text-app-secondary-60 uppercase tracking-wider font-mono">
+                    {baseCurrency.symbol}
+                  </span>
+                  <SortIcon field="solBalance" />
+                </button>
+              </th>
+
+              {/* Mode */}
+              <th className="px-2 py-3 text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-app-secondary-60 uppercase tracking-wider font-mono">
+                    Mode
+                  </span>
+                  <WalletTooltip content="Configure categories" position="bottom">
                     <button
                       onClick={onOpenQuickTradeSettings}
-                      className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
+                      className="p-1 hover:bg-app-quaternary rounded-md opacity-50 hover:opacity-100 transition-all"
                     >
-                      <Settings
-                        size={12}
-                        className="text-app-secondary-80 hover:text-app-primary"
-                      />
+                      <Settings size={12} className="text-app-secondary-60" />
                     </button>
                   </WalletTooltip>
                 </div>
               </th>
-              <th className="hidden sm:table-cell p-2 sm:p-3 text-left bg-app-primary">
-                <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                  <span className="text-app-secondary-80">TYPE</span>
-                </div>
-              </th>
-              <th className="p-2 sm:p-3 text-left bg-app-primary">
-                {showAddressSearch ? (
-                  <div className="flex items-center gap-1 text-[10px] sm:text-xs">
-                    <input
-                      type="text"
-                      placeholder="Search address..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onBlur={() => {
-                        if (!searchTerm.trim()) {
-                          setShowAddressSearch(false);
-                        }
-                      }}
-                      autoFocus
-                      className="bg-app-quaternary border border-app-primary-20 rounded px-2 py-1 text-xs text-app-primary focus:border-app-primary-60 focus:outline-none font-mono w-32"
-                    />
-                    <button
-                      onClick={() => {
-                        setSearchTerm("");
-                        setShowAddressSearch(false);
-                      }}
-                      className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                    >
-                      <XCircle
-                        size={12}
-                        className="text-app-secondary-80 hover:text-app-primary"
-                      />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
-                    <span className="text-app-secondary-80">ADDRESS</span>
-                    <button
-                      onClick={() => setShowAddressSearch(true)}
-                      className="p-1 hover:bg-app-quaternary rounded transition-colors touch-manipulation"
-                    >
-                      <Search
-                        size={14}
-                        className="text-app-secondary-80 hover:color-primary"
-                      />
-                    </button>
-                  </div>
-                )}
-              </th>
-              <th className="p-2 sm:p-3 text-left bg-app-primary">
-                <button
-                  onClick={() => onSort("solBalance")}
-                  className="flex items-center gap-1 sm:gap-2 text-app-secondary-80 hover:color-primary transition-colors touch-manipulation text-[10px] sm:text-xs"
-                >
-                  {baseCurrency.symbol} BALANCE
-                  <SortIcon field="solBalance" />
-                </button>
-              </th>
-              <th className="hidden sm:table-cell p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">
-                PRIVATE KEY
-              </th>
-              <th className="p-2 sm:p-3 text-left text-app-secondary-80 text-[10px] sm:text-xs bg-app-primary">
-                ACTIONS
+
+              {/* Actions */}
+              <th className="px-2 py-3 pr-3 text-right">
+                <span className="text-xs font-semibold text-app-secondary-60 uppercase tracking-wider font-mono">
+                  Actions
+                </span>
               </th>
             </tr>
           </thead>
@@ -275,13 +240,72 @@ export const WalletTable: React.FC<WalletTableProps> = ({
 
         {/* Empty State */}
         {filteredAndSortedWallets.length === 0 && (
-          <div className="p-6 sm:p-8 text-center text-app-secondary-80">
-            <Wallet size={40} className="sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
-            <div className="font-mono text-xs sm:text-sm">
-              {searchTerm || labelSearchTerm
-                ? "No wallets match your search"
-                : "No wallets found"}
-            </div>
+          <div className="p-12">
+            {hasSearchActive ? (
+              <div className="text-center text-app-secondary-60">
+                <Search size={40} className="mx-auto mb-4 opacity-20" />
+                <div className="text-lg font-medium mb-1 font-mono">No wallets found</div>
+                <div className="text-sm text-app-secondary-40">Try different search terms</div>
+              </div>
+            ) : wallets.length === 0 ? (
+              <div className="max-w-md mx-auto text-center">
+                <div className="relative inline-block mb-6">
+                  <div className="w-16 h-16 bg-app-primary-10 rounded-2xl flex items-center justify-center border border-app-primary-20">
+                    <Wallet size={32} className="color-primary" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500/20 rounded-full flex items-center justify-center animate-pulse">
+                    <Sparkles size={14} className="text-yellow-400" />
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-bold text-app-primary mb-2 font-mono">Get Started</h3>
+                <p className="text-app-secondary-60 mb-6">Create or import your first wallet</p>
+
+                <div className="flex gap-3 justify-center mb-6">
+                  {onCreateWallet && (
+                    <button
+                      onClick={onCreateWallet}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm
+                              bg-app-primary-color hover:brightness-110 text-app-quaternary font-semibold transition-all"
+                    >
+                      <Plus size={18} strokeWidth={2.5} />
+                      <span>Create</span>
+                    </button>
+                  )}
+                  {onImportWallet && (
+                    <button
+                      onClick={onImportWallet}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm
+                              bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20
+                              text-app-primary font-medium transition-all"
+                    >
+                      <Key size={18} />
+                      <span>Import</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="text-left bg-app-quaternary/30 border border-app-primary-10 rounded-xl p-4">
+                  <div className="text-app-secondary-40 uppercase tracking-wider mb-2 text-[10px] font-semibold font-mono">Tips</div>
+                  <ul className="space-y-2 text-sm text-app-secondary-60">
+                    <li className="flex items-start gap-2">
+                      <ArrowRight size={14} className="color-primary mt-0.5 flex-shrink-0" />
+                      <span>Create multiple wallets for different purposes</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ArrowRight size={14} className="color-primary mt-0.5 flex-shrink-0" />
+                      <span>Use labels to organize your wallets</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-app-secondary-60">
+                <Wallet size={40} className="mx-auto mb-4 opacity-20" />
+                <div className="text-lg font-medium mb-1 font-mono">No wallets in this view</div>
+                <div className="text-sm text-app-secondary-40">Try changing the filters</div>
+              </div>
+            )}
           </div>
         )}
       </div>
