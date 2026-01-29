@@ -1175,6 +1175,8 @@ export const WalletsPage: React.FC = () => {
               setIsQuickTradeModalOpen(true);
             }}
             categorySettings={categorySettings}
+            onUpdateCategorySettings={handleSaveCategorySettings}
+            onSaveWalletCustomSettings={handleSaveWalletCustomSettings}
             onCreateWallet={() => setIsCreateWalletModalOpen(true)}
             onImportWallet={() => setIsImportModalOpen(true)}
           />

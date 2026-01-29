@@ -6,6 +6,8 @@ export {
 export { WalletToolbar } from "./WalletToolbar";
 export { WalletTable } from "./WalletTable";
 export { WalletTableRow } from "./WalletTableRow";
+export { WalletCard } from "./WalletCard";
+export { QuickTradeBar } from "./QuickTradeBar";
 export { BulkActionsPanel } from "./BulkActionsPanel";
 export type {
   SortField,

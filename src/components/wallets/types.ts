@@ -122,6 +122,9 @@ export interface WalletTableProps {
   onOpenQuickTradeSettings: () => void;
   onEditWalletQuickTrade: (wallet: WalletType) => void;
   categorySettings: Record<WalletCategory, CategoryQuickTradeSettings>;
+  // New props for inline quick trade management
+  onUpdateCategorySettings?: (settings: Record<WalletCategory, CategoryQuickTradeSettings>) => void;
+  onSaveWalletCustomSettings?: (walletId: number, settings: import("../../utils/types").CustomQuickTradeSettings | null) => void;
   // Empty state callbacks
   onCreateWallet?: () => void;
   onImportWallet?: () => void;
