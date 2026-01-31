@@ -33,6 +33,7 @@ import {
 import { loadConfigFromCookies } from "../../utils/storage";
 import { addRecentToken } from "../../utils/recentTokens";
 import { getWalletDisplayName } from "../../utils/wallet";
+import type { WalletType } from "../../utils/types";
 import type { TokenMetadata } from "../deploy/types";
 import { PlatformIcons, PLATFORMS } from "../deploy/constants";
 import { MIN_WALLETS, MAX_WALLETS_ADVANCED } from "../deploy/types";
@@ -223,7 +224,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
     }
   };
 
-  const getWallet = (pk: string) => wallets.find((w) => w.privateKey === pk);
+  const getWallet = (pk: string): WalletType | undefined => wallets.find((w) => w.privateKey === pk);
 
   // Deploy handler
   const handleDeploy = async (): Promise<void> => {
