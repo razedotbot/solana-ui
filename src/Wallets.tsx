@@ -371,7 +371,7 @@ const WalletList: React.FC<WalletRowData> = (props) => {
     const updateHeight = (): void => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        const availableHeight = window.innerHeight - rect.top - 20;
+        const availableHeight = window.innerHeight - rect.top;
         setListHeight(Math.max(200, availableHeight));
       }
     };
@@ -1060,7 +1060,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
   );
 
   return (
-    <div className="relative flex-1 overflow-y-auto overflow-x-hidden bg-app-primary h-full min-h-full">
+    <div className="relative flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-app-primary h-full min-h-full">
       {/* Background effects - same as Actions.tsx */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden min-h-full">
         {/* Grid background */}
@@ -1233,7 +1233,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
       </div>
 
       {/* Wallets list with virtualization */}
-      <div className="pt-2 relative z-10 flex-1">
+      <div className="pt-2 relative z-10 flex-1 min-h-0">
         <WalletList
           wallets={visibleWallets}
           tokenAddress={tokenAddress}

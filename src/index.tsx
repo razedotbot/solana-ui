@@ -82,6 +82,13 @@ const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
     region: "US",
     flag: "🇺🇸",
   },
+  {
+    id: "jp",
+    name: "Japan",
+    url: "https://tokyo.raze.sh/",
+    region: "JP",
+    flag: "🇯🇵",
+  },
 ];
 
 export const ServerCheckLoading = (): JSX.Element => {
@@ -590,39 +597,39 @@ export const Root = (): JSX.Element => {
           <ToastProvider>
             <ToastWrapper>
               <AppContextProvider
-                showToast={(window as WindowWithToast).showToast || (() => {})}
+                showToast={(window as WindowWithToast).showToast || (() => { })}
               >
                 <IframeStateProvider>
                   <MultichartProvider>
                     {serverUrl ? (
-                    <Suspense fallback={<ServerCheckLoading />}>
-                      <Routes>
-                        {/* Homepage */}
-                        <Route path="/" element={<Homepage />} />
+                      <Suspense fallback={<ServerCheckLoading />}>
+                        <Routes>
+                          {/* Homepage */}
+                          <Route path="/" element={<Homepage />} />
 
-                        {/* Main app routes */}
-                        <Route path="/holdings" element={<App />} />
-                        <Route path="/monitor" element={<App />} />
-                        <Route path="/tokens/:tokenAddress" element={<App />} />
+                          {/* Main app routes */}
+                          <Route path="/holdings" element={<App />} />
+                          <Route path="/monitor" element={<App />} />
+                          <Route path="/tokens/:tokenAddress" element={<App />} />
 
-                        {/* Feature pages */}
-                        <Route path="/tools" element={<AutomatePage />} />
-                        <Route path="/deploy" element={<DeployPage />} />
-                        <Route path="/wallets" element={<WalletsPage />} />
-                        <Route path="/settings" element={<SettingsPage />} />
+                          {/* Feature pages */}
+                          <Route path="/tools" element={<AutomatePage />} />
+                          <Route path="/deploy" element={<DeployPage />} />
+                          <Route path="/wallets" element={<WalletsPage />} />
+                          <Route path="/settings" element={<SettingsPage />} />
 
-                        {/* Fallback - redirect to homepage */}
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                      </Routes>
-                    </Suspense>
-                  ) : (
-                    <BeRightBack
-                      onOpenWallets={() => (window.location.href = "/wallets")}
-                      onOpenSettings={() => {
-                        window.location.href = "/settings";
-                      }}
-                    />
-                  )}
+                          {/* Fallback - redirect to homepage */}
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                      </Suspense>
+                    ) : (
+                      <BeRightBack
+                        onOpenWallets={() => (window.location.href = "/wallets")}
+                        onOpenSettings={() => {
+                          window.location.href = "/settings";
+                        }}
+                      />
+                    )}
                   </MultichartProvider>
                 </IframeStateProvider>
               </AppContextProvider>

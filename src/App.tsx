@@ -14,7 +14,6 @@ import {
   Wrench,
   Bot,
   Blocks,
-  RefreshCw,
   Wallet,
   BookOpen,
   Columns2,
@@ -42,12 +41,12 @@ import type {
   WalletCategory,
   CategoryQuickTradeSettings,
 } from "./utils/types";
-import Split from "./components/Split";
 import { addRecentToken } from "./utils/recentTokens";
 import { useAppContext } from "./contexts";
 import { useToast } from "./utils/hooks/useToast";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
 import { MultichartLayout } from "./components/multichart/MultichartLayout";
+import { AdvancedLayout } from "./components/advanced";
 import { useMultichart } from "./contexts/useMultichart";
 
 // Extend Window interface to include server-related properties
@@ -77,94 +76,6 @@ const PnlModal = lazy(() =>
     default: module.PnlModal,
   })),
 );
-
-// ViewModeDropdown Component
-const ViewModeDropdown: React.FC<{
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-}> = ({ viewMode, onViewModeChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const modes: { value: ViewMode; label: string }[] = [
-    { value: "simple", label: "SIMPLE" },
-    { value: "advanced", label: "ADVANCED" },
-    { value: "multichart", label: "MULTI" },
-  ];
-
-  const handleSelect = (mode: ViewMode): void => {
-    onViewModeChange(mode);
-    setIsOpen(false);
-  };
-
-  const currentLabel =
-    viewMode === "simple"
-      ? "SIMPLE"
-      : viewMode === "advanced"
-        ? "ADVANCED"
-        : "MULTI";
-
-  return (
-    <div className="relative z-40">
-      {/* Main Button */}
-      <button
-        onClick={(): void => setIsOpen(!isOpen)}
-        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
-      >
-        <Columns2
-          size={16}
-          className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
-        />
-        <span className="text-xs font-mono color-primary font-medium tracking-wider">
-          {currentLabel}
-        </span>
-        <ChevronDown
-          size={12}
-          className={`text-app-primary-40 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {/* Dropdown */}
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={(): void => setIsOpen(false)}
-          />
-
-          {/* Dropdown Panel */}
-          <div className="absolute top-full right-0 mt-1 w-36 z-50">
-            <div className="bg-app-secondary border border-app-primary-20 rounded overflow-hidden shadow-xl">
-              {modes.map((mode) => (
-                <button
-                  key={mode.value}
-                  onClick={() => handleSelect(mode.value)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-all duration-200 hover:bg-primary-05 ${
-                    viewMode === mode.value
-                      ? "bg-primary-10 color-primary"
-                      : "text-app-tertiary"
-                  }`}
-                >
-                  <Columns2
-                    size={14}
-                    className={
-                      viewMode === mode.value
-                        ? "color-primary"
-                        : "text-app-secondary-60"
-                    }
-                  />
-                  <span className="text-xs font-mono font-medium">
-                    {mode.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
 
 const ToolsDropdown: React.FC = () => {
   const navigate = useNavigate();
@@ -1116,12 +1027,13 @@ const WalletManager: React.FC = () => {
     [state.wallets],
   );
 
-  // Clear token balances when switching to a different token
-  // This prevents showing stale balances from the previous token
+  // Clear token balances and iframe data when switching to a different token
+  // This prevents showing stale balances and PnL from the previous token
   useEffect(() => {
     if (previousTokenAddressRef.current !== state.tokenAddress) {
-      // Token address changed - clear token balances immediately
+      // Token address changed - clear token balances and iframe data immediately
       memoizedCallbacks.setTokenBalances(new Map());
+      dispatch({ type: "SET_IFRAME_DATA", payload: null });
       previousTokenAddressRef.current = state.tokenAddress;
     }
   }, [state.tokenAddress, memoizedCallbacks]);
@@ -1282,224 +1194,43 @@ const WalletManager: React.FC = () => {
                 connection={state.connection}
               />
             ) : (
-              <>
-                <Split
-                  key={viewMode} // Force remount when switching modes to recreate gutter
-                  className="flex flex-1 h-full split-custom"
-                  sizes={splitSizes}
-                  minSize={[0, 250]}
-                  gutterSize={viewMode === "simple" ? 0 : 12}
-                  gutterAlign="center"
-                  direction="horizontal"
-                  dragInterval={1}
-                  snapOffset={30}
-                  onDragEnd={(sizes: number[]): void => {
-                    setSplitSizes(sizes);
-                    // Auto-detect collapse: if left column is below 5%, switch to simple mode
-                    if (sizes[0] < 5 && viewMode === "advanced") {
-                      setViewMode("simple");
-                      setSplitSizes([0, 100]);
-                    }
-                  }}
-                  gutter={(_index, direction): HTMLDivElement => {
-                    const gutter = document.createElement("div");
-                    gutter.className = `gutter gutter-${direction} gutter-animated`;
-
-                    // Hide gutter in simple mode
-                    if (viewMode === "simple") {
-                      gutter.style.display = "none";
-                    }
-
-                    // Add dots pattern
-                    for (let i = 0; i < 5; i++) {
-                      const dot = document.createElement("div");
-                      dot.className = "gutter-dot";
-                      dot.style.animationDelay = `${i * 0.1}s`;
-                      gutter.appendChild(dot);
-                    }
-
-                    return gutter;
-                  }}
-                >
-                  {/* Left Column */}
-                  <div className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col">
-                    {/* Top Navigation - Left Column */}
-                    <nav className="sticky top-0 border-b border-app-primary-70 px-1 sm:px-2 md:px-4 py-1.5 sm:py-2 backdrop-blur-sm bg-app-primary-99 z-30">
-                      <div className="flex items-center gap-1 sm:gap-2 md:gap-3 justify-between">
-                        {/* Refresh Button */}
-                        <button
-                          onClick={handleRefresh}
-                          disabled={state.isRefreshing || !state.connection}
-                          className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${viewMode === "advanced" && splitSizes[0] > 15 ? "min-w-auto" : "min-w-[32px]"}`}
-                          title="Refresh wallet balances"
-                        >
-                          <RefreshCw
-                            size={14}
-                            className={`sm:w-4 sm:h-4 color-primary ${state.isRefreshing ? "animate-spin" : ""}`}
-                          />
-                          {viewMode === "advanced" && splitSizes[0] > 15 && (
-                            <span className="text-xs font-mono color-primary font-medium tracking-wider">
-                              REFRESH
-                            </span>
-                          )}
-                        </button>
-
-                        {/* Wallets Page Button */}
-                        <button
-                          onClick={(): void => navigate("/wallets")}
-                          className={`flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-2 md:px-3 py-1.5 sm:py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${viewMode === "advanced" && splitSizes[0] > 15 ? "min-w-auto" : "min-w-[32px]"}`}
-                          title="Open wallets page"
-                        >
-                          <Wallet
-                            size={14}
-                            className="sm:w-4 sm:h-4 color-primary"
-                          />
-                          {viewMode === "advanced" && splitSizes[0] > 15 && (
-                            <span className="text-xs font-mono color-primary font-medium tracking-wider">
-                              WALLETS
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                    </nav>
-
-                    {/* Wallets Page Content */}
-                    <div className="flex-1 overflow-y-auto">
-                      {state.connection && (
-                        <WalletsPage
-                          wallets={state.wallets}
-                          setWallets={memoizedCallbacks.setWallets}
-                          tokenAddress={state.tokenAddress}
-                          baseCurrencyBalances={state.baseCurrencyBalances}
-                          baseCurrency={contextBaseCurrency}
-                          tokenBalances={state.tokenBalances}
-                          quickBuyEnabled={state.quickBuyEnabled}
-                          quickBuyAmount={state.quickBuyAmount}
-                          quickBuyMinAmount={state.quickBuyMinAmount}
-                          quickBuyMaxAmount={state.quickBuyMaxAmount}
-                          useQuickBuyRange={state.useQuickBuyRange}
-                          quickSellPercentage={state.quickSellPercentage}
-                          quickSellMinPercentage={state.quickSellMinPercentage}
-                          quickSellMaxPercentage={state.quickSellMaxPercentage}
-                          useQuickSellRange={state.useQuickSellRange}
-                          categorySettings={categorySettings}
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Middle Column */}
-                  <div className="backdrop-blur-sm bg-app-primary-99 border-l border-r border-app-primary-40 overflow-y-auto">
-                    <Frame
-                      isLoadingChart={state.isLoadingChart}
-                      tokenAddress={state.tokenAddress}
-                      wallets={state.wallets}
-                      onDataUpdate={memoizedCallbacks.setIframeData}
-                      onTokenSelect={memoizedCallbacks.setTokenAddress}
-                      onNonWhitelistedTrade={handleNonWhitelistedTrade}
-                      quickBuyEnabled={state.quickBuyEnabled}
-                      quickBuyAmount={state.quickBuyAmount}
-                      quickBuyMinAmount={state.quickBuyMinAmount}
-                      quickBuyMaxAmount={state.quickBuyMaxAmount}
-                      useQuickBuyRange={state.useQuickBuyRange}
-                    />
-                  </div>
-                </Split>
-
-                {/* Non-resizable divider between middle and right column */}
-                <div className="gutter-divider gutter-divider-non-resizable"></div>
-
-                {/* Right Column - Fixed Width */}
-                <div
-                  className="backdrop-blur-sm bg-app-primary-99 overflow-hidden relative flex flex-col"
-                  style={{
-                    width: "350px",
-                    minWidth: "350px",
-                    maxWidth: "350px",
-                  }}
-                >
-                  {/* Top Navigation - Only over Actions column */}
-                  <nav className="flex-shrink-0 border-b border-app-primary-70 px-2 md:px-4 py-2 backdrop-blur-sm bg-app-primary-99 z-30">
-                    <div className="flex items-center justify-between gap-2">
-                      {/* Logo button that redirects to home */}
-                      <button
-                        onClick={() => navigate("/")}
-                        className="hover:scale-105 active:scale-95 transition-transform"
-                      >
-                        <img
-                          src={logo}
-                          alt={brand.altText}
-                          className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
-                        />
-                      </button>
-
-                      <div className="flex items-center gap-2">
-                        {/* View Mode Dropdown - Hidden on mobile */}
-                        {!isMobile && (
-                          <ViewModeDropdown
-                            viewMode={viewMode}
-                            onViewModeChange={handleViewModeChange}
-                          />
-                        )}
-
-                        {/* Mobile: Inline buttons, Desktop: Dropdown */}
-                        {isMobile ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => navigate("/wallets")}
-                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
-                              title="Wallets"
-                            >
-                              <Wallet size={14} className="color-primary" />
-                              <span className="text-xs font-mono color-primary">
-                                WALLETS
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => navigate("/settings")}
-                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
-                              title="Settings"
-                            >
-                              <Settings size={14} className="color-primary" />
-                              <span className="text-xs font-mono color-primary">
-                                SETTINGS
-                              </span>
-                            </button>
-                          </div>
-                        ) : (
-                          <ToolsDropdown />
-                        )}
-                      </div>
-                    </div>
-                  </nav>
-
-                  <ActionsPage
-                    tokenAddress={state.tokenAddress}
-                    setTokenAddress={memoizedCallbacks.setTokenAddress}
-                    transactionFee={state.config.transactionFee}
-                    handleRefresh={handleRefresh}
-                    wallets={state.wallets}
-                    setWallets={memoizedCallbacks.setWallets}
-                    baseCurrencyBalances={state.baseCurrencyBalances}
-                    baseCurrency={contextBaseCurrency}
-                    tokenBalances={state.tokenBalances}
-                    currentMarketCap={state.currentMarketCap}
-                    setCalculatePNLModalOpen={
-                      memoizedCallbacks.setCalculatePNLModalOpen
-                    }
-                    isAutomateCardOpen={state.automateCard.isOpen}
-                    automateCardPosition={state.automateCard.position}
-                    setAutomateCardPosition={
-                      memoizedCallbacks.setAutomateCardPosition
-                    }
-                    isAutomateCardDragging={state.automateCard.isDragging}
-                    setAutomateCardDragging={
-                      memoizedCallbacks.setAutomateCardDragging
-                    }
-                    iframeData={state.iframeData}
-                  />
-                </div>
-              </>
+              <AdvancedLayout
+                wallets={state.wallets}
+                setWallets={memoizedCallbacks.setWallets}
+                tokenAddress={state.tokenAddress}
+                setTokenAddress={memoizedCallbacks.setTokenAddress}
+                isRefreshing={state.isRefreshing}
+                handleRefresh={handleRefresh}
+                connection={state.connection}
+                baseCurrencyBalances={state.baseCurrencyBalances}
+                baseCurrency={contextBaseCurrency}
+                tokenBalances={state.tokenBalances}
+                transactionFee={state.config.transactionFee}
+                currentMarketCap={state.currentMarketCap}
+                setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
+                automateCardPosition={state.automateCard.position}
+                setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
+                isAutomateCardOpen={state.automateCard.isOpen}
+                isAutomateCardDragging={state.automateCard.isDragging}
+                setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
+                quickBuyEnabled={state.quickBuyEnabled}
+                quickBuyAmount={state.quickBuyAmount}
+                quickBuyMinAmount={state.quickBuyMinAmount}
+                quickBuyMaxAmount={state.quickBuyMaxAmount}
+                useQuickBuyRange={state.useQuickBuyRange}
+                quickSellPercentage={state.quickSellPercentage}
+                quickSellMinPercentage={state.quickSellMinPercentage}
+                quickSellMaxPercentage={state.quickSellMaxPercentage}
+                useQuickSellRange={state.useQuickSellRange}
+                iframeData={state.iframeData}
+                setIframeData={memoizedCallbacks.setIframeData}
+                categorySettings={categorySettings}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
+                onNonWhitelistedTrade={handleNonWhitelistedTrade}
+                isLoadingChart={state.isLoadingChart}
+                isMobile={isMobile}
+              />
             )}
           </div>
         )}

@@ -116,7 +116,7 @@ export const PnlModal: React.FC<PnlModalProps> = ({
         var(--color-primary-05) 0%,
         var(--color-primary-30) 50%,
         var(--color-primary-05) 100%
-      );
+      ); 
       transform: rotate(45deg);
       transition: all 0.5s ease;
       opacity: 0;
