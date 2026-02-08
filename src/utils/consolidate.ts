@@ -59,63 +59,58 @@ const getPartiallyPreparedTransactions = async (
   percentage: number,
   baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
-  try {
-    const baseUrl =
-      (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
+  const baseUrl =
+    (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
 
-    const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
-    const endpoint = isNativeSOL
-      ? `${baseUrl}/v2/sol/consolidate`
-      : `${baseUrl}/v2/token/consolidate`;
+  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
+  const endpoint = isNativeSOL
+    ? `${baseUrl}/v2/sol/consolidate`
+    : `${baseUrl}/v2/token/consolidate`;
 
-    const requestBody: Record<string, unknown> = {
-      sourceAddresses,
-      receiverAddress,
-      percentage,
-    };
+  const requestBody: Record<string, unknown> = {
+    sourceAddresses,
+    receiverAddress,
+    percentage,
+  };
 
-    // Add token mint for non-native currencies
-    if (!isNativeSOL) {
-      requestBody["tokenMint"] = baseCurrency.mint;
-    }
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    const data = (await response.json()) as {
-      success: boolean;
-      error?: string;
-      transactions?: string[];
-      data?: { transactions?: string[] };
-    };
-
-    if (!data.success) {
-      throw new Error(
-        data.error || "Failed to get partially prepared transactions",
-      );
-    }
-
-    // Handle different response formats
-    const transactions =
-      (data as unknown as { data?: { transactions?: string[] } }).data
-        ?.transactions || data.transactions;
-
-    if (!transactions || !Array.isArray(transactions)) {
-      throw new Error("No transactions returned from backend");
-    }
-
-    return transactions; // Array of base58 encoded partially prepared transactions
-  } catch (error) {
-    console.error("Error getting partially prepared transactions:", error);
-    throw error;
+  // Add token mint for non-native currencies
+  if (!isNativeSOL) {
+    requestBody["tokenMint"] = baseCurrency.mint;
   }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    success: boolean;
+    error?: string;
+    transactions?: string[];
+    data?: { transactions?: string[] };
+  };
+
+  if (!data.success) {
+    throw new Error(
+      data.error || "Failed to get partially prepared transactions",
+    );
+  }
+
+  // Handle different response formats
+  const transactions =
+    (data as unknown as { data?: { transactions?: string[] } }).data
+      ?.transactions || data.transactions;
+
+  if (!transactions || !Array.isArray(transactions)) {
+    throw new Error("No transactions returned from backend");
+  }
+
+  return transactions; // Array of base58 encoded partially prepared transactions
 };
 
 /**
@@ -126,37 +121,32 @@ const completeTransactionSigning = (
   sourceKeypairs: Map<string, Keypair>,
   receiverKeypair: Keypair,
 ): string[] => {
-  try {
-    return partiallyPreparedTransactionsBase58.map((txBase58) => {
-      // Deserialize transaction
-      const txBuffer = bs58.decode(txBase58);
-      const transaction = VersionedTransaction.deserialize(txBuffer);
+  return partiallyPreparedTransactionsBase58.map((txBase58) => {
+    // Deserialize transaction
+    const txBuffer = bs58.decode(txBase58);
+    const transaction = VersionedTransaction.deserialize(txBuffer);
 
-      // Extract transaction message to determine required signers
-      const message = transaction.message;
-      const signers: Keypair[] = [];
+    // Extract transaction message to determine required signers
+    const message = transaction.message;
+    const signers: Keypair[] = [];
 
-      // Always add receiver keypair as it's the fee payer
-      signers.push(receiverKeypair);
+    // Always add receiver keypair as it's the fee payer
+    signers.push(receiverKeypair);
 
-      // Add source keypairs based on accounts in transaction
-      for (const accountKey of message.staticAccountKeys) {
-        const pubkeyStr = accountKey.toBase58();
-        if (sourceKeypairs.has(pubkeyStr)) {
-          signers.push(sourceKeypairs.get(pubkeyStr)!);
-        }
+    // Add source keypairs based on accounts in transaction
+    for (const accountKey of message.staticAccountKeys) {
+      const pubkeyStr = accountKey.toBase58();
+      if (sourceKeypairs.has(pubkeyStr)) {
+        signers.push(sourceKeypairs.get(pubkeyStr)!);
       }
+    }
 
-      // Sign the transaction
-      transaction.sign(signers);
+    // Sign the transaction
+    transaction.sign(signers);
 
-      // Serialize and encode the fully signed transaction
-      return bs58.encode(transaction.serialize());
-    });
-  } catch (error) {
-    console.error("Error completing transaction signing:", error);
-    throw error;
-  }
+    // Serialize and encode the fully signed transaction
+    return bs58.encode(transaction.serialize());
+  });
 };
 
 /**
@@ -259,7 +249,6 @@ export const consolidateBaseCurrency = async (
       result: results,
     };
   } catch (error) {
-    console.error("Consolidation error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

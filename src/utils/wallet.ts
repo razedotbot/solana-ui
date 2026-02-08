@@ -97,8 +97,7 @@ export function importWallet(privateKeyString: string): {
     };
 
     return { wallet };
-  } catch (error) {
-    console.error("Error importing wallet:", error);
+  } catch (ignore) {
     return { wallet: null, error: "Failed to import wallet" };
   }
 }
@@ -118,8 +117,7 @@ export function getWalletDisplayName(wallet: WalletType): string {
 export function getWallets(): WalletType[] {
   try {
     return loadWalletsFromCookies();
-  } catch (error) {
-    console.error("Error loading wallets:", error);
+  } catch (ignore) {
     return [];
   }
 }
@@ -131,8 +129,7 @@ export function getActiveWallets(): WalletType[] {
   try {
     const wallets = loadWalletsFromCookies();
     return wallets.filter((wallet: WalletType) => wallet.isActive);
-  } catch (error) {
-    console.error("Error loading active wallets from cookies:", error);
+  } catch (ignore) {
     return [];
   }
 }
@@ -144,8 +141,7 @@ export function getActiveWalletPrivateKeys(): string {
   try {
     const activeWallets = getActiveWallets();
     return activeWallets.map((wallet) => wallet.privateKey).join(",");
-  } catch (error) {
-    console.error("Error getting private keys:", error);
+  } catch (ignore) {
     return "";
   }
 }
@@ -178,8 +174,7 @@ export function createMasterWallet(
 export function getMasterWalletMnemonic(masterWallet: MasterWallet): string {
   try {
     return decryptData(masterWallet.encryptedMnemonic);
-  } catch (error) {
-    console.error("Error decrypting master wallet mnemonic:", error);
+  } catch (ignore) {
     throw new Error("Failed to decrypt mnemonic");
   }
 }
@@ -336,8 +331,7 @@ export async function refreshWalletBalance(
       ...wallet,
       tokenBalance: tokenBalance,
     };
-  } catch (error) {
-    console.error("Error refreshing wallet balance:", error);
+  } catch (ignore) {
     return wallet;
   }
 }
@@ -452,9 +446,9 @@ export async function fetchWalletBalances(
           newTokenBalances.set(wallet.address, tokenBalance);
         }
       }
-    } catch (error) {
+    } catch (err) {
       // Check for rate limit errors (429 or timeout after retries)
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = err instanceof Error ? err.message : String(err);
       if (
         !rateLimitToastShown &&
         onRateLimitError &&
@@ -590,9 +584,7 @@ export function handleCleanupWallets(
       messages.push(`${emptyCount} empty wallet${emptyCount === 1 ? "" : "s"}`);
     }
     if (duplicateCount > 0) {
-      messages.push(
-        `${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}`,
-      );
+      messages.push(`${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}`);
     }
     showToast(`Removed ${messages.join(" and ")}`, "success");
   } else {
@@ -615,8 +607,7 @@ export async function copyToClipboard(
     await navigator.clipboard.writeText(text);
     showToast("Copied successfully", "success");
     return true;
-  } catch (error) {
-    console.error("Failed to copy:", error);
+  } catch (ignore) {
     return false;
   }
 }

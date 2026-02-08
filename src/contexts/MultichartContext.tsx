@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { MultichartToken, MultichartTokenStats } from '../utils/types/multichart';
 import {
   saveMultichartTokens,
@@ -8,6 +8,7 @@ import {
   getMaxMultichartTokens,
 } from '../utils/storage';
 import { MultichartContext } from './MultichartContextDef';
+import { getTokenMetadataSync, prefetchTokenMetadata } from '../utils/hooks';
 
 export function MultichartProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [tokens, setTokens] = useState<MultichartToken[]>(() => loadMultichartTokens());
@@ -32,6 +33,40 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
     saveMultichartActiveIndex(activeTokenIndex);
   }, [activeTokenIndex]);
 
+  // Auto-enrich tokens with metadata from the cache/API
+  const enrichedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const unenriched = tokens.filter(
+      (t) => !t.symbol && !enrichedRef.current.has(t.address),
+    );
+    if (unenriched.length === 0) return;
+
+    // Kick off prefetch for any tokens not yet cached
+    prefetchTokenMetadata(unenriched.map((t) => t.address));
+
+    // Check sync cache immediately + schedule a delayed check for API results
+    const enrichFromCache = (): void => {
+      for (const token of unenriched) {
+        const meta = getTokenMetadataSync(token.address);
+        if (meta && (meta.symbol || meta.name)) {
+          enrichedRef.current.add(token.address);
+          setTokens((prev) =>
+            prev.map((t) =>
+              t.address === token.address && !t.symbol
+                ? { ...t, symbol: meta.symbol, imageUrl: meta.image }
+                : t,
+            ),
+          );
+        }
+      }
+    };
+
+    enrichFromCache();
+    // Retry after API has had time to respond
+    const timer = setTimeout(enrichFromCache, 2000);
+    return () => clearTimeout(timer);
+  }, [tokens]);
+
   const addToken = useCallback(
     (address: string, metadata?: Partial<MultichartToken>): boolean => {
       // Check if token already exists
@@ -44,13 +79,15 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
 
       // Check max tokens limit
       if (tokens.length >= maxTokens) {
-        console.warn(`Cannot add more than ${maxTokens} tokens`);
         return false;
       }
 
+      // Try to enrich with cached metadata immediately
+      const cachedMeta = getTokenMetadataSync(address);
       const newToken: MultichartToken = {
         address,
         addedAt: Date.now(),
+        ...(cachedMeta && { symbol: cachedMeta.symbol, imageUrl: cachedMeta.image }),
         ...metadata,
       };
 
@@ -58,7 +95,7 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
       setActiveTokenIndex(tokens.length); // Set to the new token's index
       return true;
     },
-    [tokens, maxTokens]
+    [tokens, maxTokens],
   );
 
   const removeToken = useCallback(
@@ -81,7 +118,7 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
         setActiveTokenIndex(newIndex);
       }
     },
-    [tokens, activeTokenIndex]
+    [tokens, activeTokenIndex],
   );
 
   const setActiveToken = useCallback(
@@ -91,7 +128,7 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
         setActiveTokenIndex(index);
       }
     },
-    [tokens.length]
+    [tokens.length],
   );
 
   const updateTokenStats = useCallback((address: string, stats: MultichartTokenStats) => {

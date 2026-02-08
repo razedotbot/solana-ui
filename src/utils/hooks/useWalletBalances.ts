@@ -42,13 +42,13 @@ export const useWalletBalances = ({
   // Memoized active wallets
   const activeWallets = useMemo(
     () => wallets.filter(wallet => wallet.isActive),
-    [wallets]
+    [wallets],
   );
 
   // Calculate total SOL across all wallets
   const totalSol = useMemo(
     () => Array.from(solBalances.values()).reduce((sum, balance) => sum + balance, 0),
-    [solBalances]
+    [solBalances],
   );
 
   // Calculate active SOL (only active wallets)
@@ -57,13 +57,13 @@ export const useWalletBalances = ({
       (sum, wallet) => sum + (solBalances.get(wallet.address) || 0),
       0
     ),
-    [activeWallets, solBalances]
+    [activeWallets, solBalances],
   );
 
   // Calculate total tokens across all wallets
   const totalTokens = useMemo(
     () => Array.from(tokenBalances.values()).reduce((sum, balance) => sum + balance, 0),
-    [tokenBalances]
+    [tokenBalances],
   );
 
   // Calculate active tokens (only active wallets)
@@ -72,33 +72,33 @@ export const useWalletBalances = ({
       (sum, wallet) => sum + (tokenBalances.get(wallet.address) || 0),
       0
     ),
-    [activeWallets, tokenBalances]
+    [activeWallets, tokenBalances],
   );
 
   // Helper functions
   const getWalletSolBalance = useCallback(
     (address: string) => solBalances.get(address) || 0,
-    [solBalances]
+    [solBalances],
   );
 
   const getWalletTokenBalance = useCallback(
     (address: string) => tokenBalances.get(address) || 0,
-    [tokenBalances]
+    [tokenBalances],
   );
 
   const getWalletsWithSol = useCallback(
     () => wallets.filter(wallet => (solBalances.get(wallet.address) || 0) > 0),
-    [wallets, solBalances]
+    [wallets, solBalances],
   );
 
   const getWalletsWithTokens = useCallback(
     () => wallets.filter(wallet => (tokenBalances.get(wallet.address) || 0) > 0),
-    [wallets, tokenBalances]
+    [wallets, tokenBalances],
   );
 
   const getActiveWallets = useCallback(
     () => activeWallets,
-    [activeWallets]
+    [activeWallets],
   );
 
   return {

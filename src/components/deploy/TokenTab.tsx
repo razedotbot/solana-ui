@@ -13,27 +13,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../utils/hooks";
 import type { TokenMetadata } from "./types";
-
-interface MetadataApiResponse {
-  success: boolean;
-  metadata: {
-    tokenMint: string;
-    onChain: {
-      name: string;
-      symbol: string;
-      uri: string;
-      source: string;
-    } | null;
-    offChain: {
-      name?: string;
-      symbol?: string;
-      description?: string;
-      image?: string;
-    } | null;
-    metadataSource: string;
-    timestamp: string;
-  };
-}
+import type { TokenMetadataApiResponse } from "../../utils/types";
 
 interface TokenTabProps {
   tokenData: TokenMetadata;
@@ -70,7 +50,7 @@ export const TokenTab: React.FC<TokenTabProps> = ({ tokenData, setTokenData }) =
       if (!response.ok) {
         throw new Error("Failed to fetch metadata");
       }
-      const data = await response.json() as MetadataApiResponse;
+      const data = await response.json() as TokenMetadataApiResponse;
 
       if (!data.success || !data.metadata) {
         throw new Error("No metadata found");

@@ -234,7 +234,6 @@ export const DistributeModal: React.FC<DistributeModalProps> = ({
         showToast(result.error || "Distribution failed", "error");
       }
     } catch (error) {
-      console.error("Distribution error:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       showToast(

@@ -16,8 +16,7 @@ const loadBrandCSS = async (): Promise<void> => {
   try {
     // Use dynamic import for CSS files in Vite based on theme name
     await import(`../${brand.theme.name}.css`);
-  } catch (error) {
-    console.error("Failed to load brand CSS:", error);
+  } catch (ignore) {
     // Fallback to globals.css
     await import("../green.css");
   }
@@ -33,7 +32,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 // Lazy load page components
 const App = lazy(() => import("./App"));
 const Homepage = lazy(() => import("./pages/HomePage"));
-const AutomatePage = lazy(() => import("./pages/AutomatePage"));
 const DeployPage = lazy(() => import("./pages/DeployPage"));
 const WalletsPage = lazy(() =>
   import("./pages/WalletsPage").then((module) => ({
@@ -85,7 +83,7 @@ const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
   {
     id: "jp",
     name: "Japan",
-    url: "https://tokyo.raze.sh/",
+    url: "https://jp.raze.sh/",
     region: "JP",
     flag: "🇯🇵",
   },
@@ -613,7 +611,6 @@ export const Root = (): JSX.Element => {
                           <Route path="/tokens/:tokenAddress" element={<App />} />
 
                           {/* Feature pages */}
-                          <Route path="/tools" element={<AutomatePage />} />
                           <Route path="/deploy" element={<DeployPage />} />
                           <Route path="/wallets" element={<WalletsPage />} />
                           <Route path="/settings" element={<SettingsPage />} />

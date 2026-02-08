@@ -10,7 +10,6 @@ import type {
   WalletSell,
   BundleMode,
   SellConfig,
-  ServerResponse,
   SellBundle,
   SellResult,
 } from "./types";
@@ -18,7 +17,6 @@ import {
   addTradeHistory,
   checkRateLimit,
   getServerBaseUrl,
-  isSelfHostedServer,
   completeBundleSigning,
   splitLargeBundles,
   createKeypairs,
@@ -33,7 +31,6 @@ export type {
   WalletSell,
   BundleMode,
   SellConfig,
-  ServerResponse,
   SellBundle,
   SellResult,
 };
@@ -49,10 +46,9 @@ const getPartiallyPreparedSellTransactions = async (
   wallets: WalletSell[],
   sellConfig: SellConfig,
 ): Promise<SellBundle[]> => {
-  try {
+
     const config = loadConfigFromCookies();
     const baseUrl = getServerBaseUrl();
-    const selfHosted = isSelfHostedServer();
 
     // Determine output mint (what to sell tokens for)
     const outputMint =
@@ -63,15 +59,8 @@ const getPartiallyPreparedSellTransactions = async (
 
     const requestBody: Record<string, unknown> = {
       tokenAddress: sellConfig.tokenAddress,
+      walletAddresses: wallets.map((wallet) => wallet.address),
     };
-
-    if (selfHosted) {
-      requestBody["walletPrivateKeys"] = wallets.map(
-        (wallet) => wallet.privateKey,
-      );
-    } else {
-      requestBody["walletAddresses"] = wallets.map((wallet) => wallet.address);
-    }
 
     if (sellConfig.tokensAmount !== undefined) {
       requestBody["tokensAmount"] = sellConfig.tokensAmount;
@@ -108,18 +97,19 @@ const getPartiallyPreparedSellTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data: ServerResponse = (await response.json()) as ServerResponse;
+    const data = (await response.json()) as {
+      success?: boolean;
+      error?: string;
+      data?: unknown;
+      bundles?: unknown[];
+      transactions?: string[];
+    };
 
     if (!data.success) {
       throw new Error(
         (data.error ? String(data.error) : undefined) ||
-          "Failed to get partially prepared transactions",
+          "Failed to get partially prepared transactions"
       );
-    }
-
-    // Handle self-hosted server response
-    if (config?.tradingServerEnabled === "true" && data.data) {
-      return [{ transactions: [], serverResponse: data }];
     }
 
     // Handle various response formats
@@ -144,7 +134,7 @@ const getPartiallyPreparedSellTransactions = async (
     }
 
     if ("bundles" in data && Array.isArray(data["bundles"])) {
-      return (data["bundles"] as unknown[]).map((bundle: unknown) =>
+      return data["bundles"].map((bundle: unknown) =>
         Array.isArray(bundle)
           ? { transactions: bundle as string[] }
           : (bundle as SellBundle),
@@ -152,7 +142,7 @@ const getPartiallyPreparedSellTransactions = async (
     }
 
     if ("transactions" in data && Array.isArray(data["transactions"])) {
-      return [{ transactions: data["transactions"] as string[] }];
+      return [{ transactions: data["transactions"] }];
     }
 
     if (Array.isArray(data)) {
@@ -160,13 +150,6 @@ const getPartiallyPreparedSellTransactions = async (
     }
 
     throw new Error("No transactions returned from backend");
-  } catch (error) {
-    console.error(
-      "[Sell] Error getting partially prepared sell transactions:",
-      error,
-    );
-    throw error;
-  }
 };
 
 // ============================================================================
@@ -218,8 +201,7 @@ const executeSellSingleMode = async (
           ),
         );
       }
-    } catch (error) {
-      console.error(`[Sell] Error processing wallet ${wallet.address}:`, error);
+    } catch (ignore) {
       failedWallets++;
     }
   }
@@ -280,8 +262,7 @@ const executeSellBatchMode = async (
       if (i < batches.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, batchDelay));
       }
-    } catch (error) {
-      console.error(`[Sell] Error processing batch ${i + 1}:`, error);
+    } catch (ignore) {
       failedBatches++;
     }
   }
@@ -300,40 +281,15 @@ const executeSellAllInOneMode = async (
   wallets: WalletSell[],
   sellConfig: SellConfig,
 ): Promise<SellResult> => {
-  const config = loadConfigFromCookies();
   const partiallyPreparedBundles = await getPartiallyPreparedSellTransactions(
     wallets,
     sellConfig,
   );
 
-  // Handle self-hosted server response
-  if (config?.tradingServerEnabled === "true") {
-    if (
-      partiallyPreparedBundles.length > 0 &&
-      partiallyPreparedBundles[0].serverResponse
-    ) {
-      const serverResponse = partiallyPreparedBundles[0].serverResponse;
-      return {
-        success: serverResponse.success ?? false,
-        result: serverResponse.data,
-        error: serverResponse.success
-          ? undefined
-          : serverResponse.error
-            ? String(serverResponse.error)
-            : undefined,
-      };
-    }
-    return {
-      success: false,
-      error: "No response received from self-hosted server",
-    };
-  }
-
   if (partiallyPreparedBundles.length === 0) {
     return {
       success: false,
-      error:
-        "No transactions generated. Wallets might not have sufficient token balance.",
+      error: "No transactions generated.",
     };
   }
 
@@ -388,11 +344,7 @@ export const executeSell = async (
 ): Promise<SellResult> => {
   try {
     const config = loadConfigFromCookies();
-    let bundleMode = sellConfig.bundleMode || "batch";
-
-    if (config?.tradingServerEnabled === "true") {
-      bundleMode = "all-in-one";
-    }
+    const bundleMode = sellConfig.bundleMode || "batch";
 
     // Get the output mint for trade history
     const outputMint =

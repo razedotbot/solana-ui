@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, Copy, Check, ExternalLink } from "lucide-react";
 import type { PlatformType } from "../../utils/create";
-import { useToast } from "../../utils/hooks";
+import { useToast, useTokenMetadata } from "../../utils/hooks";
 import { PLATFORMS } from "./constants";
 
 interface SuccessModalProps {
@@ -18,6 +18,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { metadata: tokenMeta } = useTokenMetadata(mintAddress);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (): Promise<void> => {
@@ -40,6 +41,17 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
           Successfully launched on {PLATFORMS.find((p) => p.id === platform)?.name}
         </p>
         <div className="bg-app-tertiary/50 rounded-xl p-4 mb-6 border border-app-primary-20">
+          {tokenMeta?.name && (
+            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-app-primary-10">
+              {tokenMeta.image && (
+                <img src={tokenMeta.image} alt={tokenMeta.symbol} className="w-10 h-10 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              )}
+              <div className="min-w-0">
+                <div className="font-bold text-app-primary truncate">{tokenMeta.name}</div>
+                <div className="text-xs text-app-secondary-60 font-mono">{tokenMeta.symbol}</div>
+              </div>
+            </div>
+          )}
           <p className="text-[10px] text-app-secondary-40 font-mono uppercase tracking-wider mb-2">Token Address</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 text-xs text-app-primary font-mono break-all">{mintAddress}</code>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, X, Move, Edit3, Check, Zap } from "lucide-react";
-import { toggleWallet, getWalletDisplayName } from "../utils/wallet";
+import { Loader2, X, Move, Edit3, Check } from "lucide-react";
+import { toggleWallet } from "../utils/wallet";
 import { saveWalletsToCookies } from "../utils/storage";
-import { formatTokenBalance } from "../utils/formatting";
+import WalletSelectorPopup from "./WalletSelectorPopup";
 import type { WalletType } from "../utils/types";
 
 // Hook to detect mobile viewport
@@ -195,173 +195,6 @@ const TabButton = React.memo<TabButtonProps>(
 );
 TabButton.displayName = "TabButton";
 
-// Wallet Selector Popup Component for FloatingTradingCard
-interface FloatingWalletSelectorProps {
-  wallets: WalletType[];
-  baseCurrencyBalances: Map<string, number>;
-  tokenBalances: Map<string, number>;
-  anchorRef: React.RefObject<HTMLButtonElement>;
-  onClose: () => void;
-  onToggleWallet: (id: number) => void;
-  onSelectAll: () => void;
-  onSelectAllWithBalance: () => void;
-}
-
-const FloatingWalletSelector: React.FC<FloatingWalletSelectorProps> = ({
-  wallets,
-  baseCurrencyBalances,
-  tokenBalances,
-  anchorRef,
-  onClose,
-  onToggleWallet,
-  onSelectAll,
-  onSelectAllWithBalance,
-}) => {
-  const popupRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, right: 0 });
-
-  // Calculate position based on button location
-  useEffect(() => {
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
-      });
-    }
-  }, [anchorRef]);
-
-  // Handle click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent): void => {
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(e.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose, anchorRef]);
-
-  return (
-    <div
-      ref={popupRef}
-      className="fixed z-[10000]"
-      style={{
-        top: position.top,
-        right: position.right,
-      }}
-    >
-      <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 min-w-[320px] max-h-[400px] overflow-hidden">
-        {/* Header with Select All buttons */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
-          <button
-            onClick={onSelectAll}
-            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
-          >
-            Select All
-          </button>
-          <button
-            onClick={onSelectAllWithBalance}
-            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
-          >
-            Select All with Balance
-          </button>
-        </div>
-
-        {/* Wallet List */}
-        <div className="overflow-y-auto max-h-[340px]">
-          {wallets
-            .filter((w) => !w.isArchived)
-            .map((wallet) => {
-              const solBal = baseCurrencyBalances.get(wallet.address) || 0;
-              const tokenBal = tokenBalances.get(wallet.address) || 0;
-
-              return (
-                <div
-                  key={wallet.id}
-                  onClick={() => onToggleWallet(wallet.id)}
-                  className={`
-                  flex items-center justify-between px-3 py-2 cursor-pointer transition-all duration-200
-                  border-b border-app-primary-20 last:border-b-0
-                  ${
-                    wallet.isActive
-                      ? "bg-primary-20 border-l-2 border-l-primary"
-                      : "hover:bg-app-primary-60"
-                  }
-                `}
-                >
-                  {/* Selection indicator & wallet info */}
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {/* Selection checkbox */}
-                    <div
-                      className={`
-                    w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
-                    ${
-                      wallet.isActive
-                        ? "bg-app-primary-color border-app-primary-color"
-                        : "bg-transparent border-app-primary-40"
-                    }
-                  `}
-                    >
-                      {wallet.isActive && (
-                        <Check size={10} className="text-black" />
-                      )}
-                    </div>
-
-                    {/* Wallet name and address */}
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span
-                        className={`text-xs font-mono truncate ${wallet.isActive ? "text-app-primary" : "text-app-secondary"}`}
-                      >
-                        {getWalletDisplayName(wallet)}
-                      </span>
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
-                        <Zap size={8} className="text-app-secondary-40" />
-                        <span>Off</span>
-                        <span className="text-app-primary-40">
-                          {wallet.address.slice(0, 5)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Balances */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* SOL Balance */}
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
-                      <span
-                        className={`text-xs font-mono ${solBal > 0 ? "text-app-primary" : "text-app-secondary-60"}`}
-                      >
-                        {solBal.toFixed(3)}
-                      </span>
-                    </div>
-
-                    {/* Token Balance */}
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-3 bg-app-primary-color rounded-sm"></div>
-                      <span
-                        className={`text-xs font-mono ${tokenBal > 0 ? "color-primary" : "text-app-secondary-60"}`}
-                      >
-                        {formatTokenBalance(tokenBal)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 interface FloatingTradingCardProps {
   isOpen: boolean;
   onClose: () => void;
@@ -403,6 +236,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   onPositionChange,
   isDragging,
   onDraggingChange,
+  tokenAddress,
   wallets,
   setWallets,
   selectedDex,
@@ -531,8 +365,8 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
               : "degen",
         };
       }
-    } catch (error) {
-      console.error("Error loading presets from cookies:", error);
+    } catch (ignore) {
+      // Invalid JSON, use defaults
     }
     return {
       tabs: defaultPresetTabs,
@@ -552,8 +386,8 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
         const expires = new Date();
         expires.setFullYear(expires.getFullYear() + 1); // 1 year expiry
         document.cookie = `tradingPresets=${encoded}; expires=${expires.toUTCString()}; path=/`;
-      } catch (error) {
-        console.error("Error saving presets to cookies:", error);
+      } catch (ignore) {
+        // Cookie save error, ignore
       }
     },
     [],
@@ -1170,10 +1004,11 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
         {/* Wallet Selector - rendered inline for embedded mode */}
         {showWalletSelector && (
           <div className="absolute left-0 right-0 bottom-full mb-2 z-50">
-            <FloatingWalletSelector
+            <WalletSelectorPopup
               wallets={wallets}
               baseCurrencyBalances={baseCurrencyBalances}
               tokenBalances={tokenBalances}
+              tokenAddress={tokenAddress}
               anchorRef={walletButtonRef}
               onClose={() => setShowWalletSelector(false)}
               onToggleWallet={handleToggleWallet}
@@ -1194,10 +1029,11 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
       {createPortal(content, document.body)}
       {showWalletSelector &&
         createPortal(
-          <FloatingWalletSelector
+          <WalletSelectorPopup
             wallets={wallets}
             baseCurrencyBalances={baseCurrencyBalances}
             tokenBalances={tokenBalances}
+            tokenAddress={tokenAddress}
             anchorRef={walletButtonRef}
             onClose={() => setShowWalletSelector(false)}
             onToggleWallet={handleToggleWallet}

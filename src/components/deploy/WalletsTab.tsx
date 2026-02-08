@@ -65,7 +65,7 @@ export const WalletsTab: React.FC<WalletsTabProps> = ({
         }
       }
     } catch {
-      console.error("Failed to load presets from localStorage");
+      // Invalid JSON, ignore
     }
   }, []);
 
@@ -74,8 +74,7 @@ export const WalletsTab: React.FC<WalletsTabProps> = ({
     try {
       localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(newPresets));
       setPresets(newPresets);
-    } catch (e) {
-      console.error("Failed to save presets:", e);
+    } catch (ignore) {
       showToast("Failed to save presets", "error");
     }
   };

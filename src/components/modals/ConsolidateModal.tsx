@@ -162,17 +162,13 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
       );
 
       if (result.success) {
-        showToast(
-          `${baseCurrency.symbol} consolidated successfully`,
-          "success",
-        );
+        showToast("Consolidation successful", "success");
         resetForm();
         onClose();
       } else {
         showToast(result.error || "Consolidation failed", "error");
       }
     } catch (error) {
-      console.error("Consolidation error:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       showToast(
@@ -1109,7 +1105,7 @@ export const ConsolidateModal: React.FC<ConsolidateModalProps> = ({
                     PROCESSING...
                   </>
                 ) : (
-                  `CONSOLIDATE ${baseCurrency.symbol}`
+                  "CONSOLIDATE"
                 )}
               </button>
             </div>

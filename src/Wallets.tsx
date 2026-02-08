@@ -35,6 +35,7 @@ import {
   validateSellInputs,
 } from "./utils/sell";
 import { Tooltip } from "./components/Tooltip";
+import { PageBackground } from "./components/PageBackground";
 
 // ============================================================================
 // Virtualized Wallet List Component
@@ -270,7 +271,7 @@ const WalletRow = React.memo(
         </div>
 
         {/* SOL Balance */}
-        <div className="py-3 px-2 text-right font-mono w-20 flex-shrink-0">
+        <div className={`py-3 pl-2 text-right font-mono flex-shrink-0 ${tokenAddress ? "pr-0 w-[4.5rem]" : "pr-2 w-20"}`}>
           <span
             className={`font-medium transition-colors duration-300 ${
               wallet.isActive
@@ -288,7 +289,7 @@ const WalletRow = React.memo(
 
         {/* Token Balance */}
         {tokenAddress && (
-          <div className="py-3 px-2 text-right font-mono w-24 flex-shrink-0">
+          <div className="py-3 pl-0 pr-1 text-right font-mono w-[5.25rem] flex-shrink-0">
             <span
               className={`font-medium transition-colors duration-300 ${
                 wallet.isActive
@@ -786,7 +787,6 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
 
       await executeBuy([walletForBuy], buyConfig);
     } catch (error) {
-      console.error("Quick buy error:", error);
       showToast(
         "Quick buy failed: " +
           (error instanceof Error ? error.message : "Unknown error"),
@@ -1017,7 +1017,6 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
 
       await executeSell([walletForSell], sellConfig);
     } catch (error) {
-      console.error("Quick sell error:", error);
       showToast(
         "Quick sell failed: " +
           (error instanceof Error ? error.message : "Unknown error"),
@@ -1061,48 +1060,13 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
 
   return (
     <div className="relative flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-app-primary h-full min-h-full">
-      {/* Background effects - same as Actions.tsx */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden min-h-full">
-        {/* Grid background */}
-        <div className="absolute inset-0 bg-app-primary opacity-90">
-          <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `
-                linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
-              `,
-              backgroundSize: "20px 20px",
-              backgroundPosition: "center center",
-            }}
-          ></div>
-        </div>
-
-        {/* Glowing corner accents */}
-        <div className="absolute top-0 left-0 w-32 h-32 opacity-20">
-          <div className="absolute top-0 left-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-          <div className="absolute top-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-        </div>
-        <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
-          <div className="absolute top-0 right-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-          <div className="absolute top-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-        </div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 opacity-20">
-          <div className="absolute bottom-0 left-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-          <div className="absolute bottom-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-        </div>
-        <div className="absolute bottom-0 right-0 w-32 h-32 opacity-20">
-          <div className="absolute bottom-0 right-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-          <div className="absolute bottom-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-        </div>
-      </div>
+      <PageBackground />
 
       {/*  header */}
       <div className="sticky top-0 bg-app-primary-99 backdrop-blur-sm border-b border-app-primary-40 z-10 shadow-sm">
         {/* Improved balance info */}
         <div className="py-2 px-3 bg-app-secondary-80-solid relative">
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between items-center text-sm">
             <div>
               <div className="text-app-secondary font-mono flex items-center gap-2">
                 <span
@@ -1157,6 +1121,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({
                 </button>
               </div>
             </div>
+
             {tokenAddress && (
               <div className="text-right">
                 <div className="text-app-secondary font-mono flex items-center justify-end gap-2">

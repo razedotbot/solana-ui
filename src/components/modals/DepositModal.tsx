@@ -142,28 +142,18 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         const pubKey = new PublicKey(response.publicKey.toString());
         const balance = await connection.getBalance(pubKey, "processed");
         const solBalance = balance / 1e9; // Convert lamports to SOL
-
-        console.info(
-          `Fetched balance for connected Phantom wallet ${walletAddress}: ${solBalance} SOL`,
-        );
-
         // Update the baseCurrencyBalances map with the connected wallet's balance
         if (setBaseCurrencyBalances) {
           const newBalances = new Map(baseCurrencyBalances);
           newBalances.set(walletAddress, solBalance);
           setBaseCurrencyBalances(newBalances);
-          console.info("Updated baseCurrencyBalances map for connected wallet");
-        } else {
-          console.info("setBaseCurrencyBalances is not available");
         }
-      } catch (balanceError) {
-        console.error("Error fetching wallet balance:", balanceError);
+      } catch (ignore) {
         // Don't fail the connection if balance fetch fails
       }
 
       return true;
-    } catch (error) {
-      console.error("Error connecting to Phantom wallet:", error);
+    } catch (ignore) {
       showToast("Failed to connect to Phantom wallet", "error");
       return false;
     }
@@ -176,10 +166,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
     // Check if wallet has sufficient balance before proceeding
     if (hasInsufficientBalance()) {
-      showToast(
-        `Insufficient ${baseCurrency.symbol} balance for this transaction`,
-        "error",
-      );
+      showToast("Insufficient balance for this deposit", "error");
       return;
     }
 
@@ -244,8 +231,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       // Reset form and close modal
       resetForm();
       onClose();
-    } catch (error) {
-      console.error("Error:", error);
+    } catch (ignore) {
       showToast("Deposit failed", "error");
     } finally {
       setIsSubmitting(false);
@@ -816,7 +802,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   ) : hasInsufficientBalance() ? (
                     "INSUFFICIENT BALANCE"
                   ) : (
-                    `DEPOSIT ${baseCurrency.symbol}`
+                    "CONFIRM DEPOSIT"
                   )}
                 </button>
               </div>

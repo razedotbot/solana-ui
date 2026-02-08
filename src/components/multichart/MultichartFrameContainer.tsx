@@ -167,9 +167,7 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
 
   // Drag-to-reorder handlers - disabled when any token is expanded
   const handleDragStart = useCallback((e: React.MouseEvent, index: number) => {
-    // Disable drag when a token is expanded
     if (expandedToken) return;
-
     e.preventDefault();
     setDragIndex(index);
     isDraggingRef.current = true;
@@ -286,29 +284,28 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
           tradeWallets,
           config,
           isBuy,
-          baseCurrencyBalances
+          baseCurrencyBalances,
         );
 
         if (result.success) {
           showToast(
-            `${isBuy ? "Buy" : "Sell"} transactions submitted successfully`,
+            `${isBuy ? "Buy" : "Sell"} successful`,
             "success"
           );
         } else {
           showToast(
-            `${isBuy ? "Buy" : "Sell"} failed: ${result.error}`,
+            result.error || `${isBuy ? "Buy" : "Sell"} failed`,
             "error"
           );
         }
       } catch (error) {
-        console.error("Trading error:", error);
         const errorMessage = error instanceof Error ? error.message : String(error);
         showToast(`Error: ${errorMessage}`, "error");
       } finally {
         setIsTrading(false);
       }
     },
-    [tradingCardToken, selectedDex, buyAmount, sellAmount, baseCurrencyBalances, showToast]
+    [tradingCardToken, selectedDex, buyAmount, sellAmount, baseCurrencyBalances, showToast],
   );
 
   const isDragging = dragIndex !== null;
@@ -432,19 +429,13 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
                 ${isThisDragging ? "opacity-50" : ""}
               `}
               style={{
-                gridRow: gridPos.gridRow,
-                gridColumn: gridPos.gridColumn,
-                boxShadow: isThisDragOver
-                  ? '0 0 0 2px var(--color-primary), 0 8px 32px rgba(0,0,0,0.4)'
-                  : isThisDragging
-                    ? '0 0 0 2px var(--color-primary), 0 4px 20px rgba(0,0,0,0.3)'
-                    : isExpanded
-                      ? '0 0 0 2px var(--color-primary), 0 4px 24px rgba(0,0,0,0.3)'
-                      : '0 2px 8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05)',
-                transition: 'box-shadow 0.2s ease',
+                ...gridPos,
+                boxShadow: isThisDragging
+                  ? '0 0 20px rgba(var(--color-primary-rgb, 0,255,136), 0.3)'
+                  : '0 2px 8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05)',
+                transition: isThisDragging ? 'none' : 'box-shadow 0.2s ease',
               }}
             >
-              {/* Header */}
               <div
                 onMouseDown={(e) => handleDragStart(e, globalIndex)}
                 className={`
@@ -460,6 +451,14 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
                     size={14}
                     className={`flex-shrink-0 transition-colors ${expandedToken ? "text-app-secondary-60 opacity-30" : isDragging ? "color-primary" : "text-app-secondary-40"}`}
                   />
+                  {token.address !== MONITOR_SLOT && token.imageUrl && (
+                    <img
+                      src={token.imageUrl}
+                      alt={token.symbol || ""}
+                      className="w-4 h-4 rounded-full object-cover flex-shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
                   <span className="text-xs font-mono font-medium text-app-primary truncate">
                     {token.address === MONITOR_SLOT
                       ? "Browse"

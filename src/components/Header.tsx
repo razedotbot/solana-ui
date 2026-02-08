@@ -1,18 +1,21 @@
 import React, { useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Settings, Bot, Blocks, Wallet, TrendingUp, BookOpen } from 'lucide-react';
+import { Settings, Bot, Blocks, Wallet, TrendingUp, BookOpen, Home } from 'lucide-react';
 import { brand } from '../utils/brandConfig';
 import logo from '../logo.png';
 
 interface HeaderProps {
   tokenAddress?: string;
-  onNavigateHome?: () => void;
   showToast?: (message: string, type: 'success' | 'error') => void;
 }
 
 const VerticalSidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleHomeClick = (): void => {
+    navigate('/');
+  };
 
   const handleWalletsClick = (): void => {
     navigate('/wallets');
@@ -25,7 +28,6 @@ const VerticalSidebar: React.FC = () => {
   const handleToolsClick = (): void => {
     navigate('/tools');
   };
-
 
   const handleDeployClick = (): void => {
     navigate('/deploy');
@@ -59,6 +61,17 @@ const VerticalSidebar: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Home */}
+      <button
+        onClick={handleHomeClick}
+        className={getButtonClassName('/')}
+      >
+        <Home size={24} className={getIconClassName('/')} />
+        <span className="text-xs font-mono font-medium tracking-wider uppercase">
+          HOME
+        </span>
+      </button>
+
       {/* Wallets */}
       <button
         onClick={handleWalletsClick}
@@ -129,15 +142,10 @@ const VerticalSidebar: React.FC = () => {
   );
 };
 
-export const HomepageHeader: React.FC<HeaderProps> = ({
-  onNavigateHome,
-}) => {
-  const navigate = useNavigate();
-  
+export const HomepageHeader: React.FC<HeaderProps> = () => {
   const handleLogoClick = useCallback(() => {
-    onNavigateHome?.();
-    navigate('/');
-  }, [onNavigateHome, navigate]);
+    window.open(`https://${brand.domain}`, '_blank', 'noopener,noreferrer');
+  }, []);
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-screen w-48 border-r border-app-primary-40 backdrop-blur-sm bg-app-primary-80-alpha z-30 flex-col p-4 gap-6 overflow-y-auto shadow-inner-black-80">
@@ -163,11 +171,9 @@ export const HomepageHeader: React.FC<HeaderProps> = ({
 
 // Unified header component for all pages
 export const UnifiedHeader: React.FC<HeaderProps> = () => {
-  const navigate = useNavigate();
-
   const handleLogoClick = useCallback((): void => {
-    navigate('/');
-  }, [navigate]);
+    window.open(`https://${brand.domain}`, '_blank', 'noopener,noreferrer');
+  }, []);
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-screen w-48 border-r border-app-primary-40 backdrop-blur-sm bg-app-primary-80-alpha z-30 flex-col p-4 gap-6 overflow-y-auto shadow-inner-black-80">

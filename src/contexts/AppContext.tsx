@@ -39,9 +39,6 @@ const defaultConfig: ConfigType = {
   bundleMode: "batch",
   singleDelay: "200",
   batchDelay: "1000",
-  tradingServerEnabled: "false",
-  tradingServerUrl: "https://localhost:4444",
-  streamApiKey: "",
   balanceRefreshStrategy: "batch",
   balanceRefreshBatchSize: "5",
   balanceRefreshDelay: "50",
@@ -110,16 +107,15 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
             .then((conn) => {
               setConnection(conn);
             })
-            .catch((error) => {
-              console.error("Error creating initial connection:", error);
+            .catch((_error) => {
               showToast("Failed to connect to RPC endpoints", "error");
             });
-        } catch (error) {
-          console.error("Error creating RPC manager:", error);
+        } catch (ignore) {
+          // RPC connection error, already handled
         }
       }
-    } catch (error) {
-      console.error("Error loading initial data:", error);
+    } catch (ignore) {
+      // RPC endpoints parse error, ignore
     }
   }, [showToast]);
 
@@ -137,12 +133,11 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           .then((conn) => {
             setConnection(conn);
           })
-          .catch((error) => {
-            console.error("Error creating connection:", error);
+          .catch((_error) => {
             showToast("Failed to connect to RPC endpoints", "error");
           });
-      } catch (error) {
-        console.error("Error updating RPC manager:", error);
+      } catch (ignore) {
+        // RPC endpoints parse error, ignore
       }
     }
   }, [config.rpcEndpoints, showToast]);
@@ -220,8 +215,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           },
           baseCurrency,
         );
-      } catch (error) {
-        console.error("Error refreshing balances:", error);
+      } catch (ignore) {
         showToast("Failed to refresh balances", "error");
       } finally {
         setIsRefreshing(false);

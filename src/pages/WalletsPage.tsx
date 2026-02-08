@@ -10,7 +10,6 @@ import type {
 } from "../utils/types";
 import {
   copyToClipboard,
-  downloadPrivateKey,
   deleteWallet,
   importWallet,
   fetchBaseCurrencyBalance,
@@ -42,17 +41,21 @@ import {
   getMnemonicWordCount,
 } from "../utils/hdWallet";
 import { useAppContext } from "../contexts";
-import { useToast } from "../utils/hooks";
+import { useToast, useWalletGroups } from "../utils/hooks";
 
-import {
-  MasterWalletSection,
-  MasterWalletExpandedDetails,
-  WalletToolbar,
-  WalletTable,
-  BulkActionsPanel,
-} from "../components/wallets";
 import { formatBaseCurrencyBalance } from "../utils/formatting";
-import type { SortField, SortDirection, ViewMode, ActiveModal } from "../components/wallets";
+import type { SortField, SortDirection, ActiveModal, FilterTab } from "../components/wallets";
+import {
+  WalletsHeader,
+  WalletGridView,
+  FilterTabs,
+  CommandPalette,
+  GroupDrawer,
+  SelectionFooter,
+  createWalletCommands,
+} from "../components/wallets";
+import { PageBackground } from "../components/PageBackground";
+import { DEFAULT_GROUP_ID } from "../utils/types";
 
 export const WalletsPage: React.FC = () => {
   const { showToast } = useToast();
@@ -69,17 +72,13 @@ export const WalletsPage: React.FC = () => {
   } = useAppContext();
 
   const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sortDirection] = useState<SortDirection>("desc");
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAddressSearch, setShowAddressSearch] = useState(false);
-  const [labelSearchTerm, setLabelSearchTerm] = useState("");
-  const [showLabelSearch, setShowLabelSearch] = useState(false);
   const [selectedWallets, setSelectedWallets] = useState<Set<number>>(
     new Set()
   );
   const [editingLabel, setEditingLabel] = useState<number | null>(null);
   const [editLabelValue, setEditLabelValue] = useState<string>("");
-  const [editingCategory, setEditingCategory] = useState<number | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCreateWalletModalOpen, setIsCreateWalletModalOpen] = useState(false);
@@ -95,9 +94,10 @@ export const WalletsPage: React.FC = () => {
     useState(false);
   const [exportSeedPhraseMasterWallet, setExportSeedPhraseMasterWallet] =
     useState<MasterWallet | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("all");
-  const [showViewModeDropdown, setShowViewModeDropdown] = useState(false);
-  const viewModeDropdownRef = useRef<HTMLDivElement>(null);
+  // V2 UI State
+  const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>("all");
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isGroupDrawerOpen, setIsGroupDrawerOpen] = useState(false);
 
   // Modal states
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -113,6 +113,28 @@ export const WalletsPage: React.FC = () => {
   const [draggedWalletId, setDraggedWalletId] = useState<number | null>(null);
   const [dragOverWalletId, setDragOverWalletId] = useState<number | null>(null);
 
+  // Wallet groups
+  const {
+    groups,
+    createGroup,
+    renameGroup,
+    deleteGroup,
+    reorderGroups: _reorderGroups,
+    updateGroupColor,
+    moveWalletToGroup,
+    moveWalletsToGroup: _moveWalletsToGroup,
+  } = useWalletGroups(wallets, setWallets);
+
+  // Active group state
+  const [activeGroupId, setActiveGroupId] = useState<string>(() => {
+    return localStorage.getItem("wallets_page_active_group") || "all";
+  });
+
+  const handleGroupChange = (groupId: string): void => {
+    setActiveGroupId(groupId);
+    localStorage.setItem("wallets_page_active_group", groupId);
+  };
+
   // Category settings for quick trade (loaded from localStorage)
   const [categorySettings, setCategorySettings] = useState<
     Record<WalletCategory, CategoryQuickTradeSettings>
@@ -124,8 +146,8 @@ export const WalletsPage: React.FC = () => {
           WalletCategory,
           CategoryQuickTradeSettings
         >;
-      } catch (error) {
-        console.error("Error loading category settings:", error);
+      } catch (ignore) {
+        // Invalid JSON, use defaults
       }
     }
     // Default settings
@@ -183,8 +205,8 @@ export const WalletsPage: React.FC = () => {
           }
         }
       }
-    } catch (error) {
-      console.error("Error loading wallets from storage:", error);
+    } catch (ignore) {
+      // Load wallets error, ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -199,8 +221,8 @@ export const WalletsPage: React.FC = () => {
           if (savedWallets && savedWallets.length > 0) {
             setWallets(savedWallets);
           }
-        } catch (error) {
-          console.error("Error loading wallets from storage (delayed):", error);
+        } catch (ignore) {
+          // Load wallets error, ignore
         }
       }, 500);
       return () => clearTimeout(timeoutId);
@@ -223,7 +245,7 @@ export const WalletsPage: React.FC = () => {
         .map((w) => w.address)
         .sort()
         .join(","),
-    [wallets]
+    [wallets],
   );
 
   const lastRefreshedAddressesRef = useRef<string>("");
@@ -281,8 +303,7 @@ export const WalletsPage: React.FC = () => {
       } else {
         showToast("Failed to import wallet", "error");
       }
-    } catch (error) {
-      console.error("Error importing wallet:", error);
+    } catch (ignore) {
       showToast("Failed to import wallet", "error");
     }
   };
@@ -292,52 +313,47 @@ export const WalletsPage: React.FC = () => {
       throw new Error("Connection not available");
     }
 
-    try {
-      const balance = await fetchBaseCurrencyBalance(
-        connection,
-        wallet.address,
-        baseCurrency
+    const balance = await fetchBaseCurrencyBalance(
+      connection,
+      wallet.address,
+      baseCurrency,
+    );
+
+    setBaseCurrencyBalances((prevBalances) => {
+      const newBalances = new Map(prevBalances);
+      newBalances.set(wallet.address, balance);
+      return newBalances;
+    });
+
+    setWallets((prevWallets) => {
+      const alreadyExists = prevWallets.some(
+        (w) => w.address === wallet.address
       );
-
-      setBaseCurrencyBalances((prevBalances) => {
-        const newBalances = new Map(prevBalances);
-        newBalances.set(wallet.address, balance);
-        return newBalances;
-      });
-
-      setWallets((prevWallets) => {
-        const alreadyExists = prevWallets.some(
-          (w) => w.address === wallet.address
-        );
-        if (alreadyExists) {
-          return prevWallets;
-        }
-        const newWallets = [...prevWallets, wallet];
-        saveWalletsToCookies(newWallets);
-        return newWallets;
-      });
-
-      if (
-        wallet.source === "hd-derived" &&
-        wallet.masterWalletId &&
-        wallet.derivationIndex !== undefined
-      ) {
-        setMasterWallets((prevMasterWallets) => {
-          const updatedMasterWallets = updateMasterWalletAccountCount(
-            prevMasterWallets,
-            wallet.masterWalletId!,
-            wallet.derivationIndex! + 1
-          );
-          saveMasterWallets(updatedMasterWallets);
-          return updatedMasterWallets;
-        });
+      if (alreadyExists) {
+        return prevWallets;
       }
+      const newWallets = [...prevWallets, wallet];
+      saveWalletsToCookies(newWallets);
+      return newWallets;
+    });
 
-      showToast("Wallet created successfully", "success");
-    } catch (error) {
-      console.error("Error creating wallet:", error);
-      throw error;
+    if (
+      wallet.source === "hd-derived" &&
+      wallet.masterWalletId &&
+      wallet.derivationIndex !== undefined
+    ) {
+      setMasterWallets((prevMasterWallets) => {
+        const updatedMasterWallets = updateMasterWalletAccountCount(
+          prevMasterWallets,
+          wallet.masterWalletId!,
+          wallet.derivationIndex! + 1
+        );
+        saveMasterWallets(updatedMasterWallets);
+        return updatedMasterWallets;
+      });
     }
+
+    showToast("Wallet created successfully", "success");
   };
 
   const handleImportFromFile = async (file: File): Promise<void> => {
@@ -444,8 +460,8 @@ export const WalletsPage: React.FC = () => {
         newSolBalances.set(wallet.address, balance);
 
         await new Promise((resolve) => setTimeout(resolve, 10));
-      } catch (error) {
-        console.error("Error importing wallet:", error);
+      } catch (ignore) {
+        // Fetch balance error, continue with others
       }
     }
 
@@ -454,8 +470,8 @@ export const WalletsPage: React.FC = () => {
         const masterWalletName = `Imported Master ${Date.now()}`;
         await handleImportMasterWallet(masterWalletName, mnemonic, 0);
         await new Promise((resolve) => setTimeout(resolve, 10));
-      } catch (error) {
-        console.error("Error importing master wallet:", error);
+      } catch (ignore) {
+        // Import master wallet error, continue with others
       }
     }
 
@@ -472,7 +488,7 @@ export const WalletsPage: React.FC = () => {
 
     const totalImported = importedWallets.length + foundMnemonics.length;
     showToast(
-      `Successfully imported ${totalImported} wallet${totalImported > 1 ? "s" : ""}`,
+      `Successfully imported ${totalImported} wallet${totalImported === 1 ? "" : "s"}`,
       "success"
     );
   };
@@ -509,8 +525,7 @@ export const WalletsPage: React.FC = () => {
       setBaseCurrencyBalances(newSolBalances);
 
       showToast("Master wallet created with primary wallet", "success");
-    } catch (error) {
-      console.error("Error creating master wallet:", error);
+    } catch (ignore) {
       showToast("Failed to create master wallet", "error");
     }
   };
@@ -542,7 +557,7 @@ export const WalletsPage: React.FC = () => {
         const derivedWallets = deriveMultipleWallets(
           mnemonic,
           initialWalletCount,
-          1
+          1,
         );
 
         for (let i = 0; i < derivedWallets.length; i++) {
@@ -584,13 +599,11 @@ export const WalletsPage: React.FC = () => {
       setWallets(allWallets);
       setBaseCurrencyBalances(newSolBalances);
 
-      const totalWallets = initialWalletCount + 1;
       showToast(
-        `Master wallet imported with ${totalWallets} wallet${totalWallets > 1 ? "s" : ""}`,
+        "Master wallet imported successfully",
         "success"
       );
-    } catch (error) {
-      console.error("Error importing master wallet:", error);
+    } catch (ignore) {
       showToast("Failed to import master wallet", "error");
     }
   };
@@ -602,7 +615,7 @@ export const WalletsPage: React.FC = () => {
     if (derivedWallets.length > 0) {
       const confirmed = window.confirm(
         `This master wallet has ${derivedWallets.length} derived wallet(s). ` +
-          `The wallets will remain but you won't be able to generate new ones. Continue?`
+        `Deleting it will also remove all derived wallets. Continue?`,
       );
       if (!confirmed) return;
     }
@@ -670,18 +683,26 @@ export const WalletsPage: React.FC = () => {
         (wallet.label && wallet.label.toLowerCase().includes(searchQuery));
 
       const matchesViewMode =
-        viewMode === "all"
+        activeFilterTab === "all"
           ? true
-          : viewMode === "hd"
+          : activeFilterTab === "hd"
             ? wallet.source === "hd-derived"
-            : viewMode === "imported"
+            : activeFilterTab === "imported"
               ? wallet.source === "imported" || !wallet.source
-              : true;
+              : activeFilterTab === "archived"
+                ? wallet.isArchived === true
+                : true;
+
+      // Group filtering
+      const matchesGroup = activeGroupId === "all"
+        ? true
+        : (wallet.groupId || DEFAULT_GROUP_ID) === activeGroupId;
 
       return (
         matchesArchivedFilter &&
         matchesSearch &&
-        matchesViewMode
+        matchesViewMode &&
+        matchesGroup
       );
     });
 
@@ -712,72 +733,21 @@ export const WalletsPage: React.FC = () => {
     searchTerm,
     baseCurrencyBalances,
     showArchived,
-    viewMode,
+    activeFilterTab,
+    activeGroupId,
   ]);
 
-  // Keep search inputs visible when there's a search term
+  // Command palette keyboard shortcut (Ctrl/Cmd + K)
   useEffect(() => {
-    if (searchTerm.trim() && !showAddressSearch) {
-      setShowAddressSearch(true);
-    }
-  }, [searchTerm, showAddressSearch]);
-
-  useEffect(() => {
-    if (labelSearchTerm.trim() && !showLabelSearch) {
-      setShowLabelSearch(true);
-    }
-  }, [labelSearchTerm, showLabelSearch]);
-
-  // Close view mode dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent): void => {
-      if (
-        viewModeDropdownRef.current &&
-        !viewModeDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowViewModeDropdown(false);
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
       }
     };
-
-    if (showViewModeDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-    return undefined;
-  }, [showViewModeDropdown]);
-
-  // Sorting function
-  const handleSort = (field: SortField): void => {
-    const newDirection =
-      sortField === field && sortDirection === "asc" ? "desc" : "asc";
-    setSortField(field);
-    setSortDirection(newDirection);
-
-    const sortedWallets = [...wallets].sort((a, b) => {
-      let aValue: number;
-      let bValue: number;
-
-      switch (field) {
-        case "solBalance":
-          aValue = baseCurrencyBalances.get(a.address) || 0;
-          bValue = baseCurrencyBalances.get(b.address) || 0;
-          break;
-        default:
-          aValue = baseCurrencyBalances.get(a.address) || 0;
-          bValue = baseCurrencyBalances.get(b.address) || 0;
-      }
-
-      return newDirection === "asc" ? aValue - bValue : bValue - aValue;
-    });
-
-    setWallets(sortedWallets);
-    showToast(
-      `Sorted by ${field} (${newDirection === "asc" ? "ascending" : "descending"})`,
-      "success"
-    );
-  };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Selection functions
   const toggleWalletSelection = (walletId: number): void => {
@@ -787,11 +757,6 @@ export const WalletsPage: React.FC = () => {
     } else {
       newSelected.add(walletId);
     }
-    setSelectedWallets(newSelected);
-  };
-
-  const selectAllVisible = (): void => {
-    const newSelected = new Set(filteredAndSortedWallets.map((w) => w.id));
     setSelectedWallets(newSelected);
   };
 
@@ -841,7 +806,6 @@ export const WalletsPage: React.FC = () => {
     );
     saveWalletsToCookies(updatedWallets);
     setWallets(updatedWallets);
-    setEditingCategory(null);
     showToast("Category updated", "success");
   };
 
@@ -918,7 +882,7 @@ export const WalletsPage: React.FC = () => {
     setWallets(newWallets);
 
     showToast(
-      `Deleted ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      `Successfully deleted ${selectedWallets.size} wallet${selectedWallets.size === 1 ? "" : "s"}`,
       "success"
     );
     setSelectedWallets(new Set());
@@ -943,7 +907,7 @@ export const WalletsPage: React.FC = () => {
     URL.revokeObjectURL(url);
 
     showToast(
-      `Downloaded ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      `Successfully downloaded ${selectedWallets.size} wallet${selectedWallets.size === 1 ? "" : "s"}`,
       "success"
     );
   };
@@ -958,7 +922,7 @@ export const WalletsPage: React.FC = () => {
     setWallets(newWallets);
 
     showToast(
-      `Archived ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      `Successfully archived ${selectedWallets.size} wallet${selectedWallets.size === 1 ? "" : "s"}`,
       "success"
     );
     setSelectedWallets(new Set());
@@ -974,7 +938,7 @@ export const WalletsPage: React.FC = () => {
     setWallets(newWallets);
 
     showToast(
-      `Unarchived ${selectedWallets.size} wallet${selectedWallets.size > 1 ? "s" : ""}`,
+      `Successfully unarchived ${selectedWallets.size} wallet${selectedWallets.size === 1 ? "" : "s"}`,
       "success"
     );
     setSelectedWallets(new Set());
@@ -1009,187 +973,185 @@ export const WalletsPage: React.FC = () => {
   const nonArchivedWallets = wallets.filter((w) => !w.isArchived);
   const totalSOL = nonArchivedWallets.reduce(
     (sum, wallet) => sum + (baseCurrencyBalances.get(wallet.address) || 0),
-    0
+    0,
   );
-  const activeWallets = nonArchivedWallets.filter(
-    (w) => (baseCurrencyBalances.get(w.address) || 0) > 0
-  ).length;
-  const archivedCount = wallets.filter((w) => w.isArchived).length;
 
   return (
     <div className="h-full min-h-screen md:h-screen bg-app-primary text-app-tertiary flex flex-col overflow-hidden">
       <HorizontalHeader />
 
       <div className="relative flex-1 overflow-hidden w-full pt-16 bg-app-primary flex flex-col">
-        {/* Background effects */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute inset-0 bg-app-primary opacity-90">
-            <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `
-                  linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
-                `,
-                backgroundSize: "20px 20px",
-              }}
-            ></div>
-          </div>
-        </div>
+        <PageBackground />
 
         {/* Content container */}
-        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-2 sm:py-3 pb-16 md:pb-3 flex flex-col flex-1 min-h-0 overflow-hidden">
-
-          {/* Master Wallets Section (only if exists) */}
-          {masterWallets.length > 0 && (
-            <div className="mb-2 pb-2 border-b border-app-primary-20 flex-shrink-0">
-              <MasterWalletSection
-                masterWallets={masterWallets}
-                wallets={wallets}
-                expandedMasterWallets={expandedMasterWallets}
-                baseCurrencyBalances={baseCurrencyBalances}
-                baseCurrency={baseCurrency}
-                onToggleExpansion={toggleMasterWalletExpansion}
-                onExportSeedPhrase={setExportSeedPhraseMasterWallet}
-                onDeleteMasterWallet={handleDeleteMasterWallet}
-                onCreateMasterWallet={() => setIsCreateMasterWalletModalOpen(true)}
-                onImportMasterWallet={() => setIsImportMasterWalletModalOpen(true)}
-                onRefreshBalances={async () => {
-                  await refreshBalances();
-                  setBaseCurrencyBalances((prev) => new Map(prev));
-                }}
-                isRefreshing={isRefreshing}
-                connection={connection}
-                showToast={showToast}
-              />
-            </div>
-          )}
-
-          {/* Expanded Master Wallet Details */}
-          {expandedMasterWallets.size > 0 && (
-            <MasterWalletExpandedDetails
-              masterWallets={masterWallets}
-              wallets={wallets}
-              expandedMasterWallets={expandedMasterWallets}
-              baseCurrencyBalances={baseCurrencyBalances}
-              baseCurrency={baseCurrency}
-              onExportSeedPhrase={setExportSeedPhraseMasterWallet}
-              onDeleteMasterWallet={handleDeleteMasterWallet}
-              showToast={showToast}
-            />
-          )}
-
-          {/* Toolbar with integrated stats */}
-          <WalletToolbar
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            showViewModeDropdown={showViewModeDropdown}
-            setShowViewModeDropdown={setShowViewModeDropdown}
-            viewModeDropdownRef={viewModeDropdownRef}
-            showArchived={showArchived}
-            setShowArchived={setShowArchived}
-            onCreateWallet={() => setIsCreateWalletModalOpen(true)}
-            onImportWallet={() => setIsImportModalOpen(true)}
-            onDownloadAll={() => downloadAllWallets(wallets)}
-            onCleanup={() =>
-              handleCleanupWallets(
-                wallets,
-                baseCurrencyBalances,
-                new Map<string, number>(),
-                setWallets,
-                showToast
-              )
-            }
-            onDistribute={() => setActiveModal("distribute")}
-            onMixer={() => setActiveModal("mixer")}
-            onConsolidate={() => setActiveModal("consolidate")}
-            onTransfer={() => setActiveModal("transfer")}
-            onBurn={() => {
-              setBurnTokenAddress("");
-              setActiveModal("burn");
-            }}
-            onDeposit={() => setActiveModal("deposit")}
-            connection={connection}
-            baseCurrency={baseCurrency}
-            setSelectedWallets={setSelectedWallets}
-            // Stats props
-            walletsCount={filteredAndSortedWallets.length}
-            totalWallets={nonArchivedWallets.length}
+        <div className="relative z-10 w-full flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* V2 Header */}
+          <WalletsHeader
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            walletCount={filteredAndSortedWallets.length}
             totalBalance={formatBaseCurrencyBalance(totalSOL, baseCurrency)}
-            activeCount={showArchived ? archivedCount : activeWallets}
-            // Refresh
             onRefresh={refreshBalances}
             isRefreshing={isRefreshing}
-          />
-
-          {/* Table Container */}
-          <WalletTable
-            wallets={wallets}
-            filteredAndSortedWallets={filteredAndSortedWallets}
-            selectedWallets={selectedWallets}
-            baseCurrencyBalances={baseCurrencyBalances}
-            baseCurrency={baseCurrency}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            showAddressSearch={showAddressSearch}
-            setShowAddressSearch={setShowAddressSearch}
-            labelSearchTerm={labelSearchTerm}
-            setLabelSearchTerm={setLabelSearchTerm}
-            showLabelSearch={showLabelSearch}
-            setShowLabelSearch={setShowLabelSearch}
-            editingLabel={editingLabel}
-            editLabelValue={editLabelValue}
-            editingCategory={editingCategory}
-            draggedWalletId={draggedWalletId}
-            dragOverWalletId={dragOverWalletId}
-            onSort={handleSort}
-            onToggleSelection={toggleWalletSelection}
-            onSelectAll={selectAllVisible}
-            onClearSelection={clearSelection}
-            onStartEditingLabel={startEditingLabel}
-            onSaveLabel={saveLabel}
-            onCancelEditingLabel={cancelEditingLabel}
-            onLabelKeyPress={handleLabelKeyPress}
-            setEditLabelValue={setEditLabelValue}
-            setEditingCategory={setEditingCategory}
-            onSaveCategory={saveCategory}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}
-            onArchiveWallet={archiveWallet}
-            onUnarchiveWallet={unarchiveWallet}
-            onDeleteWallet={handleDeleteWallet}
-            onDownloadPrivateKey={downloadPrivateKey}
-            onCopyToClipboard={(text) => copyToClipboard(text, showToast)}
+            onCreateWallet={() => setIsCreateWalletModalOpen(true)}
+            onImportWallet={() => setIsImportModalOpen(true)}
+            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+            onOpenGroupDrawer={() => setIsGroupDrawerOpen(true)}
+            categorySettings={categorySettings}
+            onUpdateCategorySettings={handleSaveCategorySettings}
             onOpenQuickTradeSettings={() => {
               setEditingWalletQuickTrade(null);
               setIsQuickTradeModalOpen(true);
             }}
-            onEditWalletQuickTrade={(wallet) => {
-              setEditingWalletQuickTrade(wallet);
-              setIsQuickTradeModalOpen(true);
-            }}
-            categorySettings={categorySettings}
-            onUpdateCategorySettings={handleSaveCategorySettings}
-            onSaveWalletCustomSettings={handleSaveWalletCustomSettings}
-            onCreateWallet={() => setIsCreateWalletModalOpen(true)}
-            onImportWallet={() => setIsImportModalOpen(true)}
+            groups={groups}
+            activeGroupId={activeGroupId}
+            onGroupChange={handleGroupChange}
+            isConnected={!!connection}
           />
 
-          {/* Bulk Actions - Fixed bottom slide-up panel */}
-          <BulkActionsPanel
+          {/* Filter Tabs */}
+          <div className="px-4 py-3 border-b border-app-primary-15">
+            <FilterTabs
+              activeTab={activeFilterTab}
+              onTabChange={(tab) => {
+                setActiveFilterTab(tab);
+                if (tab === "archived") {
+                  setShowArchived(true);
+                } else {
+                  setShowArchived(false);
+                }
+              }}
+              counts={{
+                all: wallets.filter((w) => !w.isArchived).length,
+                hd: wallets.filter((w) => !w.isArchived && w.source === "hd-derived").length,
+                imported: wallets.filter((w) => !w.isArchived && (w.source === "imported" || !w.source)).length,
+                archived: wallets.filter((w) => w.isArchived).length,
+              }}
+            />
+          </div>
+
+          {/* Wallet Grid */}
+          <div className="flex-1 overflow-y-auto p-4 pb-24">
+            <WalletGridView
+              wallets={filteredAndSortedWallets}
+              groups={groups}
+              selectedWallets={selectedWallets}
+              baseCurrencyBalances={baseCurrencyBalances}
+              editingLabel={editingLabel}
+              editLabelValue={editLabelValue}
+              draggedWalletId={draggedWalletId}
+              dragOverWalletId={dragOverWalletId}
+              categorySettings={categorySettings}
+              onToggleSelection={toggleWalletSelection}
+              onStartEditingLabel={startEditingLabel}
+              onSaveLabel={saveLabel}
+              onCancelEditingLabel={cancelEditingLabel}
+              onLabelKeyPress={handleLabelKeyPress}
+              setEditLabelValue={setEditLabelValue}
+              onSaveCategory={saveCategory}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+              onArchiveWallet={archiveWallet}
+              onUnarchiveWallet={unarchiveWallet}
+              onDeleteWallet={handleDeleteWallet}
+              onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
+              onEditWalletQuickTrade={(wallet: WalletType) => {
+                setEditingWalletQuickTrade(wallet);
+                setIsQuickTradeModalOpen(true);
+              }}
+              onSaveWalletCustomSettings={handleSaveWalletCustomSettings}
+              onMoveWalletToGroup={moveWalletToGroup}
+            />
+          </div>
+
+          {/* Selection Footer */}
+          <SelectionFooter
             selectedCount={selectedWallets.size}
             showArchived={showArchived}
-            onDownload={downloadSelectedWallets}
-            onArchive={archiveSelectedWallets}
-            onUnarchive={unarchiveSelectedWallets}
-            onDelete={deleteSelectedWallets}
-            onClearSelection={() => setSelectedWallets(new Set())}
+            groups={groups}
+            onClearSelection={clearSelection}
+            onExportSelected={downloadSelectedWallets}
+            onArchiveSelected={archiveSelectedWallets}
+            onUnarchiveSelected={unarchiveSelectedWallets}
+            onDeleteSelected={deleteSelectedWallets}
+            onMoveToGroup={(groupId) => {
+              selectedWallets.forEach((walletId) => {
+                moveWalletToGroup(walletId, groupId);
+              });
+              showToast(`Moved ${selectedWallets.size} wallet(s) to group`, "success");
+              clearSelection();
+            }}
+          />
+
+          {/* Command Palette */}
+          <CommandPalette
+            isOpen={isCommandPaletteOpen}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            commands={createWalletCommands({
+              onCreateWallet: () => setIsCreateWalletModalOpen(true),
+              onImportWallet: () => setIsImportModalOpen(true),
+              onCreateMasterWallet: () => setIsCreateMasterWalletModalOpen(true),
+              onImportMasterWallet: () => setIsImportMasterWalletModalOpen(true),
+              onDistribute: () => setActiveModal("distribute"),
+              onConsolidate: () => setActiveModal("consolidate"),
+              onTransfer: () => setActiveModal("transfer"),
+              onDeposit: () => setActiveModal("deposit"),
+              onExportKeys: () => downloadAllWallets(wallets),
+              onBurnTokens: () => {
+                setBurnTokenAddress("");
+                setActiveModal("burn");
+              },
+              onCleanup: () =>
+                handleCleanupWallets(
+                  wallets,
+                  baseCurrencyBalances,
+                  new Map<string, number>(),
+                  setWallets,
+                  showToast
+                ),
+              onQuickTradeSettings: () => {
+                setEditingWalletQuickTrade(null);
+                setIsQuickTradeModalOpen(true);
+              },
+              onManageGroups: () => setIsGroupDrawerOpen(true),
+              onToggleArchived: () => {
+                const newTab = activeFilterTab === "archived" ? "all" : "archived";
+                setActiveFilterTab(newTab);
+                setShowArchived(newTab === "archived");
+              },
+              onRefresh: () => { void refreshBalances(); },
+            })}
+          />
+
+          {/* Group Drawer */}
+          <GroupDrawer
+            isOpen={isGroupDrawerOpen}
+            onClose={() => setIsGroupDrawerOpen(false)}
+            groups={groups}
+            activeGroupId={activeGroupId}
+            walletCounts={new Map(groups.map((g) => [g.id, wallets.filter((w) => (w.groupId || DEFAULT_GROUP_ID) === g.id && !w.isArchived).length]))}
+            onGroupChange={(groupId) => {
+              handleGroupChange(groupId);
+              setIsGroupDrawerOpen(false);
+            }}
+            onCreateGroup={createGroup}
+            onRenameGroup={renameGroup}
+            onDeleteGroup={deleteGroup}
+            onUpdateGroupColor={updateGroupColor}
+            masterWallets={masterWallets}
+            wallets={wallets}
+            baseCurrencyBalances={baseCurrencyBalances}
+            baseCurrency={baseCurrency}
+            expandedMasterWallets={expandedMasterWallets}
+            onToggleMasterExpansion={toggleMasterWalletExpansion}
+            onCreateMasterWallet={() => setIsCreateMasterWalletModalOpen(true)}
+            onImportMasterWallet={() => setIsImportMasterWalletModalOpen(true)}
+            onExportSeedPhrase={setExportSeedPhraseMasterWallet}
+            onDeleteMasterWallet={handleDeleteMasterWallet}
+            onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
           />
         </div>
 

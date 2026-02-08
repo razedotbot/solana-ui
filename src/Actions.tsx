@@ -6,8 +6,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Clock,
-  Check,
-  Zap,
 } from "lucide-react";
 import { brand } from "./utils/brandConfig";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
@@ -15,11 +13,12 @@ import type { WalletType, IframeData } from "./utils/types";
 import type { BaseCurrencyConfig } from "./utils/constants";
 import { useToast } from "./utils/hooks";
 import { countActiveWallets } from "./utils/wallet";
-import { toggleWallet, getWalletDisplayName } from "./utils/wallet";
+import { toggleWallet } from "./utils/wallet";
 import { saveWalletsToCookies } from "./utils/storage";
-import { formatTokenBalance } from "./utils/formatting";
-import TradingCard from "./components/TradingForm";
 import FloatingTradingCard from "./components/FloatingTradingCard";
+import TradingCard from "./components/TradingForm";
+import WalletSelectorPopup from "./components/WalletSelectorPopup";
+import { PageBackground } from "./components/PageBackground";
 import { getLatestTrades, type TradeHistoryEntry } from "./utils/trading";
 
 import { executeTrade } from "./utils/trading";
@@ -471,175 +470,6 @@ const LatestTrades: React.FC<{
 });
 LatestTrades.displayName = "LatestTrades";
 
-// Wallet Selector Popup Component for Actions page
-interface ActionsWalletSelectorProps {
-  wallets: WalletType[];
-  baseCurrencyBalances: Map<string, number>;
-  tokenBalances: Map<string, number>;
-  baseCurrency: BaseCurrencyConfig;
-  anchorRef: React.RefObject<HTMLDivElement>;
-  onClose: () => void;
-  onToggleWallet: (id: number) => void;
-  onSelectAll: () => void;
-  onSelectAllWithBalance: () => void;
-}
-
-const ActionsWalletSelector: React.FC<ActionsWalletSelectorProps> = ({
-  wallets,
-  baseCurrencyBalances,
-  tokenBalances,
-  baseCurrency: _baseCurrency,
-  anchorRef,
-  onClose,
-  onToggleWallet,
-  onSelectAll,
-  onSelectAllWithBalance,
-}) => {
-  const popupRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, right: 0 });
-
-  // Calculate position based on anchor location
-  useEffect(() => {
-    if (anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
-      });
-    }
-  }, [anchorRef]);
-
-  // Handle click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent): void => {
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(e.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose, anchorRef]);
-
-  return (
-    <div
-      ref={popupRef}
-      className="fixed z-[9999]"
-      style={{
-        top: position.top,
-        right: position.right,
-      }}
-    >
-      <div className="bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 min-w-[320px] max-h-[400px] overflow-hidden">
-        {/* Header with Select All buttons */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
-          <button
-            onClick={onSelectAll}
-            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
-          >
-            Select All
-          </button>
-          <button
-            onClick={onSelectAllWithBalance}
-            className="px-2 py-1 text-[10px] font-mono bg-app-primary-80 border border-app-primary-40 text-app-secondary rounded hover:bg-app-primary-20 hover:color-primary transition-colors"
-          >
-            Select All with Balance
-          </button>
-        </div>
-
-        {/* Wallet List */}
-        <div className="overflow-y-auto max-h-[340px]">
-          {wallets
-            .filter((w) => !w.isArchived)
-            .map((wallet) => {
-              const solBal = baseCurrencyBalances.get(wallet.address) || 0;
-              const tokenBal = tokenBalances.get(wallet.address) || 0;
-
-              return (
-                <div
-                  key={wallet.id}
-                  onClick={() => onToggleWallet(wallet.id)}
-                  className={`
-                  flex items-center justify-between px-3 py-2 cursor-pointer transition-all duration-200
-                  border-b border-app-primary-20 last:border-b-0
-                  ${
-                    wallet.isActive
-                      ? "bg-primary-20 border-l-2 border-l-primary"
-                      : "hover:bg-app-primary-60"
-                  }
-                `}
-                >
-                  {/* Selection indicator & wallet info */}
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {/* Selection checkbox */}
-                    <div
-                      className={`
-                    w-4 h-4 rounded border flex items-center justify-center flex-shrink-0
-                    ${
-                      wallet.isActive
-                        ? "bg-app-primary-color border-app-primary-color"
-                        : "bg-transparent border-app-primary-40"
-                    }
-                  `}
-                    >
-                      {wallet.isActive && (
-                        <Check size={10} className="text-black" />
-                      )}
-                    </div>
-
-                    {/* Wallet name and address */}
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span
-                        className={`text-xs font-mono truncate ${wallet.isActive ? "text-app-primary" : "text-app-secondary"}`}
-                      >
-                        {getWalletDisplayName(wallet)}
-                      </span>
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
-                        <Zap size={8} className="text-app-secondary-40" />
-                        <span>Off</span>
-                        <span className="text-app-primary-40">
-                          {wallet.address.slice(0, 5)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Balances */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* SOL Balance */}
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-3 bg-gradient-to-b from-[#9945FF] to-[#14F195] rounded-sm"></div>
-                      <span
-                        className={`text-xs font-mono ${solBal > 0 ? "text-app-primary" : "text-app-secondary-60"}`}
-                      >
-                        {solBal.toFixed(3)}
-                      </span>
-                    </div>
-
-                    {/* Token Balance */}
-                    <div className="flex items-center gap-1">
-                      <div className="w-1.5 h-3 bg-app-primary-color rounded-sm"></div>
-                      <span
-                        className={`text-xs font-mono ${tokenBal > 0 ? "color-primary" : "text-app-secondary-60"}`}
-                      >
-                        {formatTokenBalance(tokenBal)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export const ActionsPage: React.FC<ActionsPageProps> = ({
   tokenAddress,
   setTokenAddress,
@@ -653,7 +483,10 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   iframeData,
 }) => {
   // State management
-  const [buyAmount, setBuyAmount] = useState("");
+  const [buyAmount, setBuyAmount] = useState(() => {
+    const saved = localStorage.getItem("quickBuyAmount");
+    return saved || "";
+  });
   const [sellAmount, setSellAmount] = useState("");
   const [selectedDex, setSelectedDex] = useState("auto"); // Default to auto
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -661,7 +494,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const { showToast } = useToast();
 
   // Auto-buy settings
-  const [autoBuyAmount, setAutoBuyAmount] = useState("0.01"); // Default SOL amount for auto-buy
   const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true); // Auto redirect to token after buy
 
   // Floating card state
@@ -735,21 +567,14 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     saveWalletsToCookies(updatedWallets);
   }, [wallets, baseCurrencyBalances, tokenBalances, setWallets, showToast]);
 
-  // Handler to open floating card
-  const handleOpenFloating = useCallback(() => {
-    // Recalculate center position when opening
-    const cardWidth = 320;
-    const cardHeight = 400;
-    setFloatingCardPosition({
-      x: Math.max(0, (window.innerWidth - cardWidth) / 2),
-      y: Math.max(0, (window.innerHeight - cardHeight) / 2),
-    });
-    setIsFloatingCardOpen(true);
-  }, []);
-
   // Handler to close floating card
   const handleCloseFloating = useCallback(() => {
     setIsFloatingCardOpen(false);
+  }, []);
+
+  // Handler to open floating card
+  const handleOpenFloating = useCallback(() => {
+    setIsFloatingCardOpen(true);
   }, []);
 
   const handleTradeSubmit = useCallback(
@@ -794,18 +619,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         );
 
         if (result.success) {
-          showToast(
-            `${isBuyMode ? "Buy" : "Sell"} transactions submitted successfully`,
-            "success",
-          );
+          showToast(`${isBuyMode ? "Buy" : "Sell"} successful`, "success");
         } else {
-          showToast(
-            `${isBuyMode ? "Buy" : "Sell"} failed: ${result.error}`,
-            "error",
-          );
+          showToast(result.error || `${isBuyMode ? "Buy" : "Sell"} failed`, "error");
         }
       } catch (error) {
-        console.error(`Trading error:`, error);
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         showToast(`Error: ${errorMessage}`, "error");
@@ -873,7 +691,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             now - lastProcessed.timestamp < 2000
           ) {
             // This is a duplicate message, ignore it
-            console.info("Ignoring duplicate TOKEN_BUY message for", tokenMint);
             return;
           }
 
@@ -889,11 +706,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
               activeWallets,
               true,
               "auto",
-              autoBuyAmount,
+              buyAmount,
               undefined,
               tokenMint,
             );
-            showToast(`Quick buying ${autoBuyAmount} SOL`, "success");
+            showToast(`Quick buying ${buyAmount} SOL`, "success");
 
             // Auto redirect to token if enabled
             if (autoRedirectEnabled && setTokenAddress) {
@@ -905,10 +722,6 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             showToast("No active wallets", "error");
           }
         } else {
-          console.error(
-            "TOKEN_BUY message missing token identifier. Available properties:",
-            Object.keys(data),
-          );
           showToast("Invalid token", "error");
         }
       }
@@ -923,13 +736,20 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     };
   }, [
     tokenAddress,
-    autoBuyAmount,
+    buyAmount,
     autoRedirectEnabled,
     wallets,
     handleTradeSubmit,
     showToast,
     setTokenAddress,
   ]);
+
+  // Save buyAmount to localStorage when it changes
+  useEffect(() => {
+    if (buyAmount) {
+      localStorage.setItem("quickBuyAmount", buyAmount);
+    }
+  }, [buyAmount]);
 
   // Send QUICKBUY_ACTIVATE to iframe when component loads without token set
   useEffect(() => {
@@ -953,161 +773,17 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto bg-app-primary p-4 md:p-6 pb-32 relative min-h-full">
-      {/* Background effects - keeping original */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* Grid background */}
-        <div className="absolute inset-0 bg-app-primary opacity-90">
-          <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent"></div>
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `
-                linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)
-              `,
-              backgroundSize: "20px 20px",
-              backgroundPosition: "center center",
-            }}
-          ></div>
-        </div>
+      <PageBackground />
 
-        {/* Glowing corner accents */}
-        <div className="absolute top-0 left-0 w-32 h-32 opacity-20">
-          <div className="absolute top-0 left-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-          <div className="absolute top-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-        </div>
-        <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
-          <div className="absolute top-0 right-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-          <div className="absolute top-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-        </div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 opacity-20">
-          <div className="absolute bottom-0 left-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-          <div className="absolute bottom-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-        </div>
-        <div className="absolute bottom-0 right-0 w-32 h-32 opacity-20">
-          <div className="absolute bottom-0 right-0 w-px h-16 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-          <div className="absolute bottom-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
-        {/* Trading Card - only show when token is selected, otherwise show auto-buy settings */}
-        {tokenAddress ? (
-          <TradingCard
-            tokenAddress={tokenAddress}
-            wallets={wallets}
-            setWallets={setWallets}
-            selectedDex={selectedDex}
-            setSelectedDex={setSelectedDex}
-            isDropdownOpen={isDropdownOpen}
-            setIsDropdownOpen={setIsDropdownOpen}
-            buyAmount={buyAmount}
-            setBuyAmount={setBuyAmount}
-            sellAmount={sellAmount}
-            setSellAmount={setSellAmount}
-            handleTradeSubmit={handleTradeSubmit}
-            isLoading={isLoading}
-            countActiveWallets={countActiveWallets}
-            currentMarketCap={currentMarketCap}
-            baseCurrencyBalances={baseCurrencyBalances}
-            tokenBalances={tokenBalances}
-            baseCurrency={baseCurrency}
-            solPrice={iframeData?.solPrice ?? null}
-            onOpenFloating={handleOpenFloating}
-            isFloatingCardOpen={isFloatingCardOpen}
-          />
-        ) : (
-          <div className="relative overflow-hidden rounded-xl shadow-xl bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm p-6 border border-app-primary-20">
-            {/*  corner accents */}
-            <div className="absolute top-0 left-0 w-24 h-24 pointer-events-none">
-              <div className="absolute top-0 left-0 w-px h-8 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-              <div className="absolute top-0 left-0 w-8 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-            </div>
-            <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none">
-              <div className="absolute top-0 right-0 w-px h-8 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-              <div className="absolute top-0 right-0 w-8 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-            </div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 pointer-events-none">
-              <div className="absolute bottom-0 left-0 w-px h-8 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-              <div className="absolute bottom-0 left-0 w-8 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-            </div>
-            <div className="absolute bottom-0 right-0 w-24 h-24 pointer-events-none">
-              <div className="absolute bottom-0 right-0 w-px h-8 bg-gradient-to-t from-app-primary-color to-transparent"></div>
-              <div className="absolute bottom-0 right-0 w-8 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-            </div>
-            <div className="space-y-6">
-              {/* SOL amount input */}
-              <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
-                {/*  corner accents - smaller version */}
-                <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
-                  <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-                  <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
-                </div>
-                <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none opacity-60">
-                  <div className="absolute top-0 right-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
-                  <div className="absolute top-0 right-0 w-4 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
-                </div>
-
-                <div className="text-app-secondary font-mono text-xs tracking-wide mb-3 flex items-center">
-                  <span className="mr-2 text-app-primary-color">⟁</span>
-                  <span>SOL AMOUNT</span>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={autoBuyAmount}
-                    onChange={(e) => setAutoBuyAmount(e.target.value)}
-                    min="0.001"
-                    step="0.001"
-                    className="w-full px-2 py-2 bg-app-primary-80-alpha border border-app-primary-40 rounded-lg
-                           text-app-primary placeholder-app-secondary-60 font-mono text-sm
-                           focus:outline-none focus-border-primary focus:ring-1 focus:ring-app-primary-40
-                           transition-all duration-300 shadow-inner-black-80
-                           disabled:opacity-50 disabled:cursor-not-allowed"
-                    placeholder="Enter SOL amount"
-                  />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-app-primary-color text-xs font-mono font-bold">
-                    SOL
-                  </div>
-                </div>
-
-                {/* Auto redirect toggle - thin flag */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-app-primary-20">
-                  <SwitchPrimitive.Root
-                    checked={autoRedirectEnabled}
-                    onCheckedChange={setAutoRedirectEnabled}
-                    className={`
-                      peer inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full
-                      border-2 border-app-primary-40 transition-colors duration-300
-                      focus-visible:outline-none focus-visible:ring-2
-                      focus-visible:ring-app-primary-color focus-visible:ring-offset-2
-                      focus-visible:ring-offset-app-primary disabled:cursor-not-allowed
-                      disabled:opacity-50 data-[state=checked]:bg-app-primary-color data-[state=unchecked]:bg-app-secondary
-                      relative overflow-hidden
-                    `}
-                  >
-                    <SwitchPrimitive.Thumb
-                      className={`
-                        pointer-events-none block h-3 w-3 rounded-full
-                        bg-white shadow-lg ring-0 transition-transform
-                        data-[state=checked]:translate-x-3 data-[state=checked]:bg-app-primary
-                        data-[state=unchecked]:translate-x-0 data-[state=unchecked]:bg-app-secondary-color
-                      `}
-                    />
-                  </SwitchPrimitive.Root>
-                  <div className="flex items-center gap-1.5 text-app-secondary-60 text-[10px] font-mono">
-                    <span className="text-app-primary-color">⟁</span>
-                    <span>Auto redirect to token after buy</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Active wallets info - Clickable */}
-              <div
-                ref={activeWalletsRef}
-                onClick={() => setShowWalletSelector(!showWalletSelector)}
-                className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden cursor-pointer hover:border-app-primary-60 transition-all duration-200"
+      {/* Main Content */}
+      <div className="relative z-10 max-w-4xl mx-auto space-y-6">
+        {!tokenAddress && (
+          <div className="space-y-4">
+            {/* Active wallets info - Clickable */}
+            <div
+              ref={activeWalletsRef}
+              onClick={() => setShowWalletSelector(!showWalletSelector)}
+              className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden cursor-pointer hover:border-app-primary-60 transition-all duration-200"
               >
                 {/*  corner accents - smaller version */}
                 <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
@@ -1142,7 +818,96 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 )}
               </div>
             </div>
+        )}
+
+        {/* Quick Buy Form - Only show when no token selected */}
+        {!tokenAddress && (
+          <div className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden">
+            {/* Corner accents - smaller version */}
+            <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
+              <div className="absolute top-0 left-0 w-px h-4 bg-gradient-to-b from-app-primary-color to-transparent"></div>
+              <div className="absolute top-0 left-0 w-4 h-px bg-gradient-to-r from-app-primary-color to-transparent"></div>
+            </div>
+            <div className="absolute bottom-0 right-0 w-16 h-16 pointer-events-none opacity-60">
+              <div className="absolute bottom-0 right-0 w-px h-4 bg-gradient-to-t from-app-primary-color to-transparent"></div>
+              <div className="absolute bottom-0 right-0 w-4 h-px bg-gradient-to-l from-app-primary-color to-transparent"></div>
+            </div>
+
+            {/* Header with SOL Amount label and Auto Redirect switch */}
+            <div className="text-app-secondary font-mono text-xs tracking-wide mb-3 flex items-center justify-between">
+              <div className="flex items-center">
+                <span className="mr-2 text-app-primary-color">⟁</span>
+                <span>SOL AMOUNT</span>
+              </div>
+
+              {/* Auto Redirect Switch */}
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <span className={`text-[10px] transition-colors ${autoRedirectEnabled ? 'text-app-primary-color' : 'text-app-secondary-60 group-hover:text-app-secondary'}`}>
+                  Auto redirect
+                </span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={autoRedirectEnabled}
+                    onChange={(e) => setAutoRedirectEnabled(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <div className="w-8 h-5 bg-app-secondary border border-app-primary-30 rounded-full
+                                peer-checked:bg-gradient-to-r peer-checked:from-success peer-checked:to-success-alt
+                                peer-checked:border-success transition-all duration-200
+                                peer-checked:shadow-md peer-checked:shadow-success-40"></div>
+                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full
+                                transition-all duration-200 peer-checked:translate-x-3
+                                shadow-md peer-checked:shadow-lg"></div>
+                </div>
+              </label>
+            </div>
+
+            {/* SOL Amount Input */}
+            <div className="relative">
+              <input
+                type="number"
+                value={buyAmount}
+                onChange={(e) => setBuyAmount(e.target.value)}
+                placeholder="0.01"
+                step="0.01"
+                min="0"
+                className="w-full bg-app-primary border border-app-primary-40 rounded px-4 py-2
+                         text-app-primary font-mono focus:outline-none focus:border-app-primary-color
+                         transition-colors text-sm"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-app-secondary-60 font-mono text-sm">
+                SOL
+              </span>
+            </div>
           </div>
+        )}
+
+        {/* Trading Card - Show when token is selected */}
+        {tokenAddress && (
+          <TradingCard
+            tokenAddress={tokenAddress}
+            wallets={wallets}
+            setWallets={setWallets}
+            selectedDex={selectedDex}
+            setSelectedDex={setSelectedDex}
+            isDropdownOpen={isDropdownOpen}
+            setIsDropdownOpen={setIsDropdownOpen}
+            buyAmount={buyAmount}
+            setBuyAmount={setBuyAmount}
+            sellAmount={sellAmount}
+            setSellAmount={setSellAmount}
+            handleTradeSubmit={handleTradeSubmit}
+            isLoading={isLoading}
+            countActiveWallets={countActiveWallets}
+            currentMarketCap={currentMarketCap}
+            baseCurrencyBalances={baseCurrencyBalances}
+            tokenBalances={tokenBalances}
+            baseCurrency={baseCurrency}
+            onOpenFloating={handleOpenFloating}
+            isFloatingCardOpen={isFloatingCardOpen}
+            solPrice={iframeData?.solPrice || null}
+          />
         )}
 
         {/* Live Data Section */}
@@ -1275,39 +1040,37 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       </div>
 
       {/* Floating Trading Card */}
-      {tokenAddress && (
-        <FloatingTradingCard
-          isOpen={isFloatingCardOpen}
-          onClose={handleCloseFloating}
-          position={floatingCardPosition}
-          onPositionChange={setFloatingCardPosition}
-          isDragging={isFloatingCardDragging}
-          onDraggingChange={setIsFloatingCardDragging}
-          tokenAddress={tokenAddress}
-          wallets={wallets}
-          setWallets={setWallets}
-          selectedDex={selectedDex}
-          setSelectedDex={setSelectedDex}
-          isDropdownOpen={isDropdownOpen}
-          setIsDropdownOpen={setIsDropdownOpen}
-          buyAmount={buyAmount}
-          setBuyAmount={setBuyAmount}
-          sellAmount={sellAmount}
-          setSellAmount={setSellAmount}
-          handleTradeSubmit={handleFloatingTradeSubmit}
-          isLoading={isLoading}
-          countActiveWallets={countActiveWallets}
-          currentMarketCap={currentMarketCap}
-          baseCurrencyBalances={baseCurrencyBalances}
-          tokenBalances={tokenBalances}
-        />
-      )}
+      <FloatingTradingCard
+        isOpen={isFloatingCardOpen}
+        onClose={handleCloseFloating}
+        position={floatingCardPosition}
+        onPositionChange={setFloatingCardPosition}
+        isDragging={isFloatingCardDragging}
+        onDraggingChange={setIsFloatingCardDragging}
+        tokenAddress={tokenAddress}
+        wallets={wallets}
+        setWallets={setWallets}
+        selectedDex={selectedDex}
+        setSelectedDex={setSelectedDex}
+        isDropdownOpen={isDropdownOpen}
+        setIsDropdownOpen={setIsDropdownOpen}
+        buyAmount={buyAmount}
+        setBuyAmount={setBuyAmount}
+        sellAmount={sellAmount}
+        setSellAmount={setSellAmount}
+        handleTradeSubmit={handleFloatingTradeSubmit}
+        isLoading={isLoading}
+        countActiveWallets={countActiveWallets}
+        currentMarketCap={currentMarketCap}
+        baseCurrencyBalances={baseCurrencyBalances}
+        tokenBalances={tokenBalances}
+      />
 
       {/* Wallet Selector Popup - Rendered via Portal when no token is set */}
       {!tokenAddress &&
         showWalletSelector &&
         createPortal(
-          <ActionsWalletSelector
+          <WalletSelectorPopup
             wallets={wallets}
             baseCurrencyBalances={baseCurrencyBalances}
             tokenBalances={tokenBalances}

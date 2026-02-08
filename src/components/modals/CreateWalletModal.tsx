@@ -149,16 +149,12 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
     }
 
     if (prefix && !isValidBase58(prefix)) {
-      setError(
-        "Prefix contains invalid characters. Valid: 1-9, A-H, J-N, P-Z, a-k, m-z",
-      );
+      setError("Prefix contains invalid characters");
       return;
     }
 
     if (suffix && !isValidBase58(suffix)) {
-      setError(
-        "Suffix contains invalid characters. Valid: 1-9, A-H, J-N, P-Z, a-k, m-z",
-      );
+      setError("Suffix contains invalid characters");
       return;
     }
 
@@ -251,8 +247,8 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       await navigator.clipboard.writeText(text);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
+    } catch (ignore) {
+      // Clipboard error, ignore
     }
   };
 
@@ -295,8 +291,8 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
         await onCreateWallet(wallet);
         successCount++;
         await new Promise((resolve) => setTimeout(resolve, 50));
-      } catch (err) {
-        console.error("Error adding vanity wallet:", err);
+      } catch (ignore) {
+        // Wallet creation failed, continue with others
       }
     }
 
@@ -381,8 +377,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
           if (i < newWallets.length - 1) {
             await new Promise((resolve) => setTimeout(resolve, 50));
           }
-        } catch (error) {
-          console.error("Error creating wallet:", error);
+        } catch (ignore) {
           failCount++;
         }
       }
@@ -393,7 +388,6 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
         setError(`Created ${successCount} wallet(s), ${failCount} failed`);
       }
     } catch (error) {
-      console.error("Error creating wallets:", error);
       setError(
         error instanceof Error ? error.message : "Failed to create wallets",
       );

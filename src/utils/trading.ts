@@ -27,7 +27,6 @@ export interface RateLimitState {
 
 export interface TransactionBundle {
   transactions: string[];
-  serverResponse?: unknown;
 }
 
 export interface BatchResult {
@@ -77,23 +76,9 @@ export const checkRateLimit = async (): Promise<void> => {
  * Get the base URL for trading server
  */
 export const getServerBaseUrl = (): string => {
-  const config = loadConfigFromCookies();
-
-  if (config?.tradingServerEnabled === "true" && config?.tradingServerUrl) {
-    return config.tradingServerUrl.replace(/\/+$/, "");
-  }
-
   return (
     (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || ""
   );
-};
-
-/**
- * Check if self-hosted trading server is enabled
- */
-export const isSelfHostedServer = (): boolean => {
-  const config = loadConfigFromCookies();
-  return config?.tradingServerEnabled === "true";
 };
 
 // ============================================================================
@@ -129,14 +114,12 @@ export const signTransaction = (
     }
 
     if (signers.length === 0) {
-      console.warn("[Trading] No matching signers found for transaction");
       return null;
     }
 
     transaction.sign(signers);
     return bs58.encode(transaction.serialize());
-  } catch (error) {
-    console.error("[Trading] Error signing transaction:", error);
+  } catch (ignore) {
     return null;
   }
 };
@@ -149,7 +132,6 @@ export const completeBundleSigning = (
   walletKeypairs: Keypair[],
 ): TransactionBundle => {
   if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
-    console.error("[Trading] Invalid bundle format:", bundle);
     return { transactions: [] };
   }
 
@@ -275,7 +257,7 @@ export const processBatchResults = (
   let successCount = 0;
   let failCount = 0;
 
-  bundleResults.forEach((result, index) => {
+  bundleResults.forEach((result, _index) => {
     if (result.status === "fulfilled") {
       if (result.value.success) {
         if (result.value.result) results.push(result.value.result);
@@ -284,10 +266,6 @@ export const processBatchResults = (
         failCount++;
       }
     } else {
-      console.error(
-        `[Trading] Bundle ${index + 1} promise rejected:`,
-        result.reason,
-      );
       failCount++;
     }
   });
@@ -404,10 +382,10 @@ const executeUnifiedBuy = async (
     });
 
     return await executeBuy(wallets, buyConfig);
-  } catch (error) {
+  } catch (err) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: err instanceof Error ? err.message : String(err),
     };
   }
 };
@@ -482,10 +460,10 @@ const executeUnifiedSell = async (
     });
 
     return await executeSell(wallets, sellConfig);
-  } catch (error) {
+  } catch (err) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: err instanceof Error ? err.message : String(err),
     };
   }
 };
@@ -520,10 +498,10 @@ export const executeTrade = async (
     } else {
       return await executeUnifiedSell(formattedWallets, config);
     }
-  } catch (error) {
+  } catch (err) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: err instanceof Error ? err.message : String(err),
     };
   }
 };
@@ -561,8 +539,7 @@ export const getTradeHistory = (): TradeHistoryEntry[] => {
     const history = JSON.parse(stored) as TradeHistoryEntry[];
     // Sort by timestamp descending (newest first)
     return history.sort((a, b) => b.timestamp - a.timestamp);
-  } catch (error) {
-    console.error("Error reading trade history:", error);
+  } catch (ignore) {
     return [];
   }
 };
@@ -594,8 +571,8 @@ export const addTradeHistory = (
     window.dispatchEvent(
       new CustomEvent("tradeHistoryUpdated", { detail: newEntry }),
     );
-  } catch (error) {
-    console.error("Error saving trade history:", error);
+  } catch (ignore) {
+    // Intentionally ignored
   }
 };
 
@@ -606,8 +583,8 @@ export const clearTradeHistory = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new CustomEvent("tradeHistoryUpdated"));
-  } catch (error) {
-    console.error("Error clearing trade history:", error);
+  } catch (ignore) {
+    // Intentionally ignored
   }
 };
 

@@ -18,7 +18,7 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { useToast } from "../../utils/hooks";
+import { useToast, useTokenMetadata } from "../../utils/hooks";
 import type { WalletType } from "../../utils/types";
 import { getWalletDisplayName, fetchTokenBalance } from "../../utils/wallet";
 import { loadConfigFromCookies } from "../../utils/storage";
@@ -71,6 +71,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   const [distributionMode, setDistributionMode] = useState<
     "percentage" | "amount"
   >("amount"); // How to distribute amounts
+  const { metadata: tokenMeta } = useTokenMetadata(tokenAddressInput || undefined);
 
   // States for batch transfer processing
   const [transferQueue, setTransferQueue] = useState<
@@ -163,7 +164,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
       // Validate token address
       try {
         new PublicKey(tokenAddressInput);
-      } catch {
+      } catch (ignore) {
         showToast("Invalid token address", "error");
         return;
       }
@@ -188,11 +189,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
               tokenAddressInput,
             );
             newBalances.set(wallet.address, balance);
-          } catch (error) {
-            console.error(
-              `Error fetching balance for ${wallet.address}:`,
-              error,
-            );
+          } catch (ignore) {
             newBalances.set(wallet.address, 0);
           }
         }
@@ -203,17 +200,15 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         const walletsWithBalance = Array.from(newBalances.values()).filter(
           (b) => b > 0,
         ).length;
-        showToast(
-          `Found ${walletsWithBalance} wallet(s) with token balance`,
-          "success",
-        );
-      } catch (error) {
-        console.error("Error fetching token balances:", error);
+        showToast(`Loaded balances for ${walletsWithBalance} wallets`, "success");
+      } catch (ignore) {
         showToast("Failed to fetch token balances", "error");
       } finally {
         setIsLoadingBalances(false);
       }
-    }, [tokenAddressInput, wallets, showToast]);
+    },
+    [tokenAddressInput, wallets, showToast],
+  );
 
   // Auto-fetch token balances when token address is set
   useEffect(() => {
@@ -444,7 +439,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
           completedCount++;
         } catch (error) {
-          console.error(`Transfer ${i + 1} failed:`, error);
 
           let errorMessage = "Transfer failed";
           if (error instanceof Error) {
@@ -469,7 +463,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
       // Show summary
       showToast(
-        `Batch transfer completed: ${completedCount} successful, ${failedCount} failed`,
+        `Transfers completed: ${completedCount} successful, ${failedCount} failed`,
         completedCount > 0 ? "success" : "error",
       );
 
@@ -480,8 +474,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
           onClose();
         }, 3000);
       }
-    } catch (error) {
-      console.error("Batch transfer error:", error);
+    } catch (ignore) {
       showToast("Batch transfer failed", "error");
     } finally {
       setBatchProcessing(false);
@@ -821,9 +814,12 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                         </div>
                         {tokenAddressInput && (
                           <div className="mt-1.5 flex items-center justify-between">
-                            <div className="text-xs color-primary font-mono">
+                            <div className="text-xs color-primary font-mono flex items-center gap-1.5">
                               <span className="text-app-secondary">TOKEN:</span>{" "}
-                              {formatAddress(tokenAddressInput)}
+                              {tokenMeta?.image && (
+                                <img src={tokenMeta.image} alt={tokenMeta.symbol} className="w-3.5 h-3.5 rounded-full object-cover inline-block" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                              )}
+                              {tokenMeta?.symbol ? `${tokenMeta.symbol} (${formatAddress(tokenAddressInput)})` : formatAddress(tokenAddressInput)}
                             </div>
                             {isLoadingBalances && (
                               <div className="text-xs text-app-secondary font-mono flex items-center">
@@ -983,9 +979,9 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                               </div>
                             </>
                           ) : sourceSearchTerm ? (
-                            `NO WALLETS FOUND WITH ${transferType} BALANCE > 0`
+                            <div>No matching wallets found</div>
                           ) : (
-                            `NO WALLETS AVAILABLE WITH ${transferType} BALANCE > 0`
+                            <div>No wallets available</div>
                           )}
                         </div>
                       )}
@@ -1300,7 +1296,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                               : "INITIALIZING..."}
                           </>
                         ) : (
-                          `EXECUTE BATCH (${sourceWallets.length * receiverAddresses.length} TXN)`
+                          "TRANSFER"
                         )}
                       </button>
                     </div>

@@ -167,8 +167,7 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
       } else if (importType === 'privateKey') {
         setPrivateKey(text);
       }
-    } catch (error) {
-      console.error('Failed to paste from clipboard:', error);
+    } catch (ignore) {
       setError('Failed to paste from clipboard. Please paste manually.');
     }
   };
@@ -200,7 +199,6 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
       await onImportFromFile(selectedFile);
       onClose();
     } catch (error) {
-      console.error('Error importing from file:', error);
       setError(error instanceof Error ? error.message : 'Failed to import from file');
     } finally {
       setIsProcessingFile(false);

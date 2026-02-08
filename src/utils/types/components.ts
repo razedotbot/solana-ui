@@ -276,7 +276,7 @@ export interface CalculatePNLModalProps {
 /**
  * Mobile page type
  */
-export type MobilePage = "wallets" | "chart" | "actions";
+export type MobilePage = "chart" | "actions";
 
 /**
  * Props for the Mobile Layout component
@@ -288,7 +288,6 @@ export interface MobileLayoutProps {
   setCurrentPage: (page: MobilePage) => void;
   /** Child components for each page */
   children: {
-    WalletsPage: React.ReactNode;
     Frame: React.ReactNode;
     ActionsPage: React.ReactNode;
   };

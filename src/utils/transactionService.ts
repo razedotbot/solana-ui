@@ -224,74 +224,69 @@ const sendViaRpcSequential = async (
 export const sendTransactions = async (
   transactions: string[],
 ): Promise<BundleResult> => {
-  try {
-    const config = getSendingConfig();
+  const config = getSendingConfig();
 
-    // If using server mode, send via trading server
-    if (config.sendingMode === "server") {
+  // If using server mode, send via trading server
+  if (config.sendingMode === "server") {
+    return await sendViaServer(transactions);
+  }
+
+  // Custom mode - route based on configuration
+  const isSingleTx = transactions.length === 1;
+
+  if (isSingleTx) {
+    // Single transaction routing
+    if (config.singleTxMode === "jito" && config.customJitoSingleEndpoint) {
+      return await sendViaJitoSingle(
+        transactions[0],
+        config.customJitoSingleEndpoint,
+      );
+    } else if (config.customRpcEndpoint) {
+      const signature = await sendViaRpc(
+        transactions[0],
+        config.customRpcEndpoint,
+      );
+      return createBundleResult(signature);
+    } else {
+      // Fallback to server if no custom endpoint configured
       return await sendViaServer(transactions);
     }
-
-    // Custom mode - route based on configuration
-    const isSingleTx = transactions.length === 1;
-
-    if (isSingleTx) {
-      // Single transaction routing
-      if (config.singleTxMode === "jito" && config.customJitoSingleEndpoint) {
-        return await sendViaJitoSingle(
-          transactions[0],
-          config.customJitoSingleEndpoint,
-        );
-      } else if (config.customRpcEndpoint) {
-        const signature = await sendViaRpc(
-          transactions[0],
-          config.customRpcEndpoint,
-        );
-        return createBundleResult(signature);
-      } else {
-        // Fallback to server if no custom endpoint configured
+  } else {
+    // Multiple transactions routing
+    switch (config.multiTxMode) {
+      case "bundle":
+        if (config.customJitoBundleEndpoint) {
+          return await sendViaJitoBundle(
+            transactions,
+            config.customJitoBundleEndpoint,
+          );
+        }
+        // Fallback to server if no Jito endpoint
         return await sendViaServer(transactions);
-      }
-    } else {
-      // Multiple transactions routing
-      switch (config.multiTxMode) {
-        case "bundle":
-          if (config.customJitoBundleEndpoint) {
-            return await sendViaJitoBundle(
-              transactions,
-              config.customJitoBundleEndpoint,
-            );
-          }
-          // Fallback to server if no Jito endpoint
-          return await sendViaServer(transactions);
 
-        case "parallel":
-          if (config.customRpcEndpoint) {
-            return await sendViaRpcParallel(
-              transactions,
-              config.customRpcEndpoint,
-            );
-          }
-          // Fallback to server if no RPC endpoint
-          return await sendViaServer(transactions);
+      case "parallel":
+        if (config.customRpcEndpoint) {
+          return await sendViaRpcParallel(
+            transactions,
+            config.customRpcEndpoint,
+          );
+        }
+        // Fallback to server if no RPC endpoint
+        return await sendViaServer(transactions);
 
-        case "sequential":
-          if (config.customRpcEndpoint) {
-            return await sendViaRpcSequential(
-              transactions,
-              config.customRpcEndpoint,
-            );
-          }
-          // Fallback to server if no RPC endpoint
-          return await sendViaServer(transactions);
+      case "sequential":
+        if (config.customRpcEndpoint) {
+          return await sendViaRpcSequential(
+            transactions,
+            config.customRpcEndpoint,
+          );
+        }
+        // Fallback to server if no RPC endpoint
+        return await sendViaServer(transactions);
 
-        default:
-          // Default to server
-          return await sendViaServer(transactions);
-      }
+      default:
+        // Default to server
+        return await sendViaServer(transactions);
     }
-  } catch (error) {
-    console.error("Error sending transactions:", error);
-    throw error;
   }
 };

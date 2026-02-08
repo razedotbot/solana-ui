@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, lazy, Suspense } from "react";
+import React, { useState, useCallback, useEffect, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
@@ -13,6 +13,8 @@ import {
   Rocket,
 } from "lucide-react";
 import { DeployForm } from "./DeployForm";
+import { GroupSelector } from "../wallets/GroupSelector";
+import { useWalletGroups } from "../../utils/hooks";
 
 // Left column view type
 type LeftColumnView = "wallets" | "deploy";
@@ -311,6 +313,27 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
   // Left column view state (wallets or deploy)
   const [leftColumnView, setLeftColumnView] = useState<LeftColumnView>("wallets");
 
+  // Wallet groups
+  const { groups } = useWalletGroups(wallets, setWallets);
+
+  // Active group state
+  const [activeGroupId, setActiveGroupId] = useState<string>(() => {
+    return localStorage.getItem("advanced_layout_active_group") || "all";
+  });
+
+  const handleGroupChange = (groupId: string): void => {
+    setActiveGroupId(groupId);
+    localStorage.setItem("advanced_layout_active_group", groupId);
+  };
+
+  // Filter wallets based on active group
+  const filteredWallets = useMemo(() => {
+    if (activeGroupId === "all") {
+      return wallets;
+    }
+    return wallets.filter((wallet) => wallet.groupId === activeGroupId);
+  }, [wallets, activeGroupId]);
+
   // Store advanced sizes separately so we can restore them when switching back from simple mode
   const [savedAdvancedSizes, setSavedAdvancedSizes] = useState<number[]>([25, 75]);
 
@@ -419,24 +442,31 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                 </button>
               </div>
 
-              {/* Refresh Button - Only show in wallets view */}
+              {/* Refresh & Group Selector - Only show in wallets view */}
               {leftColumnView === "wallets" && (
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing || !connection}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Refresh wallet balances"
-                >
-                  <RefreshCw
-                    size={14}
-                    className={`color-primary ${isRefreshing ? "animate-spin" : ""}`}
-                  />
-                  {viewMode === "advanced" && splitSizes[0] > 20 && (
-                    <span className="text-[10px] font-mono color-primary font-medium tracking-wider">
-                      REFRESH
-                    </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing || !connection}
+                    className="flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh wallet balances"
+                  >
+                    <RefreshCw
+                      size={14}
+                      className={`color-primary ${isRefreshing ? "animate-spin" : ""}`}
+                    />
+                  </button>
+
+                  {/* Group Selector - right after refresh button */}
+                  {groups.length > 0 && (
+                    <GroupSelector
+                      groups={groups}
+                      activeGroupId={activeGroupId}
+                      onGroupChange={handleGroupChange}
+                      showAllOption={true}
+                    />
                   )}
-                </button>
+                </div>
               )}
             </div>
           </nav>
@@ -448,7 +478,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
               !!connection && (
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center"><RefreshCw className="animate-spin color-primary" size={20} /></div>}>
                   <WalletsPage
-                    wallets={wallets}
+                    wallets={filteredWallets}
                     setWallets={setWallets}
                     tokenAddress={tokenAddress}
                     baseCurrencyBalances={baseCurrencyBalances}

@@ -13,7 +13,6 @@ import type {
   WalletBuy,
   BundleMode,
   BuyConfig,
-  ServerResponse,
   BuyBundle,
   BuyResult,
 } from "./types";
@@ -21,7 +20,6 @@ import {
   addTradeHistory,
   checkRateLimit,
   getServerBaseUrl,
-  isSelfHostedServer,
   completeBundleSigning,
   splitLargeBundles,
   createKeypairs,
@@ -36,7 +34,6 @@ export type {
   WalletBuy,
   BundleMode,
   BuyConfig,
-  ServerResponse,
   BuyBundle,
   BuyResult,
 };
@@ -52,121 +49,98 @@ const getPartiallyPreparedTransactions = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyBundle[]> => {
-  try {
-    const appConfig = loadConfigFromCookies();
-    const baseUrl = getServerBaseUrl();
-    const selfHosted = isSelfHostedServer();
+  const appConfig = loadConfigFromCookies();
+  const baseUrl = getServerBaseUrl();
 
-    // Determine if using SOL or stablecoin as input
-    const inputMint =
-      config.inputMint ||
-      appConfig?.baseCurrencyMint ||
-      BASE_CURRENCIES.SOL.mint;
-    const isNativeSOL = inputMint === BASE_CURRENCIES.SOL.mint;
+  // Determine if using SOL or stablecoin as input
+  const inputMint =
+    config.inputMint ||
+    appConfig?.baseCurrencyMint ||
+    BASE_CURRENCIES.SOL.mint;
+  const isNativeSOL = inputMint === BASE_CURRENCIES.SOL.mint;
 
-    const requestBody: Record<string, unknown> = {
-      tokenAddress: config.tokenAddress,
-      solAmount: config.amount,
-    };
+  const requestBody: Record<string, unknown> = {
+    tokenAddress: config.tokenAddress,
+    solAmount: config.amount,
+    walletAddresses: wallets.map((wallet) => wallet.address),
+  };
 
-    // Add inputMint for non-SOL base currencies
-    if (!isNativeSOL) {
-      requestBody["inputMint"] = inputMint;
-    }
-
-    if (selfHosted) {
-      requestBody["walletPrivateKeys"] = wallets.map(
-        (wallet) => wallet.privateKey,
-      );
-    } else {
-      requestBody["walletAddresses"] = wallets.map((wallet) => wallet.address);
-    }
-
-    if (config.amounts) {
-      requestBody["amounts"] = config.amounts;
-    }
-
-    requestBody["slippageBps"] = getSlippageBps(config.slippageBps);
-
-    const fees = getFeeLamports(
-      wallets.length,
-      config.jitoTipLamports,
-      config.transactionsFeeLamports,
-    );
-    Object.assign(requestBody, fees);
-
-    // Use /v2/swap/buy for stablecoins, /v2/sol/buy for SOL
-    const endpoint = isNativeSOL
-      ? `${baseUrl}/v2/sol/buy`
-      : `${baseUrl}/v2/swap/buy`;
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    const data = (await response.json()) as ApiResponse<{
-      bundles?: Array<string[] | BuyBundle>;
-      transactions?: string[];
-      bundlesSent?: number;
-      results?: Array<Record<string, unknown>>;
-    }>;
-
-    if (!data.success) {
-      throw new Error(
-        data.error || "Failed to get partially prepared transactions",
-      );
-    }
-
-    // Handle self-hosted server response
-    if (appConfig?.tradingServerEnabled === "true" && data.data) {
-      return [
-        { transactions: [], serverResponse: data.data as ServerResponse },
-      ];
-    }
-
-    // Handle various response formats
-    if (data.data?.bundles && Array.isArray(data.data.bundles)) {
-      return data.data.bundles.map((bundle: string[] | BuyBundle) =>
-        Array.isArray(bundle) ? { transactions: bundle } : bundle,
-      );
-    }
-
-    if (data.data?.transactions && Array.isArray(data.data.transactions)) {
-      return [{ transactions: data.data.transactions }];
-    }
-
-    if (
-      "transactions" in data &&
-      Array.isArray(
-        (data as unknown as { transactions: string[] }).transactions,
-      )
-    ) {
-      return [
-        {
-          transactions: (data as unknown as { transactions: string[] })
-            .transactions,
-        },
-      ];
-    }
-
-    if (Array.isArray(data)) {
-      return [{ transactions: data as string[] }];
-    }
-
-    throw new Error("No transactions returned from backend");
-  } catch (error) {
-    console.error(
-      "[Buy] Error getting partially prepared transactions:",
-      error,
-    );
-    throw error;
+  // Add inputMint for non-SOL base currencies
+  if (!isNativeSOL) {
+    requestBody["inputMint"] = inputMint;
   }
+
+  if (config.amounts) {
+    requestBody["amounts"] = config.amounts;
+  }
+
+  requestBody["slippageBps"] = getSlippageBps(config.slippageBps);
+
+  const fees = getFeeLamports(
+    wallets.length,
+    config.jitoTipLamports,
+    config.transactionsFeeLamports,
+  );
+  Object.assign(requestBody, fees);
+
+  // Use /v2/swap/buy for stablecoins, /v2/sol/buy for SOL
+  const endpoint = isNativeSOL
+    ? `${baseUrl}/v2/sol/buy`
+    : `${baseUrl}/v2/swap/buy`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status}`);
+  }
+
+  const data = (await response.json()) as ApiResponse<{
+    bundles?: Array<string[] | BuyBundle>;
+    transactions?: string[];
+    bundlesSent?: number;
+    results?: Array<Record<string, unknown>>;
+  }>;
+
+  if (!data.success) {
+    throw new Error(
+      data.error || "Failed to get partially prepared transactions",
+    );
+  }
+
+  // Handle various response formats
+  if (data.data?.bundles && Array.isArray(data.data.bundles)) {
+    return data.data.bundles.map((bundle: string[] | BuyBundle) =>
+      Array.isArray(bundle) ? { transactions: bundle } : bundle,
+    );
+  }
+
+  if (data.data?.transactions && Array.isArray(data.data.transactions)) {
+    return [{ transactions: data.data.transactions }];
+  }
+
+  if (
+    "transactions" in data &&
+    Array.isArray(
+      (data as unknown as { transactions: string[] }).transactions,
+    )
+  ) {
+    return [
+      {
+        transactions: (data as unknown as { transactions: string[] })
+          .transactions,
+      },
+    ];
+  }
+
+  if (Array.isArray(data)) {
+    return [{ transactions: data as string[] }];
+  }
+
+  throw new Error("No transactions returned from backend");
 };
 
 // ============================================================================
@@ -218,8 +192,7 @@ const executeBuySingleMode = async (
       if (i < wallets.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, singleDelay));
       }
-    } catch (error) {
-      console.error(`[Buy] Error processing wallet ${wallet.address}:`, error);
+    } catch (ignore) {
       failedWallets++;
     }
   }
@@ -282,8 +255,7 @@ const executeBuyBatchMode = async (
       if (i < batches.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, batchDelay));
       }
-    } catch (error) {
-      console.error(`[Buy] Error processing batch ${i + 1}:`, error);
+    } catch (ignore) {
       failedBatches++;
     }
   }
@@ -302,7 +274,6 @@ const executeBuyAllInOneMode = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyResult> => {
-  const appConfig = loadConfigFromCookies();
   const partiallyPreparedBundles = await getPartiallyPreparedTransactions(
     wallets,
     config,
@@ -310,17 +281,6 @@ const executeBuyAllInOneMode = async (
 
   if (partiallyPreparedBundles.length === 0) {
     return { success: false, error: "No transactions generated." };
-  }
-
-  // Self-hosted server handles everything
-  if (appConfig?.tradingServerEnabled === "true") {
-    if (partiallyPreparedBundles[0].serverResponse) {
-      return {
-        success: true,
-        result: partiallyPreparedBundles[0].serverResponse,
-      };
-    }
-    return { success: true, result: partiallyPreparedBundles };
   }
 
   const walletKeypairs = createKeypairs(wallets);
@@ -374,11 +334,7 @@ export const executeBuy = async (
 ): Promise<BuyResult> => {
   try {
     const appConfig = loadConfigFromCookies();
-    let bundleMode = config.bundleMode || "batch";
-
-    if (appConfig?.tradingServerEnabled === "true") {
-      bundleMode = "all-in-one";
-    }
+    const bundleMode = config.bundleMode || "batch";
 
     // Get the input mint for trade history
     const inputMint =

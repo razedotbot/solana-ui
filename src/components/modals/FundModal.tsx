@@ -278,7 +278,6 @@ export const FundModal: React.FC<FundModalProps> = ({
         showToast(result.error || `${modeText} failed`, "error");
       }
     } catch (error) {
-      console.error(`${fundingMode} error:`, error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       const modeText = fundingMode === "distribute" ? "Distribution" : "Mixing";

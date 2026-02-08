@@ -67,8 +67,7 @@ const PnlCard: React.FC<PnlCardProps> = ({
         link.download = `pnl.png`;
         link.click();
       }
-    } catch (error) {
-      console.error("Failed to download image:", error);
+    } catch (ignore) {
       alert("To download this card as an image, html2canvas library would need to be installed.");
     } finally {
       setIsDownloading(false);
@@ -173,9 +172,7 @@ const PnlCard: React.FC<PnlCardProps> = ({
               </div>
             </div>
           </div>
-          
 
-          
           {/* Footer */}
            <div className="flex items-center justify-between pt-4 border-t border-app-primary-10">
              <div className="flex items-center space-x-1">

@@ -33,24 +33,14 @@ import {
 import { loadConfigFromCookies } from "../../utils/storage";
 import { addRecentToken } from "../../utils/recentTokens";
 import { getWalletDisplayName } from "../../utils/wallet";
-import type { WalletType } from "../../utils/types";
+import type { WalletType, TokenMetadataApiResponse } from "../../utils/types";
 import type { TokenMetadata } from "../deploy/types";
 import { PlatformIcons, PLATFORMS } from "../deploy/constants";
 import { MIN_WALLETS, MAX_WALLETS_ADVANCED } from "../deploy/types";
+import { PageBackground } from "../PageBackground";
 
 interface DeployFormProps {
   onTokenDeployed?: (mintAddress: string) => void;
-}
-
-interface MetadataApiResponse {
-  success: boolean;
-  metadata: {
-    tokenMint: string;
-    onChain: { name: string; symbol: string; uri: string; source: string } | null;
-    offChain: { name?: string; symbol?: string; description?: string; image?: string } | null;
-    metadataSource: string;
-    timestamp: string;
-  };
 }
 
 export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
@@ -88,13 +78,14 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
 
   // Wallet search
   const [walletSearch, setWalletSearch] = useState("");
+  const [showAllWallets, setShowAllWallets] = useState(false);
 
   // Collapsible sections
   type SectionKey = "platform" | "token" | "wallets";
   const [expandedSections, setExpandedSections] = useState<{ platform: boolean; token: boolean; wallets: boolean }>({
-    platform: true,
+    platform: false,
     token: true,
-    wallets: true,
+    wallets: false,
   });
 
   const toggleSection = (section: SectionKey): void => {
@@ -119,7 +110,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
 
   const totalSolAmount = useMemo(() =>
     selectedWallets.reduce((sum, pk) => sum + (parseFloat(walletAmounts[pk]) || 0), 0),
-    [selectedWallets, walletAmounts]
+    [selectedWallets, walletAmounts],
   );
 
   useEffect(() => {
@@ -127,6 +118,11 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
       void refreshBalances();
     }
   }, [propWallets, baseCurrencyBalances.size, refreshBalances]);
+
+  // Reset showAllWallets when search changes
+  useEffect(() => {
+    setShowAllWallets(false);
+  }, [walletSearch]);
 
   // Import metadata
   const importMetadata = async (): Promise<void> => {
@@ -137,7 +133,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
     try {
       const response = await fetch(`https://public.raze.sh/api/metadata/${mint}`);
       if (!response.ok) throw new Error("Failed to fetch");
-      const data = await response.json() as MetadataApiResponse;
+      const data = await response.json() as TokenMetadataApiResponse;
       if (!data.success || !data.metadata) throw new Error("No metadata");
       const { onChain, offChain } = data.metadata;
       setTokenData((prev) => ({
@@ -290,25 +286,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
 
   return (
     <div className="relative flex-1 flex flex-col overflow-hidden bg-app-primary h-full">
-      {/* Background - matching wallet list */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 bg-app-primary opacity-90">
-          <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent" />
-          <div className="absolute inset-0" style={{
-            backgroundImage: `linear-gradient(rgba(2, 179, 109, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(2, 179, 109, 0.05) 1px, transparent 1px)`,
-            backgroundSize: "20px 20px",
-          }} />
-        </div>
-        {/* Corner accents */}
-        <div className="absolute top-0 left-0 w-32 h-32 opacity-20">
-          <div className="absolute top-0 left-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent" />
-          <div className="absolute top-0 left-0 w-16 h-px bg-gradient-to-r from-app-primary-color to-transparent" />
-        </div>
-        <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
-          <div className="absolute top-0 right-0 w-px h-16 bg-gradient-to-b from-app-primary-color to-transparent" />
-          <div className="absolute top-0 right-0 w-16 h-px bg-gradient-to-l from-app-primary-color to-transparent" />
-        </div>
-      </div>
+      <PageBackground />
 
       {/* Sticky Header */}
       <div className="sticky top-0 bg-app-primary-99 backdrop-blur-sm border-b border-app-primary-40 z-10">
@@ -697,7 +675,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
                   Add All
                 </button>
               </div>
-              {filteredWallets.slice(0, 5).map((w) => {
+              {filteredWallets.slice(0, showAllWallets ? filteredWallets.length : 5).map((w) => {
                 const balance = baseCurrencyBalances.get(w.address) || 0;
                 return (
                   <div
@@ -716,8 +694,13 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
                 );
               })}
               {filteredWallets.length > 5 && (
-                <div className="px-3 py-1.5 text-[10px] text-app-secondary-40 font-mono text-center">
-                  +{filteredWallets.length - 5} more wallets
+                <div
+                  onClick={() => setShowAllWallets(!showAllWallets)}
+                  className="px-3 py-1.5 text-[10px] font-mono text-center cursor-pointer hover:bg-primary-08 transition-all border-b border-app-primary-15"
+                >
+                  <span className="color-primary hover:underline">
+                    {showAllWallets ? "Show less" : `+${filteredWallets.length - 5} more wallets`}
+                  </span>
                 </div>
               )}
               {filteredWallets.length === 0 && (

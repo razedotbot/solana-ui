@@ -59,9 +59,6 @@ declare global {
 }
 
 // Lazy loaded components
-const WalletsPage = lazy(() =>
-  import("./Wallets").then((module) => ({ default: module.WalletsPage })),
-);
 const Frame = lazy(() =>
   import("./Frame").then((module) => ({ default: module.Frame })),
 );
@@ -280,8 +277,8 @@ const WalletManager: React.FC = () => {
           WalletCategory,
           CategoryQuickTradeSettings
         >;
-      } catch (error) {
-        console.error("Error loading category settings:", error);
+      } catch (ignore) {
+        // Invalid JSON, use defaults
       }
     }
     // Default settings
@@ -333,8 +330,8 @@ const WalletManager: React.FC = () => {
             CategoryQuickTradeSettings
           >;
           setCategorySettings(parsed);
-        } catch (error) {
-          console.error("Error syncing category settings:", error);
+        } catch (ignore) {
+          // Invalid JSON, ignore
         }
       }
     };
@@ -436,7 +433,7 @@ const WalletManager: React.FC = () => {
     copiedAddress: string | null;
     tokenAddress: string;
     config: ConfigType;
-    currentPage: "wallets" | "chart" | "actions";
+    currentPage: "chart" | "actions";
     wallets: WalletType[];
     isRefreshing: boolean;
     connection: Connection | null;
@@ -484,7 +481,7 @@ const WalletManager: React.FC = () => {
     | { type: "SET_COPIED_ADDRESS"; payload: string | null }
     | { type: "SET_TOKEN_ADDRESS"; payload: string }
     | { type: "SET_CONFIG"; payload: ConfigType }
-    | { type: "SET_CURRENT_PAGE"; payload: "wallets" | "chart" | "actions" }
+    | { type: "SET_CURRENT_PAGE"; payload: "chart" | "actions" }
     | { type: "SET_WALLETS"; payload: WalletType[] }
     | { type: "SET_REFRESHING"; payload: boolean }
     | { type: "SET_CONNECTION"; payload: Connection | null }
@@ -542,7 +539,7 @@ const WalletManager: React.FC = () => {
     copiedAddress: null,
     tokenAddress: routeTokenAddress,
     config: contextConfig,
-    currentPage: "wallets",
+    currentPage: "chart",
     wallets: contextWallets,
     isRefreshing: false, // Always start fresh - don't inherit stale refreshing state from context
     connection: contextConnection,
@@ -705,7 +702,7 @@ const WalletManager: React.FC = () => {
         dispatch({ type: "SET_CONFIG", payload: config });
         setContextConfig(config);
       },
-      setCurrentPage: (page: "wallets" | "chart" | "actions"): void =>
+      setCurrentPage: (page: "chart" | "actions"): void =>
         dispatch({ type: "SET_CURRENT_PAGE", payload: page }),
       setWallets: (wallets: WalletType[]): void => {
         dispatch({ type: "SET_WALLETS", payload: wallets });
@@ -1124,8 +1121,8 @@ const WalletManager: React.FC = () => {
           },
         },
       );
-    } catch (error) {
-      console.error("Error refreshing balances:", error);
+    } catch (ignore) {
+      // Balance refresh error, handled in finally block
     } finally {
       // Set refreshing to false
       memoizedCallbacks.setIsRefreshing(false);
@@ -1241,33 +1238,6 @@ const WalletManager: React.FC = () => {
             currentPage={state.currentPage}
             setCurrentPage={memoizedCallbacks.setCurrentPage}
             children={{
-              WalletsPage: state.connection ? (
-                <WalletsPage
-                  wallets={state.wallets}
-                  setWallets={memoizedCallbacks.setWallets}
-                  tokenAddress={state.tokenAddress}
-                  baseCurrencyBalances={state.baseCurrencyBalances}
-                  baseCurrency={contextBaseCurrency}
-                  tokenBalances={state.tokenBalances}
-                  quickBuyEnabled={state.quickBuyEnabled}
-                  quickBuyAmount={state.quickBuyAmount}
-                  quickBuyMinAmount={state.quickBuyMinAmount}
-                  quickBuyMaxAmount={state.quickBuyMaxAmount}
-                  useQuickBuyRange={state.useQuickBuyRange}
-                  quickSellPercentage={state.quickSellPercentage}
-                  quickSellMinPercentage={state.quickSellMinPercentage}
-                  quickSellMaxPercentage={state.quickSellMaxPercentage}
-                  useQuickSellRange={state.useQuickSellRange}
-                  categorySettings={categorySettings}
-                />
-              ) : (
-                <div className="p-4 text-center text-app-secondary">
-                  <div className="loading-anim inline-block">
-                    <div className="h-4 w-4 rounded-full bg-app-primary-color mx-auto"></div>
-                  </div>
-                  <p className="mt-2 font-mono">CONNECTING TO NETWORK...</p>
-                </div>
-              ),
               Frame: (
                 <Frame
                   isLoadingChart={state.isLoadingChart}
@@ -1286,7 +1256,7 @@ const WalletManager: React.FC = () => {
               ActionsPage: (
                 <div className="h-full flex flex-col">
                   {/* Top Navigation - Mobile */}
-                  <nav className="border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
+                  <nav className="relative z-20 border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
                     <div className="flex items-center justify-between gap-2">
                       {/* Logo button that redirects to home */}
                       <button

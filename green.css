@@ -146,6 +146,48 @@
     animation: slideIn 0.5s ease-out forwards;
 }
 
+/* V2 Redesign Animations */
+@keyframes drawerSlideIn {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes drawerSlideOut {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes expandCard {
+    from {
+        max-height: 0;
+        opacity: 0;
+    }
+    to {
+        max-height: 300px;
+        opacity: 1;
+    }
+}
+
+.animate-drawer-in {
+    animation: drawerSlideIn 0.25s ease-out forwards;
+}
+
+.animate-drawer-out {
+    animation: drawerSlideOut 0.2s ease-in forwards;
+}
+
+.animate-expand {
+    animation: expandCard 0.2s ease-out forwards;
+}
+
 .scanline {
     position: relative;
 }

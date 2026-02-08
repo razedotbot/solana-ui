@@ -1,6 +1,5 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
-import { loadConfigFromCookies } from "./storage";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult as SharedBundleResult } from "./types";
 
@@ -80,16 +79,6 @@ export interface MeteoraDBCStage {
 
 export interface CreateBundle {
   transactions: string[];
-  serverResponse?: ServerResponse;
-}
-
-export interface ServerResponse {
-  success?: boolean;
-  data?: unknown;
-  error?: string;
-  bundlesSent?: number;
-  results?: Array<Record<string, unknown>>;
-  [key: string]: unknown;
 }
 
 export interface CreateResult {
@@ -156,12 +145,6 @@ const getRetryDelay = (attempt: number): number => {
 };
 
 const getBaseUrl = (): string => {
-  const config = loadConfigFromCookies();
-
-  if (config?.tradingServerEnabled === "true" && config?.tradingServerUrl) {
-    return config.tradingServerUrl.replace(/\/+$/, "");
-  }
-
   return (
     (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || ""
   );
@@ -186,7 +169,6 @@ const sendTransactionsWithResult = async (
       bundleId,
     };
   } catch (error) {
-    console.error("Error sending transactions:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -198,12 +180,10 @@ const sendTransactionsWithResult = async (
  * Wait for LUT activation
  */
 const waitForLutActivation = async (): Promise<void> => {
-  console.info("⏳ Waiting for Lookup Table activation...");
 
   // Always wait exactly 5 seconds instead of using bundle-status to confirm LUT transaction
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  console.info("✅ Lookup Table should be activated");
 };
 
 /**
@@ -212,10 +192,6 @@ const waitForLutActivation = async (): Promise<void> => {
 const sendFirstBundle = async (
   transactions: string[],
 ): Promise<SendBundleResult> => {
-  console.info(
-    `Sending first bundle with ${transactions.length} transactions (critical)...`,
-  );
-
   let attempt = 0;
   let consecutiveErrors = 0;
 
@@ -226,16 +202,11 @@ const sendFirstBundle = async (
     const result = await sendTransactionsWithResult(transactions);
 
     if (result.success) {
-      console.info(`First bundle sent successfully on attempt ${attempt + 1}`);
       return result;
     }
 
     consecutiveErrors++;
     const waitTime = getRetryDelay(attempt);
-    console.warn(
-      `First bundle attempt ${attempt + 1} failed. Retrying in ${waitTime}ms...`,
-      result.error,
-    );
     await new Promise((resolve) => setTimeout(resolve, waitTime));
 
     attempt++;
@@ -262,147 +233,116 @@ const getPartiallyPreparedTransactions = async (
   mintPrivateKey?: string;
   isAdvancedMode?: boolean;
 }> => {
-  try {
-    const appConfig = loadConfigFromCookies();
-    const baseUrl = getBaseUrl();
+  const baseUrl = getBaseUrl();
 
-    const requestBody: Record<string, unknown> = {
-      platform: config.platform,
-      token: config.token,
-    };
+  const requestBody: Record<string, unknown> = {
+    platform: config.platform,
+    token: config.token,
+    wallets: wallets.map((w) => ({
+      address: w.address,
+      amount: w.amount,
+    })),
+  };
 
-    if (appConfig?.tradingServerEnabled === "true") {
-      requestBody["wallets"] = wallets.map((w) => ({
-        privateKey: w.privateKey,
-        amount: w.amount,
-      }));
-    } else {
-      requestBody["wallets"] = wallets.map((w) => ({
-        address: w.address,
-        amount: w.amount,
-      }));
+  if (config.platform === "pumpfun") {
+    if (config.pumpType !== undefined) {
+      requestBody["pumpType"] = config.pumpType;
     }
-
-    if (config.platform === "pumpfun") {
-      if (config.pumpType !== undefined) {
-        requestBody["pumpType"] = config.pumpType;
-      }
-      if (config.pumpAdvanced !== undefined) {
-        requestBody["pumpAdvanced"] = config.pumpAdvanced;
-      }
+    if (config.pumpAdvanced !== undefined) {
+      requestBody["pumpAdvanced"] = config.pumpAdvanced;
     }
-    if (config.platform === "bonk") {
-      if (config.bonkType) {
-        requestBody["bonkType"] = config.bonkType;
-      }
-      if (config.bonkAdvanced !== undefined) {
-        requestBody["bonkAdvanced"] = config.bonkAdvanced;
-      }
-      if (config.bonkConfig) {
-        requestBody["bonkConfig"] = config.bonkConfig;
-      }
+  }
+  if (config.platform === "bonk") {
+    if (config.bonkType) {
+      requestBody["bonkType"] = config.bonkType;
     }
-    if (config.platform === "meteoraDBC" && config.meteoraDBCConfig) {
-      requestBody["meteoraDBCConfig"] = config.meteoraDBCConfig;
+    if (config.bonkAdvanced !== undefined) {
+      requestBody["bonkAdvanced"] = config.bonkAdvanced;
     }
-    if (config.platform === "meteoraCPAMM" && config.meteoraCPAMMConfig) {
-      requestBody["meteoraCPAMMConfig"] = config.meteoraCPAMMConfig;
+    if (config.bonkConfig) {
+      requestBody["bonkConfig"] = config.bonkConfig;
     }
+  }
+  if (config.platform === "meteoraDBC" && config.meteoraDBCConfig) {
+    requestBody["meteoraDBCConfig"] = config.meteoraDBCConfig;
+  }
+  if (config.platform === "meteoraCPAMM" && config.meteoraCPAMMConfig) {
+    requestBody["meteoraCPAMMConfig"] = config.meteoraCPAMMConfig;
+  }
 
-    const response = await fetch(`${baseUrl}/v2/sol/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
+  const response = await fetch(`${baseUrl}/v2/sol/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status}`);
+  }
 
-    const data = (await response.json()) as PartiallyPreparedResponse;
+  const data = (await response.json()) as PartiallyPreparedResponse;
 
-    if (!data.success) {
-      throw new Error(
-        data.error || "Failed to get partially prepared transactions",
-      );
-    }
+  if (!data.success) {
+    throw new Error(
+      data.error || "Failed to get partially prepared transactions",
+    );
+  }
 
-    // Extract common fields
-    const mint = data.data?.mint || data.mint;
-    const poolId = data.data?.poolId || data.poolId;
-    const lookupTableAddress =
-      data.data?.lookupTableAddress || data.lookupTableAddress;
-    const mintPrivateKey = data.data?.mintPrivateKey || data.mintPrivateKey;
-    const isAdvancedMode = data.data?.isAdvancedMode || data.isAdvancedMode;
-    const stages = data.data?.stages || data.stages;
+  // Extract common fields
+  const mint = data.data?.mint || data.mint;
+  const poolId = data.data?.poolId || data.poolId;
+  const lookupTableAddress =
+    data.data?.lookupTableAddress || data.lookupTableAddress;
+  const mintPrivateKey = data.data?.mintPrivateKey || data.mintPrivateKey;
+  const isAdvancedMode = data.data?.isAdvancedMode || data.isAdvancedMode;
+  const stages = data.data?.stages || data.stages;
 
-    // Handle self-hosted server response
-    if (appConfig?.tradingServerEnabled === "true" && data.data) {
-      console.info("Self-hosted server response:", data);
-      return {
-        bundles: [
-          { transactions: [], serverResponse: data.data as ServerResponse },
-        ],
-        mint,
-        poolId,
-        lookupTableAddress,
-        mintPrivateKey,
-        isAdvancedMode,
-        stages,
-      };
-    }
-
-    // Handle advanced mode with stages (MeteoraDBC 6-20 wallets)
-    if (stages && Array.isArray(stages) && stages.length > 0) {
-      console.info(`Advanced mode detected: ${stages.length} stages`);
-      return {
-        bundles: [], // Advanced mode uses stages instead
-        stages,
-        mint,
-        poolId,
-        lookupTableAddress,
-        mintPrivateKey,
-        isAdvancedMode: true,
-      };
-    }
-
-    // Handle bundles (both simple and advanced mode for pumpfun)
-    let bundles: CreateBundle[] = [];
-
-    if (data.data?.bundles && Array.isArray(data.data.bundles)) {
-      bundles = data.data.bundles.map((bundle: CreateBundle | string[]) =>
-        Array.isArray(bundle) ? { transactions: bundle } : bundle,
-      );
-    } else if (
-      data.data?.transactions &&
-      Array.isArray(data.data.transactions)
-    ) {
-      bundles = [{ transactions: data.data.transactions }];
-    } else if (data.bundles && Array.isArray(data.bundles)) {
-      bundles = data.bundles.map((bundle: CreateBundle | string[]) =>
-        Array.isArray(bundle) ? { transactions: bundle } : bundle,
-      );
-    } else if (data.transactions && Array.isArray(data.transactions)) {
-      bundles = [{ transactions: data.transactions }];
-    } else {
-      throw new Error("No transactions returned from backend");
-    }
-
-    // isAdvancedMode can be true for pumpfun with multiple bundles
-    const finalIsAdvancedMode = isAdvancedMode || bundles.length > 1;
-
+  // Handle advanced mode with stages (MeteoraDBC 6-20 wallets)
+  if (stages && Array.isArray(stages) && stages.length > 0) {
     return {
-      bundles,
+      bundles: [], // Advanced mode uses stages instead
+      stages,
       mint,
       poolId,
       lookupTableAddress,
       mintPrivateKey,
-      isAdvancedMode: finalIsAdvancedMode,
+      isAdvancedMode: true,
     };
-  } catch (error) {
-    console.error("Error getting partially prepared transactions:", error);
-    throw error;
   }
+
+  // Handle bundles (both simple and advanced mode for pumpfun)
+  let bundles: CreateBundle[] = [];
+
+  if (data.data?.bundles && Array.isArray(data.data.bundles)) {
+    bundles = data.data.bundles.map((bundle: CreateBundle | string[]) =>
+      Array.isArray(bundle) ? { transactions: bundle } : bundle,
+    );
+  } else if (
+    data.data?.transactions &&
+    Array.isArray(data.data.transactions)
+  ) {
+    bundles = [{ transactions: data.data.transactions }];
+  } else if (data.bundles && Array.isArray(data.bundles)) {
+    bundles = data.bundles.map((bundle: CreateBundle | string[]) =>
+      Array.isArray(bundle) ? { transactions: bundle } : bundle,
+    );
+  } else if (data.transactions && Array.isArray(data.transactions)) {
+    bundles = [{ transactions: data.transactions }];
+  } else {
+    throw new Error("No transactions returned from backend");
+  }
+
+  // isAdvancedMode can be true for pumpfun with multiple bundles
+  const finalIsAdvancedMode = isAdvancedMode || bundles.length > 1;
+
+  return {
+    bundles,
+    mint,
+    poolId,
+    lookupTableAddress,
+    mintPrivateKey,
+    isAdvancedMode: finalIsAdvancedMode,
+  };
 };
 
 /**
@@ -415,102 +355,92 @@ const completeBundleSigning = (
   isFirstBundle: boolean = false,
 ): CreateBundle => {
   if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
-    console.error("Invalid bundle format:", bundle);
     return { transactions: [] };
   }
 
   const allKeypairs = [...walletKeypairs, ...additionalKeypairs];
 
   const signedTransactions = bundle.transactions.map((txBase58, index) => {
+    let txBuffer: Uint8Array;
     try {
-      let txBuffer: Uint8Array;
-      try {
-        txBuffer = bs58.decode(txBase58);
-      } catch {
-        txBuffer = new Uint8Array(Buffer.from(txBase58, "base64"));
-      }
+      txBuffer = bs58.decode(txBase58);
+    } catch {
+      txBuffer = new Uint8Array(Buffer.from(txBase58, "base64"));
+    }
 
-      const transaction = VersionedTransaction.deserialize(txBuffer);
+    const transaction = VersionedTransaction.deserialize(txBuffer);
 
-      // Check if already has signatures (partially signed by server)
-      if (isFirstBundle && index === 0) {
-        const hasSignature = transaction.signatures.some(
-          (sig) => !sig.every((byte) => byte === 0),
-        );
-
-        if (hasSignature) {
-          console.info(
-            "First transaction already partially signed, adding remaining signatures",
-          );
-
-          const requiredSigners: Keypair[] = [];
-          for (const accountKey of transaction.message.staticAccountKeys) {
-            const pubkeyStr = accountKey.toBase58();
-            const matchingKeypair = allKeypairs.find(
-              (kp) => kp.publicKey.toBase58() === pubkeyStr,
-            );
-
-            if (matchingKeypair) {
-              const signerIndex =
-                transaction.message.staticAccountKeys.findIndex((key) =>
-                  key.equals(matchingKeypair.publicKey),
-                );
-
-              if (
-                signerIndex >= 0 &&
-                transaction.signatures[signerIndex] &&
-                transaction.signatures[signerIndex].every((byte) => byte === 0)
-              ) {
-                requiredSigners.push(matchingKeypair);
-              }
-            }
-          }
-
-          if (requiredSigners.length > 0) {
-            transaction.sign(requiredSigners);
-          }
-          return bs58.encode(transaction.serialize());
-        }
-      }
-
-      // Standard signing - only sign with keys that are ACTUAL SIGNERS in the transaction
-      // The number of required signers is in the message header
-      const numRequiredSignatures =
-        transaction.message.header.numRequiredSignatures;
-      const signerAccountKeys = transaction.message.staticAccountKeys.slice(
-        0,
-        numRequiredSignatures,
+    // Check if already has signatures (partially signed by server)
+    if (isFirstBundle && index === 0) {
+      const hasSignature = transaction.signatures.some(
+        (sig) => !sig.every((byte) => byte === 0),
       );
 
-      const signers: Keypair[] = [];
-      for (const accountKey of signerAccountKeys) {
-        const pubkeyStr = accountKey.toBase58();
-        const matchingKeypair = allKeypairs.find(
-          (kp) => kp.publicKey.toBase58() === pubkeyStr,
-        );
-        if (matchingKeypair && !signers.includes(matchingKeypair)) {
-          // Only add if signature slot is empty (not already signed)
-          const signerIndex = transaction.message.staticAccountKeys.findIndex(
-            (key) => key.equals(matchingKeypair.publicKey),
+      if (hasSignature) {
+        const requiredSigners: Keypair[] = [];
+        for (const accountKey of transaction.message.staticAccountKeys) {
+          const pubkeyStr = accountKey.toBase58();
+          const matchingKeypair = allKeypairs.find(
+            (kp) => kp.publicKey.toBase58() === pubkeyStr,
           );
-          if (
-            signerIndex >= 0 &&
-            signerIndex < transaction.signatures.length &&
-            transaction.signatures[signerIndex].every((byte) => byte === 0)
-          ) {
-            signers.push(matchingKeypair);
+
+          if (matchingKeypair) {
+            const signerIndex =
+              transaction.message.staticAccountKeys.findIndex((key) =>
+                key.equals(matchingKeypair.publicKey),
+              );
+
+            if (
+              signerIndex >= 0 &&
+              transaction.signatures[signerIndex] &&
+              transaction.signatures[signerIndex].every((byte) => byte === 0)
+            ) {
+              requiredSigners.push(matchingKeypair);
+            }
           }
         }
-      }
 
-      if (signers.length > 0) {
-        transaction.sign(signers);
+        if (requiredSigners.length > 0) {
+          transaction.sign(requiredSigners);
+        }
+        return bs58.encode(transaction.serialize());
       }
-      return bs58.encode(transaction.serialize());
-    } catch (error) {
-      console.error("Error signing transaction:", error);
-      throw error;
     }
+
+    // Standard signing - only sign with keys that are ACTUAL SIGNERS in the transaction
+    // The number of required signers is in the message header
+    const numRequiredSignatures =
+      transaction.message.header.numRequiredSignatures;
+    const signerAccountKeys = transaction.message.staticAccountKeys.slice(
+      0,
+      numRequiredSignatures,
+    );
+
+    const signers: Keypair[] = [];
+    for (const accountKey of signerAccountKeys) {
+      const pubkeyStr = accountKey.toBase58();
+      const matchingKeypair = allKeypairs.find(
+        (kp) => kp.publicKey.toBase58() === pubkeyStr,
+      );
+      if (matchingKeypair && !signers.includes(matchingKeypair)) {
+        // Only add if signature slot is empty (not already signed)
+        const signerIndex = transaction.message.staticAccountKeys.findIndex(
+          (key) => key.equals(matchingKeypair.publicKey),
+        );
+        if (
+          signerIndex >= 0 &&
+          signerIndex < transaction.signatures.length &&
+          transaction.signatures[signerIndex].every((byte) => byte === 0)
+        ) {
+          signers.push(matchingKeypair);
+        }
+      }
+    }
+
+    if (signers.length > 0) {
+      transaction.sign(signers);
+    }
+    return bs58.encode(transaction.serialize());
   });
 
   return { transactions: signedTransactions };
@@ -559,18 +489,11 @@ const executeAdvancedModeCreate = async (
   poolId?: string,
   lookupTableAddress?: string,
 ): Promise<CreateResult> => {
-  console.info(
-    `🚀 Executing advanced mode deployment with ${stages.length} stages`,
-  );
-
   const stageResults: StageResult[] = [];
   const additionalKeypairs = mintKeypair ? [mintKeypair] : [];
 
   for (let i = 0; i < stages.length; i++) {
     const stage = stages[i];
-    console.info(`\n📦 Stage ${i + 1}/${stages.length}: ${stage.name}`);
-    console.info(`   Description: ${stage.description}`);
-    console.info(`   Transactions: ${stage.transactions.length}`);
 
     // Sign transactions for this stage
     const signedBundle = completeBundleSigning(
@@ -582,7 +505,6 @@ const executeAdvancedModeCreate = async (
 
     if (signedBundle.transactions.length === 0) {
       const error = `Failed to sign transactions for stage: ${stage.name}`;
-      console.error(`❌ ${error}`);
       stageResults.push({ stageName: stage.name, success: false, error });
       return {
         success: false,
@@ -599,7 +521,6 @@ const executeAdvancedModeCreate = async (
 
     if (!sendResult.success) {
       const error = `Failed to send bundle for stage: ${stage.name} - ${sendResult.error}`;
-      console.error(`❌ ${error}`);
       stageResults.push({ stageName: stage.name, success: false, error });
       return {
         success: false,
@@ -611,9 +532,8 @@ const executeAdvancedModeCreate = async (
       };
     }
 
-    console.info(`✅ Stage ${stage.name} bundle sent successfully`);
     if (sendResult.bundleId) {
-      console.info(`   Bundle ID: ${sendResult.bundleId}`);
+      // Bundle ID tracked for stage result
     }
 
     stageResults.push({
@@ -626,9 +546,7 @@ const executeAdvancedModeCreate = async (
     if (stage.requiresConfirmation) {
       // For LUT stages, wait for activation
       if (stage.waitForActivation) {
-        console.info(`⏳ Waiting for ${stage.name} to land and activate...`);
         await waitForLutActivation();
-        console.info(`✅ ${stage.name} should be active now`);
       }
     }
 
@@ -638,7 +556,6 @@ const executeAdvancedModeCreate = async (
     }
   }
 
-  console.info(`\n🎉 All ${stages.length} stages completed!`);
 
   return {
     success: true,
@@ -665,12 +582,6 @@ export const executeCreate = async (
   config: CreateConfig,
 ): Promise<CreateResult> => {
   try {
-    console.info(
-      `Preparing to create token on ${config.platform} using ${wallets.length} wallets`,
-    );
-
-    const appConfig = loadConfigFromCookies();
-
     // Step 1: Get partially prepared bundles/stages from backend
     const {
       bundles: partiallyPreparedBundles,
@@ -682,30 +593,6 @@ export const executeCreate = async (
       isAdvancedMode,
     } = await getPartiallyPreparedTransactions(wallets, config);
 
-    // Handle self-hosted server response
-    if (appConfig?.tradingServerEnabled === "true") {
-      console.info("Self-hosted server handled signing and sending");
-      if (
-        partiallyPreparedBundles.length > 0 &&
-        partiallyPreparedBundles[0].serverResponse
-      ) {
-        return {
-          success: true,
-          mintAddress: mint,
-          poolId,
-          lookupTableAddress,
-          result: partiallyPreparedBundles[0].serverResponse,
-        };
-      }
-      return {
-        success: true,
-        mintAddress: mint,
-        poolId,
-        lookupTableAddress,
-        result: partiallyPreparedBundles,
-      };
-    }
-
     // Create keypairs from private keys
     const walletKeypairs = wallets.map((wallet) =>
       Keypair.fromSecretKey(bs58.decode(wallet.privateKey)),
@@ -716,17 +603,13 @@ export const executeCreate = async (
     if (mintPrivateKey) {
       try {
         mintKeypair = Keypair.fromSecretKey(bs58.decode(mintPrivateKey));
-        console.info(
-          `Mint keypair loaded: ${mintKeypair.publicKey.toBase58()}`,
-        );
-      } catch (e) {
-        console.warn("Failed to load mint keypair:", e);
+      } catch (ignore) {
+        // Invalid mint private key, will proceed without it
       }
     }
 
     // Handle advanced mode (MeteoraDBC with 6-20 wallets)
     if (isAdvancedMode && stages && stages.length > 0) {
-      console.info(`🚀 Advanced mode: ${stages.length} stages to execute`);
       return await executeAdvancedModeCreate(
         stages,
         walletKeypairs,
@@ -745,10 +628,6 @@ export const executeCreate = async (
       };
     }
 
-    console.info(
-      `Received ${partiallyPreparedBundles.length} bundles from backend`,
-    );
-
     // Split and sign all bundles
     const splitBundles = splitLargeBundles(partiallyPreparedBundles);
     const additionalKeypairs = mintKeypair ? [mintKeypair] : [];
@@ -761,7 +640,6 @@ export const executeCreate = async (
       ),
     );
 
-    console.info(`Completed signing for ${signedBundles.length} bundles`);
 
     // Filter out empty bundles
     const validSignedBundles = signedBundles.filter(
@@ -781,10 +659,6 @@ export const executeCreate = async (
     );
 
     if (!firstBundleResult.success) {
-      console.error(
-        "❌ Critical error: First bundle failed to land:",
-        firstBundleResult.error,
-      );
       return {
         success: false,
         mintAddress: mint,
@@ -792,7 +666,6 @@ export const executeCreate = async (
       };
     }
 
-    console.info("✅ First bundle landed successfully!");
 
     // Send remaining bundles
     const results: BundleResult[] = firstBundleResult.result
@@ -810,10 +683,8 @@ export const executeCreate = async (
       if (result.success && result.result) {
         results.push(result.result);
         successCount++;
-        console.info(`Bundle ${i + 1} sent successfully`);
       } else {
         failureCount++;
-        console.error(`Error sending bundle ${i + 1}:`, result.error);
       }
     }
 
@@ -830,7 +701,6 @@ export const executeCreate = async (
       },
     };
   } catch (error) {
-    console.error("Create error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "../contexts";
 import { HorizontalHeader } from "../components/HorizontalHeader";
+import { PageBackground } from "../components/PageBackground";
 import { Rocket, ChevronRight } from "lucide-react";
 import { useToast } from "../utils/hooks";
 import {
@@ -223,14 +224,14 @@ export const DeployPage: React.FC = () => {
                 mintAddress: result.mintAddress,
                 error: result.error
               } : p));
-            } catch (err) {
+            } catch (error) {
               setDeploymentProgress((prev) => prev.map((p, idx) => idx === i ? {
                 ...p,
                 status: "failed",
-                error: err instanceof Error ? err.message : String(err)
+                error: error instanceof Error ? error.message : String(error)
               } : p));
             }
-          })
+          }),
         );
 
         void refreshBalances();
@@ -332,18 +333,7 @@ export const DeployPage: React.FC = () => {
       {/* Main Content */}
       <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
         {/* Background */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute inset-0 bg-app-primary opacity-90">
-            <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent" />
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `linear-gradient(rgba(2, 179, 109, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(2, 179, 109, 0.03) 1px, transparent 1px)`,
-                backgroundSize: "40px 40px",
-              }}
-            />
-          </div>
-        </div>
+        <PageBackground />
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
           {/* Page Header */}

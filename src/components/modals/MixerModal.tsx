@@ -235,7 +235,6 @@ export const MixerModal: React.FC<MixerModalProps> = ({
         showToast(result.error || "Mixing failed", "error");
       }
     } catch (error) {
-      console.error("Mixing error:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       showToast("Mixing failed: " + (errorMessage || "Unknown error"), "error");

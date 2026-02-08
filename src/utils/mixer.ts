@@ -28,62 +28,57 @@ const getPartiallySignedTransactions = async (
   recipients: { address: string; amount: string }[],
   baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
-  try {
-    const baseUrl =
-      (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
+  const baseUrl =
+    (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
 
-    const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
-    const endpoint = isNativeSOL
-      ? `${baseUrl}/v2/sol/mixer`
-      : `${baseUrl}/v2/token/mixer`;
+  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
+  const endpoint = isNativeSOL
+    ? `${baseUrl}/v2/sol/mixer`
+    : `${baseUrl}/v2/token/mixer`;
 
-    const requestBody: Record<string, unknown> = {
-      sender: senderAddress,
-      recipients: recipients,
-    };
+  const requestBody: Record<string, unknown> = {
+    sender: senderAddress,
+    recipients: recipients,
+  };
 
-    // Add token mint for non-native currencies
-    if (!isNativeSOL) {
-      requestBody["tokenMint"] = baseCurrency.mint;
-    }
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    const data = (await response.json()) as {
-      success: boolean;
-      error?: string;
-      transactions?: string[];
-      data?: { transactions?: string[] };
-    };
-
-    if (!data.success) {
-      throw new Error(
-        data.error || "Failed to get partially signed transactions",
-      );
-    }
-
-    // Handle different response formats
-    const transactions =
-      (data as unknown as { data?: { transactions?: string[] } }).data
-        ?.transactions || data.transactions;
-
-    if (!transactions || !Array.isArray(transactions)) {
-      throw new Error("No transactions returned from backend");
-    }
-
-    return transactions; // Array of base58 encoded partially signed transactions
-  } catch (error) {
-    console.error("Error getting partially signed transactions:", error);
-    throw error;
+  // Add token mint for non-native currencies
+  if (!isNativeSOL) {
+    requestBody["tokenMint"] = baseCurrency.mint;
   }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    success: boolean;
+    error?: string;
+    transactions?: string[];
+    data?: { transactions?: string[] };
+  };
+
+  if (!data.success) {
+    throw new Error(
+      data.error || "Failed to get partially signed transactions",
+    );
+  }
+
+  // Handle different response formats
+  const transactions =
+    (data as unknown as { data?: { transactions?: string[] } }).data
+      ?.transactions || data.transactions;
+
+  if (!transactions || !Array.isArray(transactions)) {
+    throw new Error("No transactions returned from backend");
+  }
+
+  return transactions; // Array of base58 encoded partially signed transactions
 };
 
 /**
@@ -96,60 +91,43 @@ const completeTransactionSigning = (
   senderKeypair: Keypair,
   recipientKeypairs: Map<string, Keypair>,
 ): string[] => {
-  try {
-    return partiallySignedTransactionsBase58.map((txBase58, index) => {
-      // Deserialize transaction
-      const txBuffer = bs58.decode(txBase58);
-      const transaction = VersionedTransaction.deserialize(txBuffer);
+  return partiallySignedTransactionsBase58.map((txBase58, index) => {
+    // Deserialize transaction
+    const txBuffer = bs58.decode(txBase58);
+    const transaction = VersionedTransaction.deserialize(txBuffer);
+    // Determine which keypair to use based on transaction index
+    if (index === 0) {
+      // First transaction: signed by depositor (sender)
+      transaction.sign([senderKeypair]);
+    } else if (index === 1 && recipientKeypairs.size > 0) {
+      // Second transaction: signed by receiver (recipient)
+      const recipientKeypair = Array.from(recipientKeypairs.values())[0]; // Get the first (and should be only) recipient keypair
+      transaction.sign([recipientKeypair]);
+    } else {
+      // For any additional transactions, fall back to analyzing required signers
+      const message = transaction.message;
+      const requiredSigners: Keypair[] = [];
 
-      console.info(
-        `Signing transaction ${index + 1}/${partiallySignedTransactionsBase58.length}`,
-      );
-
-      // Determine which keypair to use based on transaction index
-      if (index === 0) {
-        // First transaction: signed by depositor (sender)
-        console.info(`Transaction ${index + 1}: Signing with depositor wallet`);
-        transaction.sign([senderKeypair]);
-      } else if (index === 1 && recipientKeypairs.size > 0) {
-        // Second transaction: signed by receiver (recipient)
-        const recipientKeypair = Array.from(recipientKeypairs.values())[0]; // Get the first (and should be only) recipient keypair
-        console.info(`Transaction ${index + 1}: Signing with receiver wallet`);
-        transaction.sign([recipientKeypair]);
-      } else {
-        // For any additional transactions, fall back to analyzing required signers
-        console.info(`Transaction ${index + 1}: Analyzing required signers`);
-        const message = transaction.message;
-        const requiredSigners: Keypair[] = [];
-
-        // Check which accounts are required signers
-        for (const accountKey of message.staticAccountKeys) {
-          const pubkeyStr = accountKey.toBase58();
-          if (pubkeyStr === senderKeypair.publicKey.toBase58()) {
-            requiredSigners.push(senderKeypair);
-          } else if (recipientKeypairs.has(pubkeyStr)) {
-            requiredSigners.push(recipientKeypairs.get(pubkeyStr)!);
-          }
-        }
-
-        if (requiredSigners.length === 0) {
-          // Default to sender if no specific signers found
+      // Check which accounts are required signers
+      for (const accountKey of message.staticAccountKeys) {
+        const pubkeyStr = accountKey.toBase58();
+        if (pubkeyStr === senderKeypair.publicKey.toBase58()) {
           requiredSigners.push(senderKeypair);
+        } else if (recipientKeypairs.has(pubkeyStr)) {
+          requiredSigners.push(recipientKeypairs.get(pubkeyStr)!);
         }
-
-        console.info(
-          `Transaction ${index + 1}: Signing with ${requiredSigners.length} keypair(s)`,
-        );
-        transaction.sign(requiredSigners);
       }
 
-      // Serialize and encode the fully signed transaction
-      return bs58.encode(transaction.serialize());
-    });
-  } catch (error) {
-    console.error("Error completing transaction signing:", error);
-    throw error;
-  }
+      if (requiredSigners.length === 0) {
+        // Default to sender if no specific signers found
+        requiredSigners.push(senderKeypair);
+      }
+      transaction.sign(requiredSigners);
+    }
+
+    // Serialize and encode the fully signed transaction
+    return bs58.encode(transaction.serialize());
+  });
 };
 
 /**
@@ -184,11 +162,6 @@ export const mixBaseCurrencyToSingleRecipient = async (
           )
         : BASE_CURRENCIES.SOL) ||
       BASE_CURRENCIES.SOL;
-
-    console.info(
-      `Preparing to mix ${recipientWallet.amount} ${currency.symbol} from ${senderWallet.address} to ${recipientWallet.address}`,
-    );
-
     // Convert single recipient wallet to backend format
     const recipients = [
       {
@@ -204,10 +177,6 @@ export const mixBaseCurrencyToSingleRecipient = async (
       recipients,
       currency,
     );
-    console.info(
-      `Received ${partiallySignedTransactions.length} partially signed transactions from backend`,
-    );
-
     // Step 2: Create keypairs from private keys
     const senderKeypair = Keypair.fromSecretKey(
       bs58.decode(senderWallet.privateKey),
@@ -229,22 +198,13 @@ export const mixBaseCurrencyToSingleRecipient = async (
       senderKeypair,
       recipientKeypairsMap,
     );
-    console.info(
-      `Completed signing for ${fullySignedTransactions.length} transactions`,
-    );
-
     // Step 4: Prepare mixing bundles
     const mixingBundles = prepareMixingBundles(fullySignedTransactions);
-    console.info(`Prepared ${mixingBundles.length} mixing bundles`);
 
     // Step 5: Send bundles
     const results: BundleResult[] = [];
     for (let i = 0; i < mixingBundles.length; i++) {
       const bundle = mixingBundles[i];
-      console.info(
-        `Sending bundle ${i + 1}/${mixingBundles.length} with ${bundle.transactions.length} transactions`,
-      );
-
       const result = await sendTransactions(bundle.transactions);
       results.push(result);
 
@@ -259,7 +219,6 @@ export const mixBaseCurrencyToSingleRecipient = async (
       result: results,
     };
   } catch (error) {
-    console.error("Mixing error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -418,11 +377,6 @@ export const batchMixBaseCurrency = async (
           )
         : BASE_CURRENCIES.SOL) ||
       BASE_CURRENCIES.SOL;
-
-    console.info(
-      `Starting batch ${currency.symbol} mixing to ${recipientWallets.length} recipients (1 recipient per batch)`,
-    );
-
     // Return early if no recipients
     if (recipientWallets.length === 0) {
       return { success: true, results: [] };
@@ -432,10 +386,6 @@ export const batchMixBaseCurrency = async (
     const results: unknown[] = [];
     for (let i = 0; i < recipientWallets.length; i++) {
       const recipientWallet = recipientWallets[i];
-      console.info(
-        `Processing recipient ${i + 1}/${recipientWallets.length}: ${recipientWallet.address} (${recipientWallet.amount} ${currency.symbol})`,
-      );
-
       // Execute mixing to single recipient
       const result = await mixBaseCurrencyToSingleRecipient(
         senderWallet,
@@ -456,20 +406,14 @@ export const batchMixBaseCurrency = async (
 
       // Add delay between recipients (except after the last one)
       if (i < recipientWallets.length - 1) {
-        console.info(`Waiting 3 seconds before processing next recipient...`);
         await new Promise((resolve) => setTimeout(resolve, 3000)); // 3 second delay between recipients
       }
     }
-
-    console.info(
-      `Successfully completed mixing to all ${recipientWallets.length} recipients`,
-    );
     return {
       success: true,
       results,
     };
   } catch (error) {
-    console.error("Batch mixing error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

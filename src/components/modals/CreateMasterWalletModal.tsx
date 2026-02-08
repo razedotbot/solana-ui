@@ -44,8 +44,8 @@ const CreateMasterWalletModal: React.FC<CreateMasterWalletModalProps> = ({
       await navigator.clipboard.writeText(mnemonic);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy mnemonic:', error);
+    } catch (ignore) {
+      // Clipboard error, ignore
     }
   };
 
@@ -57,9 +57,8 @@ const CreateMasterWalletModal: React.FC<CreateMasterWalletModalProps> = ({
     try {
       await onCreateMasterWallet(walletName.trim(), mnemonic);
       onClose();
-    } catch (error) {
+    } catch (ignore) {
       // Error handling is done in the parent component
-      console.error('Error creating master wallet:', error);
     }
   };
 

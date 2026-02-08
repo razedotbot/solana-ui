@@ -111,33 +111,12 @@ export interface SellConfig {
 // ============================================================================
 
 /**
- * Server response from trading operations
- * Contains results from self-hosted server or backend
- */
-export interface ServerResponse {
-  /** Whether the operation was successful */
-  success?: boolean;
-  /** Response data from the server */
-  data?: unknown;
-  /** Error message if operation failed */
-  error?: string;
-  /** Number of bundles sent */
-  bundlesSent?: number;
-  /** Array of individual results */
-  results?: Array<Record<string, unknown>>;
-  /** Allow additional properties */
-  [key: string]: unknown;
-}
-
-/**
  * Transaction bundle for buy operations
  * Contains base58 encoded transactions ready for signing
  */
 export interface BuyBundle {
   /** Array of base58 encoded transaction data */
   transactions: string[];
-  /** Server response for self-hosted server operations */
-  serverResponse?: ServerResponse;
 }
 
 /**
@@ -147,8 +126,6 @@ export interface BuyBundle {
 export interface SellBundle {
   /** Array of base58 encoded transaction data */
   transactions: string[];
-  /** Server response for self-hosted server operations */
-  serverResponse?: ServerResponse;
 }
 
 // ============================================================================

@@ -135,8 +135,32 @@ export interface WalletType {
   /** Custom quick trade settings (overrides category settings) */
   customQuickTradeSettings?: CustomQuickTradeSettings;
 
+  /** ID of the wallet group this wallet belongs to */
+  groupId?: string;
+
   /** Allow additional properties for extensibility */
   [key: string]: unknown;
+}
+
+// ============================================================================
+// Wallet Group Types
+// ============================================================================
+
+/** Default group ID for wallets that haven't been assigned to a group */
+export const DEFAULT_GROUP_ID = "default";
+
+/** User-created wallet group for organizational purposes */
+export interface WalletGroup {
+  /** Unique identifier */
+  id: string;
+  /** User-defined display name */
+  name: string;
+  /** Sort order position for column layout */
+  order: number;
+  /** Optional color for visual distinction */
+  color?: string;
+  /** Whether this is the default group (cannot be deleted) */
+  isDefault?: boolean;
 }
 
 // ============================================================================
@@ -170,12 +194,6 @@ export interface ConfigType {
   singleDelay: string;
   /** Delay between batches in batch mode (milliseconds) */
   batchDelay: string;
-  /** Whether to use self-hosted trading server ('true' or 'false') */
-  tradingServerEnabled: string;
-  /** URL of the self-hosted trading server */
-  tradingServerUrl: string;
-  /** API key for WebSocket stream authentication */
-  streamApiKey: string;
   /** Balance refresh strategy ('sequential', 'batch', 'parallel') */
   balanceRefreshStrategy: string;
   /** Number of wallets to process per batch in batch mode */

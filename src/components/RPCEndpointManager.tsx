@@ -4,17 +4,23 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
-  AlertCircle,
   RefreshCw,
   Activity,
   Wifi,
   WifiOff,
+  Shield,
+  ShieldAlert,
 } from "lucide-react";
 import type { RPCEndpoint } from "../utils/rpcManager";
+import { RPCManager } from "../utils/rpcManager";
 
 interface RPCEndpointManagerProps {
   endpoints: RPCEndpoint[];
   onChange: (endpoints: RPCEndpoint[]) => void;
+  autoHealthCheckInterval?: number; // Auto health check interval in ms (default: 60000 = 1 min)
+  autoDisableThreshold?: number; // Consecutive failures before auto-disable (default: 3)
+  enableAutoDisable?: boolean; // Enable automatic disabling (default: true)
+  enableAutoReEnable?: boolean; // Enable automatic re-enabling (default: true)
 }
 
 const POPULAR_ENDPOINTS = [
@@ -88,6 +94,10 @@ const checkEndpointHealth = async (
 export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
   endpoints,
   onChange,
+  autoHealthCheckInterval = 60000, // 1 minute default
+  autoDisableThreshold = 3,
+  enableAutoDisable = true,
+  enableAutoReEnable = true,
 }) => {
   const [newEndpointUrl, setNewEndpointUrl] = useState("");
   const [newEndpointName, setNewEndpointName] = useState("");
@@ -96,27 +106,35 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
   const [checkingEndpointId, setCheckingEndpointId] = useState<string | null>(
     null,
   );
+  const [autoMonitoringEnabled, setAutoMonitoringEnabled] = useState(true);
+  const [_lastAutoCheck, setLastAutoCheck] = useState<number>(Date.now());
   const hasInitializedWeights = useRef(false);
   const hasCheckedHealthOnMount = useRef(false);
+  const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const normalizeWeights = (endpointsToNormalize: RPCEndpoint[]): void => {
     const active = endpointsToNormalize.filter((e) => e.isActive);
     if (active.length === 0) return;
+
+    // Zero out disabled endpoint weights
+    endpointsToNormalize.forEach((e) => {
+      if (!e.isActive) {
+        e.weight = 0;
+      }
+    });
 
     const currentTotal = active.reduce((sum, e) => sum + (e.weight || 0), 0);
 
     if (currentTotal === 0) {
       // Distribute evenly if no weights set
       const evenWeight = Math.round(100 / active.length);
-      endpointsToNormalize.forEach((e) => {
-        if (e.isActive) {
-          e.weight = evenWeight;
-        }
+      active.forEach((e) => {
+        e.weight = evenWeight;
       });
     } else if (currentTotal !== 100) {
       // Normalize proportionally to total 100
-      endpointsToNormalize.forEach((e) => {
-        if (e.isActive && e.weight !== undefined) {
+      active.forEach((e) => {
+        if (e.weight !== undefined) {
           e.weight = Math.round((e.weight / currentTotal) * 100);
         }
       });
@@ -124,30 +142,66 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
   };
 
   // Check health of all endpoints
-  const checkAllEndpointsHealth = useCallback(async () => {
-    if (isCheckingHealth) return;
+  const checkAllEndpointsHealth = useCallback(
+    async (isAutoCheck = false) => {
+      if (isCheckingHealth) return;
 
-    setIsCheckingHealth(true);
+      setIsCheckingHealth(true);
+      if (isAutoCheck) {
+        setLastAutoCheck(Date.now());
+      }
 
-    const updatedEndpoints = await Promise.all(
-      endpoints.map(async (endpoint) => {
-        if (!endpoint.isActive) {
-          return { ...endpoint, healthStatus: "unknown" as const };
-        }
+      // Check health for all endpoints (including inactive ones if auto-re-enable is on)
+      const updatedEndpoints = await Promise.all(
+        endpoints.map(async (endpoint) => {
+          // Skip inactive endpoints unless they were auto-disabled and auto re-enable is on
+          if (
+            !endpoint.isActive &&
+            !(enableAutoReEnable && endpoint.autoDisabled)
+          ) {
+            return { ...endpoint, healthStatus: "unknown" as const };
+          }
 
-        const { latency, status } = await checkEndpointHealth(endpoint.url);
-        return {
-          ...endpoint,
-          latency,
-          healthStatus: status,
-          lastHealthCheck: Date.now(),
-        };
-      }),
-    );
+          const { latency, status } = await checkEndpointHealth(endpoint.url);
+          return {
+            ...endpoint,
+            latency,
+            healthStatus: status,
+            lastHealthCheck: Date.now(),
+          };
+        }),
+      );
 
-    onChange(updatedEndpoints);
-    setIsCheckingHealth(false);
-  }, [endpoints, onChange, isCheckingHealth]);
+      // Process health checks through RPC Manager to auto-disable/enable
+      if (enableAutoDisable || enableAutoReEnable) {
+        const rpcManager = new RPCManager(
+          endpoints.filter((e) => e.isActive),
+          {
+            autoDisableThreshold,
+            autoDisableOnUnhealthy: enableAutoDisable,
+            autoReEnableOnHealthy: enableAutoReEnable,
+          },
+        );
+
+        const processedEndpoints =
+          rpcManager.processHealthChecks(updatedEndpoints);
+        normalizeWeights(processedEndpoints);
+        onChange(processedEndpoints);
+      } else {
+        onChange(updatedEndpoints);
+      }
+
+      setIsCheckingHealth(false);
+    },
+    [
+      endpoints,
+      onChange,
+      isCheckingHealth,
+      enableAutoDisable,
+      enableAutoReEnable,
+      autoDisableThreshold,
+    ],
+  );
 
   // Check health of a single endpoint
   const checkSingleEndpointHealth = async (
@@ -218,9 +272,38 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
 
     if (needsHealthCheck) {
       hasCheckedHealthOnMount.current = true;
-      void checkAllEndpointsHealth();
+      void checkAllEndpointsHealth(false);
     }
   }, [endpoints, checkAllEndpointsHealth]);
+
+  // Background health monitoring
+  useEffect(() => {
+    if (!autoMonitoringEnabled || endpoints.length === 0) {
+      if (autoCheckIntervalRef.current) {
+        clearInterval(autoCheckIntervalRef.current);
+        autoCheckIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Set up periodic health checks
+    autoCheckIntervalRef.current = setInterval(() => {
+       
+      void checkAllEndpointsHealth(true);
+    }, autoHealthCheckInterval);
+
+    return () => {
+      if (autoCheckIntervalRef.current) {
+        clearInterval(autoCheckIntervalRef.current);
+        autoCheckIntervalRef.current = null;
+      }
+    };
+  }, [
+    autoMonitoringEnabled,
+    autoHealthCheckInterval,
+    endpoints.length,
+    checkAllEndpointsHealth,
+  ]);
 
   // Calculate total weight of active endpoints
   const activeEndpoints = endpoints.filter((e) => e.isActive);
@@ -275,7 +358,8 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
   };
 
   const removeEndpoint = (id: string): void => {
-    if (endpoints.filter((e) => e.isActive).length <= 1) {
+    const endpoint = endpoints.find((e) => e.id === id);
+    if (endpoint?.isActive && endpoints.filter((e) => e.isActive).length <= 1) {
       alert("You must have at least one active RPC endpoint");
       return;
     }
@@ -400,31 +484,37 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
             </span>
           </label>
 
-          {/* Refresh All Health Button */}
-          <button
-            type="button"
-            onClick={() => void checkAllEndpointsHealth()}
-            disabled={isCheckingHealth}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono rounded-lg bg-app-tertiary border border-app-primary-30 hover:border-app-primary-color hover:bg-app-primary-color/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ color: "var(--app-primary-color, #02b36d)" }}
-          >
-            <RefreshCw
-              size={12}
-              className={isCheckingHealth ? "animate-spin" : ""}
-            />
-            {isCheckingHealth ? "Checking..." : "Check Health"}
-          </button>
-        </div>
+          <div className="flex items-center gap-2">
+            {/* Auto-monitoring toggle */}
+            <button
+              type="button"
+              onClick={() => setAutoMonitoringEnabled(!autoMonitoringEnabled)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono rounded-lg border transition-all ${
+                autoMonitoringEnabled
+                  ? "bg-app-primary-color/10 border-app-primary-color text-app-primary-color"
+                  : "bg-app-tertiary border-app-primary-30 text-app-secondary"
+              }`}
+              title={`Auto-monitoring: ${autoMonitoringEnabled ? "Enabled" : "Disabled"}`}
+            >
+              <Shield size={12} />
+              {autoMonitoringEnabled ? "Auto: ON" : "Auto: OFF"}
+            </button>
 
-        <div
-          className="text-[10px] sm:text-xs font-mono mb-3 flex items-start gap-2"
-          style={{ color: "var(--app-secondary-80, rgba(125, 223, 189, 0.8))" }}
-        >
-          <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-          <span>
-            Add multiple RPC endpoints with weights for weighted selection.
-            Health checks measure latency and reliability.
-          </span>
+            {/* Refresh All Health Button */}
+            <button
+              type="button"
+              onClick={() => void checkAllEndpointsHealth(false)}
+              disabled={isCheckingHealth}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono rounded-lg bg-app-tertiary border border-app-primary-30 hover:border-app-primary-color hover:bg-app-primary-color/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ color: "var(--app-primary-color, #02b36d)" }}
+            >
+              <RefreshCw
+                size={12}
+                className={isCheckingHealth ? "animate-spin" : ""}
+              />
+              {isCheckingHealth ? "Checking..." : "Check Now"}
+            </button>
+          </div>
         </div>
 
         {/* Weight Total Indicator */}
@@ -451,7 +541,9 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
                 className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
                   endpoint.isActive
                     ? "bg-app-tertiary border-app-primary-40"
-                    : "bg-app-quaternary border-app-primary-20 opacity-60"
+                    : endpoint.autoDisabled
+                      ? "bg-red-950/20 border-red-500/30 opacity-80"
+                      : "bg-app-quaternary border-app-primary-20 opacity-60"
                 }`}
               >
                 {/* Priority Controls */}
@@ -491,6 +583,13 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
                     <span className="text-xs font-medium text-app-primary font-mono truncate">
                       {endpoint.name}
                     </span>
+                    {/* Auto-disabled Badge */}
+                    {endpoint.autoDisabled && (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+                        <ShieldAlert size={10} />
+                        Auto-disabled
+                      </span>
+                    )}
                     {/* Latency Badge */}
                     {endpoint.isActive && endpoint.latency !== undefined && (
                       <span
@@ -537,22 +636,51 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
                   </div>
                 )}
 
+                {/* Re-enable button for auto-disabled endpoints */}
+                {endpoint.autoDisabled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = endpoints.map((e) =>
+                        e.id === endpoint.id
+                          ? {
+                              ...e,
+                              isActive: true,
+                              autoDisabled: false,
+                              consecutiveFailures: 0,
+                              failureCount: 0,
+                            }
+                          : e,
+                      );
+                      normalizeWeights(updated);
+                      onChange(updated);
+                    }}
+                    className="text-[10px] font-mono px-2 py-1 rounded bg-orange-500/20 text-orange-400 border border-orange-500/40 hover:bg-orange-500/30 transition-all"
+                    title="Manually re-enable this endpoint"
+                  >
+                    Re-enable
+                  </button>
+                )}
+
                 {/* Toggle Active */}
-                <button
-                  type="button"
-                  onClick={() => toggleEndpoint(endpoint.id)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    endpoint.isActive
-                      ? "bg-app-primary-color"
-                      : "bg-app-primary-30"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                      endpoint.isActive ? "translate-x-5" : "translate-x-1"
+                {!endpoint.autoDisabled && (
+                  <button
+                    type="button"
+                    onClick={() => toggleEndpoint(endpoint.id)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      endpoint.isActive
+                        ? "bg-app-primary-color"
+                        : "bg-app-primary-30"
                     }`}
-                  />
-                </button>
+                    title={endpoint.isActive ? "Disable endpoint" : "Enable endpoint"}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        endpoint.isActive ? "translate-x-5" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                )}
 
                 {/* Delete Button */}
                 <button
@@ -569,7 +697,7 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
 
         {/* Health Summary */}
         {activeEndpoints.length > 0 && (
-          <div className="flex items-center gap-4 text-[10px] font-mono py-2 px-3 rounded-lg bg-app-quaternary/50 border border-app-primary-20">
+          <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono py-2 px-3 rounded-lg bg-app-quaternary/50 border border-app-primary-20">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-green-500" />
               <span className="text-app-secondary">
@@ -603,6 +731,14 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
                 }
               </span>
             </div>
+            {endpoints.some((e) => e.autoDisabled) && (
+              <div className="flex items-center gap-1.5">
+                <ShieldAlert size={12} className="text-orange-400" />
+                <span className="text-orange-400">
+                  Auto-disabled: {endpoints.filter((e) => e.autoDisabled).length}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

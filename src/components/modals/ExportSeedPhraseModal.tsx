@@ -57,8 +57,8 @@ const ExportSeedPhraseModal: React.FC<ExportSeedPhraseModalProps> = ({
       await navigator.clipboard.writeText(mnemonic);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy mnemonic:', error);
+    } catch (ignore) {
+      // Clipboard error, ignore
     }
   };
 

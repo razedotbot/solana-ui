@@ -32,6 +32,7 @@ export type {
   CustomQuickTradeSettings,
   QuickBuyPreferences,
   WalletType,
+  WalletGroup,
   ConfigType,
   RecentToken,
   CategoryQuickTradeSettings,
@@ -45,6 +46,8 @@ export type {
   WalletFilterOptions,
 } from "./wallet";
 
+export { DEFAULT_GROUP_ID } from "./wallet";
+
 // ============================================================================
 // Trading Types
 // ============================================================================
@@ -55,7 +58,6 @@ export type {
   WalletSell,
   BuyConfig,
   SellConfig,
-  ServerResponse,
   BuyBundle,
   SellBundle,
   BuyResult,
@@ -70,107 +72,6 @@ export type {
   QuickTradeParams,
   QuickTradeResult,
 } from "./trading";
-
-// ============================================================================
-// WebSocket Types
-// ============================================================================
-
-export type {
-  WebSocketWelcomeMessage,
-  WebSocketConnectionMessage,
-  WebSocketSubscriptionMessage,
-  WebSocketTradeMessage,
-  WebSocketErrorMessage,
-  WebSocketMessage,
-  TradeTransactionData,
-  AutomateTrade,
-  AutomateWebSocketConfig,
-  MultiTokenWebSocketConfig,
-  CopyTradeData as WebSocketCopyTradeData,
-  CopyTradeWebSocketConfig,
-  WebSocketConnectionState,
-  WebSocketStatus,
-  TokenSubscriptionRequest,
-  SignerSubscriptionRequest,
-  WebSocketSubscriptionRequest,
-  WebSocketEventHandlers,
-  WebSocketConstants,
-  WebSocketPriceInfo,
-  WebSocketAuthConfig,
-} from "./websocket";
-
-// ============================================================================
-// Automation Types (Unified - Sniper, CopyTrade, Automate)
-// ============================================================================
-
-export type {
-  // Tool Types
-  ToolType,
-
-  // Common Types
-  PriorityLevel,
-  ActionPriority,
-  CooldownUnit,
-  OperatorType,
-  ConditionOperator,
-  FilterMatchType,
-  ConditionLogic,
-
-  // Wallet Types (Automation)
-  WalletList,
-  SelectedWallet,
-  AutomationWalletType,
-
-  // Sniper Bot Types
-  SniperEventType,
-  BuyAmountType,
-  DeployEventData,
-  MigrationEventData,
-  DeployEvent,
-  MigrationEvent,
-  SniperEvent,
-  SniperFilter,
-  SniperProfile,
-  SniperExecutionLog,
-  SniperBotStorage,
-  SniperBotWebSocketConfig,
-
-  // Copy Trade Types
-  CopyTradeMode,
-  TokenFilterMode,
-  CopyTradeConditionType,
-  CopyTradeAmountType,
-  CopyTradeCondition,
-  CopyTradeAction,
-  SimpleModeCopyConfig,
-  CopyTradeProfile,
-  CopyTradeData,
-  CopyTradeExecutionLog,
-  CopyTradeProfileStorage,
-
-  // Automate (Strategy) Types
-  TradingConditionType,
-  ActionAmountType,
-  VolumeType,
-  TradingCondition,
-  TradingAction,
-  TradingStrategy,
-  AutomateTrade as AutomationTrade,
-  MarketData,
-  TokenMonitor,
-  ActiveStrategyInstance,
-  StrategyExecutionLog,
-  TradingStrategyStorage,
-
-  // Whitelist Types
-  WhitelistEntry,
-  WhitelistConfig,
-
-  // Unified Types
-  UnifiedProfile,
-  ToolsUIState,
-  RecentSniperEvent,
-} from "./automation";
 
 // ============================================================================
 // Component Types
@@ -245,3 +146,14 @@ export type {
   QueuedMessage,
   FrameProps,
 } from "./iframe";
+
+// ============================================================================
+// Token Metadata Types
+// ============================================================================
+
+export type {
+  TokenOnChainMetadata,
+  TokenOffChainMetadata,
+  TokenMetadataApiResponse,
+  TokenMetadataInfo,
+} from "./tokenMetadata";

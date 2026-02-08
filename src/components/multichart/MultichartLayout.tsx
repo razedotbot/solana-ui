@@ -21,6 +21,7 @@ import logo from "../../logo.png";
 import type { WalletType } from "../../utils/types";
 import type { ViewMode } from "../../utils/storage";
 import type { RecentToken } from "../../utils/types";
+import { useTokenMetadata, prefetchTokenMetadata } from "../../utils/hooks";
 
 interface MultichartLayoutProps {
   wallets: WalletType[];
@@ -136,23 +137,33 @@ const RecentTokenChip: React.FC<{
   onClick: () => void;
   isInList: boolean;
 }> = ({ token, onClick, isInList }) => {
+  const { metadata } = useTokenMetadata(token.address);
   const shortAddress = `${token.address.slice(0, 4)}...${token.address.slice(-3)}`;
+  const displayLabel = metadata?.symbol || shortAddress;
 
   return (
     <button
       onClick={onClick}
       disabled={isInList}
       className={`
-        flex-shrink-0 px-2 py-1 rounded text-[10px] font-mono
+        flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono
         border transition-all duration-200
         ${isInList
           ? "bg-app-primary-color/20 border-app-primary-color/40 text-app-primary cursor-default opacity-60"
           : "bg-app-primary-80 border-app-primary-40 text-app-secondary-60 hover:border-app-primary-color hover:text-app-primary"
         }
       `}
-      title={token.address}
+      title={metadata?.name ? `${metadata.name} (${token.address})` : token.address}
     >
-      {shortAddress}
+      {metadata?.image && (
+        <img
+          src={metadata.image}
+          alt={metadata.symbol}
+          className="w-3 h-3 rounded-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+        />
+      )}
+      {displayLabel}
     </button>
   );
 };
@@ -179,7 +190,9 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
 
   // Load recent tokens
   useEffect(() => {
-    setRecentTokens(getRecentTokens());
+    const recent = getRecentTokens();
+    setRecentTokens(recent);
+    prefetchTokenMetadata(recent.map((t) => t.address));
   }, [tokens]); // Refresh when tokens change
 
   // Calculate how many tokens can fit
@@ -208,7 +221,7 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
 
   // Filter out tokens already in the list and MONITOR_SLOT
   const availableRecentTokens = recentTokens.filter(
-    (rt) => rt.address !== MONITOR_SLOT && !tokens.some((t) => t.address === rt.address)
+    (rt) => rt.address !== MONITOR_SLOT && !tokens.some((t) => t.address === rt.address),
   );
 
   const visibleRecentTokens = availableRecentTokens.slice(0, visibleCount);

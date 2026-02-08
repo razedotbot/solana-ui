@@ -17,8 +17,7 @@ const ENCRYPTION_KEY = 'raze-bot-wallet-encryption-key';
 export function encryptData(data: string): string {
   try {
     return CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
-  } catch (error) {
-    console.error('Error encrypting data:', error);
+  } catch (ignore) {
     throw new Error('Failed to encrypt data');
   }
 }
@@ -37,8 +36,7 @@ export function decryptData(encryptedData: string): string {
       throw new Error('Failed to decrypt data - invalid key or corrupted data');
     }
     return decryptedData;
-  } catch (error) {
-    console.error('Error decrypting data:', error);
+  } catch (ignore) {
     throw new Error('Failed to decrypt data');
   }
 }

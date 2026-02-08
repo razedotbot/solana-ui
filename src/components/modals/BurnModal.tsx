@@ -10,7 +10,7 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { getWallets, getWalletDisplayName } from "../../utils/wallet";
-import { useToast } from "../../utils/hooks";
+import { useToast, useTokenMetadata } from "../../utils/hooks";
 import { loadConfigFromCookies } from "../../utils/storage";
 import * as web3 from "@solana/web3.js";
 import bs58 from "bs58";
@@ -76,6 +76,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
   const wallets = getWallets();
   const { showToast } = useToast();
+  const { metadata: tokenMeta } = useTokenMetadata(tokenAddress || undefined);
 
   // Reset form state
   const resetForm = useCallback((): void => {
@@ -160,19 +161,14 @@ export const BurnModal: React.FC<BurnModalProps> = ({
             } else {
               balancesMap.set(wallet.address, 0);
             }
-          } catch (error) {
-            console.error(
-              `Error fetching balance for wallet ${wallet.address}:`,
-              error,
-            );
+          } catch (ignore) {
             balancesMap.set(wallet.address, 0);
           }
         }),
       );
 
       setTokenBalancesForWallets(balancesMap);
-    } catch (error) {
-      console.error("Error fetching token balances:", error);
+    } catch (ignore) {
       showToast("Failed to fetch token balances", "error");
     } finally {
       setIsLoadingBalances(false);
@@ -211,14 +207,13 @@ export const BurnModal: React.FC<BurnModalProps> = ({
             {
               mint: tokenAddress,
               balance: balance,
-              symbol: tokenAddress.slice(0, 4),
+              symbol: tokenMeta?.symbol || tokenAddress.slice(0, 4),
             },
           ]);
         } else {
           setTokenAccounts([]);
         }
-      } catch (error) {
-        console.error("Error fetching token accounts:", error);
+      } catch (ignore) {
         showToast("Failed to fetch token accounts", "error");
         setTokenAccounts([]);
       } finally {
@@ -227,7 +222,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
     };
 
     void fetchTokenAccounts();
-  }, [sourceWallet, tokenAddress, showToast]);
+  }, [sourceWallet, tokenAddress, showToast, tokenMeta?.symbol]);
 
   const handleNext = async (): Promise<void> => {
     if (currentStep === 0) {
@@ -310,8 +305,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       if (!prepareResponse.ok) {
         const errorData = (await prepareResponse.json()) as ApiResponse;
         throw new Error(
-          errorData.error ||
-            `Failed to prepare transaction: HTTP ${prepareResponse.status}`,
+          errorData.error || "Failed to prepare burn transaction"
         );
       }
 
@@ -343,13 +337,8 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       const signedTransactionBs58 = bs58.encode(signedTransactionBuffer);
       // 3. Submit the signed transaction to Jito via the bundle service
       try {
-        const submitResult = await sendTransactions([signedTransactionBs58]);
-        console.info(
-          "Transaction successfully submitted to Jito:",
-          submitResult,
-        );
+        await sendTransactions([signedTransactionBs58]);
       } catch (error) {
-        console.error("Error submitting transaction:", error);
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         throw new Error(`Failed to submit transaction: ${errorMessage}`);
@@ -359,13 +348,9 @@ export const BurnModal: React.FC<BurnModalProps> = ({
       resetForm();
       onClose();
     } catch (error) {
-      console.error("Error:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      showToast(
-        `Token burn failed: ${errorMessage || "Unknown error"}`,
-        "error",
-      );
+      showToast(`Error burning tokens: ${errorMessage}`, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -389,7 +374,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
 
   // Get the token symbol for the selected token
   const getSelectedTokenSymbol = (): string => {
-    return tokenAddress.slice(0, 4) || "TKN";
+    return tokenMeta?.symbol || tokenAddress.slice(0, 4) || "TKN";
   };
 
   // Filter wallets based on search and other filters
@@ -796,9 +781,12 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                       <span className="text-sm color-primary font-mono tracking-wide">
                         TOKEN_SET
                       </span>
-                      <div className="flex items-center bg-app-tertiary px-2 py-1 rounded-lg border border-app-primary-20">
+                      <div className="flex items-center gap-2 bg-app-tertiary px-2 py-1 rounded-lg border border-app-primary-20">
+                        {tokenMeta?.image && (
+                          <img src={tokenMeta.image} alt={tokenMeta.symbol} className="w-4 h-4 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        )}
                         <span className="text-sm font-mono text-app-primary">
-                          {formatAddress(tokenAddress)}
+                          {tokenMeta?.symbol ? `${tokenMeta.symbol} (${formatAddress(tokenAddress)})` : formatAddress(tokenAddress)}
                         </span>
                       </div>
                     </div>
@@ -942,7 +930,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                                       wallet.address,
                                     ) || 0
                                   ).toFixed(4)}{" "}
-                                  {tokenAddress.slice(0, 4)}
+                                  {tokenMeta?.symbol || tokenAddress.slice(0, 4)}
                                 </span>
                               )}
                             </div>
@@ -995,7 +983,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                                 ?.address || "",
                             ) || 0
                           ).toFixed(4)}{" "}
-                          {tokenAddress.slice(0, 4)}
+                          {tokenMeta?.symbol || tokenAddress.slice(0, 4)}
                         </span>
                       </div>
                     </div>
@@ -1061,8 +1049,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                           </div>
                         ) : (
                           <span className="text-sm text-app-secondary font-mono">
-                            {tokenAddress.slice(0, 6)}...
-                            {tokenAddress.slice(-4)}
+                            {tokenMeta?.symbol || `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`}
                           </span>
                         )}
                       </div>
@@ -1120,7 +1107,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                                 )?.address || "",
                               ) || 0
                             ).toFixed(4)}{" "}
-                            {tokenAddress.slice(0, 4)}
+                            {tokenMeta?.symbol || tokenAddress.slice(0, 4)}
                           </span>
                         </div>
                       </div>
@@ -1288,11 +1275,15 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                             TOKEN
                           </span>
                           <div className="flex items-center">
-                            <div className="w-5 h-5 rounded-full bg-primary-20 border border-app-primary-30 flex items-center justify-center mr-2">
-                              <span className="text-xs color-primary font-mono">
-                                {getSelectedTokenSymbol()[0] || "T"}
-                              </span>
-                            </div>
+                            {tokenMeta?.image ? (
+                              <img src={tokenMeta.image} alt={tokenMeta.symbol} className="w-5 h-5 rounded-full object-cover mr-2" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-primary-20 border border-app-primary-30 flex items-center justify-center mr-2">
+                                <span className="text-xs color-primary font-mono">
+                                  {getSelectedTokenSymbol()[0] || "T"}
+                                </span>
+                              </div>
+                            )}
                             <span className="text-sm text-app-primary font-mono">
                               {getSelectedTokenSymbol()}
                             </span>
@@ -1304,8 +1295,7 @@ export const BurnModal: React.FC<BurnModalProps> = ({
                             TOKEN_ADDR
                           </span>
                           <span className="text-sm font-mono text-app-primary glitch-text">
-                            {tokenAddress.slice(0, 6)}...
-                            {tokenAddress.slice(-4)}
+                            {tokenMeta?.symbol || `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`}
                           </span>
                         </div>
 

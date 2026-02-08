@@ -234,7 +234,6 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
                 }}
             >
 
-                
                 {/* Header with Logo */}
                 <div className="flex items-start justify-between relative">
                     <div className="flex items-center gap-3">

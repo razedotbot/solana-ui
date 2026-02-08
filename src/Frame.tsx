@@ -361,7 +361,6 @@ export const Frame: React.FC<FrameProps> = ({
     }
   }, []);
 
-
   // Determine current view and token mint - using stable primitives
   // In multichart mode (when tokenAddress prop is provided), always treat as token view
   const currentViewType: ViewType = useMemo(() => {
@@ -710,8 +709,6 @@ export const Frame: React.FC<FrameProps> = ({
     setFrameLoading(false);
   };
 
-
-
   // Render loader
   const renderLoader = (loading: boolean): React.JSX.Element => {
     if (!loading) return <></>;
@@ -726,8 +723,6 @@ export const Frame: React.FC<FrameProps> = ({
       </div>
     );
   };
-
-
 
   // Render iframe with single frame (SPA - no URL changes after initial load)
   const renderFrame = (): React.JSX.Element => {
@@ -774,7 +769,6 @@ export const Frame: React.FC<FrameProps> = ({
     >
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-app-secondary-80 to-transparent pointer-events-none" />
-
 
       {isLoadingChart ? (
         <div className="h-full flex items-center justify-center">

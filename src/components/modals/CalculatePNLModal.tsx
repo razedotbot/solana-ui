@@ -4,6 +4,7 @@ import { BarChart2, X } from "lucide-react";
 import { getWallets } from "../../utils/wallet";
 import PnlCard from "../PnlCard";
 import type { IframeData } from "../../utils/types";
+import { useTokenMetadata } from "../../utils/hooks";
 
 interface BasePnlModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const PnlModal: React.FC<PnlModalProps> = ({
   tokenBalances,
 }) => {
   const wallets = getWallets();
+  const { metadata: tokenMeta } = useTokenMetadata(tokenAddress || undefined);
 
   // Calculate PNL using the same formula as DataBox
   const pnlData = useMemo(() => {
@@ -222,11 +224,16 @@ export const PnlModal: React.FC<PnlModalProps> = ({
             <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-app-secondary font-mono">
-                  TOKEN ADDRESS:
+                  TOKEN:
                 </span>
-                <span className="text-sm font-mono text-app-primary glitch-text">
-                  {tokenAddress.slice(0, 6)}...{tokenAddress.slice(-4)}
-                </span>
+                <div className="flex items-center gap-2">
+                  {tokenMeta?.image && (
+                    <img src={tokenMeta.image} alt={tokenMeta.symbol} className="w-4 h-4 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  )}
+                  <span className="text-sm font-mono text-app-primary glitch-text">
+                    {tokenMeta?.symbol ? `${tokenMeta.symbol} (${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)})` : `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`}
+                  </span>
+                </div>
               </div>
             </div>
 

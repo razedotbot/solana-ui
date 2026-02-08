@@ -4,14 +4,11 @@ import {
   Zap,
   Save,
   Wifi,
-  Key,
   Server,
   AlertCircle,
   RefreshCw,
   BookOpen,
   Settings,
-  Shield,
-  Activity,
   ChevronRight,
   Check,
   Gauge,
@@ -27,6 +24,7 @@ import { useAppContext } from "../contexts";
 import { useToast } from "../utils/hooks";
 import { saveConfigToCookies } from "../utils/storage";
 import { HorizontalHeader } from "../components/HorizontalHeader";
+import { PageBackground } from "../components/PageBackground";
 import type { ServerInfo } from "../utils/types";
 import { RPCEndpointManager } from "../components/RPCEndpointManager";
 import { createDefaultEndpoints, type RPCEndpoint } from "../utils/rpcManager";
@@ -34,10 +32,8 @@ import { OnboardingTutorial } from "../components/OnboardingTutorial";
 
 type SettingsTab =
   | "network"
-  | "server"
-  | "sending"
+  | "trading"
   | "execution"
-  | "api"
   | "help";
 
 interface TabConfig {
@@ -55,28 +51,16 @@ const TABS: TabConfig[] = [
     description: "RPC Endpoints",
   },
   {
-    id: "server",
-    label: "Server",
+    id: "trading",
+    label: "Trading",
     icon: <Server size={18} />,
-    description: "Trading Server",
-  },
-  {
-    id: "sending",
-    label: "Sending",
-    icon: <Send size={18} />,
-    description: "Transaction Routing",
+    description: "Server & Routing",
   },
   {
     id: "execution",
     label: "Execution",
     icon: <Zap size={18} />,
     description: "Trade Settings",
-  },
-  {
-    id: "api",
-    label: "API",
-    icon: <Key size={18} />,
-    description: "Access Keys",
   },
   {
     id: "help",
@@ -216,92 +200,65 @@ export const SettingsPage: React.FC = () => {
     </div>
   );
 
-  const renderServerTab = (): JSX.Element => (
-    <div className="space-y-6 animate-fade-in-down">
-      {/* Section Header */}
-      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 border border-blue-500/30 flex items-center justify-center">
-          <Server size={24} className="text-blue-400" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-app-primary font-mono">
-            Trading Server
-          </h2>
-          <p className="text-xs text-app-secondary-60 font-mono">
-            Configure server connection for trade execution
-          </p>
-        </div>
-      </div>
+  const renderTradingTab = (): JSX.Element => {
+    // Check which endpoints are configured
+    const hasRpcEndpoint = !!config.customRpcEndpoint?.trim();
+    const hasJitoSingleEndpoint = !!config.customJitoSingleEndpoint?.trim();
+    const hasJitoBundleEndpoint = !!config.customJitoBundleEndpoint?.trim();
 
-      {/* Self-Hosted Toggle Card */}
-      <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-app-tertiary to-app-quaternary border border-app-primary-20 hover:border-app-primary-40 transition-all duration-300">
-        <div className="absolute inset-0 bg-gradient-to-r from-app-primary-color/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="relative p-5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg bg-app-primary-color/10 border border-app-primary-color/20 flex items-center justify-center">
-              <Shield size={20} className="color-primary" />
-            </div>
-            <div>
-              <div className="text-sm font-bold text-app-primary font-mono">
-                Self-Hosted Mode
-              </div>
-              <div className="text-xs text-app-secondary-60 font-mono mt-0.5">
-                Use your own local or remote trading server
-              </div>
-            </div>
+    // Determine if current selections are valid
+    const singleTxMode = config.singleTxMode || "rpc";
+    const multiTxMode = config.multiTxMode || "bundle";
+
+    const isSingleModeValid =
+      singleTxMode === "rpc" ? hasRpcEndpoint : hasJitoSingleEndpoint;
+    const isMultiModeValid =
+      multiTxMode === "bundle" ? hasJitoBundleEndpoint : hasRpcEndpoint;
+
+    // Handler that validates before changing mode
+    const handleSingleTxModeChange = (value: string): void => {
+      if (value === "rpc" && !hasRpcEndpoint) {
+        showToast("Please configure RPC Endpoint first", "error");
+        return;
+      }
+      if (value === "jito" && !hasJitoSingleEndpoint) {
+        showToast("Please configure Jito Single TX Endpoint first", "error");
+        return;
+      }
+      handleConfigChange("singleTxMode", value);
+    };
+
+    const handleMultiTxModeChange = (value: string): void => {
+      if (value === "bundle" && !hasJitoBundleEndpoint) {
+        showToast("Please configure Jito Bundle Endpoint first", "error");
+        return;
+      }
+      if ((value === "parallel" || value === "sequential") && !hasRpcEndpoint) {
+        showToast("Please configure RPC Endpoint first", "error");
+        return;
+      }
+      handleConfigChange("multiTxMode", value);
+    };
+
+    return (
+      <div className="space-y-6 animate-fade-in-down">
+        {/* Section Header */}
+        <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+            <Server size={24} className="color-primary" />
           </div>
-          <button
-            onClick={() =>
-              handleConfigChange(
-                "tradingServerEnabled",
-                config.tradingServerEnabled === "true" ? "false" : "true",
-              )
-            }
-            className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
-              config.tradingServerEnabled === "true"
-                ? "bg-app-primary-color shadow-[0_0_15px_rgba(2,179,109,0.4)]"
-                : "bg-app-quaternary border border-app-primary-30"
-            }`}
-          >
-            <span
-              className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${
-                config.tradingServerEnabled === "true" ? "left-8" : "left-1"
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-
-      {config.tradingServerEnabled === "true" ? (
-        <div className="space-y-4 animate-fade-in-down">
-          <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-            <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-              <Wifi size={14} className="color-primary" />
-              Server URL
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={config.tradingServerUrl || "http://localhost:4444"}
-                onChange={(e) =>
-                  handleConfigChange("tradingServerUrl", e.target.value)
-                }
-                className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all"
-                placeholder="http://localhost:4444"
-              />
-              <div className="absolute right-4 top-3.5">
-                <div className="w-2 h-2 rounded-full bg-app-primary-color animate-pulse" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-3 text-[10px] text-app-secondary-40 font-mono">
-              <AlertCircle size={10} />
-              <span>Ensure your server is running and accessible</span>
-            </div>
+          <div>
+            <h2 className="text-lg font-bold text-app-primary font-mono">
+              Trading Configuration
+            </h2>
+            <p className="text-xs text-app-secondary-60 font-mono">
+              Configure server connection and transaction routing
+            </p>
           </div>
         </div>
-      ) : (
-        <div className="space-y-4 animate-fade-in-down">
-          <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+
+        {/* Regional Server Selection */}
+        <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
             <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
               <Radio size={14} className="color-primary" />
               Regional Server Selection
@@ -311,7 +268,7 @@ export const SettingsPage: React.FC = () => {
             <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-app-quaternary border border-app-primary-20">
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-2.5 h-2.5 rounded-full ${isLoadingServers ? "bg-yellow-500 animate-pulse" : "bg-app-primary-color"}`}
+                  className={`w-2.5 h-2.5 rounded-full ${isLoadingServers ? "bg-app-primary-color animate-pulse" : "bg-app-primary-color"}`}
                 />
                 <span className="text-sm font-mono text-app-primary font-bold">
                   {isLoadingServers
@@ -372,7 +329,7 @@ export const SettingsPage: React.FC = () => {
                         <div
                           className={`text-xs font-mono px-2 py-1 rounded-full border ${getPingBg(server.ping)} ${getPingColor(server.ping)} border-current/20`}
                         >
-                          {server.ping}ms
+                          {Math.round(server.ping)}ms
                         </div>
                       )}
                       {server.region === currentRegion && (
@@ -390,72 +347,11 @@ export const SettingsPage: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderSendingTab = (): JSX.Element => {
-    // Check which endpoints are configured
-    const hasRpcEndpoint = !!config.customRpcEndpoint?.trim();
-    const hasJitoSingleEndpoint = !!config.customJitoSingleEndpoint?.trim();
-    const hasJitoBundleEndpoint = !!config.customJitoBundleEndpoint?.trim();
-
-    // Determine if current selections are valid
-    const singleTxMode = config.singleTxMode || "rpc";
-    const multiTxMode = config.multiTxMode || "bundle";
-
-    const isSingleModeValid =
-      singleTxMode === "rpc" ? hasRpcEndpoint : hasJitoSingleEndpoint;
-    const isMultiModeValid =
-      multiTxMode === "bundle" ? hasJitoBundleEndpoint : hasRpcEndpoint;
-
-    // Handler that validates before changing mode
-    const handleSingleTxModeChange = (value: string): void => {
-      if (value === "rpc" && !hasRpcEndpoint) {
-        showToast("Please configure RPC Endpoint first", "error");
-        return;
-      }
-      if (value === "jito" && !hasJitoSingleEndpoint) {
-        showToast("Please configure Jito Single TX Endpoint first", "error");
-        return;
-      }
-      handleConfigChange("singleTxMode", value);
-    };
-
-    const handleMultiTxModeChange = (value: string): void => {
-      if (value === "bundle" && !hasJitoBundleEndpoint) {
-        showToast("Please configure Jito Bundle Endpoint first", "error");
-        return;
-      }
-      if ((value === "parallel" || value === "sequential") && !hasRpcEndpoint) {
-        showToast("Please configure RPC Endpoint first", "error");
-        return;
-      }
-      handleConfigChange("multiTxMode", value);
-    };
-
-    return (
-      <div className="space-y-6 animate-fade-in-down">
-        {/* Section Header */}
-        <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-500/5 border border-orange-500/30 flex items-center justify-center">
-            <Send size={24} className="text-orange-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-app-primary font-mono">
-              Transaction Sending
-            </h2>
-            <p className="text-xs text-app-secondary-60 font-mono">
-              Configure how transactions are sent to the network
-            </p>
-          </div>
-        </div>
 
         {/* Sending Mode Toggle */}
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
-            <Radio size={14} className="text-orange-400" />
+            <Radio size={14} className="color-primary" />
             Sending Mode
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -478,26 +374,26 @@ export const SettingsPage: React.FC = () => {
                 onClick={() => handleConfigChange("sendingMode", opt.value)}
                 className={`relative group p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
                   (config.sendingMode || "server") === opt.value
-                    ? "border-orange-500/50 bg-orange-500/10 shadow-[0_0_20px_rgba(249,115,22,0.15)]"
+                    ? "border-app-primary-color/50 bg-app-primary-color/10 shadow-[0_0_20px_rgba(2,179,109,0.15)]"
                     : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
                 }`}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-app-primary-color/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative">
                   <div className="flex items-center justify-between mb-2">
                     <span
-                      className={`${(config.sendingMode || "server") === opt.value ? "text-orange-400" : "text-app-secondary-60"}`}
+                      className={`${(config.sendingMode || "server") === opt.value ? "color-primary" : "text-app-secondary-60"}`}
                     >
                       {opt.icon}
                     </span>
                     {(config.sendingMode || "server") === opt.value && (
-                      <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
+                      <div className="w-5 h-5 rounded-full bg-app-primary-color flex items-center justify-center">
                         <Check size={12} className="text-black" />
                       </div>
                     )}
                   </div>
                   <div
-                    className={`text-sm font-bold font-mono ${(config.sendingMode || "server") === opt.value ? "text-orange-400" : "text-app-primary"}`}
+                    className={`text-sm font-bold font-mono ${(config.sendingMode || "server") === opt.value ? "color-primary" : "text-app-primary"}`}
                   >
                     {opt.label}
                   </div>
@@ -518,7 +414,7 @@ export const SettingsPage: React.FC = () => {
               className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasRpcEndpoint ? "border-app-primary-20" : "border-red-500/30"}`}
             >
               <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-                <Globe size={14} className="text-blue-400" />
+                <Globe size={14} className="color-primary" />
                 RPC Endpoint
                 {hasRpcEndpoint && (
                   <Check size={12} className="text-green-500 ml-auto" />
@@ -530,7 +426,7 @@ export const SettingsPage: React.FC = () => {
                 onChange={(e) =>
                   handleConfigChange("customRpcEndpoint", e.target.value)
                 }
-                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 focus:outline-none font-mono transition-all ${hasRpcEndpoint ? "border-app-primary-30" : "border-red-500/50"}`}
+                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all ${hasRpcEndpoint ? "border-app-primary-30" : "border-red-500/50"}`}
                 placeholder="https://your-rpc.solana-mainnet.quiknode.pro/..."
               />
               <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
@@ -540,10 +436,10 @@ export const SettingsPage: React.FC = () => {
 
             {/* Jito Single TX Endpoint */}
             <div
-              className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasJitoSingleEndpoint ? "border-app-primary-20" : "border-yellow-500/30"}`}
+              className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasJitoSingleEndpoint ? "border-app-primary-20" : "border-red-500/30"}`}
             >
               <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-                <Zap size={14} className="text-yellow-400" />
+                <Zap size={14} className="color-primary" />
                 Jito Single TX Endpoint
                 {hasJitoSingleEndpoint && (
                   <Check size={12} className="text-green-500 ml-auto" />
@@ -555,7 +451,7 @@ export const SettingsPage: React.FC = () => {
                 onChange={(e) =>
                   handleConfigChange("customJitoSingleEndpoint", e.target.value)
                 }
-                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/50 focus:outline-none font-mono transition-all ${hasJitoSingleEndpoint ? "border-app-primary-30" : "border-yellow-500/50"}`}
+                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all ${hasJitoSingleEndpoint ? "border-app-primary-30" : "border-red-500/50"}`}
                 placeholder="https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/transactions?uuid=..."
               />
               <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
@@ -565,10 +461,10 @@ export const SettingsPage: React.FC = () => {
 
             {/* Jito Bundle Endpoint */}
             <div
-              className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasJitoBundleEndpoint ? "border-app-primary-20" : "border-purple-500/30"}`}
+              className={`p-5 rounded-xl bg-app-tertiary/50 border ${hasJitoBundleEndpoint ? "border-app-primary-20" : "border-red-500/30"}`}
             >
               <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-                <Layers size={14} className="text-purple-400" />
+                <Layers size={14} className="color-primary" />
                 Jito Bundle Endpoint
                 {hasJitoBundleEndpoint && (
                   <Check size={12} className="text-green-500 ml-auto" />
@@ -580,7 +476,7 @@ export const SettingsPage: React.FC = () => {
                 onChange={(e) =>
                   handleConfigChange("customJitoBundleEndpoint", e.target.value)
                 }
-                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 focus:outline-none font-mono transition-all ${hasJitoBundleEndpoint ? "border-app-primary-30" : "border-purple-500/50"}`}
+                className={`w-full bg-app-quaternary border rounded-lg px-4 py-3 text-sm text-app-primary focus:border-app-primary-color focus:ring-1 focus:ring-app-primary-color/50 focus:outline-none font-mono transition-all ${hasJitoBundleEndpoint ? "border-app-primary-30" : "border-red-500/50"}`}
                 placeholder="https://amsterdam.mainnet.block-engine.jito.wtf/api/v1/bundles?uuid=..."
               />
               <p className="text-[10px] text-app-secondary-40 font-mono mt-2">
@@ -596,7 +492,7 @@ export const SettingsPage: React.FC = () => {
             {/* Single Transaction Mode */}
             <div className="space-y-3 animate-fade-in-down">
               <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
-                <Send size={14} className="text-yellow-400" />
+                <Send size={14} className="color-primary" />
                 Single Transaction Mode
                 {!isSingleModeValid && (
                   <span className="text-red-400 text-[10px] ml-2">
@@ -630,9 +526,7 @@ export const SettingsPage: React.FC = () => {
                       disabled={isDisabled}
                       className={`relative group p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
                         isSelected
-                          ? opt.value === "rpc"
-                            ? "border-blue-500/50 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.15)]"
-                            : "border-yellow-500/50 bg-yellow-500/10 shadow-[0_0_20px_rgba(234,179,8,0.15)]"
+                          ? "border-app-primary-color/50 bg-app-primary-color/10 shadow-[0_0_20px_rgba(2,179,109,0.15)]"
                           : isDisabled
                             ? "border-app-primary-10 bg-app-tertiary/30 opacity-50 cursor-not-allowed"
                             : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
@@ -641,14 +535,12 @@ export const SettingsPage: React.FC = () => {
                       <div className="relative">
                         <div className="flex items-center justify-between mb-2">
                           <span
-                            className={`${isSelected ? (opt.value === "rpc" ? "text-blue-400" : "text-yellow-400") : "text-app-secondary-60"}`}
+                            className={`${isSelected ? "color-primary" : "text-app-secondary-60"}`}
                           >
                             {opt.icon}
                           </span>
                           {isSelected && (
-                            <div
-                              className={`w-5 h-5 rounded-full flex items-center justify-center ${opt.value === "rpc" ? "bg-blue-500" : "bg-yellow-500"}`}
-                            >
+                            <div className="w-5 h-5 rounded-full bg-app-primary-color flex items-center justify-center">
                               <Check size={12} className="text-black" />
                             </div>
                           )}
@@ -657,7 +549,7 @@ export const SettingsPage: React.FC = () => {
                           )}
                         </div>
                         <div
-                          className={`text-sm font-bold font-mono ${isSelected ? (opt.value === "rpc" ? "text-blue-400" : "text-yellow-400") : "text-app-primary"}`}
+                          className={`text-sm font-bold font-mono ${isSelected ? "color-primary" : "text-app-primary"}`}
                         >
                           {opt.label}
                         </div>
@@ -677,7 +569,7 @@ export const SettingsPage: React.FC = () => {
             {/* Multiple Transactions Mode */}
             <div className="space-y-3 animate-fade-in-down">
               <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
-                <Layers size={14} className="text-cyan-400" />
+                <Layers size={14} className="color-primary" />
                 Multiple Transactions Mode
                 {!isMultiModeValid && (
                   <span className="text-red-400 text-[10px] ml-2">
@@ -718,18 +610,18 @@ export const SettingsPage: React.FC = () => {
                       disabled={isDisabled}
                       className={`relative group p-4 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden ${
                         isSelected
-                          ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.15)]"
+                          ? "border-app-primary-color/50 bg-app-primary-color/10 shadow-[0_0_20px_rgba(2,179,109,0.15)]"
                           : isDisabled
                             ? "border-app-primary-10 bg-app-tertiary/30 opacity-50 cursor-not-allowed"
                             : "border-app-primary-20 bg-app-tertiary/50 hover:border-app-primary-40 hover:bg-app-tertiary"
                       }`}
                     >
-                      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-cyan-500/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-app-primary-color/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
                       <div className="relative">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-2xl">{opt.icon}</span>
                           {isSelected && (
-                            <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-app-primary-color flex items-center justify-center">
                               <Check size={12} className="text-black" />
                             </div>
                           )}
@@ -738,7 +630,7 @@ export const SettingsPage: React.FC = () => {
                           )}
                         </div>
                         <div
-                          className={`text-sm font-bold font-mono ${isSelected ? "text-cyan-400" : "text-app-primary"}`}
+                          className={`text-sm font-bold font-mono ${isSelected ? "color-primary" : "text-app-primary"}`}
                         >
                           {opt.label}
                         </div>
@@ -763,7 +655,7 @@ export const SettingsPage: React.FC = () => {
             (config.sendingMode || "server") === "custom" &&
             (!isSingleModeValid || !isMultiModeValid)
               ? "from-red-500/5 to-transparent border-red-500/20"
-              : "from-orange-500/5 to-transparent border-orange-500/20"
+              : "from-app-primary-color/5 to-transparent border-app-primary-color/20"
           }`}
         >
           <div className="flex items-start gap-3">
@@ -772,7 +664,7 @@ export const SettingsPage: React.FC = () => {
                 (config.sendingMode || "server") === "custom" &&
                 (!isSingleModeValid || !isMultiModeValid)
                   ? "bg-red-500/20"
-                  : "bg-orange-500/20"
+                  : "bg-app-primary-color/20"
               }`}
             >
               <AlertCircle
@@ -781,7 +673,7 @@ export const SettingsPage: React.FC = () => {
                   (config.sendingMode || "server") === "custom" &&
                   (!isSingleModeValid || !isMultiModeValid)
                     ? "text-red-400"
-                    : "text-orange-400"
+                    : "color-primary"
                 }
               />
             </div>
@@ -825,8 +717,8 @@ export const SettingsPage: React.FC = () => {
     <div className="space-y-6 animate-fade-in-down">
       {/* Section Header */}
       <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-500/5 border border-purple-500/30 flex items-center justify-center">
-          <Zap size={24} className="text-purple-400" />
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+          <Zap size={24} className="color-primary" />
         </div>
         <div>
           <h2 className="text-lg font-bold text-app-primary font-mono">
@@ -841,7 +733,7 @@ export const SettingsPage: React.FC = () => {
       {/* Bundle Strategy */}
       <div className="space-y-3">
         <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
-          <Layers size={14} className="text-purple-400" />
+          <Layers size={14} className="color-primary" />
           Bundle Strategy
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -905,7 +797,7 @@ export const SettingsPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
           <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-            <Timer size={14} className="text-blue-400" />
+            <Timer size={14} className="color-primary" />
             Single Delay
           </label>
           <div className="relative">
@@ -928,7 +820,7 @@ export const SettingsPage: React.FC = () => {
 
         <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
           <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-            <Timer size={14} className="text-purple-400" />
+            <Timer size={14} className="color-primary" />
             Batch Delay
           </label>
           <div className="relative">
@@ -952,7 +844,7 @@ export const SettingsPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
           <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-            <Coins size={14} className="text-yellow-400" />
+            <Coins size={14} className="color-primary" />
             Priority Fee
           </label>
           <div className="relative">
@@ -972,7 +864,7 @@ export const SettingsPage: React.FC = () => {
 
         <div className="p-4 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
           <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-            <Percent size={14} className="text-orange-400" />
+            <Percent size={14} className="color-primary" />
             Max Slippage
           </label>
           <div className="relative">
@@ -1003,8 +895,8 @@ export const SettingsPage: React.FC = () => {
       {/* Balance Refresh Section */}
       <div className="p-5 rounded-xl bg-gradient-to-br from-app-tertiary to-app-quaternary/50 border border-app-primary-20">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
-            <RefreshCw size={18} className="text-cyan-400" />
+          <div className="w-10 h-10 rounded-lg bg-app-primary-color/20 border border-app-primary-color/30 flex items-center justify-center">
+            <RefreshCw size={18} className="color-primary" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-app-primary font-mono">
@@ -1039,18 +931,18 @@ export const SettingsPage: React.FC = () => {
               }
               className={`p-3 rounded-lg border transition-all duration-200 text-left ${
                 (config.balanceRefreshStrategy || "batch") === opt.value
-                  ? "border-cyan-500/50 bg-cyan-500/10"
+                  ? "border-app-primary-color/50 bg-app-primary-color/10"
                   : "border-app-primary-20 bg-app-quaternary/50 hover:border-app-primary-40"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-lg">{opt.icon}</span>
                 {(config.balanceRefreshStrategy || "batch") === opt.value && (
-                  <Check size={14} className="text-cyan-400" />
+                  <Check size={14} className="color-primary" />
                 )}
               </div>
               <div
-                className={`text-xs font-bold font-mono ${(config.balanceRefreshStrategy || "batch") === opt.value ? "text-cyan-400" : "text-app-primary"}`}
+                className={`text-xs font-bold font-mono ${(config.balanceRefreshStrategy || "batch") === opt.value ? "color-primary" : "text-app-primary"}`}
               >
                 {opt.label}
               </div>
@@ -1075,7 +967,7 @@ export const SettingsPage: React.FC = () => {
                 handleConfigChange("balanceRefreshBatchSize", e.target.value)
               }
               disabled={(config.balanceRefreshStrategy || "batch") !== "batch"}
-              className={`w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary font-mono transition-all ${(config.balanceRefreshStrategy || "batch") !== "batch" ? "opacity-40" : "focus:border-cyan-500"}`}
+              className={`w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary font-mono transition-all ${(config.balanceRefreshStrategy || "batch") !== "batch" ? "opacity-40" : "focus:border-app-primary-color"}`}
             />
           </div>
           <div>
@@ -1093,70 +985,9 @@ export const SettingsPage: React.FC = () => {
               disabled={
                 (config.balanceRefreshStrategy || "batch") === "parallel"
               }
-              className={`w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary font-mono transition-all ${(config.balanceRefreshStrategy || "batch") === "parallel" ? "opacity-40" : "focus:border-cyan-500"}`}
+              className={`w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-sm text-app-primary font-mono transition-all ${(config.balanceRefreshStrategy || "batch") === "parallel" ? "opacity-40" : "focus:border-app-primary-color"}`}
             />
           </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderApiTab = (): JSX.Element => (
-    <div className="space-y-6 animate-fade-in-down">
-      {/* Section Header */}
-      <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border border-yellow-500/30 flex items-center justify-center">
-          <Key size={24} className="text-yellow-400" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-app-primary font-mono">
-            API Configuration
-          </h2>
-          <p className="text-xs text-app-secondary-60 font-mono">
-            Configure API keys for data streams and services
-          </p>
-        </div>
-      </div>
-
-      {/* API Key Input */}
-      <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-        <div className="flex items-center justify-between mb-4">
-          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
-            <Activity size={14} className="text-yellow-400" />
-            Data Stream API Key
-          </label>
-          <a
-            href="https://my.raze.bot"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs font-mono color-primary hover:text-app-primary-light transition-colors"
-          >
-            Get API Key
-            <ChevronRight size={14} />
-          </a>
-        </div>
-        <input
-          type="password"
-          value={config.streamApiKey || ""}
-          onChange={(e) => handleConfigChange("streamApiKey", e.target.value)}
-          className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-4 py-3 text-sm text-app-primary focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/50 focus:outline-none font-mono transition-all"
-          placeholder="sk_live_xxxxxxxxxxxxxxxxxxxxx"
-        />
-        <p className="text-[10px] text-app-secondary-40 font-mono mt-3">
-          Required for real-time market data websockets and automated trading
-          features.
-        </p>
-      </div>
-
-      {/* API Status Card */}
-      <div className="p-4 rounded-xl bg-gradient-to-r from-yellow-500/5 to-transparent border border-yellow-500/20">
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-3 h-3 rounded-full ${config.streamApiKey ? "bg-app-primary-color" : "bg-app-secondary-40"}`}
-          />
-          <span className="text-sm font-mono text-app-primary">
-            {config.streamApiKey ? "API Key Configured" : "No API Key Set"}
-          </span>
         </div>
       </div>
     </div>
@@ -1166,8 +997,8 @@ export const SettingsPage: React.FC = () => {
     <div className="space-y-6 animate-fade-in-down">
       {/* Section Header */}
       <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-500/5 border border-pink-500/30 flex items-center justify-center">
-          <BookOpen size={24} className="text-pink-400" />
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+          <BookOpen size={24} className="color-primary" />
         </div>
         <div>
           <h2 className="text-lg font-bold text-app-primary font-mono">
@@ -1182,16 +1013,16 @@ export const SettingsPage: React.FC = () => {
       {/* Tutorial Card */}
       <button
         onClick={() => setShowTutorial(true)}
-        className="w-full group relative overflow-hidden p-6 rounded-xl bg-gradient-to-br from-app-tertiary to-app-quaternary border border-app-primary-20 hover:border-pink-500/40 transition-all duration-300 text-left"
+        className="w-full group relative overflow-hidden p-6 rounded-xl bg-gradient-to-br from-app-tertiary to-app-quaternary border border-app-primary-20 hover:border-app-primary-color/40 transition-all duration-300 text-left"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute inset-0 bg-gradient-to-r from-app-primary-color/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-pink-500/20 border border-pink-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <BookOpen size={28} className="text-pink-400" />
+            <div className="w-14 h-14 rounded-xl bg-app-primary-color/20 border border-app-primary-color/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <BookOpen size={28} className="color-primary" />
             </div>
             <div>
-              <div className="text-base font-bold text-app-primary font-mono group-hover:text-pink-400 transition-colors">
+              <div className="text-base font-bold text-app-primary font-mono group-hover:color-primary transition-colors">
                 Onboarding Tutorial
               </div>
               <div className="text-xs text-app-secondary-60 font-mono mt-1">
@@ -1199,10 +1030,10 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="w-10 h-10 rounded-full bg-pink-500/20 border border-pink-500/30 flex items-center justify-center group-hover:bg-pink-500 transition-all">
+          <div className="w-10 h-10 rounded-full bg-app-primary-color/20 border border-app-primary-color/30 flex items-center justify-center group-hover:bg-app-primary-color transition-all">
             <ChevronRight
               size={20}
-              className="text-pink-400 group-hover:text-white transition-colors"
+              className="color-primary group-hover:text-black transition-colors"
             />
           </div>
         </div>
@@ -1214,14 +1045,10 @@ export const SettingsPage: React.FC = () => {
     switch (activeTab) {
       case "network":
         return renderNetworkTab();
-      case "server":
-        return renderServerTab();
-      case "sending":
-        return renderSendingTab();
+      case "trading":
+        return renderTradingTab();
       case "execution":
         return renderExecutionTab();
-      case "api":
-        return renderApiTab();
       case "help":
         return renderHelpTab();
       default:
@@ -1235,18 +1062,7 @@ export const SettingsPage: React.FC = () => {
 
       <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
         {/* Background */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          <div className="absolute inset-0 bg-app-primary opacity-90">
-            <div className="absolute inset-0 bg-gradient-to-b from-app-primary-05 to-transparent" />
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `linear-gradient(rgba(2, 179, 109, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(2, 179, 109, 0.03) 1px, transparent 1px)`,
-                backgroundSize: "40px 40px",
-              }}
-            />
-          </div>
-        </div>
+        <PageBackground />
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
           {/* Page Header */}
@@ -1283,17 +1099,6 @@ export const SettingsPage: React.FC = () => {
                   </div>
                   <div className="text-[10px] text-app-secondary-40 font-mono">
                     REGION
-                  </div>
-                </div>
-                <div className="w-px h-8 bg-app-primary-20" />
-                <div className="text-center">
-                  <div
-                    className={`text-xs font-mono font-bold ${config.tradingServerEnabled === "true" ? "color-primary" : "text-app-secondary-60"}`}
-                  >
-                    {config.tradingServerEnabled === "true" ? "SELF" : "CLOUD"}
-                  </div>
-                  <div className="text-[10px] text-app-secondary-40 font-mono">
-                    SERVER
                   </div>
                 </div>
               </div>
