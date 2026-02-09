@@ -1075,6 +1075,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             baseCurrencyBalances={baseCurrencyBalances}
             tokenBalances={tokenBalances}
             baseCurrency={baseCurrency}
+            tokenAddress={tokenAddress}
             anchorRef={activeWalletsRef}
             onClose={() => setShowWalletSelector(false)}
             onToggleWallet={handleToggleWallet}

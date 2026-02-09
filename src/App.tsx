@@ -220,7 +220,7 @@ const WalletManager: React.FC = () => {
   } = useAppContext();
 
   // Multichart context for adding tokens when in multichart mode
-  const { addToken: addMultichartToken, tokens: multichartTokens } = useMultichart();
+  const { addToken: addMultichartToken, tokens: multichartTokens, setActiveToken: setMultichartActiveToken } = useMultichart();
 
   // Toast notifications
   const { showToast } = useToast();
@@ -690,6 +690,14 @@ const WalletManager: React.FC = () => {
       setCopiedAddress: (address: string | null): void =>
         dispatch({ type: "SET_COPIED_ADDRESS", payload: address }),
       setTokenAddress: (address: string): void => {
+        if (viewMode === "multichart" && address) {
+          const alreadyInList = multichartTokens.some(t => t.address === address);
+          if (!alreadyInList) {
+            addMultichartToken(address);
+          }
+          navigate("/monitor", { replace: true });
+          return;
+        }
         dispatch({ type: "SET_TOKEN_ADDRESS", payload: address });
         // Navigate to the new token route
         if (address) {
@@ -789,6 +797,9 @@ const WalletManager: React.FC = () => {
       setContextWallets,
       setContextBaseCurrencyBalances,
       setContextTokenBalances,
+      addMultichartToken,
+      multichartTokens,
+      viewMode,
     ],
   );
 
@@ -800,16 +811,22 @@ const WalletManager: React.FC = () => {
       const alreadyInList = multichartTokens.some(t => t.address === tokenAddressParam);
       if (!alreadyInList) {
         addMultichartToken(tokenAddressParam);
+      } else {
+        // Token already exists - switch to it
+        const tokenIndex = multichartTokens.findIndex(t => t.address === tokenAddressParam);
+        if (tokenIndex >= 0) {
+          setMultichartActiveToken(tokenIndex);
+        }
       }
-      // Navigate to root to clear the token from URL
-      navigate("/", { replace: true });
+      // Navigate to monitor to show multichart view
+      navigate("/monitor", { replace: true });
       return;
     }
 
     if (tokenAddressParam !== state.tokenAddress) {
       dispatch({ type: "SET_TOKEN_ADDRESS", payload: tokenAddressParam || "" });
     }
-  }, [tokenAddressParam, state.tokenAddress, viewMode, multichartTokens, addMultichartToken, navigate]);
+  }, [tokenAddressParam, state.tokenAddress, viewMode, multichartTokens, addMultichartToken, setMultichartActiveToken, navigate]);
 
   // Track processed trades to avoid infinite loops
   const processedTradesRef = useRef<Set<string>>(new Set());

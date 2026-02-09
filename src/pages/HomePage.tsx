@@ -20,6 +20,7 @@ import { OnboardingTutorial } from '../components/OnboardingTutorial';
 import { createConnectionFromConfig } from '../utils/rpcManager';
 import { useTokenMetadata, prefetchTokenMetadata } from '../utils/hooks';
 import { useMultichart } from '../contexts/useMultichart';
+import { loadViewModeFromCookies } from '../utils/storage';
 
 interface NetworkStats {
   solPrice: string;
@@ -106,7 +107,7 @@ const RecentTokenCard: React.FC<{
 
 export const Homepage: React.FC = () => {
   const navigate = useNavigate();
-  const { tokens: multichartTokens } = useMultichart();
+  const { tokens: multichartTokens, addToken: addMultichartToken } = useMultichart();
   const [recentTokens, setRecentTokens] = useState<RecentToken[]>([]);
   const [_isLoadingTokens, setIsLoadingTokens] = useState(true);
   const [_tokensError, setTokensError] = useState<string | null>(null);
@@ -207,7 +208,13 @@ export const Homepage: React.FC = () => {
   };
 
   const handleNavigateToToken = (tokenAddress: string): void => {
-    navigate(`/tokens/${tokenAddress}`);
+    const viewMode = loadViewModeFromCookies();
+    if (viewMode === 'multichart') {
+      addMultichartToken(tokenAddress);
+      navigate('/monitor');
+    } else {
+      navigate(`/tokens/${tokenAddress}`);
+    }
   };
 
   const handleExploreChart = (): void => {

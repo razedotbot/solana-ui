@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Check, Zap } from "lucide-react";
+import { Check, Zap, RefreshCw } from "lucide-react";
 import { getWalletDisplayName } from "../utils/wallet";
 import { formatTokenBalance, formatBaseCurrencyBalance } from "../utils/formatting";
 import type { WalletType } from "../utils/types";
 import { BASE_CURRENCIES, type BaseCurrencyConfig } from "../utils/constants";
+import { useAppContext } from "../contexts";
 
 interface WalletSelectorPopupProps {
   wallets: WalletType[];
@@ -30,6 +31,7 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
   onSelectAll,
   onSelectAllWithBalance,
 }) => {
+  const { refreshBalances, isRefreshing } = useAppContext();
   const popupRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -92,6 +94,19 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
           >
             Select All with Balance
           </button>
+          {refreshBalances && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                void refreshBalances(tokenAddress);
+              }}
+              disabled={isRefreshing}
+              className="ml-auto p-1 text-app-secondary border border-app-primary-40 rounded hover:bg-app-primary-20 hover:color-primary transition-colors disabled:opacity-50"
+              title="Refresh balances"
+            >
+              <RefreshCw size={12} className={isRefreshing ? "animate-spin" : ""} />
+            </button>
+          )}
         </div>
 
         {/* Wallet List */}
