@@ -3,7 +3,7 @@ import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
 import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
-import { loadConfigFromCookies } from "./storage";
+import { getServerBaseUrl, resolveBaseCurrency, type TransactionBundle } from "./trading";
 
 interface WalletDistribution {
   address: string;
@@ -11,13 +11,6 @@ interface WalletDistribution {
   amount: string;
 }
 
-interface DistributionBundle {
-  transactions: string[]; // Base58 encoded transaction data
-}
-
-interface WindowWithConfig {
-  tradingServerUrl?: string;
-}
 
 /**
  * Get partially signed transactions from backend
@@ -28,8 +21,7 @@ const getPartiallySignedTransactions = async (
   recipients: { address: string; amount: string }[],
   baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
-  const baseUrl =
-    (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
+  const baseUrl = getServerBaseUrl();
 
   const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const endpoint = isNativeSOL
@@ -121,9 +113,9 @@ const completeTransactionSigning = (
 /**
  * Prepare distribution bundles
  */
-const prepareDistributionBundles = (
+const prepareTransactionBundles = (
   signedTransactions: string[],
-): DistributionBundle[] => {
+): TransactionBundle[] => {
   // For simplicity, we're putting all transactions in a single bundle
   // In a production environment, you might want to split these into multiple bundles
   return [
@@ -142,16 +134,7 @@ export const distributeBaseCurrency = async (
   baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    // Get base currency from config if not provided
-    const config = loadConfigFromCookies();
-    const currency =
-      baseCurrency ||
-      (config?.baseCurrencyMint
-        ? Object.values(BASE_CURRENCIES).find(
-            (c) => c.mint === config.baseCurrencyMint,
-          )
-        : BASE_CURRENCIES.SOL) ||
-      BASE_CURRENCIES.SOL;
+    const currency = resolveBaseCurrency(baseCurrency);
     // Convert wallet data to recipient format for backend
     const recipients = recipientWallets.map((wallet) => ({
       address: wallet.address,
@@ -184,7 +167,7 @@ export const distributeBaseCurrency = async (
       recipientKeypairsMap,
     );
     // Step 4: Prepare distribution bundles
-    const distributionBundles = prepareDistributionBundles(
+    const distributionBundles = prepareTransactionBundles(
       fullySignedTransactions,
     );
 
@@ -213,10 +196,6 @@ export const distributeBaseCurrency = async (
   }
 };
 
-/**
- * @deprecated Use distributeBaseCurrency instead
- */
-export const distributeSOL = distributeBaseCurrency;
 
 /**
  * Validate distribution inputs
@@ -272,16 +251,7 @@ export const batchDistributeBaseCurrency = async (
   baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
-    // Get base currency from config if not provided
-    const config = loadConfigFromCookies();
-    const currency =
-      baseCurrency ||
-      (config?.baseCurrencyMint
-        ? Object.values(BASE_CURRENCIES).find(
-            (c) => c.mint === config.baseCurrencyMint,
-          )
-        : BASE_CURRENCIES.SOL) ||
-      BASE_CURRENCIES.SOL;
+    const currency = resolveBaseCurrency(baseCurrency);
     // Return early if no recipients
     if (recipientWallets.length === 0) {
       return { success: true, results: [] };
@@ -352,7 +322,3 @@ export const batchDistributeBaseCurrency = async (
   }
 };
 
-/**
- * @deprecated Use batchDistributeBaseCurrency instead
- */
-export const batchDistributeSOL = batchDistributeBaseCurrency;

@@ -80,7 +80,7 @@ const checkEndpointHealth = async (
     } else if (latency < 500) {
       return { latency, status: "slow" };
     } else {
-      return { latency, status: "slow" };
+      return { latency, status: "unhealthy" };
     }
   } catch {
     const latency = Math.round(performance.now() - startTime);
@@ -107,7 +107,6 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
     null,
   );
   const [autoMonitoringEnabled, setAutoMonitoringEnabled] = useState(true);
-  const [_lastAutoCheck, setLastAutoCheck] = useState<number>(Date.now());
   const hasInitializedWeights = useRef(false);
   const hasCheckedHealthOnMount = useRef(false);
   const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -143,13 +142,10 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
 
   // Check health of all endpoints
   const checkAllEndpointsHealth = useCallback(
-    async (isAutoCheck = false) => {
+    async (_isAutoCheck = false) => {
       if (isCheckingHealth) return;
 
       setIsCheckingHealth(true);
-      if (isAutoCheck) {
-        setLastAutoCheck(Date.now());
-      }
 
       // Check health for all endpoints (including inactive ones if auto-re-enable is on)
       const updatedEndpoints = await Promise.all(

@@ -36,6 +36,7 @@ import { getWalletDisplayName } from "../../utils/wallet";
 import type { WalletType, TokenMetadataApiResponse } from "../../utils/types";
 import type { TokenMetadata } from "../deploy/types";
 import { PlatformIcons, PLATFORMS } from "../deploy/constants";
+import { API_URLS } from "../../utils/constants";
 import { MIN_WALLETS, MAX_WALLETS_ADVANCED } from "../deploy/types";
 import { PageBackground } from "../PageBackground";
 
@@ -131,7 +132,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) { showToast("Invalid mint address", "error"); return; }
     setIsImporting(true);
     try {
-      const response = await fetch(`https://public.raze.sh/api/metadata/${mint}`);
+      const response = await fetch(`${API_URLS.RAZE_PUBLIC}/metadata/${mint}`);
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json() as TokenMetadataApiResponse;
       if (!data.success || !data.metadata) throw new Error("No metadata");
@@ -174,7 +175,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
       setIsUploading(false);
     });
     xhr.addEventListener("error", () => { showToast("Upload failed", "error"); setIsUploading(false); });
-    xhr.open("POST", "https://public.raze.sh/api/upload");
+    xhr.open("POST", `${API_URLS.RAZE_PUBLIC}/upload`);
     xhr.send(formData);
   };
 

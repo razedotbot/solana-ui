@@ -30,7 +30,6 @@ interface PresetButtonProps {
   isLoading: boolean;
   variant?: "buy" | "sell";
   isEditMode: boolean;
-  index?: number;
 }
 
 // Preset Button component
@@ -252,7 +251,6 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
 }) => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
-  const [manualProtocol] = useState<string | null>(null);
   const [showWalletSelector, setShowWalletSelector] = useState(false);
   const isMobile = useIsMobile();
 
@@ -458,21 +456,18 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   // Handle trade submission
   const handleTrade = useCallback(
     (amount: string, isBuy: boolean): void => {
-      const dexToUse = manualProtocol || selectedDex;
-
       // Set the amount in parent state and call handleTradeSubmit with the specific amount
       if (isBuy) {
         setBuyAmount(amount);
         // Pass the amount directly to avoid using stale state values
-        handleTradeSubmit(wallets, isBuy, dexToUse, amount, undefined);
+        handleTradeSubmit(wallets, isBuy, selectedDex, amount, undefined);
       } else {
         setSellAmount(amount);
         // Pass the amount directly to avoid using stale state values
-        handleTradeSubmit(wallets, isBuy, dexToUse, undefined, amount);
+        handleTradeSubmit(wallets, isBuy, selectedDex, undefined, amount);
       }
     },
     [
-      manualProtocol,
       selectedDex,
       wallets,
       setBuyAmount,
@@ -671,7 +666,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                       isLoading={isLoading}
                       variant="buy"
                       isEditMode={isEditMode}
-                      index={index}
+
                     />
                   ))}
                 </div>
@@ -701,7 +696,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                         isLoading={isLoading}
                         variant="sell"
                         isEditMode={isEditMode}
-                        index={index}
+  
                       />
                     ),
                   )}
@@ -822,7 +817,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                   isLoading={isLoading}
                   variant="buy"
                   isEditMode={isEditMode}
-                  index={index}
+
                 />
               ))}
             </div>
@@ -847,7 +842,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                   isLoading={isLoading}
                   variant="sell"
                   isEditMode={isEditMode}
-                  index={index}
+
                 />
               ))}
             </div>
@@ -968,7 +963,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                     isLoading={isLoading}
                     variant="buy"
                     isEditMode={isEditMode}
-                    index={index}
+  
                   />
                 ))}
               </div>
@@ -993,7 +988,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                     isLoading={isLoading}
                     variant="sell"
                     isEditMode={isEditMode}
-                    index={index}
+  
                   />
                 ))}
               </div>

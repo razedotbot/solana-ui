@@ -87,6 +87,11 @@ export const isBaseCurrency = (mint: string): boolean => {
  */
 export const DEFAULT_BASE_CURRENCY = BASE_CURRENCIES.SOL;
 
+// API URLs
+export const API_URLS = {
+  RAZE_PUBLIC: "https://public.raze.sh/api",
+} as const;
+
 // Trading Constants
 export const TRADING = {
   MAX_BUNDLES_PER_SECOND: 2,

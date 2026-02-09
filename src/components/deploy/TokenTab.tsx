@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { API_URLS } from "../../utils/constants";
 import {
   Sparkles,
   Image,
@@ -46,7 +47,7 @@ export const TokenTab: React.FC<TokenTabProps> = ({ tokenData, setTokenData }) =
 
     setIsImporting(true);
     try {
-      const response = await fetch(`https://public.raze.sh/api/metadata/${mint}`);
+      const response = await fetch(`${API_URLS.RAZE_PUBLIC}/metadata/${mint}`);
       if (!response.ok) {
         throw new Error("Failed to fetch metadata");
       }
@@ -119,7 +120,7 @@ export const TokenTab: React.FC<TokenTabProps> = ({ tokenData, setTokenData }) =
       showToast("Upload failed", "error");
       setIsUploading(false);
     });
-    xhr.open("POST", "https://public.raze.sh/api/upload");
+    xhr.open("POST", `${API_URLS.RAZE_PUBLIC}/upload`);
     xhr.send(formData);
   };
 

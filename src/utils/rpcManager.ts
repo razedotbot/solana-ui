@@ -210,8 +210,7 @@ export class RPCManager {
 
     // All endpoints failed
     return Promise.reject(
-      new Error(
-      ),
+      new Error("All RPC endpoints failed"),
     );
   }
 

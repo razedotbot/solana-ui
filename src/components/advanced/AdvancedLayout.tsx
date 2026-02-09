@@ -46,7 +46,7 @@ const ViewModeDropdown: React.FC<{
   const modes: { value: ViewMode; label: string }[] = [
     { value: "simple", label: "SIMPLE" },
     { value: "advanced", label: "ADVANCED" },
-    { value: "multichart", label: "MULTI" },
+    { value: "multichart", label: "MULTICHART" },
   ];
 
   const handleSelect = (mode: ViewMode): void => {

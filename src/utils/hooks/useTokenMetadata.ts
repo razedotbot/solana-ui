@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { TokenMetadataApiResponse, TokenMetadataInfo } from "../types";
+import { API_URLS } from "../constants";
 
 const STORAGE_KEY = "raze_token_metadata_cache";
 const STALE_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -55,7 +56,7 @@ async function fetchMetadata(mint: string): Promise<TokenMetadataInfo | null> {
 
   const promise = (async () => {
     try {
-      const resp = await fetch(`https://public.raze.sh/api/metadata/${mint}`);
+      const resp = await fetch(`${API_URLS.RAZE_PUBLIC}/metadata/${mint}`);
       if (!resp.ok) return null;
       const data = (await resp.json()) as TokenMetadataApiResponse;
       if (!data.success || !data.metadata) return null;

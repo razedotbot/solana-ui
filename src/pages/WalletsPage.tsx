@@ -37,7 +37,7 @@ import { useAppContext } from "../contexts";
 import { useToast, useWalletGroups } from "../utils/hooks";
 
 import { formatBaseCurrencyBalance } from "../utils/formatting";
-import type { SortField, SortDirection, ActiveModal, FilterTab } from "../components/wallets";
+import type { SortField, ActiveModal, FilterTab } from "../components/wallets";
 import {
   WalletsHeader,
   WalletListView,
@@ -69,7 +69,6 @@ export const WalletsPage: React.FC = () => {
   } = useAppContext();
 
   const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortDirection] = useState<SortDirection>("desc");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWallets, setSelectedWallets] = useState<Set<number>>(
     new Set()
@@ -708,12 +707,11 @@ export const WalletsPage: React.FC = () => {
           bValue = baseCurrencyBalances.get(b.address) || 0;
       }
 
-      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+      return bValue - aValue;
     });
   }, [
     wallets,
     sortField,
-    sortDirection,
     searchTerm,
     baseCurrencyBalances,
     showArchived,

@@ -1,10 +1,6 @@
 import type { ApiResponse, BundleResult } from "./types";
 import { loadConfigFromCookies } from "./storage";
 
-interface WindowWithConfig {
-  tradingServerUrl?: string;
-}
-
 interface SendingConfig {
   sendingMode: string;
   customRpcEndpoint: string;
@@ -14,17 +10,8 @@ interface SendingConfig {
   multiTxMode: string;
 }
 
-/**
- * Get the base URL for the trading server
- */
-const getBaseUrl = (): string => {
-  return (
-    (window as unknown as WindowWithConfig).tradingServerUrl?.replace(
-      /\/+$/,
-      "",
-    ) || ""
-  );
-};
+const getBaseUrl = (): string =>
+  ((window as unknown as { tradingServerUrl?: string }).tradingServerUrl?.replace(/\/+$/, "") || "");
 
 /**
  * Get sending configuration from cookies with defaults

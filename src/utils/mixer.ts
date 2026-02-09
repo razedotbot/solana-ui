@@ -3,7 +3,7 @@ import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
 import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
-import { loadConfigFromCookies } from "./storage";
+import { getServerBaseUrl, resolveBaseCurrency, type TransactionBundle } from "./trading";
 
 interface WalletMixing {
   address: string;
@@ -11,13 +11,6 @@ interface WalletMixing {
   amount: string;
 }
 
-interface MixingBundle {
-  transactions: string[]; // Base58 encoded transaction data
-}
-
-interface WindowWithConfig {
-  tradingServerUrl?: string;
-}
 
 /**
  * Get partially signed transactions from backend
@@ -28,8 +21,7 @@ const getPartiallySignedTransactions = async (
   recipients: { address: string; amount: string }[],
   baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
-  const baseUrl =
-    (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
+  const baseUrl = getServerBaseUrl();
 
   const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const endpoint = isNativeSOL
@@ -133,7 +125,7 @@ const completeTransactionSigning = (
 /**
  * Prepare mixing bundles
  */
-const prepareMixingBundles = (signedTransactions: string[]): MixingBundle[] => {
+const prepareTransactionBundles = (signedTransactions: string[]): TransactionBundle[] => {
   // For simplicity, we're putting all transactions in a single bundle
   // In a production environment, you might want to split these into multiple bundles
   return [
@@ -152,16 +144,7 @@ export const mixBaseCurrencyToSingleRecipient = async (
   baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    // Get base currency from config if not provided
-    const config = loadConfigFromCookies();
-    const currency =
-      baseCurrency ||
-      (config?.baseCurrencyMint
-        ? Object.values(BASE_CURRENCIES).find(
-            (c) => c.mint === config.baseCurrencyMint,
-          )
-        : BASE_CURRENCIES.SOL) ||
-      BASE_CURRENCIES.SOL;
+    const currency = resolveBaseCurrency(baseCurrency);
     // Convert single recipient wallet to backend format
     const recipients = [
       {
@@ -199,7 +182,7 @@ export const mixBaseCurrencyToSingleRecipient = async (
       recipientKeypairsMap,
     );
     // Step 4: Prepare mixing bundles
-    const mixingBundles = prepareMixingBundles(fullySignedTransactions);
+    const mixingBundles = prepareTransactionBundles(fullySignedTransactions);
 
     // Step 5: Send bundles
     const results: BundleResult[] = [];
@@ -226,10 +209,6 @@ export const mixBaseCurrencyToSingleRecipient = async (
   }
 };
 
-/**
- * @deprecated Use mixBaseCurrencyToSingleRecipient instead
- */
-export const mixSOLToSingleRecipient = mixBaseCurrencyToSingleRecipient;
 
 /**
  * Execute base currency mixing (kept for backward compatibility)
@@ -261,10 +240,6 @@ export const mixBaseCurrency = async (
   };
 };
 
-/**
- * @deprecated Use mixBaseCurrency instead
- */
-export const mixSOL = mixBaseCurrency;
 
 /**
  * Validate mixing inputs for single recipient
@@ -367,16 +342,7 @@ export const batchMixBaseCurrency = async (
   baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
-    // Get base currency from config if not provided
-    const config = loadConfigFromCookies();
-    const currency =
-      baseCurrency ||
-      (config?.baseCurrencyMint
-        ? Object.values(BASE_CURRENCIES).find(
-            (c) => c.mint === config.baseCurrencyMint,
-          )
-        : BASE_CURRENCIES.SOL) ||
-      BASE_CURRENCIES.SOL;
+    const currency = resolveBaseCurrency(baseCurrency);
     // Return early if no recipients
     if (recipientWallets.length === 0) {
       return { success: true, results: [] };
@@ -421,7 +387,3 @@ export const batchMixBaseCurrency = async (
   }
 };
 
-/**
- * @deprecated Use batchMixBaseCurrency instead
- */
-export const batchMixSOL = batchMixBaseCurrency;

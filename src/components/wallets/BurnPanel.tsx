@@ -19,11 +19,8 @@ import type { ApiResponse } from "../../utils/types";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
+import type { WindowWithConfig } from "../../utils/trading";
 import { SourceWalletSummary } from "./SourceWalletSummary";
-
-interface WindowWithConfig {
-  tradingServerUrl?: string;
-}
 
 const STEPS_BURN_FULL = ["Token Address", "Select Source", "Burn Details", "Review"];
 const STEPS_BURN_SHORT = ["Token Address", "Burn Details", "Review"];
@@ -75,7 +72,6 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
   const [balanceFilter, setBalanceFilter] = useState("all");
   const [modalClass, setModalClass] = useState("");
   const [showInfoTip, setShowInfoTip] = useState(false);
-  const [buttonHover, setButtonHover] = useState(false);
   const [tokenBalancesForWallets, setTokenBalancesForWallets] = useState<
     Map<string, number>
   >(new Map());
@@ -361,8 +357,6 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
       setIsSubmitting(false);
     }
   };
-
-  void buttonHover;
 
   const formatAddress = (address: string): string => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
@@ -1342,8 +1336,6 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
                   (currentStepName === "Burn Details" && (!amount || parseFloat(amount) <= 0)) ||
                   (currentStepName === "Review" && !isConfirmed)
                 }
-                onMouseEnter={() => setButtonHover(true)}
-                onMouseLeave={() => setButtonHover(false)}
                 className={`px-5 py-2.5 rounded-lg shadow-lg flex items-center transition-all duration-300 font-mono tracking-wider
                           ${
                             isSubmitting ||

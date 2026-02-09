@@ -28,11 +28,8 @@ import { sendTransactions } from "../../utils/transactionService";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
+import type { WindowWithConfig } from "../../utils/trading";
 import { SourceWalletSummary } from "./SourceWalletSummary";
-
-interface WindowWithConfig {
-  tradingServerUrl?: string;
-}
 
 interface TransferPanelProps {
   isOpen: boolean;

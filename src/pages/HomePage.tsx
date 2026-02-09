@@ -109,9 +109,6 @@ export const Homepage: React.FC = () => {
   const navigate = useNavigate();
   const { tokens: multichartTokens, addToken: addMultichartToken } = useMultichart();
   const [recentTokens, setRecentTokens] = useState<RecentToken[]>([]);
-  const [_isLoadingTokens, setIsLoadingTokens] = useState(true);
-  const [_tokensError, setTokensError] = useState<string | null>(null);
-  
   const [networkStats, setNetworkStats] = useState<NetworkStats>({
     solPrice: '--',
     solChange: '--',
@@ -179,16 +176,12 @@ export const Homepage: React.FC = () => {
 
   useEffect(() => {
     try {
-      setIsLoadingTokens(true);
-      setTokensError(null);
       const tokens = getRecentTokens();
       setRecentTokens(tokens);
       // Prefetch metadata for all recent tokens
       prefetchTokenMetadata(tokens.map(t => t.address));
     } catch (ignore) {
-      setTokensError('Failed to load recent tokens');
-    } finally {
-      setIsLoadingTokens(false);
+      // Token loading failed silently
     }
   }, []);
 

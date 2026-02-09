@@ -2,6 +2,7 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult as SharedBundleResult } from "./types";
+import { getServerBaseUrl, splitLargeBundles } from "./trading";
 
 // ============================================================================
 // Constants
@@ -10,15 +11,10 @@ import type { BundleResult as SharedBundleResult } from "./types";
 const MAX_RETRY_ATTEMPTS = 50;
 const MAX_CONSECUTIVE_ERRORS = 3;
 const BASE_RETRY_DELAY = 200;
-const MAX_TRANSACTIONS_PER_BUNDLE = 5;
 
 // ============================================================================
 // Types
 // ============================================================================
-
-interface WindowWithConfig {
-  tradingServerUrl?: string;
-}
 
 type BundleResult = SharedBundleResult;
 
@@ -144,11 +140,6 @@ const getRetryDelay = (attempt: number): number => {
   return Math.floor(BASE_RETRY_DELAY * Math.pow(1.5, attempt) * jitter);
 };
 
-const getBaseUrl = (): string => {
-  return (
-    (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || ""
-  );
-};
 
 /**
  * Send transactions and wrap result with success/error handling
@@ -233,7 +224,7 @@ const getPartiallyPreparedTransactions = async (
   mintPrivateKey?: string;
   isAdvancedMode?: boolean;
 }> => {
-  const baseUrl = getBaseUrl();
+  const baseUrl = getServerBaseUrl();
 
   const requestBody: Record<string, unknown> = {
     platform: config.platform,
@@ -446,37 +437,6 @@ const completeBundleSigning = (
   return { transactions: signedTransactions };
 };
 
-/**
- * Split large bundles into smaller ones
- */
-const splitLargeBundles = (bundles: CreateBundle[]): CreateBundle[] => {
-  const result: CreateBundle[] = [];
-
-  for (const bundle of bundles) {
-    if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
-      continue;
-    }
-
-    if (bundle.transactions.length <= MAX_TRANSACTIONS_PER_BUNDLE) {
-      result.push(bundle);
-      continue;
-    }
-
-    for (
-      let i = 0;
-      i < bundle.transactions.length;
-      i += MAX_TRANSACTIONS_PER_BUNDLE
-    ) {
-      const chunkTransactions = bundle.transactions.slice(
-        i,
-        i + MAX_TRANSACTIONS_PER_BUNDLE,
-      );
-      result.push({ transactions: chunkTransactions });
-    }
-  }
-
-  return result;
-};
 
 /**
  * Execute advanced mode MeteoraDBC deployment with multi-stage bundles
@@ -530,10 +490,6 @@ const executeAdvancedModeCreate = async (
         error,
         stageResults,
       };
-    }
-
-    if (sendResult.bundleId) {
-      // Bundle ID tracked for stage result
     }
 
     stageResults.push({

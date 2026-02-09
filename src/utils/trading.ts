@@ -2,7 +2,7 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { WalletType } from "./types";
 import { loadConfigFromCookies } from "./storage";
-import { TRADING, RATE_LIMIT } from "./constants";
+import { TRADING, RATE_LIMIT, BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
 import type { BundleResult } from "./types";
 import { executeBuy, createBuyConfig } from "./buy";
 import type { BundleMode } from "./buy";
@@ -79,6 +79,27 @@ export const getServerBaseUrl = (): string => {
   return (
     (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || ""
   );
+};
+
+// ============================================================================
+// Base Currency Resolution
+// ============================================================================
+
+/**
+ * Resolve base currency from parameter or config, defaulting to SOL
+ */
+export const resolveBaseCurrency = (
+  baseCurrency?: BaseCurrencyConfig,
+): BaseCurrencyConfig => {
+  if (baseCurrency) return baseCurrency;
+  const config = loadConfigFromCookies();
+  if (config?.baseCurrencyMint) {
+    const found = Object.values(BASE_CURRENCIES).find(
+      (c) => c.mint === config.baseCurrencyMint,
+    );
+    if (found) return found;
+  }
+  return BASE_CURRENCIES.SOL;
 };
 
 // ============================================================================
@@ -474,7 +495,7 @@ export const executeTrade = async (
   wallets: WalletType[],
   config: TradingConfig,
   isBuyMode: boolean,
-  solBalances: Map<string, number>,
+  _solBalances: Map<string, number>,
 ): Promise<TradingResult> => {
   const activeWallets = wallets.filter((wallet) => wallet.isActive);
 
@@ -487,11 +508,6 @@ export const executeTrade = async (
     privateKey: wallet.privateKey,
   }));
 
-  const walletBalances = new Map<string, number>();
-  activeWallets.forEach((wallet) => {
-    const balance = solBalances.get(wallet.address) || 0;
-    walletBalances.set(wallet.address, balance);
-  });
   try {
     if (isBuyMode) {
       return await executeUnifiedBuy(formattedWallets, config);

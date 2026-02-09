@@ -3,50 +3,11 @@ import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
 import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
-import { loadConfigFromCookies } from "./storage";
-
-// Constants
-const MAX_BUNDLES_PER_SECOND = 2;
-
-// Rate limiting state
-const rateLimitState = {
-  count: 0,
-  lastReset: Date.now(),
-  maxBundlesPerSecond: MAX_BUNDLES_PER_SECOND,
-};
+import { getServerBaseUrl, checkRateLimit, resolveBaseCurrency, splitLargeBundles } from "./trading";
 
 interface WalletConsolidation {
   address: string;
   privateKey: string;
-}
-
-interface ConsolidationBundle {
-  transactions: string[]; // Base58 encoded transaction data
-}
-
-/**
- * Check rate limit and wait if necessary
- */
-const checkRateLimit = async (): Promise<void> => {
-  const now = Date.now();
-
-  if (now - rateLimitState.lastReset >= 1000) {
-    rateLimitState.count = 0;
-    rateLimitState.lastReset = now;
-  }
-
-  if (rateLimitState.count >= rateLimitState.maxBundlesPerSecond) {
-    const waitTime = 1000 - (now - rateLimitState.lastReset);
-    await new Promise((resolve) => setTimeout(resolve, waitTime));
-    rateLimitState.count = 0;
-    rateLimitState.lastReset = Date.now();
-  }
-
-  rateLimitState.count++;
-};
-
-interface WindowWithConfig {
-  tradingServerUrl?: string;
 }
 
 /**
@@ -59,8 +20,7 @@ const getPartiallyPreparedTransactions = async (
   percentage: number,
   baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
-  const baseUrl =
-    (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
+  const baseUrl = getServerBaseUrl();
 
   const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const endpoint = isNativeSOL
@@ -149,28 +109,6 @@ const completeTransactionSigning = (
   });
 };
 
-/**
- * Prepare consolidation bundles
- */
-const prepareConsolidationBundles = (
-  signedTransactions: string[],
-): ConsolidationBundle[] => {
-  // For simplicity, we're putting transactions in bundles of MAX_TXS_PER_BUNDLE
-  const MAX_TXS_PER_BUNDLE = 5;
-  const bundles: ConsolidationBundle[] = [];
-
-  for (let i = 0; i < signedTransactions.length; i += MAX_TXS_PER_BUNDLE) {
-    const bundleTransactions = signedTransactions.slice(
-      i,
-      i + MAX_TXS_PER_BUNDLE,
-    );
-    bundles.push({
-      transactions: bundleTransactions,
-    });
-  }
-
-  return bundles;
-};
 
 /**
  * Execute base currency consolidation (SOL, USDC, USD1)
@@ -182,16 +120,7 @@ export const consolidateBaseCurrency = async (
   baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    // Get base currency from config if not provided
-    const config = loadConfigFromCookies();
-    const currency =
-      baseCurrency ||
-      (config?.baseCurrencyMint
-        ? Object.values(BASE_CURRENCIES).find(
-            (c) => c.mint === config.baseCurrencyMint,
-          )
-        : BASE_CURRENCIES.SOL) ||
-      BASE_CURRENCIES.SOL;
+    const currency = resolveBaseCurrency(baseCurrency);
 
     // Extract source addresses
     const sourceAddresses = sourceWallets.map((wallet) => wallet.address);
@@ -225,9 +154,9 @@ export const consolidateBaseCurrency = async (
     );
 
     // Step 4: Prepare consolidation bundles
-    const consolidationBundles = prepareConsolidationBundles(
-      fullySignedTransactions,
-    );
+    const consolidationBundles = splitLargeBundles([
+      { transactions: fullySignedTransactions },
+    ]);
 
     // Step 5: Send bundles
     const results: BundleResult[] = [];
@@ -256,10 +185,6 @@ export const consolidateBaseCurrency = async (
   }
 };
 
-/**
- * @deprecated Use consolidateBaseCurrency instead
- */
-export const consolidateSOL = consolidateBaseCurrency;
 
 /**
  * Validate consolidation inputs
