@@ -205,7 +205,7 @@ export const PnlModal: React.FC<PnlModalProps> = ({
               <BarChart2 size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> TOKEN PNL CALCULATOR{" "}
+              <span className="color-primary">/</span> SHARE YOUR PNL{" "}
               <span className="color-primary">/</span>
             </h2>
           </div>

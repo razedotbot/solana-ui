@@ -26,8 +26,8 @@ import type { ViewMode } from "../../utils/storage";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 
 // Lazy loaded components
-const WalletsPage = lazy(() =>
-  import("../../Wallets").then((module) => ({ default: module.WalletsPage })),
+const WalletsListSidebar = lazy(() =>
+  import("./WalletsList").then((module) => ({ default: module.WalletsListSidebar })),
 );
 const Frame = lazy(() =>
   import("../../Frame").then((module) => ({ default: module.Frame })),
@@ -477,7 +477,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
               // Wallets View
               !!connection && (
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center"><RefreshCw className="animate-spin color-primary" size={20} /></div>}>
-                  <WalletsPage
+                  <WalletsListSidebar
                     wallets={filteredWallets}
                     setWallets={setWallets}
                     tokenAddress={tokenAddress}

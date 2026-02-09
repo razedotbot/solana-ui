@@ -5,10 +5,11 @@ import {
   TrendingUp,
   X,
   Copy,
+  Check,
   Trash2,
-  ArrowRight,
   Search
 } from 'lucide-react';
+import '@google/model-viewer';
 
 import { getRecentTokens, clearRecentTokens, formatTimeAgo, removeRecentToken } from '../utils/recentTokens';
 import type { RecentToken } from '../utils/types';
@@ -46,16 +47,23 @@ const RecentTokenCard: React.FC<{
   onRemove: (e: React.MouseEvent, address: string) => void;
 }> = ({ token, index, onNavigate, onCopy, onRemove }) => {
   const { metadata } = useTokenMetadata(token.address);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent): Promise<void> => {
+    await onCopy(e, token.address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <div
       key={token.address}
       onClick={() => onNavigate(token.address)}
-      className="group cursor-pointer bg-app-secondary-80/50 backdrop-blur-md border border-app-primary-20 hover:border-app-primary hover:shadow-[0_0_20px_rgba(2,179,109,0.15)] rounded-xl p-5 transition-all duration-300 relative overflow-hidden hover:-translate-y-1 animate-scale-in"
-      style={{ animationDelay: `${0.1 + index * 0.05}s` }}
+      className="group cursor-pointer bg-app-secondary-80/40 backdrop-blur-sm border border-app-primary-10 hover:border-app-primary hover:shadow-[0_0_15px_rgba(2,179,109,0.1)] rounded-lg p-3.5 transition-all duration-300 relative overflow-hidden animate-scale-in"
+      style={{ animationDelay: `${0.05 + index * 0.04}s` }}
     >
-      <div className="relative z-10 flex items-start justify-between mb-4">
-        <div className="p-2 rounded-lg bg-app-primary-10 border border-app-primary-20 group-hover:bg-app-primary-20 transition-colors overflow-hidden">
+      <div className="relative z-10 flex items-center gap-3">
+        <div className="shrink-0 w-9 h-9 rounded-lg bg-app-primary-10 border border-app-primary-20 group-hover:bg-app-primary-20 transition-colors flex items-center justify-center overflow-hidden">
           {metadata?.image ? (
             <img
               src={metadata.image}
@@ -64,39 +72,34 @@ const RecentTokenCard: React.FC<{
               onError={(e) => { (e.target as HTMLImageElement).replaceWith(Object.assign(document.createElement('span'), { className: 'block' })); }}
             />
           ) : (
-            <TrendingUp size={20} className="color-primary" />
+            <TrendingUp size={16} className="color-primary" />
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={(e) => onCopy(e, token.address)} className="p-1.5 rounded-md text-app-secondary-60 hover:text-app-primary hover:bg-app-primary-10 transition-colors" title="Copy Address">
-            <Copy size={14} />
-          </button>
-          <button onClick={(e) => onRemove(e, token.address)} className="p-1.5 rounded-md text-app-secondary-60 hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Remove">
-            <X size={14} />
-          </button>
+        <div className="min-w-0 flex-1">
+          {metadata?.name ? (
+            <div className="font-bold text-app-primary truncate text-sm tracking-tight group-hover:text-app-primary-light transition-colors">{metadata.name}</div>
+          ) : (
+            <div className="font-mono text-app-primary font-bold truncate text-sm tracking-tight group-hover:text-app-primary-light transition-colors">{formatAddress(token.address)}</div>
+          )}
+          <div className="font-mono text-[10px] text-app-secondary-60 truncate mt-0.5">
+            {metadata?.symbol ? `${metadata.symbol} · ` : ''}{formatAddress(token.address)}
+          </div>
+        </div>
+        <div className="shrink-0 flex items-center gap-1">
+          <span className="text-[10px] font-mono text-app-secondary-60 group-hover:hidden flex items-center gap-1">
+            <Clock size={10} />{formatTimeAgo(token.lastViewed)}
+          </span>
+          <div className="hidden group-hover:flex items-center gap-1">
+            <button onClick={handleCopy} className={`p-1 rounded transition-colors ${copied ? 'text-green-400' : 'text-app-secondary-60 hover:text-app-primary hover:bg-app-primary-10'}`} title={copied ? 'Copied!' : 'Copy'}>
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </button>
+            <button onClick={(e) => onRemove(e, token.address)} className="p-1 rounded text-app-secondary-60 hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Remove">
+              <X size={12} />
+            </button>
+          </div>
         </div>
       </div>
-      <div className="relative z-10 space-y-1">
-        {metadata?.name ? (
-          <>
-            <div className="font-bold text-app-primary truncate text-lg tracking-tight group-hover:text-app-primary-light transition-colors">{metadata.name}</div>
-            <div className="font-mono text-xs text-app-secondary-60 truncate">{metadata.symbol} &middot; {formatAddress(token.address)}</div>
-          </>
-        ) : (
-          <>
-            <div className="font-mono text-xs text-app-secondary-60 uppercase tracking-wider">Token Address</div>
-            <div className="font-mono text-app-primary font-bold truncate text-lg tracking-tight group-hover:text-app-primary-light transition-colors">{formatAddress(token.address)}</div>
-          </>
-        )}
-      </div>
-      <div className="relative z-10 mt-4 pt-4 border-t border-app-primary-10 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs text-app-secondary-60 font-mono">
-          <Clock size={12} />
-          <span>{formatTimeAgo(token.lastViewed)}</span>
-        </div>
-        <div className="text-xs font-mono color-primary opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">VIEW <ArrowRight size={12} /></div>
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-br from-app-primary-05 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-app-primary-05 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
     </div>
   );
 };
@@ -107,35 +110,6 @@ export const Homepage: React.FC = () => {
   const [recentTokens, setRecentTokens] = useState<RecentToken[]>([]);
   const [_isLoadingTokens, setIsLoadingTokens] = useState(true);
   const [_tokensError, setTokensError] = useState<string | null>(null);
-  const [displayedText, setDisplayedText] = useState('');
-  const [showCursor, setShowCursor] = useState(true);
-  const fullText = 'sol.raze.bot';
-
-  // Typewriter animation effect
-  useEffect(() => {
-    let currentIndex = 0;
-    const typeInterval = setInterval(() => {
-      if (currentIndex <= fullText.length) {
-        setDisplayedText(fullText.slice(0, currentIndex));
-        currentIndex++;
-      } else {
-        clearInterval(typeInterval);
-        // Hide cursor after typing completes
-        setTimeout(() => setShowCursor(false), 1500);
-      }
-    }, 150);
-
-    return () => clearInterval(typeInterval);
-  }, []);
-
-  // Cursor blink effect
-  useEffect(() => {
-    const blinkInterval = setInterval(() => {
-      setShowCursor(prev => !prev);
-    }, 530);
-
-    return () => clearInterval(blinkInterval);
-  }, []);
   
   const [networkStats, setNetworkStats] = useState<NetworkStats>({
     solPrice: '--',
@@ -263,28 +237,71 @@ export const Homepage: React.FC = () => {
       <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
         <PageBackground />
 
-        <div className="relative z-10 p-4 md:p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
-          <div className="flex flex-col items-center text-center space-y-6 py-12 animate-fade-in">
+        <div className="relative z-10 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+          <div className="hero-section">
+            {/* Vertical light beam */}
+            <div className="hero-beam" />
 
-            <h1 
-              className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tight relative" 
-              style={{ 
-                fontFamily: "'Instrument Serif', serif",
-                color: '#ffffff',
-                textShadow: '0 0 30px rgba(2, 179, 109, 0.3), 0 0 10px rgba(255, 255, 255, 0.1)'
-              }}
-            >
-              <span className="relative">
-                {displayedText}
-                <span 
-                  className={`inline-block w-[4px] h-[0.9em] ml-1 transition-opacity duration-100 ${showCursor ? 'opacity-100' : 'opacity-0'}`}
-                  style={{ 
-                    backgroundColor: '#02b36d',
-                    boxShadow: '0 0 10px rgba(2, 179, 109, 0.8), 0 0 20px rgba(2, 179, 109, 0.4)' 
-                  }}
-                />
-              </span>
-            </h1>
+            {/* Data streams */}
+            {[
+              { left: '8%', height: '80px', duration: '3s', delay: '0s' },
+              { left: '18%', height: '120px', duration: '4.5s', delay: '1.2s' },
+              { left: '32%', height: '60px', duration: '3.8s', delay: '2.5s' },
+              { left: '68%', height: '100px', duration: '4s', delay: '0.8s' },
+              { left: '82%', height: '70px', duration: '3.5s', delay: '1.8s' },
+              { left: '92%', height: '90px', duration: '4.2s', delay: '3s' },
+            ].map((s, i) => (
+              <div key={`stream-${i}`} className="hero-stream" style={{
+                left: s.left, height: s.height,
+                animationDuration: s.duration, animationDelay: s.delay,
+              }} />
+            ))}
+
+            {/* Floating geometric shapes */}
+            {[
+              { className: 'hero-geo-diamond', left: '12%', top: '25%', delay: '0s', dur: '7s' },
+              { className: 'hero-geo-hex', left: '88%', top: '20%', delay: '1s', dur: '9s' },
+              { className: 'hero-geo-ring', left: '6%', top: '60%', delay: '2s', dur: '8s' },
+              { className: 'hero-geo-diamond', left: '92%', top: '55%', delay: '0.5s', dur: '10s' },
+              { className: 'hero-geo-hex', left: '20%', top: '80%', delay: '3s', dur: '7.5s' },
+              { className: 'hero-geo-ring', left: '78%', top: '75%', delay: '1.5s', dur: '8.5s' },
+              { className: 'hero-geo-diamond', left: '45%', top: '8%', delay: '2.5s', dur: '9s' },
+              { className: 'hero-geo-hex', left: '55%', top: '90%', delay: '4s', dur: '6.5s' },
+            ].map((g, i) => (
+              <div key={`geo-${i}`} className={`hero-geo ${g.className}`} style={{
+                left: g.left, top: g.top,
+                animationDelay: g.delay, animationDuration: g.dur,
+              }} />
+            ))}
+
+
+            {/* Static glow under logo */}
+            <div className="hero-portal-static" />
+
+            {/* 3D Model */}
+            <div className="relative z-10" style={{ width: '320px', height: '320px', marginTop: '-20px' }}>
+              {/* @ts-expect-error model-viewer is a web component */}
+              <model-viewer
+                src="/logo3d.glb"
+                environment-image="/logo3d-env.hdr"
+                interaction-prompt="none"
+                auto-rotate
+                auto-rotate-delay="0"
+                rotation-per-second="30deg"
+                tone-mapping="neutral"
+                shadow-intensity="0"
+                loading="eager"
+                reveal="auto"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: 'transparent',
+                  '--poster-color': 'transparent',
+                  '--progress-bar-color': 'transparent',
+                  '--progress-bar-height': '0px',
+                } as React.CSSProperties}
+              />
+            </div>
 
           </div>
 
@@ -327,6 +344,7 @@ export const Homepage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {recentTokens
                     .filter((token) => !multichartTokens.some((mt) => mt.address === token.address))
+                    .slice(0, 12)
                     .map((token, index) => (
                     <RecentTokenCard
                       key={token.address}

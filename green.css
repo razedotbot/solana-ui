@@ -146,6 +146,291 @@
     animation: slideIn 0.5s ease-out forwards;
 }
 
+/* Model viewer overrides - remove shadow/progress bar */
+model-viewer {
+    --poster-color: transparent !important;
+    --progress-bar-color: transparent !important;
+    --progress-bar-height: 0 !important;
+}
+
+model-viewer::part(default-progress-bar) {
+    display: none !important;
+}
+
+model-viewer::part(default-ar-button) {
+    display: none !important;
+}
+
+/* Homepage hero */
+.hero-section {
+    position: relative;
+    height: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Vertical light beam */
+.hero-beam {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    transform: translateX(-50%);
+    background: linear-gradient(to bottom,
+        transparent 0%,
+        rgba(2, 179, 109, 0.0) 10%,
+        rgba(2, 179, 109, 0.4) 40%,
+        rgba(2, 179, 109, 0.6) 50%,
+        rgba(2, 179, 109, 0.4) 60%,
+        rgba(2, 179, 109, 0.0) 90%,
+        transparent 100%);
+    animation: heroBeamPulse 3s ease-in-out infinite;
+    filter: blur(1px);
+}
+
+.hero-beam::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    transform: translateX(-50%);
+    background: linear-gradient(to bottom,
+        transparent 0%,
+        rgba(2, 179, 109, 0.0) 15%,
+        rgba(2, 179, 109, 0.04) 45%,
+        rgba(2, 179, 109, 0.06) 50%,
+        rgba(2, 179, 109, 0.04) 55%,
+        rgba(2, 179, 109, 0.0) 85%,
+        transparent 100%);
+    filter: blur(10px);
+}
+
+@keyframes heroBeamPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+/* Static glow under logo */
+.hero-portal-static {
+    position: absolute;
+    left: 50%;
+    bottom: 50px;
+    width: 280px;
+    height: 50px;
+    transform: translateX(-50%) perspective(200px) rotateX(70deg);
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(2, 179, 109, 0.25) 0%, rgba(2, 179, 109, 0.08) 40%, transparent 70%);
+    animation: heroPortalStaticPulse 4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes heroPortalStaticPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* Ground portal glow (unused) */
+.hero-portal {
+    position: absolute;
+    left: 50%;
+    bottom: 60px;
+    width: 300px;
+    height: 60px;
+    transform: translateX(-50%) perspective(200px) rotateX(70deg);
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(2, 179, 109, 0.3) 0%, rgba(2, 179, 109, 0.08) 40%, transparent 70%);
+    animation: heroPortalPulse 3s ease-in-out infinite;
+}
+
+.hero-portal::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 1px solid rgba(2, 179, 109, 0.2);
+    animation: heroPortalRing 4s linear infinite;
+}
+
+.hero-portal::after {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    border-radius: 50%;
+    border: 1px solid rgba(2, 179, 109, 0.08);
+    animation: heroPortalRing 6s linear infinite reverse;
+}
+
+@keyframes heroPortalPulse {
+    0%, 100% { opacity: 0.6; transform: translateX(-50%) perspective(200px) rotateX(70deg) scale(1); }
+    50% { opacity: 1; transform: translateX(-50%) perspective(200px) rotateX(70deg) scale(1.08); }
+}
+
+@keyframes heroPortalRing {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Sweeping scan line */
+.hero-scanline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(2, 179, 109, 0.5), transparent);
+    animation: heroScanSweep 4s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 20;
+}
+
+.hero-scanline::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -8px;
+    height: 18px;
+    background: linear-gradient(to right, transparent, rgba(2, 179, 109, 0.04), transparent);
+    filter: blur(4px);
+}
+
+@keyframes heroScanSweep {
+    0% { top: 0%; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+
+/* Data streams - vertical flowing lines */
+.hero-stream {
+    position: absolute;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent 0%, rgba(2, 179, 109, 0.3) 30%, rgba(2, 179, 109, 0.15) 60%, transparent 100%);
+    animation: heroStreamFlow linear infinite;
+    pointer-events: none;
+}
+
+@keyframes heroStreamFlow {
+    0% { transform: translateY(-100%); opacity: 0; }
+    10% { opacity: 1; }
+    60% { opacity: 0.6; }
+    80% { opacity: 0; }
+    100% { transform: translateY(320px); opacity: 0; }
+}
+
+/* Floating geometric shapes */
+.hero-geo {
+    position: absolute;
+    border: 1px solid rgba(2, 179, 109, 0.15);
+    pointer-events: none;
+    animation: heroGeoFloat 8s ease-in-out infinite;
+}
+
+.hero-geo-diamond {
+    width: 12px;
+    height: 12px;
+    transform: rotate(45deg);
+}
+
+.hero-geo-hex {
+    width: 20px;
+    height: 20px;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    border: none;
+    background: rgba(2, 179, 109, 0.06);
+    outline: 1px solid rgba(2, 179, 109, 0.12);
+}
+
+.hero-geo-ring {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+}
+
+@keyframes heroGeoFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.3; }
+    25% { opacity: 0.7; }
+    50% { transform: translateY(-20px) rotate(180deg); opacity: 0.5; }
+    75% { opacity: 0.7; }
+}
+
+/* Glitch text effect */
+.hero-text-glitch {
+    position: relative;
+    animation: heroTextReveal 1.2s ease-out forwards;
+    opacity: 0;
+}
+
+.hero-text-glitch::before,
+.hero-text-glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+}
+
+.hero-text-glitch::before {
+    color: rgba(2, 179, 109, 0.7);
+    animation: heroGlitch1 6s ease-in-out infinite;
+    animation-delay: 2s;
+    clip-path: inset(0 0 60% 0);
+}
+
+.hero-text-glitch::after {
+    color: rgba(0, 255, 150, 0.4);
+    animation: heroGlitch2 6s ease-in-out infinite;
+    animation-delay: 2s;
+    clip-path: inset(60% 0 0 0);
+}
+
+@keyframes heroTextReveal {
+    0% { opacity: 0; transform: translateY(10px); filter: blur(8px); }
+    60% { filter: blur(0px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes heroGlitch1 {
+    0%, 92%, 100% { opacity: 0; transform: translate(0); }
+    93% { opacity: 0.8; transform: translate(-2px, -1px); }
+    94% { opacity: 0; }
+    96% { opacity: 0.6; transform: translate(2px, 1px); }
+    97% { opacity: 0; }
+}
+
+@keyframes heroGlitch2 {
+    0%, 93%, 100% { opacity: 0; transform: translate(0); }
+    94% { opacity: 0.6; transform: translate(2px, 1px); }
+    95% { opacity: 0; }
+    97% { opacity: 0.8; transform: translate(-1px, -2px); }
+    98% { opacity: 0; }
+}
+
+/* Tagline typing cursor */
+.hero-tag-line {
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    border-right: 2px solid rgba(2, 179, 109, 0.6);
+    animation: heroTagType 2s steps(20) 1.5s forwards, heroTagBlink 0.6s step-end infinite 1.5s;
+}
+
+@keyframes heroTagType {
+    to { width: 100%; }
+}
+
+@keyframes heroTagBlink {
+    0%, 100% { border-color: rgba(2, 179, 109, 0.6); }
+    50% { border-color: transparent; }
+}
+
 /* V2 Redesign Animations */
 @keyframes drawerSlideIn {
     from {

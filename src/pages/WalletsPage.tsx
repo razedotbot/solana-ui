@@ -28,13 +28,6 @@ import CreateMasterWalletModal from "../components/modals/CreateMasterWalletModa
 import CreateWalletModal from "../components/modals/CreateWalletModal";
 import ImportWalletModal from "../components/modals/ImportWalletModal";
 import ExportSeedPhraseModal from "../components/modals/ExportSeedPhraseModal";
-import { FundModal } from "../components/modals/FundModal";
-import { ConsolidateModal } from "../components/modals/ConsolidateModal";
-import { TransferModal } from "../components/modals/TransferModal";
-import { DepositModal } from "../components/modals/DepositModal";
-import { QuickTradeModal } from "../components/modals/QuickTradeModal";
-import { WalletQuickTradeModal } from "../components/modals/WalletQuickTradeModal";
-import { BurnModal } from "../components/modals/BurnModal";
 import {
   deriveMultipleWallets,
   validateMnemonic,
@@ -47,12 +40,16 @@ import { formatBaseCurrencyBalance } from "../utils/formatting";
 import type { SortField, SortDirection, ActiveModal, FilterTab } from "../components/wallets";
 import {
   WalletsHeader,
-  WalletGridView,
+  WalletListView,
   FilterTabs,
-  CommandPalette,
   GroupDrawer,
   SelectionFooter,
-  createWalletCommands,
+  OperationEmptyState,
+  FundPanel,
+  ConsolidatePanel,
+  TransferPanel,
+  DepositPanel,
+  BurnPanel,
 } from "../components/wallets";
 import { PageBackground } from "../components/PageBackground";
 import { DEFAULT_GROUP_ID } from "../utils/types";
@@ -83,7 +80,6 @@ export const WalletsPage: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCreateWalletModalOpen, setIsCreateWalletModalOpen] = useState(false);
 
-  // Master Wallet State
   const [masterWallets, setMasterWallets] = useState<MasterWallet[]>([]);
   const [expandedMasterWallets, setExpandedMasterWallets] = useState<
     Set<string>
@@ -94,26 +90,19 @@ export const WalletsPage: React.FC = () => {
     useState(false);
   const [exportSeedPhraseMasterWallet, setExportSeedPhraseMasterWallet] =
     useState<MasterWallet | null>(null);
-  // V2 UI State
   const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>("all");
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isGroupDrawerOpen, setIsGroupDrawerOpen] = useState(false);
 
-  // Modal states
+  const [mobileTab, setMobileTab] = useState<"wallets" | "operations">("wallets");
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [isQuickTradeModalOpen, setIsQuickTradeModalOpen] = useState(false);
-  const [editingWalletQuickTrade, setEditingWalletQuickTrade] =
-    useState<WalletType | null>(null);
   const [burnTokenAddress, setBurnTokenAddress] = useState<string>("");
   const [burnTokenBalances, setBurnTokenBalances] = useState<
     Map<string, number>
   >(new Map());
 
-  // Drag and drop state
   const [draggedWalletId, setDraggedWalletId] = useState<number | null>(null);
   const [dragOverWalletId, setDragOverWalletId] = useState<number | null>(null);
 
-  // Wallet groups
   const {
     groups,
     createGroup,
@@ -125,18 +114,18 @@ export const WalletsPage: React.FC = () => {
     moveWalletsToGroup: _moveWalletsToGroup,
   } = useWalletGroups(wallets, setWallets);
 
-  // Active group state
   const [activeGroupId, setActiveGroupId] = useState<string>(() => {
     return localStorage.getItem("wallets_page_active_group") || "all";
   });
 
   const handleGroupChange = (groupId: string): void => {
     setActiveGroupId(groupId);
+    setSelectedWallets(new Set());
     localStorage.setItem("wallets_page_active_group", groupId);
   };
 
-  // Category settings for quick trade (loaded from localStorage)
-  const [categorySettings, setCategorySettings] = useState<
+  // Quick mode settings (loaded from localStorage)
+  const [quickModeSettings, setQuickModeSettings] = useState<
     Record<WalletCategory, CategoryQuickTradeSettings>
   >(() => {
     const saved = localStorage.getItem("categoryQuickTradeSettings");
@@ -150,7 +139,6 @@ export const WalletsPage: React.FC = () => {
         // Invalid JSON, use defaults
       }
     }
-    // Default settings
     return {
       Soft: {
         enabled: true,
@@ -233,7 +221,6 @@ export const WalletsPage: React.FC = () => {
     return undefined;
   }, [wallets.length, setWallets]);
 
-  // Load master wallets on mount
   useEffect(() => {
     const loaded = loadMasterWallets();
     setMasterWallets(loaded);
@@ -268,7 +255,6 @@ export const WalletsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection, walletAddresses]);
 
-  // Wallet creation and import handlers
   const handleImportPrivateKey = async (privateKey: string): Promise<void> => {
     if (!connection) return;
 
@@ -493,7 +479,6 @@ export const WalletsPage: React.FC = () => {
     );
   };
 
-  // Master Wallet Handlers
   const handleCreateMasterWallet = async (
     name: string,
     mnemonic: string
@@ -639,18 +624,19 @@ export const WalletsPage: React.FC = () => {
     setExpandedMasterWallets(newExpanded);
   };
 
-  const handleSaveCategorySettings = (
-    settings: Record<WalletCategory, CategoryQuickTradeSettings>
+  const handleUpdateQuickMode = (
+    category: WalletCategory,
+    settings: CategoryQuickTradeSettings
   ): void => {
-    setCategorySettings(settings);
+    const newSettings = { ...quickModeSettings, [category]: settings };
+    setQuickModeSettings(newSettings);
     localStorage.setItem(
       "categoryQuickTradeSettings",
-      JSON.stringify(settings)
+      JSON.stringify(newSettings)
     );
-    showToast("Quick trade settings saved", "success");
   };
 
-  const handleSaveWalletCustomSettings = (
+  const handleSaveCustomQuickMode = (
     walletId: number,
     settings: CustomQuickTradeSettings | null
   ): void => {
@@ -669,7 +655,6 @@ export const WalletsPage: React.FC = () => {
     );
   };
 
-  // Filter and sort wallets
   const filteredAndSortedWallets = useMemo(() => {
     const filtered = wallets.filter((wallet) => {
       const matchesArchivedFilter = showArchived
@@ -693,7 +678,6 @@ export const WalletsPage: React.FC = () => {
                 ? wallet.isArchived === true
                 : true;
 
-      // Group filtering
       const matchesGroup = activeGroupId === "all"
         ? true
         : (wallet.groupId || DEFAULT_GROUP_ID) === activeGroupId;
@@ -737,19 +721,6 @@ export const WalletsPage: React.FC = () => {
     activeGroupId,
   ]);
 
-  // Command palette keyboard shortcut (Ctrl/Cmd + K)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setIsCommandPaletteOpen(true);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Selection functions
   const toggleWalletSelection = (walletId: number): void => {
     const newSelected = new Set(selectedWallets);
     if (newSelected.has(walletId)) {
@@ -764,7 +735,6 @@ export const WalletsPage: React.FC = () => {
     setSelectedWallets(new Set());
   };
 
-  // Label editing functions
   const startEditingLabel = (wallet: WalletType): void => {
     setEditingLabel(wallet.id);
     setEditLabelValue(wallet.label || "");
@@ -799,7 +769,6 @@ export const WalletsPage: React.FC = () => {
     }
   };
 
-  // Category editing functions
   const saveCategory = (walletId: number, category: WalletCategory): void => {
     const updatedWallets = wallets.map((wallet) =>
       wallet.id === walletId ? { ...wallet, category } : wallet
@@ -809,7 +778,6 @@ export const WalletsPage: React.FC = () => {
     showToast("Category updated", "success");
   };
 
-  // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, walletId: number): void => {
     e.stopPropagation();
     setDraggedWalletId(walletId);
@@ -873,7 +841,6 @@ export const WalletsPage: React.FC = () => {
     setDragOverWalletId(null);
   };
 
-  // Bulk operations
   const deleteSelectedWallets = (): void => {
     if (selectedWallets.size === 0) return;
 
@@ -969,7 +936,6 @@ export const WalletsPage: React.FC = () => {
     showToast("Wallet deleted", "success");
   };
 
-  // Calculate totals excluding archived wallets
   const nonArchivedWallets = wallets.filter((w) => !w.isArchived);
   const totalSOL = nonArchivedWallets.reduce(
     (sum, wallet) => sum + (baseCurrencyBalances.get(wallet.address) || 0),
@@ -983,9 +949,34 @@ export const WalletsPage: React.FC = () => {
       <div className="relative flex-1 overflow-hidden w-full pt-16 bg-app-primary flex flex-col">
         <PageBackground />
 
-        {/* Content container */}
-        <div className="relative z-10 w-full flex flex-col flex-1 min-h-0 overflow-hidden">
-          {/* V2 Header */}
+        {/* Mobile Tab Bar */}
+        <div className="md:hidden relative z-10 flex border-b border-app-primary-20 bg-app-primary">
+          <button
+            onClick={() => setMobileTab("wallets")}
+            className={`flex-1 py-2.5 text-xs font-mono font-semibold uppercase tracking-wider transition-colors ${
+              mobileTab === "wallets"
+                ? "text-app-primary-color border-b-2 border-app-primary-color"
+                : "text-app-secondary-40 hover:text-app-secondary"
+            }`}
+          >
+            Wallets
+          </button>
+          <button
+            onClick={() => setMobileTab("operations")}
+            className={`flex-1 py-2.5 text-xs font-mono font-semibold uppercase tracking-wider transition-colors ${
+              mobileTab === "operations"
+                ? "text-app-primary-color border-b-2 border-app-primary-color"
+                : "text-app-secondary-40 hover:text-app-secondary"
+            }`}
+          >
+            Operations
+          </button>
+        </div>
+
+        {/* Content container - tabs on mobile, 50/50 split on desktop */}
+        <div className="relative z-10 w-full flex flex-1 min-h-0 overflow-hidden">
+          {/* LEFT PANEL: Wallet list */}
+          <div className={`w-full md:w-1/2 relative flex flex-col min-h-0 overflow-hidden md:border-r border-app-primary-20 ${mobileTab === "wallets" ? "flex" : "hidden md:flex"}`}>
           <WalletsHeader
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
@@ -995,14 +986,21 @@ export const WalletsPage: React.FC = () => {
             isRefreshing={isRefreshing}
             onCreateWallet={() => setIsCreateWalletModalOpen(true)}
             onImportWallet={() => setIsImportModalOpen(true)}
-            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+            onCreateMasterWallet={() => setIsCreateMasterWalletModalOpen(true)}
+            onImportMasterWallet={() => setIsImportMasterWalletModalOpen(true)}
+            onExportKeys={() => downloadAllWallets(wallets)}
+            onCleanup={() =>
+              handleCleanupWallets(
+                wallets,
+                baseCurrencyBalances,
+                new Map<string, number>(),
+                setWallets,
+                showToast,
+              )
+            }
             onOpenGroupDrawer={() => setIsGroupDrawerOpen(true)}
-            categorySettings={categorySettings}
-            onUpdateCategorySettings={handleSaveCategorySettings}
-            onOpenQuickTradeSettings={() => {
-              setEditingWalletQuickTrade(null);
-              setIsQuickTradeModalOpen(true);
-            }}
+            quickModeSettings={quickModeSettings}
+            onUpdateQuickMode={handleUpdateQuickMode}
             groups={groups}
             activeGroupId={activeGroupId}
             onGroupChange={handleGroupChange}
@@ -1031,8 +1029,8 @@ export const WalletsPage: React.FC = () => {
           </div>
 
           {/* Wallet Grid */}
-          <div className="flex-1 overflow-y-auto p-4 pb-24">
-            <WalletGridView
+          <div className="flex-1 min-h-0 flex flex-col p-4 pb-24">
+            <WalletListView
               wallets={filteredAndSortedWallets}
               groups={groups}
               selectedWallets={selectedWallets}
@@ -1041,7 +1039,7 @@ export const WalletsPage: React.FC = () => {
               editLabelValue={editLabelValue}
               draggedWalletId={draggedWalletId}
               dragOverWalletId={dragOverWalletId}
-              categorySettings={categorySettings}
+              quickModeSettings={quickModeSettings}
               onToggleSelection={toggleWalletSelection}
               onStartEditingLabel={startEditingLabel}
               onSaveLabel={saveLabel}
@@ -1058,11 +1056,7 @@ export const WalletsPage: React.FC = () => {
               onUnarchiveWallet={unarchiveWallet}
               onDeleteWallet={handleDeleteWallet}
               onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
-              onEditWalletQuickTrade={(wallet: WalletType) => {
-                setEditingWalletQuickTrade(wallet);
-                setIsQuickTradeModalOpen(true);
-              }}
-              onSaveWalletCustomSettings={handleSaveWalletCustomSettings}
+              onSaveCustomQuickMode={handleSaveCustomQuickMode}
               onMoveWalletToGroup={moveWalletToGroup}
             />
           </div>
@@ -1084,46 +1078,6 @@ export const WalletsPage: React.FC = () => {
               showToast(`Moved ${selectedWallets.size} wallet(s) to group`, "success");
               clearSelection();
             }}
-          />
-
-          {/* Command Palette */}
-          <CommandPalette
-            isOpen={isCommandPaletteOpen}
-            onClose={() => setIsCommandPaletteOpen(false)}
-            commands={createWalletCommands({
-              onCreateWallet: () => setIsCreateWalletModalOpen(true),
-              onImportWallet: () => setIsImportModalOpen(true),
-              onCreateMasterWallet: () => setIsCreateMasterWalletModalOpen(true),
-              onImportMasterWallet: () => setIsImportMasterWalletModalOpen(true),
-              onDistribute: () => setActiveModal("distribute"),
-              onConsolidate: () => setActiveModal("consolidate"),
-              onTransfer: () => setActiveModal("transfer"),
-              onDeposit: () => setActiveModal("deposit"),
-              onExportKeys: () => downloadAllWallets(wallets),
-              onBurnTokens: () => {
-                setBurnTokenAddress("");
-                setActiveModal("burn");
-              },
-              onCleanup: () =>
-                handleCleanupWallets(
-                  wallets,
-                  baseCurrencyBalances,
-                  new Map<string, number>(),
-                  setWallets,
-                  showToast
-                ),
-              onQuickTradeSettings: () => {
-                setEditingWalletQuickTrade(null);
-                setIsQuickTradeModalOpen(true);
-              },
-              onManageGroups: () => setIsGroupDrawerOpen(true),
-              onToggleArchived: () => {
-                const newTab = activeFilterTab === "archived" ? "all" : "archived";
-                setActiveFilterTab(newTab);
-                setShowArchived(newTab === "archived");
-              },
-              onRefresh: () => { void refreshBalances(); },
-            })}
           />
 
           {/* Group Drawer */}
@@ -1153,9 +1107,91 @@ export const WalletsPage: React.FC = () => {
             onDeleteMasterWallet={handleDeleteMasterWallet}
             onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
           />
+          </div>
+
+          {/* RIGHT PANEL: Operation panel */}
+          <div className={`w-full md:w-1/2 flex flex-col min-h-0 overflow-hidden ${mobileTab === "operations" ? "flex" : "hidden md:flex"}`}>
+            {activeModal && connection ? (
+              <>
+                {(activeModal === "distribute" || activeModal === "mixer") && (
+                  <FundPanel
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setActiveModal(null)}
+                    wallets={wallets}
+                    baseCurrencyBalances={baseCurrencyBalances}
+                    connection={connection}
+                    initialMode={activeModal === "mixer" ? "mixer" : "distribute"}
+                    selectedWalletIds={selectedWallets}
+                  />
+                )}
+                {activeModal === "consolidate" && (
+                  <ConsolidatePanel
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setActiveModal(null)}
+                    wallets={wallets}
+                    baseCurrencyBalances={baseCurrencyBalances}
+                    connection={connection}
+                    selectedWalletIds={selectedWallets}
+                  />
+                )}
+                {activeModal === "transfer" && (
+                  <TransferPanel
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setActiveModal(null)}
+                    wallets={wallets}
+                    baseCurrencyBalances={baseCurrencyBalances}
+                    connection={connection}
+                    selectedWalletIds={selectedWallets}
+                  />
+                )}
+                {activeModal === "deposit" && (
+                  <DepositPanel
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setActiveModal(null)}
+                    wallets={wallets}
+                    baseCurrencyBalances={baseCurrencyBalances}
+                    setBaseCurrencyBalances={setBaseCurrencyBalances}
+                    connection={connection}
+                    selectedWalletIds={selectedWallets}
+                  />
+                )}
+                {activeModal === "burn" && (
+                  <BurnPanel
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => {
+                      setActiveModal(null);
+                      setBurnTokenBalances(new Map());
+                    }}
+                    tokenAddress={burnTokenAddress}
+                    baseCurrencyBalances={baseCurrencyBalances}
+                    tokenBalances={burnTokenBalances}
+                    selectedWalletIds={selectedWallets}
+                  />
+                )}
+              </>
+            ) : (
+              <OperationEmptyState
+                onDistribute={() => setActiveModal("distribute")}
+                onMixer={() => setActiveModal("mixer")}
+                onConsolidate={() => setActiveModal("consolidate")}
+                onTransfer={() => setActiveModal("transfer")}
+                onDeposit={() => setActiveModal("deposit")}
+                onBurn={() => {
+                  setBurnTokenAddress("");
+                  setActiveModal("burn");
+                }}
+                isConnected={!!connection}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Master Wallet Modals */}
+        {/* Master Wallet Modals (stay as overlays) */}
         {isCreateMasterWalletModalOpen && (
           <CreateMasterWalletModal
             key="create-master-wallet-modal"
@@ -1176,7 +1212,6 @@ export const WalletsPage: React.FC = () => {
           />
         )}
 
-        {/* Create Wallet Modal */}
         {isCreateWalletModalOpen && (
           <CreateWalletModal
             key="create-wallet-modal"
@@ -1187,7 +1222,6 @@ export const WalletsPage: React.FC = () => {
           />
         )}
 
-        {/* Regular Import Modal */}
         {isImportModalOpen && (
           <ImportWalletModal
             key="import-wallet-modal"
@@ -1209,76 +1243,6 @@ export const WalletsPage: React.FC = () => {
           />
         )}
 
-        {/* Wallet Operations Modals */}
-        {connection && (
-          <>
-            <FundModal
-              isOpen={activeModal === "distribute" || activeModal === "mixer"}
-              onClose={() => setActiveModal(null)}
-              wallets={wallets}
-              baseCurrencyBalances={baseCurrencyBalances}
-              connection={connection}
-              initialMode={activeModal === "mixer" ? "mixer" : "distribute"}
-            />
-
-            <ConsolidateModal
-              isOpen={activeModal === "consolidate"}
-              onClose={() => setActiveModal(null)}
-              wallets={wallets}
-              baseCurrencyBalances={baseCurrencyBalances}
-              connection={connection}
-            />
-
-            <TransferModal
-              isOpen={activeModal === "transfer"}
-              onClose={() => setActiveModal(null)}
-              wallets={wallets}
-              baseCurrencyBalances={baseCurrencyBalances}
-              connection={connection}
-            />
-
-            <DepositModal
-              isOpen={activeModal === "deposit"}
-              onClose={() => setActiveModal(null)}
-              wallets={wallets}
-              baseCurrencyBalances={baseCurrencyBalances}
-              setBaseCurrencyBalances={setBaseCurrencyBalances}
-              connection={connection}
-            />
-
-            <BurnModal
-              isOpen={activeModal === "burn"}
-              onClose={() => {
-                setActiveModal(null);
-                setBurnTokenBalances(new Map());
-              }}
-              tokenAddress={burnTokenAddress}
-              baseCurrencyBalances={baseCurrencyBalances}
-              tokenBalances={burnTokenBalances}
-            />
-          </>
-        )}
-
-        {/* Quick Trade Modals */}
-        {editingWalletQuickTrade ? (
-          <WalletQuickTradeModal
-            isOpen={isQuickTradeModalOpen}
-            onClose={() => {
-              setIsQuickTradeModalOpen(false);
-              setEditingWalletQuickTrade(null);
-            }}
-            wallet={editingWalletQuickTrade}
-            categorySettings={categorySettings}
-            onSaveCustomSettings={handleSaveWalletCustomSettings}
-          />
-        ) : (
-          <QuickTradeModal
-            isOpen={isQuickTradeModalOpen}
-            onClose={() => setIsQuickTradeModalOpen(false)}
-            categorySettings={categorySettings}
-            setCategorySettings={handleSaveCategorySettings}
-          />
-        )}
       </div>
     </div>
   );

@@ -6,12 +6,8 @@
  * page props, and shared UI component interfaces.
  */
 
-import type { Connection } from "@solana/web3.js";
 import type { WalletType, MasterWallet } from "./wallet";
 
-// ============================================================================
-// Common UI Types
-// ============================================================================
 
 /**
  * Toast notification type
@@ -46,112 +42,6 @@ export interface PresetTab {
   isActive?: boolean;
 }
 
-// ============================================================================
-// Modal Props Types
-// ============================================================================
-
-/**
- * Funding mode for fund modal
- */
-export type FundingMode = "distribute" | "mixer";
-
-/**
- * Props for the Fund Modal component
- */
-export interface FundModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** List of available wallets */
-  wallets: WalletType[];
-  /** Map of wallet addresses to SOL balances */
-  solBalances: Map<string, number>;
-  /** Solana connection instance */
-  connection: Connection;
-  /** Initial funding mode */
-  initialMode?: FundingMode;
-}
-
-/**
- * Props for the Transfer Modal component
- */
-export interface TransferModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** List of available wallets */
-  wallets: WalletType[];
-  /** Map of wallet addresses to SOL balances */
-  solBalances: Map<string, number>;
-  /** Solana connection instance */
-  connection: Connection;
-  /** Token address for token transfers */
-  tokenAddress?: string;
-  /** Map of wallet addresses to token balances */
-  tokenBalances?: Map<string, number>;
-}
-
-/**
- * Props for the Mixer Modal component
- */
-export interface MixerModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** List of available wallets */
-  wallets: WalletType[];
-  /** Map of wallet addresses to SOL balances */
-  solBalances: Map<string, number>;
-  /** Solana connection instance */
-  connection: Connection;
-}
-
-/**
- * Props for the Consolidate Modal component
- */
-export interface ConsolidateModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** List of available wallets */
-  wallets: WalletType[];
-  /** Map of wallet addresses to SOL balances */
-  solBalances: Map<string, number>;
-  /** Solana connection instance */
-  connection: Connection;
-}
-
-/**
- * Props for the Distribute Modal component
- */
-export interface DistributeModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** List of available wallets */
-  wallets: WalletType[];
-  /** Map of wallet addresses to SOL balances */
-  solBalances: Map<string, number>;
-  /** Solana connection instance */
-  connection: Connection;
-}
-
-/**
- * Props for the Deposit Modal component
- */
-export interface DepositModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** Wallet address to deposit to */
-  walletAddress: string;
-}
 
 /**
  * Props for the Create Wallet Modal component
@@ -201,21 +91,6 @@ export interface ExportSeedPhraseModalProps {
   masterWallet: MasterWallet;
 }
 
-/**
- * Props for the Burn Modal component
- */
-export interface BurnModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** List of available wallets */
-  wallets: WalletType[];
-  /** Token address to burn */
-  tokenAddress: string;
-  /** Map of wallet addresses to token balances */
-  tokenBalances: Map<string, number>;
-}
 
 /**
  * Props for the Quick Trade Modal component
@@ -269,9 +144,6 @@ export interface CalculatePNLModalProps {
   tokenAddress: string;
 }
 
-// ============================================================================
-// Page Props Types
-// ============================================================================
 
 /**
  * Mobile page type
@@ -294,48 +166,6 @@ export interface MobileLayoutProps {
 }
 
 /**
- * Props for the Wallets Page component
- */
-export interface WalletsPageProps {
-  /** List of wallets */
-  wallets: WalletType[];
-  /** Callback to update wallets */
-  setWallets: (wallets: WalletType[]) => void;
-  /** Map of wallet addresses to SOL balances */
-  solBalances: Map<string, number>;
-  /** Map of wallet addresses to token balances */
-  tokenBalances: Map<string, number>;
-  /** Solana connection instance */
-  connection: Connection;
-  /** Current token address */
-  tokenAddress: string;
-}
-
-/**
- * Props for the Deploy Page component
- */
-export interface DeployPageProps {
-  /** List of wallets */
-  wallets: WalletType[];
-  /** Map of wallet addresses to SOL balances */
-  solBalances: Map<string, number>;
-  /** Solana connection instance */
-  connection: Connection;
-}
-
-/**
- * Props for the Settings Page component
- */
-export interface SettingsPageProps {
-  /** Callback to close settings */
-  onClose?: () => void;
-}
-
-// ============================================================================
-// Wallet Amount Types
-// ============================================================================
-
-/**
  * Wallet amount for modal operations
  */
 export interface WalletAmount {
@@ -343,31 +173,4 @@ export interface WalletAmount {
   address: string;
   /** Amount as string for input handling */
   amount: string;
-}
-
-// ============================================================================
-// Transfer Queue Types
-// ============================================================================
-
-/**
- * Transfer status
- */
-export type TransferStatus = "pending" | "processing" | "completed" | "failed";
-
-/**
- * Transfer queue item for batch transfers
- */
-export interface TransferQueueItem {
-  /** Source wallet private key */
-  sourceWallet: string;
-  /** Recipient address */
-  recipient: string;
-  /** Amount to transfer */
-  amount: string;
-  /** Transfer status */
-  status: TransferStatus;
-  /** Error message if failed */
-  error?: string;
-  /** Transaction signature if completed */
-  signature?: string;
 }

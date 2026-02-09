@@ -10,9 +10,6 @@
  * import type { WalletType } from '../utils/types';
  */
 
-// ============================================================================
-// API Types
-// ============================================================================
 
 export type {
   ApiResponse,
@@ -21,9 +18,6 @@ export type {
   WindowWithToast,
 } from "./api";
 
-// ============================================================================
-// Wallet Types
-// ============================================================================
 
 export type {
   WalletCategory,
@@ -48,9 +42,6 @@ export type {
 
 export { DEFAULT_GROUP_ID } from "./wallet";
 
-// ============================================================================
-// Trading Types
-// ============================================================================
 
 export type {
   BundleMode,
@@ -73,42 +64,23 @@ export type {
   QuickTradeResult,
 } from "./trading";
 
-// ============================================================================
-// Component Types
-// ============================================================================
 
 export type {
   ToastType,
   Toast,
   PresetTab,
-  FundingMode,
-  FundModalProps,
-  TransferModalProps,
-  MixerModalProps,
-  ConsolidateModalProps,
-  DistributeModalProps,
-  DepositModalProps,
   CreateWalletModalProps,
   ImportWalletModalProps,
   CreateMasterWalletModalProps,
   ExportSeedPhraseModalProps,
-  BurnModalProps,
   QuickTradeModalProps,
   WalletQuickTradeModalProps,
   CalculatePNLModalProps,
   MobilePage,
   MobileLayoutProps,
-  WalletsPageProps,
-  DeployPageProps,
-  SettingsPageProps,
   WalletAmount as ComponentWalletAmount,
-  TransferStatus,
-  TransferQueueItem,
 } from "./components";
 
-// ============================================================================
-// Iframe Types
-// ============================================================================
 
 export type {
   ViewType,
@@ -147,9 +119,6 @@ export type {
   FrameProps,
 } from "./iframe";
 
-// ============================================================================
-// Token Metadata Types
-// ============================================================================
 
 export type {
   TokenOnChainMetadata,

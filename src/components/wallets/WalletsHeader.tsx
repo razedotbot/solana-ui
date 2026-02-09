@@ -5,11 +5,14 @@ import {
   RefreshCw,
   Plus,
   Key,
-  Command,
   Layers,
   ChevronDown,
   Zap,
-  Settings,
+  MoreHorizontal,
+  Wallet,
+  Upload,
+  Download,
+  Trash2,
 } from "lucide-react";
 import type {
   WalletCategory,
@@ -29,12 +32,14 @@ export interface WalletsHeaderProps {
   isRefreshing: boolean;
   onCreateWallet: () => void;
   onImportWallet: () => void;
-  onOpenCommandPalette: () => void;
+  onCreateMasterWallet: () => void;
+  onImportMasterWallet: () => void;
+  onExportKeys: () => void;
+  onCleanup: () => void;
   onOpenGroupDrawer: () => void;
   // QuickTrade
-  categorySettings: Record<WalletCategory, CategoryQuickTradeSettings>;
-  onUpdateCategorySettings: (settings: Record<WalletCategory, CategoryQuickTradeSettings>) => void;
-  onOpenQuickTradeSettings: () => void;
+  quickModeSettings: Record<WalletCategory, CategoryQuickTradeSettings>;
+  onUpdateQuickMode: (category: WalletCategory, settings: CategoryQuickTradeSettings) => void;
   // Group indicator
   groups: WalletGroup[];
   activeGroupId: string;
@@ -75,11 +80,13 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
   isRefreshing,
   onCreateWallet,
   onImportWallet,
-  onOpenCommandPalette,
+  onCreateMasterWallet,
+  onImportMasterWallet,
+  onExportKeys,
+  onCleanup,
   onOpenGroupDrawer,
-  categorySettings,
-  onUpdateCategorySettings: _onUpdateCategorySettings,
-  onOpenQuickTradeSettings,
+  quickModeSettings,
+  onUpdateQuickMode,
   groups,
   activeGroupId,
   onGroupChange,
@@ -87,7 +94,9 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
 }) => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<WalletCategory | null>(null);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   const activeGroup = activeGroupId === "all" ? null : groups.find((g) => g.id === activeGroupId);
 
@@ -95,6 +104,9 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
     const handleClickOutside = (event: MouseEvent): void => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setExpandedCategory(null);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -165,7 +177,7 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
           <Zap size={14} className="color-primary flex-shrink-0" />
           <div className="flex items-center gap-1">
             {categories.map((category) => {
-              const settings = categorySettings[category];
+              const settings = quickModeSettings[category];
               const styles = categoryStyles[category];
               const isExpanded = expandedCategory === category;
 
@@ -195,48 +207,120 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
               );
             })}
           </div>
-          <button
-            onClick={onOpenQuickTradeSettings}
-            className="p-1.5 hover:bg-app-quaternary rounded-lg transition-colors"
-            title="Full Settings"
-          >
-            <Settings size={14} className="text-app-secondary-60" />
-          </button>
         </div>
 
-        {/* Expanded Quick Settings */}
-        {expandedCategory && (
-          <div className="absolute top-full left-0 mt-2 z-30 p-4 rounded-xl border shadow-xl bg-app-primary min-w-[280px]"
-            style={{ borderColor: `var(--${expandedCategory.toLowerCase()}-color, #333)` }}
-          >
-            <h4 className={`text-sm font-bold mb-3 ${categoryStyles[expandedCategory].text}`}>
-              {expandedCategory} Mode
-            </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] text-app-secondary-60 uppercase">Buy (SOL)</label>
-                <div className="mt-1 font-mono text-sm text-app-primary">
-                  {formatBuyDisplay(categorySettings[expandedCategory])}
-                </div>
+        {/* Expanded Quick Settings - Editable */}
+        {expandedCategory && (() => {
+          const s = quickModeSettings[expandedCategory];
+          const styles = categoryStyles[expandedCategory];
+          const update = (field: string, value: number | boolean): void => {
+            onUpdateQuickMode(expandedCategory, { ...s, [field]: value });
+          };
+          return (
+            <div className="absolute top-full left-0 mt-2 z-30 bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-hidden min-w-[260px]">
+              <div className="px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
+                <h4 className={`text-[10px] font-mono font-bold ${styles.text} uppercase`}>
+                  {expandedCategory} Mode
+                </h4>
               </div>
-              <div>
-                <label className="text-[10px] text-app-secondary-60 uppercase">Sell</label>
-                <div className="mt-1 font-mono text-sm text-app-primary">
-                  {formatSellDisplay(categorySettings[expandedCategory])}
+              <div className="p-3">
+                {/* Buy */}
+                <div className="mb-2.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-mono text-app-secondary uppercase">Buy (SOL)</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={s.useBuyRange}
+                        onChange={(e) => update("useBuyRange", e.target.checked)}
+                        className="w-3 h-3 rounded accent-app-primary-color"
+                      />
+                      <span className="text-[10px] font-mono text-app-secondary-60">Range</span>
+                    </label>
+                  </div>
+                  {s.useBuyRange ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        value={s.buyMinAmount}
+                        onChange={(e) => update("buyMinAmount", parseFloat(e.target.value) || 0)}
+                        step="0.001"
+                        min="0.001"
+                        className="w-full bg-app-primary-80 border border-app-primary-40 rounded px-2 py-1 text-xs font-mono text-app-primary focus:border-app-primary-color focus:outline-none transition-colors"
+                      />
+                      <span className="text-[10px] text-app-secondary-40 font-mono">-</span>
+                      <input
+                        type="number"
+                        value={s.buyMaxAmount}
+                        onChange={(e) => update("buyMaxAmount", parseFloat(e.target.value) || 0)}
+                        step="0.001"
+                        min="0.001"
+                        className="w-full bg-app-primary-80 border border-app-primary-40 rounded px-2 py-1 text-xs font-mono text-app-primary focus:border-app-primary-color focus:outline-none transition-colors"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      value={s.buyAmount}
+                      onChange={(e) => update("buyAmount", parseFloat(e.target.value) || 0)}
+                      step="0.001"
+                      min="0.001"
+                      className="w-full bg-app-primary-80 border border-app-primary-40 rounded px-2 py-1 text-xs font-mono text-app-primary focus:border-app-primary-color focus:outline-none transition-colors"
+                    />
+                  )}
+                </div>
+                {/* Sell */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-mono text-app-secondary uppercase">Sell %</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={s.useSellRange}
+                        onChange={(e) => update("useSellRange", e.target.checked)}
+                        className="w-3 h-3 rounded accent-app-primary-color"
+                      />
+                      <span className="text-[10px] font-mono text-app-secondary-60">Range</span>
+                    </label>
+                  </div>
+                  {s.useSellRange ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        value={s.sellMinPercentage}
+                        onChange={(e) => update("sellMinPercentage", parseFloat(e.target.value) || 0)}
+                        step="1"
+                        min="1"
+                        max="100"
+                        className="w-full bg-app-primary-80 border border-app-primary-40 rounded px-2 py-1 text-xs font-mono text-app-primary focus:border-app-primary-color focus:outline-none transition-colors"
+                      />
+                      <span className="text-[10px] text-app-secondary-40 font-mono">-</span>
+                      <input
+                        type="number"
+                        value={s.sellMaxPercentage}
+                        onChange={(e) => update("sellMaxPercentage", parseFloat(e.target.value) || 0)}
+                        step="1"
+                        min="1"
+                        max="100"
+                        className="w-full bg-app-primary-80 border border-app-primary-40 rounded px-2 py-1 text-xs font-mono text-app-primary focus:border-app-primary-color focus:outline-none transition-colors"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      value={s.sellPercentage}
+                      onChange={(e) => update("sellPercentage", parseFloat(e.target.value) || 0)}
+                      step="1"
+                      min="1"
+                      max="100"
+                      className="w-full bg-app-primary-80 border border-app-primary-40 rounded px-2 py-1 text-xs font-mono text-app-primary focus:border-app-primary-color focus:outline-none transition-colors"
+                    />
+                  )}
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => {
-                onOpenQuickTradeSettings();
-                setExpandedCategory(null);
-              }}
-              className="mt-3 w-full text-xs text-app-secondary-60 hover:text-app-primary transition-colors"
-            >
-              Edit full settings...
-            </button>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Spacer */}
@@ -284,16 +368,6 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
           <Layers size={16} />
         </button>
 
-        {/* Command Palette */}
-        <button
-          onClick={onOpenCommandPalette}
-          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-app-quaternary text-app-secondary-60 hover:text-app-primary border border-app-primary-20 transition-colors"
-          title="Open command palette (Ctrl+K)"
-        >
-          <Command size={14} />
-          <span className="text-xs font-mono">K</span>
-        </button>
-
         {/* Divider */}
         <div className="w-px h-6 bg-app-primary-15 mx-1" />
 
@@ -319,6 +393,57 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
           <Key size={16} />
           <span className="hidden sm:inline">Import</span>
         </button>
+
+        {/* More Menu */}
+        <div className="relative" ref={moreMenuRef}>
+          <button
+            onClick={() => setShowMoreMenu(!showMoreMenu)}
+            className={`p-2 rounded-lg transition-colors ${
+              showMoreMenu
+                ? "bg-app-quaternary text-app-primary"
+                : "hover:bg-app-quaternary text-app-secondary-60 hover:text-app-primary"
+            }`}
+            title="More actions"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+
+          {showMoreMenu && (
+            <div className="absolute right-0 top-full mt-2 z-30 bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-hidden min-w-[200px]">
+              <button
+                onClick={() => { onCreateMasterWallet(); setShowMoreMenu(false); }}
+                disabled={!isConnected}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-app-secondary-60 hover:text-app-primary hover:bg-app-quaternary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Wallet size={15} className="flex-shrink-0" />
+                Create Master Wallet
+              </button>
+              <button
+                onClick={() => { onImportMasterWallet(); setShowMoreMenu(false); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-app-secondary-60 hover:text-app-primary hover:bg-app-quaternary transition-colors"
+              >
+                <Upload size={15} className="flex-shrink-0" />
+                Import Master Wallet
+              </button>
+              <div className="h-px bg-app-primary-15 mx-2" />
+              <button
+                onClick={() => { onExportKeys(); setShowMoreMenu(false); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-app-secondary-60 hover:text-app-primary hover:bg-app-quaternary transition-colors"
+              >
+                <Download size={15} className="flex-shrink-0" />
+                Export All Keys
+              </button>
+              <button
+                onClick={() => { onCleanup(); setShowMoreMenu(false); }}
+                disabled={!isConnected}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-app-secondary-60 hover:text-app-primary hover:bg-app-quaternary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={15} className="flex-shrink-0" />
+                Cleanup Empty Wallets
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

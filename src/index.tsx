@@ -5,7 +5,6 @@ import { Buffer } from "buffer";
 import Cookies from "js-cookie";
 window.Buffer = Buffer;
 import { brand } from "./utils/brandConfig";
-import logoImage from "./logo.png";
 import type { WindowWithToast, ServerInfo } from "./utils/types";
 import { AppContextProvider } from "./contexts";
 import { IframeStateProvider } from "./contexts/IframeStateContext";
@@ -90,24 +89,59 @@ const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
 ];
 
 export const ServerCheckLoading = (): JSX.Element => {
+  const fullText = 'sol.raze.bot';
+  const [displayedText, setDisplayedText] = useState('');
+  const [showCursor, setShowCursor] = useState(true);
+
+  useEffect(() => {
+    let currentIndex = 0;
+    const typeInterval = setInterval(() => {
+      if (currentIndex <= fullText.length) {
+        setDisplayedText(fullText.slice(0, currentIndex));
+        currentIndex++;
+      } else {
+        clearInterval(typeInterval);
+      }
+    }, 100);
+    return () => clearInterval(typeInterval);
+  }, []);
+
+  useEffect(() => {
+    const blinkInterval = setInterval(() => {
+      setShowCursor(prev => !prev);
+    }, 530);
+    return () => clearInterval(blinkInterval);
+  }, []);
+
   return (
     <div className="launch-animation">
-      <div className="logo-container">
-        <div className="corner corner-tl"></div>
-        <div className="corner corner-tr"></div>
-        <div className="corner corner-bl"></div>
-        <div className="corner corner-br"></div>
-        <div className="logo-orbit">
-          <div className="orbit-dot dot-1"></div>
-          <div className="orbit-dot dot-2"></div>
-          <div className="orbit-dot dot-3"></div>
-          <div className="orbit-dot dot-4"></div>
-        </div>
-        <div className="logo-hexagon">
-          <img src={logoImage} alt="Logo" />
-        </div>
-      </div>
-      <div className="loading-text">Initializing</div>
+      <h1
+        style={{
+          fontFamily: "'Instrument Serif', serif",
+          color: '#ffffff',
+          textShadow: '0 0 30px rgba(2, 179, 109, 0.3), 0 0 10px rgba(255, 255, 255, 0.1)',
+          fontSize: 'clamp(3rem, 8vw, 7rem)',
+          fontWeight: 'bold',
+          letterSpacing: '-0.02em',
+        }}
+      >
+        <span style={{ position: 'relative' }}>
+          {displayedText}
+          <span
+            style={{
+              display: 'inline-block',
+              width: '4px',
+              height: '0.9em',
+              marginLeft: '4px',
+              backgroundColor: '#02b36d',
+              boxShadow: '0 0 10px rgba(2, 179, 109, 0.8), 0 0 20px rgba(2, 179, 109, 0.4)',
+              opacity: showCursor ? 1 : 0,
+              transition: 'opacity 100ms',
+              verticalAlign: 'text-bottom',
+            }}
+          />
+        </span>
+      </h1>
       <div className="progress-container">
         <div className="progress-bar"></div>
       </div>

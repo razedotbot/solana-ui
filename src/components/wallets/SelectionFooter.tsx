@@ -37,7 +37,7 @@ export const SelectionFooter: React.FC<SelectionFooterProps> = ({
   if (selectedCount === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 animate-slide-up">
+    <div className="absolute bottom-0 left-0 right-0 z-40 animate-slide-up">
       <div className="bg-app-primary/95 backdrop-blur-md border-t border-app-primary-20 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
