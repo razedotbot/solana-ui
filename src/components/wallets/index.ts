@@ -15,7 +15,7 @@ export type { SelectionFooterProps } from "./SelectionFooter";
 
 export { GroupSelector } from "./GroupSelector";
 
-export { OperationEmptyState } from "./OperationEmptyState";
+export { OperationEmptyState } from "./SelectionFooter";
 
 
 export { DistributePanel } from "./DistributePanel";
@@ -25,9 +25,14 @@ export { TransferPanel } from "./TransferPanel";
 export { FeeClaimPanel } from "./FeeClaimPanel";
 export { BurnPanel } from "./BurnPanel";
 
-export type {
-  SortField,
-  SortDirection,
-  ViewMode,
-  ActiveModal,
-} from "./types";
+export type SortField = "solBalance";
+export type SortDirection = "asc" | "desc";
+export type ViewMode = "all" | "hd" | "imported";
+export type ActiveModal =
+  | "distribute"
+  | "consolidate"
+  | "transfer"
+  | "fee-claim"
+  | "mixer"
+  | "burn"
+  | null;

@@ -665,18 +665,42 @@ export const SettingsPage: React.FC = () => {
     return (
       <div className="space-y-6 animate-fade-in-down">
         {/* Section Header */}
-        <div className="flex items-center gap-4 pb-4 border-b border-app-primary-20">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
-            <Database size={24} className="color-primary" />
+        <div className="flex items-center justify-between pb-4 border-b border-app-primary-20">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-app-primary-color/20 to-app-primary-color/5 border border-app-primary-color/30 flex items-center justify-center">
+              <Database size={24} className="color-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-app-primary font-mono">
+                Import & Export
+              </h2>
+              <p className="text-xs text-app-secondary-60 font-mono">
+                Backup and restore your app data
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-app-primary font-mono">
-              Import & Export
-            </h2>
-            <p className="text-xs text-app-secondary-60 font-mono">
-              Backup and restore your app data
-            </p>
-          </div>
+
+          {/* Import button in header */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="group flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-dashed border-app-primary-20 hover:border-app-primary-40 bg-app-quaternary/20 hover:bg-app-primary-color/5 transition-all duration-200 cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-lg bg-app-primary-color/10 border border-app-primary-20 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+              <Upload size={15} className="color-primary" />
+            </div>
+            <div className="text-left">
+              <div className="text-xs font-mono font-semibold text-app-primary">Import</div>
+              <div className="text-[10px] font-mono text-app-secondary-40">Select .json backup</div>
+            </div>
+          </button>
         </div>
 
         {/* ===== EXPORT ===== */}
@@ -752,97 +776,70 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ===== IMPORT ===== */}
-        <div className="rounded-xl bg-app-tertiary/50 border border-app-primary-20 overflow-hidden">
-          <div className="flex items-center px-5 py-3 bg-app-primary-color/5 border-b border-app-primary-20">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-app-primary-color/15 flex items-center justify-center">
-                <Upload size={14} className="color-primary" />
+        {/* ===== IMPORT (shown only when file loaded) ===== */}
+        {importData && (
+          <div className="rounded-xl bg-app-tertiary/50 border border-app-primary-20 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 bg-app-primary-color/5 border-b border-app-primary-20">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-app-primary-color/15 flex items-center justify-center">
+                  <Upload size={14} className="color-primary" />
+                </div>
+                <span className="text-sm font-bold font-mono text-app-primary">Import</span>
               </div>
-              <span className="text-sm font-bold font-mono text-app-primary">Import</span>
-            </div>
-          </div>
-
-          <div className="p-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleImportFile}
-              className="hidden"
-            />
-
-            {!importData ? (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="group w-full flex items-center gap-4 px-5 py-5 rounded-xl border-2 border-dashed border-app-primary-20 hover:border-app-primary-40 bg-app-quaternary/20 hover:bg-app-primary-color/5 transition-all duration-200 cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-app-primary-color/10 border border-app-primary-20 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                  <Upload size={18} className="color-primary" />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-app-primary-color/5 border border-app-primary-20">
+                  <Database size={12} className="color-primary" />
+                  <span className="text-xs font-mono font-medium text-app-primary truncate max-w-[180px]">{importFileName}</span>
                 </div>
-                <div className="text-left">
-                  <div className="text-xs font-mono font-semibold text-app-primary">Select config file</div>
-                  <div className="text-[10px] font-mono text-app-secondary-40 mt-0.5">Choose a .json backup to restore</div>
-                </div>
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-app-primary-color/5 border border-app-primary-20">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-6 h-6 rounded-lg bg-app-primary-color/15 flex items-center justify-center flex-shrink-0">
-                      <Database size={12} className="color-primary" />
-                    </div>
-                    <span className="text-xs font-mono font-medium text-app-primary truncate">{importFileName}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { setImportData(null); setImportFileName(""); setImportSelection(new Set()); }}
-                    className="text-[10px] font-mono font-medium px-2 py-1 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0 ml-2"
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {DATA_CATEGORIES.filter((cat) => importData !== null && cat.id in importData).map((cat) => (
-                    <CategoryCard
-                      key={cat.id}
-                      cat={cat}
-                      selected={importSelection.has(cat.id)}
-                      accent={cat.sensitive ? "yellow" : "green"}
-                      onToggle={() => toggleImportItem(cat.id)}
-                    />
-                  ))}
-                </div>
-
-                {importData !== null && Object.keys(importData).filter((k) => k !== "_meta" && !DATA_CATEGORIES.some((c) => c.id === k)).length > 0 && (
-                  <div className="text-[10px] font-mono text-app-secondary-40 px-1">
-                    + {Object.keys(importData).filter((k) => k !== "_meta" && !DATA_CATEGORIES.some((c) => c.id === k)).length} unrecognized {Object.keys(importData).filter((k) => k !== "_meta" && !DATA_CATEGORIES.some((c) => c.id === k)).length === 1 ? "entry" : "entries"} (skipped)
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-yellow-500/8 border border-yellow-500/15">
-                  <AlertTriangle size={13} className="text-yellow-400 flex-shrink-0" />
-                  <span className="text-[10px] font-mono text-yellow-400/70 leading-snug">
-                    Importing overwrites existing data for selected categories.
-                  </span>
-                </div>
-
                 <button
                   type="button"
-                  onClick={handleImportApply}
-                  disabled={importSelection.size === 0}
-                  className="group relative w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-app-primary-color hover:bg-app-primary-dark text-black font-bold font-mono text-sm transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed overflow-hidden"
+                  onClick={() => { setImportData(null); setImportFileName(""); setImportSelection(new Set()); }}
+                  className="text-[10px] font-mono font-medium px-2 py-1 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                  <Upload size={16} />
-                  <span>Import {importSelection.size} {importSelection.size === 1 ? "Category" : "Categories"}</span>
+                  Remove
                 </button>
               </div>
-            )}
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {DATA_CATEGORIES.filter((cat) => importData !== null && cat.id in importData).map((cat) => (
+                  <CategoryCard
+                    key={cat.id}
+                    cat={cat}
+                    selected={importSelection.has(cat.id)}
+                    accent={cat.sensitive ? "yellow" : "green"}
+                    onToggle={() => toggleImportItem(cat.id)}
+                  />
+                ))}
+              </div>
+
+              {importData !== null && Object.keys(importData).filter((k) => k !== "_meta" && !DATA_CATEGORIES.some((c) => c.id === k)).length > 0 && (
+                <div className="text-[10px] font-mono text-app-secondary-40 px-1">
+                  + {Object.keys(importData).filter((k) => k !== "_meta" && !DATA_CATEGORIES.some((c) => c.id === k)).length} unrecognized {Object.keys(importData).filter((k) => k !== "_meta" && !DATA_CATEGORIES.some((c) => c.id === k)).length === 1 ? "entry" : "entries"} (skipped)
+                </div>
+              )}
+
+              <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-yellow-500/8 border border-yellow-500/15">
+                <AlertTriangle size={13} className="text-yellow-400 flex-shrink-0" />
+                <span className="text-[10px] font-mono text-yellow-400/70 leading-snug">
+                  Importing overwrites existing data for selected categories.
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleImportApply}
+                disabled={importSelection.size === 0}
+                className="group relative w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-app-primary-color hover:bg-app-primary-dark text-black font-bold font-mono text-sm transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                <Upload size={16} />
+                <span>Import {importSelection.size} {importSelection.size === 1 ? "Category" : "Categories"}</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   };

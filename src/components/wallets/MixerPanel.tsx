@@ -16,10 +16,10 @@ import { getWalletDisplayName } from "../../utils/wallet";
 import type { WalletType, ComponentWalletAmount } from "../../utils/types";
 import { batchMixBaseCurrency, validateMixingInputs } from "../../utils/mixer";
 import type { BaseCurrencyConfig } from "../../utils/constants";
-import { SourceWalletSummary } from "./SourceWalletSummary";
 import { BASE_CURRENCIES } from "../../utils/constants";
-import { filterAndSortWallets } from "./walletFilterUtils";
-import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
+import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
+import * as PU from "./PanelShared";
+import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
 
 interface MixerPanelProps {
   isOpen: boolean;
@@ -75,32 +75,15 @@ export const MixerPanel: React.FC<MixerPanelProps> = ({
   }, [useExternalRecipients, selectedWalletIds, wallets, currentStep]);
 
   const getWalletBalance = useCallback(
-    (address: string): number => {
-      return baseCurrencyBalances.has(address)
-        ? baseCurrencyBalances.get(address) || 0
-        : 0;
-    },
+    (address: string): number => PU.getWalletBalance(address, baseCurrencyBalances),
     [baseCurrencyBalances],
   );
 
-  const calculateTotalAmount = (): number => {
-    if (useCustomAmounts) {
-      return walletAmounts.reduce((total, item) => {
-        return total + (parseFloat(item.amount) || 0);
-      }, 0);
-    } else {
-      return parseFloat(commonAmount || "0") * selectedRecipientWallets.length;
-    }
-  };
+  const calculateTotalAmount = (): number =>
+    PU.calculateTotalAmount(useCustomAmounts, walletAmounts, commonAmount, selectedRecipientWallets.length);
 
-  const hasEmptyAmounts = (): boolean => {
-    if (!useCustomAmounts) return false;
-    return walletAmounts.some(
-      (wallet) =>
-        selectedRecipientWallets.includes(wallet.address) &&
-        (!wallet.amount || parseFloat(wallet.amount) === 0),
-    );
-  };
+  const hasEmptyAmounts = (): boolean =>
+    PU.hasEmptyAmounts(useCustomAmounts, walletAmounts, selectedRecipientWallets);
 
   const totalAmount = calculateTotalAmount();
   const senderBalance = getWalletBalance(selectedSenderWallet) || 0;
@@ -154,18 +137,9 @@ export const MixerPanel: React.FC<MixerPanelProps> = ({
     updateWalletAmounts();
   }, [useCustomAmounts, commonAmount, updateWalletAmounts]);
 
-  const formatBalance = (balance: number): string => {
-    return baseCurrency.isNative ? balance.toFixed(4) : balance.toFixed(2);
-  };
-
-  const getWalletByAddress = (address: string): WalletType | undefined => {
-    return wallets.find((wallet) => wallet.address === address);
-  };
-
-  const getPrivateKeyByAddress = (address: string): string => {
-    const wallet = getWalletByAddress(address);
-    return wallet ? wallet.privateKey : "";
-  };
+  const formatBalance = (balance: number): string => PU.formatBalance(balance, baseCurrency);
+  const getWalletByAddress = (address: string): WalletType | undefined => PU.getWalletByAddress(wallets, address);
+  const getPrivateKeyByAddress = (address: string): string => PU.getPrivateKeyByAddress(wallets, address);
 
   const handleWalletAmountChange = (address: string, value: string): void => {
     if (value === "" || /^\d*\.?\d*$/.test(value)) {
@@ -245,13 +219,7 @@ export const MixerPanel: React.FC<MixerPanelProps> = ({
   };
 
   const toggleRecipientWalletSelection = (address: string): void => {
-    setSelectedRecipientWallets((prev) => {
-      if (prev.includes(address)) {
-        return prev.filter((a) => a !== address);
-      } else {
-        return [...prev, address];
-      }
-    });
+    setSelectedRecipientWallets((prev) => PU.toggleSelection(prev, address));
   };
 
   const getAvailableRecipientWallets = (): WalletType[] => {
@@ -307,139 +275,7 @@ export const MixerPanel: React.FC<MixerPanelProps> = ({
     return wallet ? wallet.amount : "";
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const id = "fund-modal-styles";
-    if (document.getElementById(id)) return;
-    const el = document.createElement("style");
-    el.id = id;
-    el.textContent = `
-    @keyframes modal-pulse {
-      0% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
-      50% { box-shadow: 0 0 15px var(--color-primary-80), 0 0 25px var(--color-primary-40); }
-      100% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
-    }
-
-    @keyframes modal-fade-in {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-
-    @keyframes modal-slide-up {
-      0% { transform: translateY(20px); opacity: 0; }
-      100% { transform: translateY(0); opacity: 1; }
-    }
-
-    @keyframes modal-scan-line {
-      0% { transform: translateY(-100%); opacity: 0.3; }
-      100% { transform: translateY(100%); opacity: 0; }
-    }
-
-    .modal-content {
-      position: relative;
-    }
-
-    .modal-input-:focus {
-      box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
-      transition: all 0.3s ease;
-    }
-
-    .modal-btn- {
-      position: relative;
-      overflow: hidden;
-      transition: all 0.3s ease;
-    }
-
-    .modal-btn-::after {
-      content: "";
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: linear-gradient(
-        to bottom right,
-        var(--color-primary-05) 0%,
-        var(--color-primary-30) 50%,
-        var(--color-primary-05) 100%
-      );
-      transform: rotate(45deg);
-      transition: all 0.5s ease;
-      opacity: 0;
-    }
-
-    .modal-btn-:hover::after {
-      opacity: 1;
-      transform: rotate(45deg) translate(50%, 50%);
-    }
-
-    .modal-btn-:active {
-      transform: scale(0.95);
-    }
-
-    .progress-bar- {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .progress-bar-::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        var(--color-primary-70) 50%,
-        transparent 100%
-      );
-      width: 100%;
-      height: 100%;
-      transform: translateX(-100%);
-      animation: progress-shine 3s infinite;
-    }
-
-    @keyframes progress-shine {
-      0% { transform: translateX(-100%); }
-      20% { transform: translateX(100%); }
-      100% { transform: translateX(100%); }
-    }
-
-    .glitch-text:hover {
-      text-shadow: 0 0 2px var(--color-primary), 0 0 4px var(--color-primary);
-      animation: glitch 2s infinite;
-    }
-
-    @keyframes glitch {
-      2%, 8% { transform: translate(-2px, 0) skew(0.3deg); }
-      4%, 6% { transform: translate(2px, 0) skew(-0.3deg); }
-      62%, 68% { transform: translate(0, 0) skew(0.33deg); }
-      64%, 66% { transform: translate(0, 0) skew(-0.33deg); }
-    }
-
-    @media (max-width: 1024px) {
-      .modal-flex-col-lg { flex-direction: column; }
-      .modal-w-full-lg { width: 100%; }
-      .modal-mt-4-lg { margin-top: 1rem; }
-    }
-
-    @media (max-width: 768px) {
-      .modal-flex-col-md { flex-direction: column; }
-      .modal-w-full-md { width: 100%; }
-      .modal-mt-4-md { margin-top: 1rem; }
-    }
-
-    @media (max-width: 640px) {
-      .modal-text-xs-sm { font-size: 0.75rem; }
-      .modal-p-3-sm { padding: 0.75rem; }
-      .modal-mx-1-sm { margin-left: 0.25rem; margin-right: 0.25rem; }
-    }
-  `;
-    document.head.appendChild(el);
-    return () => { el.remove(); };
-  }, [isOpen]);
+  useModalStyles(isOpen, "mixer-modal-styles");
 
   if (!isOpen) return null;
 
@@ -1066,34 +902,11 @@ export const MixerPanel: React.FC<MixerPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Confirmation Checkbox */}
-                <div className="flex items-center px-3 py-3 bg-app-tertiary rounded-lg border border-app-primary-30">
-                  <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => setIsConfirmed(!isConfirmed)}
-                  >
-                    <div className="relative mx-1">
-                      <div
-                        className="w-5 h-5 border border-app-primary-40 rounded peer-checked:bg-app-primary-color peer-checked:border-0 transition-all cursor-pointer"
-                        style={{
-                          backgroundColor: isConfirmed
-                            ? "var(--color-primary)"
-                            : "transparent",
-                          borderColor: isConfirmed
-                            ? "var(--color-primary)"
-                            : "var(--color-primary-40)",
-                        }}
-                      ></div>
-                      <CheckCircle
-                        size={14}
-                        className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? "opacity-100" : "opacity-0"}`}
-                      />
-                    </div>
-                    <span className="text-app-primary text-sm ml-2 cursor-pointer select-none font-mono">
-                      I CONFIRM THIS MIXING OPERATION
-                    </span>
-                  </div>
-                </div>
+                <ConfirmCheckbox
+                  checked={isConfirmed}
+                  onChange={() => setIsConfirmed(!isConfirmed)}
+                  label="I CONFIRM THIS MIXING OPERATION"
+                />
               </div>
 
               {/* Recipients List */}
@@ -1171,7 +984,7 @@ export const MixerPanel: React.FC<MixerPanelProps> = ({
               >
                 {isSubmitting ? (
                   <>
-                    <div className="h-4 w-4 rounded-full border-2 border-app-primary-80 border-t-transparent animate-spin mr-2"></div>
+                    <Spinner className="mr-2" />
                     PROCESSING...
                   </>
                 ) : (

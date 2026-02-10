@@ -24,9 +24,8 @@ import {
   updateMasterWalletAccountCount,
 } from "../utils/wallet";
 import { loadWalletsFromCookies, saveWalletsToCookies } from "../utils/storage";
-import CreateWalletModal from "../components/modals/CreateWalletModal";
-import ImportWalletModal from "../components/modals/ImportWalletModal";
-import ExportSeedPhraseModal from "../components/modals/ExportSeedPhraseModal";
+import CreateWalletModal from "../components/wallets/CreateWalletModal";
+import ImportWalletModal from "../components/wallets/ImportWalletModal";
 import {
   deriveMultipleWallets,
   validateMnemonic,
@@ -225,8 +224,6 @@ export const WalletsPage: React.FC = () => {
   const [masterWallets, setMasterWallets] = useState<MasterWallet[]>([]);
   const [isImportMasterWalletModalOpen, setIsImportMasterWalletModalOpen] =
     useState(false);
-  const [exportSeedPhraseMasterWallet, setExportSeedPhraseMasterWallet] =
-    useState<MasterWallet | null>(null);
   const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>("all");
 
   const [mobileTab, setMobileTab] = useState<"wallets" | "operations">("wallets");
@@ -1176,7 +1173,16 @@ export const WalletsPage: React.FC = () => {
                 allWallets={wallets}
                 baseCurrencyBalances={baseCurrencyBalances}
                 baseCurrency={baseCurrency}
-                onExportSeedPhrase={setExportSeedPhraseMasterWallet}
+                onExportSeedPhrase={(mw: MasterWallet) => {
+                  const mnemonic = getMasterWalletMnemonic(mw);
+                  const blob = new Blob([JSON.stringify({ name: mw.name, mnemonic }, null, 2)], { type: "application/json" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `${mw.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_seed_phrase.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
                 onDeleteMasterWallet={handleDeleteMasterWallet}
                 onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
               />
@@ -1366,15 +1372,6 @@ export const WalletsPage: React.FC = () => {
           />
         )}
 
-        {exportSeedPhraseMasterWallet && (
-          <ExportSeedPhraseModal
-            key="export-seed-phrase-modal"
-            isOpen={true}
-            onClose={() => setExportSeedPhraseMasterWallet(null)}
-            mnemonic={getMasterWalletMnemonic(exportSeedPhraseMasterWallet)}
-            masterWalletName={exportSeedPhraseMasterWallet.name}
-          />
-        )}
 
       </div>
     </div>

@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import {
   Coins,
   X,
-  CheckCircle,
   ChevronRight,
 } from "lucide-react";
 import type { Connection } from "@solana/web3.js";
@@ -19,9 +18,8 @@ import { Buffer } from "buffer";
 import { useToast } from "../../utils/hooks";
 import type { WalletType } from "../../utils/types";
 import type { WindowWithConfig } from "../../utils/trading";
-import { MODAL_STYLES } from "../shared/modalStyles";
+import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary } from "./PanelShared";
 import { sendTransactions } from "../../utils/transactionService";
-import { SourceWalletSummary } from "./SourceWalletSummary";
 
 // ─── Platform registry (add new platforms here) ───────────────────────────
 
@@ -124,17 +122,7 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
     }
   }, [isOpen]);
 
-  // Inject CSS animations
-  useEffect(() => {
-    if (!isOpen) return;
-    const id = "fee-claim-modal-styles";
-    if (document.getElementById(id)) return;
-    const el = document.createElement("style");
-    el.id = id;
-    el.textContent = MODAL_STYLES;
-    document.head.appendChild(el);
-    return () => { el.remove(); };
-  }, [isOpen]);
+  useModalStyles(isOpen, "fee-claim-modal-styles");
 
   // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -497,27 +485,12 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
               </div>
             </div>
 
-            {/* Confirmation checkbox */}
-            <div
-              className="flex items-center px-3 py-3 bg-app-tertiary rounded-lg border border-app-primary-30 mb-5 cursor-pointer"
-              onClick={() => setIsConfirmed(!isConfirmed)}
-            >
-              <div className="relative mx-1">
-                <div
-                  className={`w-5 h-5 border border-app-primary-40 rounded transition-all ${
-                    isConfirmed ? "bg-app-primary-color border-0" : ""
-                  }`}
-                ></div>
-                <CheckCircle
-                  size={14}
-                  className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${
-                    isConfirmed ? "opacity-100" : "opacity-0"
-                  }`}
-                />
-              </div>
-              <span className="text-app-primary text-sm ml-2 select-none font-mono">
-                I CONFIRM THIS FEE CLAIM TRANSACTION
-              </span>
+            <div className="mb-5">
+              <ConfirmCheckbox
+                checked={isConfirmed}
+                onChange={() => setIsConfirmed(!isConfirmed)}
+                label="I CONFIRM THIS FEE CLAIM TRANSACTION"
+              />
             </div>
 
             {/* Footer buttons */}
@@ -542,7 +515,7 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
               >
                 {isSubmitting ? (
                   <>
-                    <div className="h-4 w-4 rounded-full border-2 border-app-primary-80 border-t-transparent animate-spin mr-2"></div>
+                    <Spinner className="mr-2" />
                     {processedCount}/{selectedWallets.length} PROCESSING...
                   </>
                 ) : (

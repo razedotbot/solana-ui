@@ -20,10 +20,8 @@ import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
 import type { WindowWithConfig } from "../../utils/trading";
-import { MODAL_STYLES } from "../shared/modalStyles";
-import { SourceWalletSummary } from "./SourceWalletSummary";
-import { filterAndSortWallets } from "./walletFilterUtils";
-import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
+import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
+import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
 
 const STEPS_BURN_FULL = ["Token Address", "Select Source", "Burn Details", "Review"];
 const STEPS_BURN_SHORT = ["Token Address", "Burn Details", "Review"];
@@ -403,15 +401,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
     );
   };
 
-  useEffect(() => {
-    const styleId = "burn-modal-styles";
-    if (document.getElementById(styleId)) return;
-    const style = document.createElement("style");
-    style.id = styleId;
-    style.textContent = MODAL_STYLES;
-    document.head.appendChild(style);
-    return () => { const el = document.getElementById(styleId); if (el) el.remove(); };
-  }, []);
+  useModalStyles(isOpen, "burn-modal-styles");
 
   // If modal is not open, don't render anything
   if (!isOpen) return null;
@@ -569,11 +559,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
 
                 {isLoadingBalances && (
                   <div className="flex justify-center items-center h-32">
-                    <div className="relative h-12 w-12">
-                      <div className="absolute inset-0 rounded-full border-2 border-t-app-primary border-r-app-primary-30 border-b-app-primary-10 border-l-app-primary-30 animate-spin"></div>
-                      <div className="absolute inset-2 rounded-full border-2 border-t-transparent border-r-app-primary-70 border-b-app-primary-50 border-l-transparent animate-spin-slow"></div>
-                      <div className="absolute inset-0 rounded-full border border-app-primary-20"></div>
-                    </div>
+                    <Spinner size="lg" />
                   </div>
                 )}
               </div>
@@ -791,11 +777,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
 
                 {isLoadingTokens ? (
                   <div className="flex justify-center items-center h-32">
-                    <div className="relative h-12 w-12">
-                      <div className="absolute inset-0 rounded-full border-2 border-t-app-primary border-r-app-primary-30 border-b-app-primary-10 border-l-app-primary-30 animate-spin"></div>
-                      <div className="absolute inset-2 rounded-full border-2 border-t-transparent border-r-app-primary-70 border-b-app-primary-50 border-l-transparent animate-spin-slow"></div>
-                      <div className="absolute inset-0 rounded-full border border-app-primary-20"></div>
-                    </div>
+                    <Spinner size="lg" />
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1195,31 +1177,13 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Confirmation Checkbox with  style */}
-                <div className="bg-app-tertiary rounded-lg border border-app-primary-30 p-4 mt-4">
-                  <div
-                    className="flex items-start gap-3 cursor-pointer"
-                    onClick={() => setIsConfirmed(!isConfirmed)}
-                  >
-                    <div className="relative mt-1">
-                      <div
-                        className={`w-5 h-5 border border-app-primary-40 rounded transition-all ${isConfirmed ? "bg-app-primary-color border-0" : ""}`}
-                      ></div>
-                      <CheckCircle
-                        size={14}
-                        className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? "opacity-100" : "opacity-0"}`}
-                      />
-                    </div>
-                    <span className="text-sm text-app-primary leading-relaxed font-mono select-none">
-                      I confirm that I want to burn{" "}
-                      <span className="color-primary font-medium">
-                        {amount} {getSelectedTokenSymbol()}
-                      </span>
-                      . I understand this action cannot be undone and the tokens
-                      will be permanently removed from circulation.
-                    </span>
-                  </div>
-                </div>
+                <ConfirmCheckbox
+                  checked={isConfirmed}
+                  onChange={() => setIsConfirmed(!isConfirmed)}
+                  label={<>I confirm that I want to burn{" "}
+                    <span className="color-primary font-medium">{amount} {getSelectedTokenSymbol()}</span>
+                    . I understand this action cannot be undone and the tokens will be permanently removed from circulation.</>}
+                />
               </div>
             )}
 
@@ -1276,7 +1240,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
                 {currentStep === STEPS.length - 1 ? (
                   isSubmitting ? (
                     <div className="flex items-center justify-center font-mono">
-                      <div className="h-4 w-4 rounded-full border-2 border-app-primary-80 border-t-transparent animate-spin mr-2"></div>
+                      <Spinner className="mr-2" />
                       <span>PROCESSING...</span>
                     </div>
                   ) : (
@@ -1284,7 +1248,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
                   )
                 ) : isLoadingBalances ? (
                   <div className="flex items-center justify-center font-mono">
-                    <div className="h-4 w-4 rounded-full border-2 border-app-primary-80 border-t-transparent animate-spin mr-2"></div>
+                    <Spinner className="mr-2" />
                     <span>LOADING...</span>
                   </div>
                 ) : (

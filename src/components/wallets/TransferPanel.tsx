@@ -29,9 +29,9 @@ import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
 import type { WindowWithConfig } from "../../utils/trading";
-import { SourceWalletSummary } from "./SourceWalletSummary";
-import { filterAndSortWallets } from "./walletFilterUtils";
-import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
+import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
+import * as PU from "./PanelShared";
+import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
 
 interface TransferPanelProps {
   isOpen: boolean;
@@ -129,16 +129,8 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
     }
   }, [transferType, tokenAddressInput]);
 
-  const formatBalance = (balance: number): string => {
-    return baseCurrency.isNative ? balance.toFixed(4) : balance.toFixed(2);
-  };
-
-  // Get wallet base currency balance by address
-  const getWalletBalance = (address: string): number => {
-    return baseCurrencyBalances.has(address)
-      ? (baseCurrencyBalances.get(address) ?? 0)
-      : 0;
-  };
+  const formatBalance = (balance: number): string => PU.formatBalance(balance, baseCurrency);
+  const getWalletBalance = (address: string): number => PU.getWalletBalance(address, baseCurrencyBalances);
 
   // Use custom token balances if we're using a custom token address, otherwise use prop balances
   const getWalletTokenBalance = (address: string): number => {
@@ -246,11 +238,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
   ]);
 
   const toggleSourceWallet = (privateKey: string): void => {
-    setSourceWallets((prev) =>
-      prev.includes(privateKey)
-        ? prev.filter((pk) => pk !== privateKey)
-        : [...prev, privateKey],
-    );
+    setSourceWallets((prev) => PU.toggleSelection(prev, privateKey));
   };
 
   const addRecipientAddress = (address: string): void => {
@@ -517,148 +505,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
     );
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const id = "transfer-modal-styles";
-    if (document.getElementById(id)) return;
-    const el = document.createElement("style");
-    el.id = id;
-    el.textContent = `
-    @keyframes modal-pulse {
-      0% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
-      50% { box-shadow: 0 0 15px var(--color-primary-80), 0 0 25px var(--color-primary-40); }
-      100% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
-    }
-
-    @keyframes modal-fade-in {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-
-    @keyframes modal-slide-up {
-      0% { transform: translateY(20px); opacity: 0; }
-      100% { transform: translateY(0); opacity: 1; }
-    }
-
-    @keyframes modal-scan-line {
-      0% { transform: translateY(-100%); opacity: 0.3; }
-      100% { transform: translateY(100%); opacity: 0; }
-    }
-
-    .modal-content {
-      position: relative;
-    }
-
-    .modal-input-:focus {
-      box-shadow: 0 0 0 1px var(--color-primary-70), 0 0 15px var(--color-primary-50);
-      transition: all 0.3s ease;
-    }
-
-    .modal-btn- {
-      position: relative;
-      overflow: hidden;
-      transition: all 0.3s ease;
-    }
-
-    .modal-btn-::after {
-      content: "";
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: linear-gradient(
-        to bottom right,
-        var(--color-primary-05) 0%,
-        var(--color-primary-30) 50%,
-        var(--color-primary-05) 100%
-      );
-      transform: rotate(45deg);
-      transition: all 0.5s ease;
-      opacity: 0;
-    }
-
-    .modal-btn-:hover::after {
-      opacity: 1;
-      transform: rotate(45deg) translate(50%, 50%);
-    }
-
-    .modal-btn-:active {
-      transform: scale(0.95);
-    }
-
-    .progress-bar- {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .progress-bar-::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        var(--color-primary-70) 50%,
-        transparent 100%
-      );
-      width: 100%;
-      height: 100%;
-      transform: translateX(-100%);
-      animation: progress-shine 3s infinite;
-    }
-
-    @keyframes progress-shine {
-      0% { transform: translateX(-100%); }
-      20% { transform: translateX(100%); }
-      100% { transform: translateX(100%); }
-    }
-
-    .glitch-text:hover {
-      text-shadow: 0 0 2px var(--color-primary), 0 0 4px var(--color-primary);
-      animation: glitch 2s infinite;
-    }
-
-    @keyframes glitch {
-      2%, 8% { transform: translate(-2px, 0) skew(0.3deg); }
-      4%, 6% { transform: translate(2px, 0) skew(-0.3deg); }
-      62%, 68% { transform: translate(0, 0) skew(0.33deg); }
-      64%, 66% { transform: translate(0, 0) skew(-0.33deg); }
-    }
-
-    @keyframes fadeIn {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-
-    @keyframes scale-in {
-      0% { transform: scale(0); }
-      100% { transform: scale(1); }
-    }
-
-    .scrollbar-thin::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    .scrollbar-thin::-webkit-scrollbar-track {
-      background: var(--color-bg-tertiary);
-    }
-
-    .scrollbar-thin::-webkit-scrollbar-thumb {
-      background: var(--color-primary);
-      border-radius: 2px;
-    }
-
-    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-      background: var(--color-primary-dark);
-    }
-    `;
-    document.head.appendChild(el);
-    return () => { el.remove(); };
-  }, [isOpen]);
+  useModalStyles(isOpen, "transfer-modal-styles");
 
   if (!isOpen) return null;
 
@@ -1226,22 +1073,12 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                       </div>
 
                       {/* Confirmation Checkbox */}
-                      <div
-                        className="flex items-center px-3 py-3 bg-app-primary rounded-lg border border-app-primary-40 mt-4 cursor-pointer"
-                        onClick={() => setIsConfirmed(!isConfirmed)}
-                      >
-                        <div className="relative mx-1">
-                          <div
-                            className={`w-5 h-5 border border-app-primary-40 rounded transition-all ${isConfirmed ? "bg-app-primary-color border-0" : ""}`}
-                          ></div>
-                          <CheckCircle
-                            size={14}
-                            className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? "opacity-100" : "opacity-0"}`}
-                          />
-                        </div>
-                        <span className="text-app-primary text-sm ml-2 select-none font-mono">
-                          CONFIRM BATCH TRANSFER
-                        </span>
+                      <div className="mt-4">
+                        <ConfirmCheckbox
+                          checked={isConfirmed}
+                          onChange={() => setIsConfirmed(!isConfirmed)}
+                          label="CONFIRM BATCH TRANSFER"
+                        />
                       </div>
 
                       {/* Execute Button */}
@@ -1261,7 +1098,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                       >
                         {isSubmitting || batchProcessing ? (
                           <>
-                            <div className="h-4 w-4 rounded-full border-2 border-app-secondary-80 border-t-transparent animate-spin mr-2"></div>
+                            <Spinner className="mr-2" />
                             {batchProcessing
                               ? "PROCESSING..."
                               : "INITIALIZING..."}

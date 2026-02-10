@@ -6,7 +6,7 @@
  * page props, and shared UI component interfaces.
  */
 
-import type { WalletType, MasterWallet } from "./wallet";
+import type { WalletType } from "./wallet";
 
 
 /**
@@ -67,17 +67,6 @@ export interface ImportWalletModalProps {
   onWalletImported: (wallet: WalletType) => void;
 }
 
-/**
- * Props for the Export Seed Phrase Modal component
- */
-export interface ExportSeedPhraseModalProps {
-  /** Whether the modal is open */
-  isOpen: boolean;
-  /** Callback to close the modal */
-  onClose: () => void;
-  /** Master wallet to export seed phrase from */
-  masterWallet: MasterWallet;
-}
 
 
 /**

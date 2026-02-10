@@ -20,10 +20,9 @@ import {
 } from "../../utils/consolidate";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
-import { MODAL_STYLES } from "../shared/modalStyles";
-import { SourceWalletSummary } from "./SourceWalletSummary";
-import { filterAndSortWallets } from "./walletFilterUtils";
-import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
+import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
+import * as PU from "./PanelShared";
+import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
 
 interface ConsolidatePanelProps {
   isOpen: boolean;
@@ -79,25 +78,10 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
     }
   }, [useExternalSource, selectedWalletIds, wallets, currentStep]);
 
-  const formatBalance = (balance: number): string => {
-    return baseCurrency.isNative ? balance.toFixed(4) : balance.toFixed(2);
-  };
-
-  // Get wallet base currency balance by address
-  const getWalletBalance = (address: string): number => {
-    return baseCurrencyBalances.has(address)
-      ? (baseCurrencyBalances.get(address) ?? 0)
-      : 0;
-  };
-
-  const getWalletByAddress = (address: string): WalletType | undefined => {
-    return wallets.find((wallet) => wallet.address === address);
-  };
-
-  const getPrivateKeyByAddress = (address: string): string => {
-    const wallet = getWalletByAddress(address);
-    return wallet ? wallet.privateKey : "";
-  };
+  const formatBalance = (balance: number): string => PU.formatBalance(balance, baseCurrency);
+  const getWalletBalance = (address: string): number => PU.getWalletBalance(address, baseCurrencyBalances);
+  const getWalletByAddress = (address: string): WalletType | undefined => PU.getWalletByAddress(wallets, address);
+  const getPrivateKeyByAddress = (address: string): string => PU.getPrivateKeyByAddress(wallets, address);
 
   const resetForm = (): void => {
     setCurrentStep(0);
@@ -187,15 +171,8 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
     }
   };
 
-  // Function to handle source wallet selection toggles for consolidate
   const toggleSourceWalletSelection = (address: string): void => {
-    setSelectedSourceWallets((prev) => {
-      if (prev.includes(address)) {
-        return prev.filter((a) => a !== address);
-      } else {
-        return [...prev, address];
-      }
-    });
+    setSelectedSourceWallets((prev) => PU.toggleSelection(prev, address));
   };
 
   // Get available wallets for consolidate source selection (exclude recipient)
@@ -243,30 +220,11 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
     );
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const id = "consolidate-modal-styles";
-    if (document.getElementById(id)) return;
-    const el = document.createElement("style");
-    el.id = id;
-    el.textContent = MODAL_STYLES + `
-    /* ConsolidatePanel-specific overrides */
-    .scrollbar-thin::-webkit-scrollbar-track {
-      background: var(--color-primary-10);
-    }
-
-    .scrollbar-thin::-webkit-scrollbar-thumb {
-      background: var(--color-primary-50);
-      border-radius: 2px;
-    }
-
-    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-      background: var(--color-primary-70);
-    }
-    `;
-    document.head.appendChild(el);
-    return () => { el.remove(); };
-  }, [isOpen]);
+  useModalStyles(isOpen, "consolidate-modal-styles", `
+    .scrollbar-thin::-webkit-scrollbar-track { background: var(--color-primary-10); }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-primary-50); border-radius: 2px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: var(--color-primary-70); }
+  `);
 
   if (!isOpen) return null;
 
@@ -857,34 +815,11 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
                   </div>
                 </div>
 
-                {/* Confirmation Checkbox */}
-                <div className="flex items-center px-3 py-3 bg-app-tertiary rounded-lg border border-app-primary-30">
-                  <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => setIsConfirmed(!isConfirmed)}
-                  >
-                    <div className="relative mx-1">
-                      <div
-                        className="w-5 h-5 border border-app-primary-40 rounded transition-all cursor-pointer"
-                        style={{
-                          backgroundColor: isConfirmed
-                            ? "var(--color-primary)"
-                            : "transparent",
-                          borderColor: isConfirmed
-                            ? "var(--color-primary)"
-                            : "var(--color-primary-40)",
-                        }}
-                      ></div>
-                      <CheckCircle
-                        size={14}
-                        className={`absolute top-0.5 left-0.5 text-app-primary transition-all ${isConfirmed ? "opacity-100" : "opacity-0"}`}
-                      />
-                    </div>
-                    <span className="text-app-primary text-sm ml-2 cursor-pointer select-none font-mono">
-                      I CONFIRM THIS CONSOLIDATION OPERATION
-                    </span>
-                  </div>
-                </div>
+                <ConfirmCheckbox
+                  checked={isConfirmed}
+                  onChange={() => setIsConfirmed(!isConfirmed)}
+                  label="I CONFIRM THIS CONSOLIDATION OPERATION"
+                />
               </div>
 
               {/* Source Wallets List */}
@@ -961,7 +896,7 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
               >
                 {isSubmitting ? (
                   <>
-                    <div className="h-4 w-4 rounded-full border-2 border-app-primary-80 border-t-transparent animate-spin mr-2"></div>
+                    <Spinner className="mr-2" />
                     PROCESSING...
                   </>
                 ) : (

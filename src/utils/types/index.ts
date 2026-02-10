@@ -68,7 +68,6 @@ export type {
   PresetTab,
   CreateWalletModalProps,
   ImportWalletModalProps,
-  ExportSeedPhraseModalProps,
   CalculatePNLModalProps,
   MobilePage,
   MobileLayoutProps,

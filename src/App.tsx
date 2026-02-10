@@ -58,7 +58,7 @@ const MobileLayout = lazy(() => import("./Mobile"));
 
 // Import modal components
 const PnlModal = lazy(() =>
-  import("./components/modals/CalculatePNLModal").then((module) => ({
+  import("./components/trading/CalculatePNLModal").then((module) => ({
     default: module.PnlModal,
   })),
 );
