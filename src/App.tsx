@@ -37,7 +37,6 @@ import type {
   WalletType,
   ConfigType,
   IframeData,
-  ServerInfo,
   WalletCategory,
   CategoryQuickTradeSettings,
 } from "./utils/types";
@@ -48,15 +47,6 @@ import { OnboardingTutorial } from "./components/OnboardingTutorial";
 import { MultichartLayout } from "./components/multichart/MultichartLayout";
 import { AdvancedLayout } from "./components/advanced";
 import { useMultichart } from "./contexts/useMultichart";
-
-// Extend Window interface to include server-related properties
-declare global {
-  interface Window {
-    serverRegion: string;
-    availableServers: ServerInfo[];
-    switchServer: (serverId: string) => Promise<boolean>;
-  }
-}
 
 // Lazy loaded components
 const Frame = lazy(() =>
@@ -277,7 +267,7 @@ const WalletManager: React.FC = () => {
           WalletCategory,
           CategoryQuickTradeSettings
         >;
-      } catch (ignore) {
+      } catch {
         // Invalid JSON, use defaults
       }
     }
@@ -330,7 +320,7 @@ const WalletManager: React.FC = () => {
             CategoryQuickTradeSettings
           >;
           setCategorySettings(parsed);
-        } catch (ignore) {
+        } catch {
           // Invalid JSON, ignore
         }
       }
@@ -1125,7 +1115,7 @@ const WalletManager: React.FC = () => {
           },
         },
       );
-    } catch (ignore) {
+    } catch {
       // Balance refresh error, handled in finally block
     } finally {
       // Set refreshing to false
@@ -1185,7 +1175,6 @@ const WalletManager: React.FC = () => {
                 isRefreshing={state.isRefreshing}
                 baseCurrencyBalances={state.baseCurrencyBalances}
                 tokenBalances={state.tokenBalances}
-                currentMarketCap={state.currentMarketCap}
                 onNonWhitelistedTrade={handleNonWhitelistedTrade}
                 viewMode={viewMode}
                 onViewModeChange={handleViewModeChange}

@@ -138,15 +138,6 @@ export const deriveMultipleWallets = (
 };
 
 /**
- * Get the next available account index for a master wallet
- * @param currentMaxIndex Current maximum account index used
- * @returns Next available account index
- */
-export const getNextAccountIndex = (currentMaxIndex: number): number => {
-  return currentMaxIndex + 1;
-};
-
-/**
  * Format derivation path for display
  * @param accountIndex Account index
  * @returns Formatted derivation path

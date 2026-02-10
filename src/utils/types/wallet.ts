@@ -314,28 +314,3 @@ export interface WalletSelectionState {
   selectedCount: number;
 }
 
-/**
- * Sort direction for wallet list
- */
-export type WalletSortDirection = "asc" | "desc";
-
-/**
- * Sort field for wallet list
- */
-export type WalletSortField = "balance" | "label" | "category" | "address";
-
-/**
- * Wallet filter options
- */
-export interface WalletFilterOptions {
-  /** Filter by category */
-  category?: WalletCategory;
-  /** Filter by source */
-  source?: WalletSource;
-  /** Filter by master wallet ID */
-  masterWalletId?: string;
-  /** Show archived wallets */
-  showArchived?: boolean;
-  /** Search query for address or label */
-  searchQuery?: string;
-}

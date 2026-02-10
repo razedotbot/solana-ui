@@ -15,7 +15,7 @@ const loadBrandCSS = async (): Promise<void> => {
   try {
     // Use dynamic import for CSS files in Vite based on theme name
     await import(`../${brand.theme.name}.css`);
-  } catch (ignore) {
+  } catch {
     // Fallback to globals.css
     await import("../green.css");
   }
@@ -385,7 +385,7 @@ export const Root = (): JSX.Element => {
 
       const data = (await response.json()) as { status?: string };
       return data.status === "healthy";
-    } catch (ignore) {
+    } catch {
       return false;
     }
   };
@@ -442,7 +442,7 @@ export const Root = (): JSX.Element => {
 
           clearTimeout(timeoutId);
           return Date.now() - startTime;
-        } catch (ignore) {
+        } catch {
           return Infinity; // Return infinite ping if unreachable
         }
       };

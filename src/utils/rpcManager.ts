@@ -183,8 +183,6 @@ export class RPCManager {
   }
 
   public createConnection(): Promise<Connection> {
-    const errors: Error[] = [];
-
     // Try each endpoint until one succeeds
     for (let attempt = 0; attempt < this.endpoints.length; attempt++) {
       const endpoint = this.getNextEndpoint();
@@ -199,11 +197,8 @@ export class RPCManager {
         // Return connection without testing (errors will be caught when actually used)
         this.markSuccess(endpoint);
         return Promise.resolve(connection);
-      } catch (error) {
+      } catch {
         this.markFailure(endpoint);
-        errors.push(error instanceof Error ? error : new Error(String(error)));
-
-        // Continue to next endpoint
         continue;
       }
     }
@@ -345,7 +340,7 @@ export const createConnectionFromConfig = async (
       const manager = new RPCManager(endpoints);
       return await manager.createConnection();
     }
-  } catch (ignore) {
+  } catch {
     // Failed to parse RPC endpoints, use defaults
   }
 

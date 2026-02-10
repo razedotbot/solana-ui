@@ -15,7 +15,7 @@ import {
   loadMasterWallets,
 } from "./storage";
 import type { WalletType, WalletCategory, MasterWallet } from "./types";
-import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
+import { BASE_CURRENCIES, BALANCE_REFRESH, type BaseCurrencyConfig } from "./constants";
 
 // ============= ID Generation =============
 
@@ -97,7 +97,7 @@ export function importWallet(privateKeyString: string): {
     };
 
     return { wallet };
-  } catch (ignore) {
+  } catch {
     return { wallet: null, error: "Failed to import wallet" };
   }
 }
@@ -117,7 +117,7 @@ export function getWalletDisplayName(wallet: WalletType): string {
 export function getWallets(): WalletType[] {
   try {
     return loadWalletsFromCookies();
-  } catch (ignore) {
+  } catch {
     return [];
   }
 }
@@ -129,7 +129,7 @@ export function getActiveWallets(): WalletType[] {
   try {
     const wallets = loadWalletsFromCookies();
     return wallets.filter((wallet: WalletType) => wallet.isActive);
-  } catch (ignore) {
+  } catch {
     return [];
   }
 }
@@ -141,7 +141,7 @@ export function getActiveWalletPrivateKeys(): string {
   try {
     const activeWallets = getActiveWallets();
     return activeWallets.map((wallet) => wallet.privateKey).join(",");
-  } catch (ignore) {
+  } catch {
     return "";
   }
 }
@@ -174,7 +174,7 @@ export function createMasterWallet(
 export function getMasterWalletMnemonic(masterWallet: MasterWallet): string {
   try {
     return decryptData(masterWallet.encryptedMnemonic);
-  } catch (ignore) {
+  } catch {
     throw new Error("Failed to decrypt mnemonic");
   }
 }
@@ -331,7 +331,7 @@ export async function refreshWalletBalance(
       ...wallet,
       tokenBalance: tokenBalance,
     };
-  } catch (ignore) {
+  } catch {
     return wallet;
   }
 }
@@ -384,8 +384,8 @@ export async function fetchWalletBalances(
       : onlyIfZeroOrNullOrOptions;
 
   const {
-    batchSize = 5,
-    delay = 50,
+    batchSize = BALANCE_REFRESH.DEFAULT_BATCH_SIZE,
+    delay = BALANCE_REFRESH.DEFAULT_DELAY_MS,
     onlyIfZeroOrNull = false,
     onRateLimitError,
   } = options;
@@ -627,7 +627,7 @@ export async function copyToClipboard(
     await navigator.clipboard.writeText(text);
     showToast("Copied successfully", "success");
     return true;
-  } catch (ignore) {
+  } catch {
     return false;
   }
 }

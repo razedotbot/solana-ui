@@ -295,7 +295,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
           activeTabId: parsed.activeTabId || "degen",
         };
       }
-    } catch (ignore) {
+    } catch {
       // Invalid JSON, use defaults
     }
     return {
@@ -318,7 +318,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       const expires = new Date();
       expires.setFullYear(expires.getFullYear() + 1); // 1 year expiry
       document.cookie = `tradingPresets=${encoded}; expires=${expires.toUTCString()}; path=/`;
-    } catch (ignore) {
+    } catch {
       // Cookie save error, ignore
     }
   };
@@ -338,7 +338,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       if (savedBuyAmount) {
         setBuyAmount(savedBuyAmount);
       }
-    } catch (ignore) {
+    } catch {
       // localStorage error, ignore
     }
   }, [setBuyAmount]);
@@ -348,7 +348,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
     if (buyAmount) {
       try {
         localStorage.setItem('quickBuyAmount', buyAmount);
-      } catch (ignore) {
+      } catch {
         // localStorage error, ignore
       }
     }

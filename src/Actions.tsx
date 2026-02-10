@@ -1050,17 +1050,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         wallets={wallets}
         setWallets={setWallets}
         selectedDex={selectedDex}
-        setSelectedDex={setSelectedDex}
-        isDropdownOpen={isDropdownOpen}
-        setIsDropdownOpen={setIsDropdownOpen}
-        buyAmount={buyAmount}
         setBuyAmount={setBuyAmount}
-        sellAmount={sellAmount}
         setSellAmount={setSellAmount}
         handleTradeSubmit={handleFloatingTradeSubmit}
         isLoading={isLoading}
         countActiveWallets={countActiveWallets}
-        currentMarketCap={currentMarketCap}
         baseCurrencyBalances={baseCurrencyBalances}
         tokenBalances={tokenBalances}
       />

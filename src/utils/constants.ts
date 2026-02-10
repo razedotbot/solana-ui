@@ -92,6 +92,35 @@ export const API_URLS = {
   RAZE_PUBLIC: "https://public.raze.sh/api",
 } as const;
 
+// API Endpoint Paths
+export const API_ENDPOINTS = {
+  // Buy
+  SOL_BUY: "/v2/sol/buy",
+  SWAP_BUY: "/v2/swap/buy",
+
+  // Sell
+  SOL_SELL: "/v2/sol/sell",
+  SWAP_SELL: "/v2/swap/sell",
+
+  // Create
+  SOL_CREATE: "/v2/sol/create",
+
+  // Distribute
+  SOL_DISTRIBUTE: "/v2/sol/distribute",
+  TOKEN_DISTRIBUTE: "/v2/token/distribute",
+
+  // Consolidate
+  SOL_CONSOLIDATE: "/v2/sol/consolidate",
+  TOKEN_CONSOLIDATE: "/v2/token/consolidate",
+
+  // Mixer
+  SOL_MIXER: "/v2/sol/mixer",
+  TOKEN_MIXER: "/v2/token/mixer",
+
+  // Send
+  SOL_SEND: "/v2/sol/send",
+} as const;
+
 // Trading Constants
 export const TRADING = {
   MAX_BUNDLES_PER_SECOND: 2,
@@ -150,6 +179,21 @@ export const STORAGE_KEYS = {
   // Automate
   automateStrategies: "automateStrategies",
   automateWhitelistLists: "whitelistLists",
+
+  // Multichart
+  multichartTokens: "multichart_tokens",
+  multichartActiveIndex: "multichartActiveIndex",
+
+  // Wallet Groups
+  walletGroups: "wallet_groups",
+
+  // Recent Tokens
+  recentTokens: "raze_recent_tokens",
+} as const;
+
+// Recent Tokens
+export const RECENT_TOKENS = {
+  MAX_COUNT: 10,
 } as const;
 
 // IndexedDB

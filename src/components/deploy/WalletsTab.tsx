@@ -74,7 +74,7 @@ export const WalletsTab: React.FC<WalletsTabProps> = ({
     try {
       localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(newPresets));
       setPresets(newPresets);
-    } catch (ignore) {
+    } catch {
       showToast("Failed to save presets", "error");
     }
   };

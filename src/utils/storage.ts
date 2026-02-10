@@ -6,6 +6,7 @@
 import Cookies from "js-cookie";
 import { encryptData, decryptData } from "./encryption";
 import { createDefaultEndpoints } from "./rpcManager";
+import { INDEXED_DB, STORAGE_KEYS } from "./constants";
 import type {
   WalletType,
   ConfigType,
@@ -16,23 +17,12 @@ import type {
 import { DEFAULT_GROUP_ID } from "./types";
 import type { MultichartToken } from "./types/multichart";
 
-// Storage keys
-export const STORAGE_KEYS = {
-  CONFIG: "config",
-  QUICK_BUY: "quickBuyPreferences",
-  ENCRYPTED_WALLETS: "encrypted_wallets",
-  ENCRYPTED_MASTER_WALLETS: "encrypted_master_wallets",
-  SPLIT_SIZES: "splitSizes",
-  VIEW_MODE: "viewMode",
-  MULTICHART_TOKENS: "multichart_tokens",
-  MULTICHART_ACTIVE_INDEX: "multichartActiveIndex",
-  WALLET_GROUPS: "wallet_groups",
-} as const;
+export { STORAGE_KEYS };
 
-// Database constants
-const DB_NAME = "WalletDB";
-const DB_VERSION = 1;
-const WALLET_STORE = "wallets";
+// Database constants (from centralized constants)
+const DB_NAME = INDEXED_DB.NAME;
+const DB_VERSION = INDEXED_DB.VERSION;
+const WALLET_STORE = INDEXED_DB.WALLET_STORE;
 
 // Database instance
 let db: IDBDatabase | null = null;
@@ -65,7 +55,7 @@ export function saveWalletsToCookies(wallets: WalletType[]): void {
     const encryptedData = encryptData(walletData);
 
     if (!db) {
-      localStorage.setItem(STORAGE_KEYS.ENCRYPTED_WALLETS, encryptedData);
+      localStorage.setItem(STORAGE_KEYS.encryptedWallets, encryptedData);
       localStorage.removeItem("wallets");
       return;
     }
@@ -81,15 +71,15 @@ export function saveWalletsToCookies(wallets: WalletType[]): void {
     store.add(encryptedWallet);
 
     // Backup to localStorage
-    localStorage.setItem(STORAGE_KEYS.ENCRYPTED_WALLETS, encryptedData);
+    localStorage.setItem(STORAGE_KEYS.encryptedWallets, encryptedData);
     localStorage.removeItem("wallets");
-  } catch (ignore) {
+  } catch {
     try {
       const walletData = JSON.stringify(wallets);
       const encryptedData = encryptData(walletData);
-      localStorage.setItem(STORAGE_KEYS.ENCRYPTED_WALLETS, encryptedData);
+      localStorage.setItem(STORAGE_KEYS.encryptedWallets, encryptedData);
       localStorage.removeItem("wallets");
-    } catch (ignore) {
+    } catch {
       localStorage.setItem("wallets", JSON.stringify(wallets));
     }
   }
@@ -100,7 +90,7 @@ export function saveWalletsToCookies(wallets: WalletType[]): void {
  */
 export function loadWalletsFromCookies(): WalletType[] {
   try {
-    const encryptedData = localStorage.getItem(STORAGE_KEYS.ENCRYPTED_WALLETS);
+    const encryptedData = localStorage.getItem(STORAGE_KEYS.encryptedWallets);
     if (encryptedData) {
       try {
         const decryptedData = decryptData(encryptedData);
@@ -124,7 +114,7 @@ export function loadWalletsFromCookies(): WalletType[] {
     }
 
     return [];
-  } catch (ignore) {
+  } catch {
     return [];
   }
 }
@@ -133,7 +123,7 @@ export function loadWalletsFromCookies(): WalletType[] {
  * Check if wallet data is encrypted.
  */
 export function isWalletDataEncrypted(): boolean {
-  const encryptedData = localStorage.getItem(STORAGE_KEYS.ENCRYPTED_WALLETS);
+  const encryptedData = localStorage.getItem(STORAGE_KEYS.encryptedWallets);
   const unencryptedData = localStorage.getItem("wallets");
   return !!encryptedData && !unencryptedData;
 }
@@ -150,7 +140,7 @@ export function migrateToEncryptedStorage(): boolean {
       return true;
     }
     return false;
-  } catch (ignore) {
+  } catch {
     return false;
   }
 }
@@ -164,8 +154,8 @@ export function saveMasterWallets(masterWallets: MasterWallet[]): void {
   try {
     const data = JSON.stringify(masterWallets);
     const encrypted = encryptData(data);
-    localStorage.setItem(STORAGE_KEYS.ENCRYPTED_MASTER_WALLETS, encrypted);
-  } catch (ignore) {
+    localStorage.setItem(STORAGE_KEYS.encryptedMasterWallets, encrypted);
+  } catch {
     throw new Error("Failed to save master wallets");
   }
 }
@@ -176,14 +166,14 @@ export function saveMasterWallets(masterWallets: MasterWallet[]): void {
 export function loadMasterWallets(): MasterWallet[] {
   try {
     const encrypted = localStorage.getItem(
-      STORAGE_KEYS.ENCRYPTED_MASTER_WALLETS,
+      STORAGE_KEYS.encryptedMasterWallets,
     );
     if (!encrypted) {
       return [];
     }
     const decrypted = decryptData(encrypted);
     return JSON.parse(decrypted) as MasterWallet[];
-  } catch (ignore) {
+  } catch {
     return [];
   }
 }
@@ -199,8 +189,8 @@ function createDefaultGroup(): WalletGroup {
  */
 export function saveWalletGroups(groups: WalletGroup[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.WALLET_GROUPS, JSON.stringify(groups));
-  } catch (ignore) {
+    localStorage.setItem(STORAGE_KEYS.walletGroups, JSON.stringify(groups));
+  } catch {
     // Intentionally ignored
   }
 }
@@ -210,7 +200,7 @@ export function saveWalletGroups(groups: WalletGroup[]): void {
  */
 export function loadWalletGroups(): WalletGroup[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEYS.WALLET_GROUPS);
+    const stored = localStorage.getItem(STORAGE_KEYS.walletGroups);
     if (stored) {
       const groups = JSON.parse(stored) as WalletGroup[];
       if (Array.isArray(groups) && groups.length > 0) {
@@ -220,7 +210,7 @@ export function loadWalletGroups(): WalletGroup[] {
         return groups;
       }
     }
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
   return [createDefaultGroup()];
@@ -232,14 +222,14 @@ export function loadWalletGroups(): WalletGroup[] {
  * Save configuration to cookies.
  */
 export function saveConfigToCookies(config: ConfigType): void {
-  Cookies.set(STORAGE_KEYS.CONFIG, JSON.stringify(config), { expires: 30 });
+  Cookies.set(STORAGE_KEYS.config, JSON.stringify(config), { expires: 30 });
 }
 
 /**
  * Load configuration from cookies with backward compatibility.
  */
 export function loadConfigFromCookies(): ConfigType | null {
-  const savedConfig = Cookies.get(STORAGE_KEYS.CONFIG);
+  const savedConfig = Cookies.get(STORAGE_KEYS.config);
   if (savedConfig) {
     try {
       const config = JSON.parse(savedConfig) as Partial<ConfigType>;
@@ -263,7 +253,7 @@ export function loadConfigFromCookies(): ConfigType | null {
 
 
       return config as ConfigType;
-    } catch (ignore) {
+    } catch {
       return null;
     }
   }
@@ -278,7 +268,7 @@ export function loadConfigFromCookies(): ConfigType | null {
 export function saveQuickBuyPreferencesToCookies(
   preferences: QuickBuyPreferences,
 ): void {
-  Cookies.set(STORAGE_KEYS.QUICK_BUY, JSON.stringify(preferences), {
+  Cookies.set(STORAGE_KEYS.quickBuyPreferences, JSON.stringify(preferences), {
     expires: 30,
   });
 }
@@ -287,11 +277,11 @@ export function saveQuickBuyPreferencesToCookies(
  * Load quick buy preferences from cookies.
  */
 export function loadQuickBuyPreferencesFromCookies(): QuickBuyPreferences | null {
-  const savedPreferences = Cookies.get(STORAGE_KEYS.QUICK_BUY);
+  const savedPreferences = Cookies.get(STORAGE_KEYS.quickBuyPreferences);
   if (savedPreferences) {
     try {
       return JSON.parse(savedPreferences) as QuickBuyPreferences;
-    } catch (ignore) {
+    } catch {
       return null;
     }
   }
@@ -307,8 +297,8 @@ export type ViewMode = "simple" | "advanced" | "multichart";
  */
 export function saveViewModeToCookies(mode: ViewMode): void {
   try {
-    Cookies.set(STORAGE_KEYS.VIEW_MODE, mode, { expires: 365 });
-  } catch (ignore) {
+    Cookies.set(STORAGE_KEYS.viewMode, mode, { expires: 365 });
+  } catch {
     // Intentionally ignored
   }
 }
@@ -318,7 +308,7 @@ export function saveViewModeToCookies(mode: ViewMode): void {
  */
 export function loadViewModeFromCookies(): ViewMode {
   try {
-    const savedMode = Cookies.get(STORAGE_KEYS.VIEW_MODE);
+    const savedMode = Cookies.get(STORAGE_KEYS.viewMode);
     if (
       savedMode === "simple" ||
       savedMode === "advanced" ||
@@ -326,7 +316,7 @@ export function loadViewModeFromCookies(): ViewMode {
     ) {
       return savedMode;
     }
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
   return "advanced";
@@ -337,10 +327,10 @@ export function loadViewModeFromCookies(): ViewMode {
  */
 export function saveSplitSizesToCookies(sizes: number[]): void {
   try {
-    Cookies.set(STORAGE_KEYS.SPLIT_SIZES, JSON.stringify(sizes), {
+    Cookies.set(STORAGE_KEYS.splitSizes, JSON.stringify(sizes), {
       expires: 365,
     });
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
 }
@@ -350,7 +340,7 @@ export function saveSplitSizesToCookies(sizes: number[]): void {
  */
 export function loadSplitSizesFromCookies(): number[] | null {
   try {
-    const savedSizes = Cookies.get(STORAGE_KEYS.SPLIT_SIZES);
+    const savedSizes = Cookies.get(STORAGE_KEYS.splitSizes);
     if (savedSizes) {
       const sizes = JSON.parse(savedSizes) as number[];
       if (
@@ -363,7 +353,7 @@ export function loadSplitSizesFromCookies(): number[] | null {
         return sizes;
       }
     }
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
   return null;
@@ -380,10 +370,10 @@ export function saveMultichartTokens(tokens: MultichartToken[]): void {
   try {
     const tokensToSave = tokens.slice(0, MAX_MULTICHART_TOKENS);
     localStorage.setItem(
-      STORAGE_KEYS.MULTICHART_TOKENS,
+      STORAGE_KEYS.multichartTokens,
       JSON.stringify(tokensToSave),
     );
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
 }
@@ -393,14 +383,14 @@ export function saveMultichartTokens(tokens: MultichartToken[]): void {
  */
 export function loadMultichartTokens(): MultichartToken[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEYS.MULTICHART_TOKENS);
+    const stored = localStorage.getItem(STORAGE_KEYS.multichartTokens);
     if (stored) {
       const tokens = JSON.parse(stored) as MultichartToken[];
       if (Array.isArray(tokens)) {
         return tokens.slice(0, MAX_MULTICHART_TOKENS);
       }
     }
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
   return [];
@@ -411,10 +401,10 @@ export function loadMultichartTokens(): MultichartToken[] {
  */
 export function saveMultichartActiveIndex(index: number): void {
   try {
-    Cookies.set(STORAGE_KEYS.MULTICHART_ACTIVE_INDEX, String(index), {
+    Cookies.set(STORAGE_KEYS.multichartActiveIndex, String(index), {
       expires: 365,
     });
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
 }
@@ -424,14 +414,14 @@ export function saveMultichartActiveIndex(index: number): void {
  */
 export function loadMultichartActiveIndex(): number {
   try {
-    const saved = Cookies.get(STORAGE_KEYS.MULTICHART_ACTIVE_INDEX);
+    const saved = Cookies.get(STORAGE_KEYS.multichartActiveIndex);
     if (saved) {
       const index = parseInt(saved, 10);
       if (!isNaN(index) && index >= 0) {
         return index;
       }
     }
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
   return 0;

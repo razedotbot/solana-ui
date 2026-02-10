@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { MultichartToken, MultichartTokenStats } from '../utils/types/multichart';
 import {
   saveMultichartTokens,
@@ -213,19 +213,34 @@ export function MultichartProvider({ children }: { children: React.ReactNode }):
     });
   }, [tokens]);
 
-  const value = {
-    tokens,
-    activeTokenIndex,
-    tokenStats,
-    addToken,
-    removeToken,
-    setActiveToken,
-    updateTokenStats,
-    updateTokenMetadata,
-    reorderTokens,
-    replaceToken,
-    maxTokens,
-  };
+  const value = useMemo(
+    () => ({
+      tokens,
+      activeTokenIndex,
+      tokenStats,
+      addToken,
+      removeToken,
+      setActiveToken,
+      updateTokenStats,
+      updateTokenMetadata,
+      reorderTokens,
+      replaceToken,
+      maxTokens,
+    }),
+    [
+      tokens,
+      activeTokenIndex,
+      tokenStats,
+      addToken,
+      removeToken,
+      setActiveToken,
+      updateTokenStats,
+      updateTokenMetadata,
+      reorderTokens,
+      replaceToken,
+      maxTokens,
+    ],
+  );
 
   return <MultichartContext.Provider value={value}>{children}</MultichartContext.Provider>;
 }

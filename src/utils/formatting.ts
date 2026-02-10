@@ -9,14 +9,6 @@ export const formatAddress = (address: string): string => {
 };
 
 /**
- * Format SOL balance with 4 decimal places
- * @deprecated Use formatBaseCurrencyBalance instead
- */
-export const formatSolBalance = (balance: number): string => {
-  return balance.toFixed(4);
-};
-
-/**
  * Format base currency balance with appropriate decimal places
  * SOL uses 4 decimals, stablecoins use 2 decimals
  */

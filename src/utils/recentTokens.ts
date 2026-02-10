@@ -1,7 +1,8 @@
 import type { RecentToken } from './types';
+import { STORAGE_KEYS, RECENT_TOKENS } from './constants';
 
-const STORAGE_KEY = 'raze_recent_tokens';
-const MAX_RECENT_TOKENS = 10;
+const STORAGE_KEY = STORAGE_KEYS.recentTokens;
+const MAX_RECENT_TOKENS = RECENT_TOKENS.MAX_COUNT;
 
 /**
  * Add a token to recent history
@@ -36,7 +37,7 @@ export const addRecentToken = (address: string): void => {
           lastViewed: Date.now()
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify([newToken]));
-      } catch (ignore) {
+      } catch {
         // Failed to save even after clearing, ignore
       }
     } else {
@@ -81,7 +82,7 @@ export const getRecentTokens = (): RecentToken[] => {
     }
     
     return validated;
-  } catch (ignore) {
+  } catch {
     // Clear corrupted data
     clearRecentTokens();
     return [];
@@ -94,7 +95,7 @@ export const getRecentTokens = (): RecentToken[] => {
 export const clearRecentTokens = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch (ignore) {
+  } catch {
     // Failed to clear storage, ignore
   }
 };
@@ -112,7 +113,7 @@ export const removeRecentToken = (address: string): void => {
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     }
-  } catch (ignore) {
+  } catch {
     // Failed to remove token, ignore
   }
 };

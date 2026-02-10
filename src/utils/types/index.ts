@@ -35,9 +35,6 @@ export type {
   WalletImportResult,
   WalletExportData,
   WalletSelectionState,
-  WalletSortDirection,
-  WalletSortField,
-  WalletFilterOptions,
 } from "./wallet";
 
 export { DEFAULT_GROUP_ID } from "./wallet";

@@ -205,12 +205,7 @@ interface FloatingTradingCardProps {
   wallets: WalletType[];
   setWallets: (wallets: WalletType[]) => void;
   selectedDex: string;
-  setSelectedDex: (dex: string) => void;
-  isDropdownOpen: boolean;
-  setIsDropdownOpen: (open: boolean) => void;
-  buyAmount: string;
   setBuyAmount: (amount: string) => void;
-  sellAmount: string;
   setSellAmount: (amount: string) => void;
   handleTradeSubmit: (
     wallets: WalletType[],
@@ -221,7 +216,6 @@ interface FloatingTradingCardProps {
   ) => void;
   isLoading: boolean;
   countActiveWallets: (wallets: WalletType[]) => number;
-  currentMarketCap: number | null;
   baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
   embedded?: boolean;
@@ -363,7 +357,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
               : "degen",
         };
       }
-    } catch (ignore) {
+    } catch {
       // Invalid JSON, use defaults
     }
     return {
@@ -384,7 +378,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
         const expires = new Date();
         expires.setFullYear(expires.getFullYear() + 1); // 1 year expiry
         document.cookie = `tradingPresets=${encoded}; expires=${expires.toUTCString()}; path=/`;
-      } catch (ignore) {
+      } catch {
         // Cookie save error, ignore
       }
     },

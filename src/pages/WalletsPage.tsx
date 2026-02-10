@@ -267,7 +267,7 @@ export const WalletsPage: React.FC = () => {
           WalletCategory,
           CategoryQuickTradeSettings
         >;
-      } catch (ignore) {
+      } catch {
         // Invalid JSON, use defaults
       }
     }
@@ -325,7 +325,7 @@ export const WalletsPage: React.FC = () => {
           }
         }
       }
-    } catch (ignore) {
+    } catch {
       // Load wallets error, ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,7 +341,7 @@ export const WalletsPage: React.FC = () => {
           if (savedWallets && savedWallets.length > 0) {
             setWallets(savedWallets);
           }
-        } catch (ignore) {
+        } catch {
           // Load wallets error, ignore
         }
       }, 500);
@@ -421,7 +421,7 @@ export const WalletsPage: React.FC = () => {
       } else {
         showToast("Failed to import wallet", "error");
       }
-    } catch (ignore) {
+    } catch {
       showToast("Failed to import wallet", "error");
     }
   };
@@ -578,7 +578,7 @@ export const WalletsPage: React.FC = () => {
         newSolBalances.set(wallet.address, balance);
 
         await new Promise((resolve) => setTimeout(resolve, 10));
-      } catch (ignore) {
+      } catch {
         // Fetch balance error, continue with others
       }
     }
@@ -588,7 +588,7 @@ export const WalletsPage: React.FC = () => {
         const masterWalletName = `Imported Master ${Date.now()}`;
         await handleImportMasterWallet(masterWalletName, mnemonic, 0);
         await new Promise((resolve) => setTimeout(resolve, 10));
-      } catch (ignore) {
+      } catch {
         // Import master wallet error, continue with others
       }
     }
@@ -642,7 +642,7 @@ export const WalletsPage: React.FC = () => {
       setBaseCurrencyBalances(newSolBalances);
 
       showToast("Master wallet created with primary wallet", "success");
-    } catch (ignore) {
+    } catch {
       showToast("Failed to create master wallet", "error");
     }
   };
@@ -720,7 +720,7 @@ export const WalletsPage: React.FC = () => {
         "Master wallet imported successfully",
         "success"
       );
-    } catch (ignore) {
+    } catch {
       showToast("Failed to import master wallet", "error");
     }
   };

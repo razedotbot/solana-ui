@@ -100,11 +100,11 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
             .catch((_error) => {
               showToast("Failed to connect to RPC endpoints", "error");
             });
-        } catch (ignore) {
+        } catch {
           // RPC connection error, already handled
         }
       }
-    } catch (ignore) {
+    } catch {
       // RPC endpoints parse error, ignore
     }
   }, [showToast]);
@@ -126,7 +126,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           .catch((_error) => {
             showToast("Failed to connect to RPC endpoints", "error");
           });
-      } catch (ignore) {
+      } catch {
         // RPC endpoints parse error, ignore
       }
     }
@@ -198,7 +198,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           },
           baseCurrency,
         );
-      } catch (ignore) {
+      } catch {
         showToast("Failed to refresh balances", "error");
       } finally {
         setIsRefreshing(false);

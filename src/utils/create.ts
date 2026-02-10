@@ -2,6 +2,7 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult as SharedBundleResult } from "./types";
+import { API_ENDPOINTS } from "./constants";
 import { getServerBaseUrl, splitLargeBundles } from "./trading";
 
 // ============================================================================
@@ -261,7 +262,7 @@ const getPartiallyPreparedTransactions = async (
     requestBody["meteoraCPAMMConfig"] = config.meteoraCPAMMConfig;
   }
 
-  const response = await fetch(`${baseUrl}/v2/sol/create`, {
+  const response = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_CREATE}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
@@ -559,7 +560,7 @@ export const executeCreate = async (
     if (mintPrivateKey) {
       try {
         mintKeypair = Keypair.fromSecretKey(bs58.decode(mintPrivateKey));
-      } catch (ignore) {
+      } catch {
         // Invalid mint private key, will proceed without it
       }
     }

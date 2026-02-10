@@ -5,7 +5,7 @@
  */
 
 import { loadConfigFromCookies } from "./storage";
-import { TRADING, BASE_CURRENCIES } from "./constants";
+import { TRADING, BASE_CURRENCIES, API_ENDPOINTS } from "./constants";
 import type {
   WalletSell,
   BundleMode,
@@ -13,6 +13,7 @@ import type {
   SellBundle,
   SellResult,
 } from "./types";
+import { parseTransactionBundles, type RawTransactionResponse } from "./transactionParsing";
 import {
   addTradeHistory,
   checkRateLimit,
@@ -84,8 +85,8 @@ const getPartiallyPreparedSellTransactions = async (
 
     // Use /v2/swap/sell for stablecoins, /v2/sol/sell for SOL
     const endpoint = isNativeSOL
-      ? `${baseUrl}/v2/sol/sell`
-      : `${baseUrl}/v2/swap/sell`;
+      ? `${baseUrl}${API_ENDPOINTS.SOL_SELL}`
+      : `${baseUrl}${API_ENDPOINTS.SWAP_SELL}`;
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -97,13 +98,7 @@ const getPartiallyPreparedSellTransactions = async (
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    const data = (await response.json()) as {
-      success?: boolean;
-      error?: string;
-      data?: unknown;
-      bundles?: unknown[];
-      transactions?: string[];
-    };
+    const data = (await response.json()) as RawTransactionResponse;
 
     if (!data.success) {
       throw new Error(
@@ -112,44 +107,7 @@ const getPartiallyPreparedSellTransactions = async (
       );
     }
 
-    // Handle various response formats
-    if (data.data && typeof data.data === "object" && data.data !== null) {
-      const responseData = data.data as {
-        bundles?: unknown[];
-        transactions?: string[];
-      };
-      if ("bundles" in responseData && Array.isArray(responseData.bundles)) {
-        return responseData.bundles.map((bundle: unknown) =>
-          Array.isArray(bundle)
-            ? { transactions: bundle as string[] }
-            : (bundle as SellBundle),
-        );
-      }
-      if (
-        "transactions" in responseData &&
-        Array.isArray(responseData.transactions)
-      ) {
-        return [{ transactions: responseData.transactions }];
-      }
-    }
-
-    if ("bundles" in data && Array.isArray(data["bundles"])) {
-      return data["bundles"].map((bundle: unknown) =>
-        Array.isArray(bundle)
-          ? { transactions: bundle as string[] }
-          : (bundle as SellBundle),
-      );
-    }
-
-    if ("transactions" in data && Array.isArray(data["transactions"])) {
-      return [{ transactions: data["transactions"] }];
-    }
-
-    if (Array.isArray(data)) {
-      return [{ transactions: data as string[] }];
-    }
-
-    throw new Error("No transactions returned from backend");
+    return parseTransactionBundles(data) as SellBundle[];
 };
 
 // ============================================================================
@@ -201,7 +159,7 @@ const executeSellSingleMode = async (
           ),
         );
       }
-    } catch (ignore) {
+    } catch {
       failedWallets++;
     }
   }
@@ -262,7 +220,7 @@ const executeSellBatchMode = async (
       if (i < batches.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, batchDelay));
       }
-    } catch (ignore) {
+    } catch {
       failedBatches++;
     }
   }

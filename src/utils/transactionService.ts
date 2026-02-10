@@ -1,5 +1,8 @@
 import type { ApiResponse, BundleResult } from "./types";
+import { API_ENDPOINTS } from "./constants";
 
+// Intentional inline getBaseUrl — cannot import from trading.ts due to circular dependency
+// (transactionService.ts is imported by trading.ts, so importing back would create a cycle)
 const getBaseUrl = (): string =>
   ((window as unknown as { tradingServerUrl?: string }).tradingServerUrl?.replace(/\/+$/, "") || "");
 
@@ -12,7 +15,7 @@ export const sendTransactions = async (
   transactions: string[],
 ): Promise<BundleResult> => {
   const baseUrl = getBaseUrl();
-  const endpoint = `${baseUrl}/v2/sol/send`;
+  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_SEND}`;
 
   const response = await fetch(endpoint, {
     method: "POST",

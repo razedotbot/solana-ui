@@ -31,7 +31,6 @@ interface MultichartLayoutProps {
   isRefreshing?: boolean;
   baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
-  currentMarketCap: number | null;
   onNonWhitelistedTrade?: (trade: {
     type: "buy" | "sell";
     address: string;
@@ -176,7 +175,6 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
   isRefreshing,
   baseCurrencyBalances,
   tokenBalances,
-  currentMarketCap,
   onNonWhitelistedTrade,
   viewMode,
   onViewModeChange,
@@ -347,7 +345,6 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
           isLoadingChart={isLoadingChart}
           baseCurrencyBalances={baseCurrencyBalances}
           tokenBalances={tokenBalances}
-          currentMarketCap={currentMarketCap}
           onNonWhitelistedTrade={onNonWhitelistedTrade}
         />
       </div>

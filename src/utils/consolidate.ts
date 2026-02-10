@@ -2,7 +2,7 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
-import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
+import { BASE_CURRENCIES, API_ENDPOINTS, type BaseCurrencyConfig } from "./constants";
 import { getServerBaseUrl, checkRateLimit, resolveBaseCurrency, splitLargeBundles } from "./trading";
 
 interface WalletConsolidation {
@@ -24,8 +24,8 @@ const getPartiallyPreparedTransactions = async (
 
   const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const endpoint = isNativeSOL
-    ? `${baseUrl}/v2/sol/consolidate`
-    : `${baseUrl}/v2/token/consolidate`;
+    ? `${baseUrl}${API_ENDPOINTS.SOL_CONSOLIDATE}`
+    : `${baseUrl}${API_ENDPOINTS.TOKEN_CONSOLIDATE}`;
 
   const requestBody: Record<string, unknown> = {
     sourceAddresses,

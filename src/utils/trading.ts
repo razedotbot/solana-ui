@@ -141,7 +141,7 @@ export const signTransaction = (
 
     transaction.sign(signers);
     return bs58.encode(transaction.serialize());
-  } catch (ignore) {
+  } catch {
     return null;
   }
 };
@@ -200,6 +200,20 @@ export const splitLargeBundles = (
   }
 
   return result;
+};
+
+/**
+ * Wrap an array of signed transactions into a single TransactionBundle.
+ * Used by distribute and mixer flows that send all transactions together.
+ */
+export const prepareTransactionBundles = (
+  signedTransactions: string[],
+): TransactionBundle[] => {
+  return [
+    {
+      transactions: signedTransactions,
+    },
+  ];
 };
 
 // ============================================================================
@@ -536,7 +550,7 @@ export const getTradeHistory = (): TradeHistoryEntry[] => {
     const history = JSON.parse(stored) as TradeHistoryEntry[];
     // Sort by timestamp descending (newest first)
     return history.sort((a, b) => b.timestamp - a.timestamp);
-  } catch (ignore) {
+  } catch {
     return [];
   }
 };
@@ -568,7 +582,7 @@ export const addTradeHistory = (
     window.dispatchEvent(
       new CustomEvent("tradeHistoryUpdated", { detail: newEntry }),
     );
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
 };
@@ -580,7 +594,7 @@ export const clearTradeHistory = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new CustomEvent("tradeHistoryUpdated"));
-  } catch (ignore) {
+  } catch {
     // Intentionally ignored
   }
 };

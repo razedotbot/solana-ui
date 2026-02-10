@@ -78,8 +78,8 @@ const DATA_CATEGORIES: DataCategory[] = [
     description: "RPC endpoints, bundle mode, delays, slippage",
     sensitive: false,
     source: "cookie",
-    key: STORAGE_KEYS.CONFIG,
-    cookieKey: STORAGE_KEYS.CONFIG,
+    key: STORAGE_KEYS.config,
+    cookieKey: STORAGE_KEYS.config,
   },
   {
     id: "quickBuy",
@@ -87,8 +87,8 @@ const DATA_CATEGORIES: DataCategory[] = [
     description: "Quick buy button amounts and settings",
     sensitive: false,
     source: "cookie",
-    key: STORAGE_KEYS.QUICK_BUY,
-    cookieKey: STORAGE_KEYS.QUICK_BUY,
+    key: STORAGE_KEYS.quickBuyPreferences,
+    cookieKey: STORAGE_KEYS.quickBuyPreferences,
   },
   {
     id: "categoryTradeSettings",
@@ -104,7 +104,7 @@ const DATA_CATEGORIES: DataCategory[] = [
     description: "Custom wallet group names and ordering",
     sensitive: true,
     source: "localStorage",
-    key: STORAGE_KEYS.WALLET_GROUPS,
+    key: STORAGE_KEYS.walletGroups,
   },
   {
     id: "deployPresets",
@@ -136,8 +136,8 @@ const DATA_CATEGORIES: DataCategory[] = [
     description: "Split panel layout dimensions",
     sensitive: false,
     source: "cookie",
-    key: STORAGE_KEYS.SPLIT_SIZES,
-    cookieKey: STORAGE_KEYS.SPLIT_SIZES,
+    key: STORAGE_KEYS.splitSizes,
+    cookieKey: STORAGE_KEYS.splitSizes,
   },
   {
     id: "encryptedWallets",
@@ -145,7 +145,7 @@ const DATA_CATEGORIES: DataCategory[] = [
     description: "Encrypted wallet private keys — handle with care",
     sensitive: true,
     source: "localStorage",
-    key: STORAGE_KEYS.ENCRYPTED_WALLETS,
+    key: STORAGE_KEYS.encryptedWallets,
   },
   {
     id: "encryptedMasterWallets",
@@ -153,7 +153,7 @@ const DATA_CATEGORIES: DataCategory[] = [
     description: "Encrypted HD master wallet keys — handle with care",
     sensitive: true,
     source: "localStorage",
-    key: STORAGE_KEYS.ENCRYPTED_MASTER_WALLETS,
+    key: STORAGE_KEYS.encryptedMasterWallets,
   },
 ];
 
@@ -366,7 +366,7 @@ export const SettingsPage: React.FC = () => {
 
     // Reload config into app state if config was imported
     if (importSelection.has("config")) {
-      const raw = Cookies.get(STORAGE_KEYS.CONFIG);
+      const raw = Cookies.get(STORAGE_KEYS.config);
       if (raw) {
         try {
           setConfig(JSON.parse(raw) as typeof config);

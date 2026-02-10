@@ -167,7 +167,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
 
       try {
         new PublicKey(tokenAddressInput);
-      } catch (ignore) {
+      } catch {
         showToast("Invalid token address", "error");
         return;
       }
@@ -191,7 +191,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
               tokenAddressInput,
             );
             newBalances.set(wallet.address, balance);
-          } catch (ignore) {
+          } catch {
             newBalances.set(wallet.address, 0);
           }
         }
@@ -203,7 +203,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           (b) => b > 0,
         ).length;
         showToast(`Loaded balances for ${walletsWithBalance} wallets`, "success");
-      } catch (ignore) {
+      } catch {
         showToast("Failed to fetch token balances", "error");
       } finally {
         setIsLoadingBalances(false);
@@ -466,7 +466,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           onClose();
         }, 3000);
       }
-    } catch (ignore) {
+    } catch {
       showToast("Batch transfer failed", "error");
     } finally {
       setBatchProcessing(false);

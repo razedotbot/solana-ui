@@ -4,6 +4,7 @@ import { X, Settings, CreditCard, BookOpen } from "lucide-react";
 import type { ConfigType } from "../utils/types";
 import { RPCEndpointManager } from "./RPCEndpointManager";
 import { createDefaultEndpoints, type RPCEndpoint } from "../utils/rpcManager";
+import { MODAL_STYLES } from "./shared/modalStyles";
 
 interface ConfigProps {
   isOpen: boolean;
@@ -22,11 +23,11 @@ const Config: React.FC<ConfigProps> = ({
   onSave,
   onShowTutorial,
 }) => {
-  // Add  styles when the modal is opened
+  // Add styles when the modal is opened
   useEffect(() => {
     if (isOpen) {
       const styleElement = document.createElement("style");
-      styleElement.textContent = `
+      styleElement.textContent = MODAL_STYLES + `
         @keyframes config-pulse {
           0% { box-shadow: 0 0 5px var(--color-primary-50), 0 0 15px var(--color-primary-20); }
           50% { box-shadow: 0 0 15px var(--color-primary-80), 0 0 25px var(--color-primary-40); }
@@ -111,18 +112,6 @@ const Config: React.FC<ConfigProps> = ({
 
         .config-btn-:active {
           transform: scale(0.95);
-        }
-
-        .glitch-text:hover {
-          text-shadow: 0 0 2px var(--color-primary), 0 0 4px var(--color-primary);
-          animation: glitch 2s infinite;
-        }
-
-        @keyframes glitch {
-          2%, 8% { transform: translate(-2px, 0) skew(0.3deg); }
-          4%, 6% { transform: translate(2px, 0) skew(-0.3deg); }
-          62%, 68% { transform: translate(0, 0) skew(0.33deg); }
-          64%, 66% { transform: translate(0, 0) skew(-0.33deg); }
         }
       `;
       document.head.appendChild(styleElement);

@@ -267,7 +267,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       await navigator.clipboard.writeText(text);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (ignore) {
+    } catch {
       // Clipboard error, ignore
     }
   };
@@ -288,7 +288,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       setVanityResults((prev) =>
         prev.filter((r) => r.address !== result.address),
       );
-    } catch (ignore) {
+    } catch {
       setError("Failed to add wallet");
     }
   };
@@ -311,7 +311,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
         await onCreateWallet(wallet);
         successCount++;
         await new Promise((resolve) => setTimeout(resolve, 50));
-      } catch (ignore) {
+      } catch {
         // Wallet creation failed, continue with others
       }
     }
@@ -340,7 +340,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       await navigator.clipboard.writeText(masterMnemonic);
       setMasterCopied(true);
       setTimeout(() => setMasterCopied(false), 2000);
-    } catch (ignore) {
+    } catch {
       // Clipboard error, ignore
     }
   };
@@ -350,7 +350,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
     try {
       await onCreateMasterWallet(masterWalletName.trim(), masterMnemonic);
       onClose();
-    } catch (ignore) {
+    } catch {
       // Error handling is done in the parent component
     }
   };
@@ -423,7 +423,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
           if (i < newWallets.length - 1) {
             await new Promise((resolve) => setTimeout(resolve, 50));
           }
-        } catch (ignore) {
+        } catch {
           failCount++;
         }
       }

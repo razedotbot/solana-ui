@@ -15,7 +15,6 @@ interface MultichartFrameContainerProps {
   isLoadingChart: boolean;
   baseCurrencyBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
-  currentMarketCap: number | null;
   onNonWhitelistedTrade?: (trade: {
     type: "buy" | "sell";
     address: string;
@@ -55,7 +54,6 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
   isLoadingChart,
   baseCurrencyBalances,
   tokenBalances,
-  currentMarketCap,
   onNonWhitelistedTrade,
 }) => {
   const { addToken, tokens, removeToken, reorderTokens, replaceToken } = useMultichart();
@@ -69,8 +67,7 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
   // Trading card state
   const [tradingCardOpen, setTradingCardOpen] = useState(false);
   const [tradingCardToken, setTradingCardToken] = useState<string>("");
-  const [selectedDex, setSelectedDex] = useState("pump");
-  const [isDexDropdownOpen, setIsDexDropdownOpen] = useState(false);
+  const [selectedDex] = useState("pump");
   const [buyAmount, setBuyAmount] = useState("0.1");
   const [sellAmount, setSellAmount] = useState("100");
   const [isTrading, setIsTrading] = useState(false);
@@ -535,17 +532,11 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
                     wallets={wallets}
                     setWallets={setWallets}
                     selectedDex={selectedDex}
-                    setSelectedDex={setSelectedDex}
-                    isDropdownOpen={isDexDropdownOpen}
-                    setIsDropdownOpen={setIsDexDropdownOpen}
-                    buyAmount={buyAmount}
                     setBuyAmount={setBuyAmount}
-                    sellAmount={sellAmount}
                     setSellAmount={setSellAmount}
                     handleTradeSubmit={handleTradeSubmit}
                     isLoading={isTrading}
                     countActiveWallets={countActiveWallets}
-                    currentMarketCap={currentMarketCap}
                     baseCurrencyBalances={baseCurrencyBalances}
                     tokenBalances={tokenBalances}
                     embedded={true}

@@ -167,7 +167,7 @@ const ImportWalletModal: React.FC<ImportWalletModalProps> = ({
       } else if (importType === 'privateKey') {
         setPrivateKey(text);
       }
-    } catch (ignore) {
+    } catch {
       setError('Failed to paste from clipboard. Please paste manually.');
     }
   };

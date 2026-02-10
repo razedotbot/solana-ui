@@ -67,7 +67,7 @@ const PnlCard: React.FC<PnlCardProps> = ({
         link.download = `pnl.png`;
         link.click();
       }
-    } catch (ignore) {
+    } catch {
       alert("To download this card as an image, html2canvas library would need to be installed.");
     } finally {
       setIsDownloading(false);

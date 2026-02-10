@@ -148,7 +148,7 @@ export const Homepage: React.FC = () => {
           const sample = perfSamples[0];
           tps = Math.round(sample.numTransactions / sample.samplePeriodSecs);
         }
-      } catch (ignore) {
+      } catch {
         // RPC error fetching performance, ignore
       }
 
@@ -163,7 +163,7 @@ export const Homepage: React.FC = () => {
         epochProgress: `${epochProgress}%`,
         avgFee: avgFeeInSol.toFixed(6),
       });
-    } catch (ignore) {
+    } catch {
       // Network stats fetch error, ignore
     }
   }, []);
@@ -180,7 +180,7 @@ export const Homepage: React.FC = () => {
       setRecentTokens(tokens);
       // Prefetch metadata for all recent tokens
       prefetchTokenMetadata(tokens.map(t => t.address));
-    } catch (ignore) {
+    } catch {
       // Token loading failed silently
     }
   }, []);
@@ -194,7 +194,7 @@ export const Homepage: React.FC = () => {
       try {
         clearRecentTokens();
         setRecentTokens([]);
-      } catch (ignore) {
+      } catch {
         // Clear history error, ignore
       }
     }
@@ -224,7 +224,7 @@ export const Homepage: React.FC = () => {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(address);
-    } catch (ignore) {
+    } catch {
       // Clipboard error, ignore
     }
   };

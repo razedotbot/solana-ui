@@ -7,8 +7,7 @@
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 import { loadConfigFromCookies } from "./storage";
-import { TRADING, BASE_CURRENCIES } from "./constants";
-import type { ApiResponse } from "./types";
+import { TRADING, BASE_CURRENCIES, API_ENDPOINTS } from "./constants";
 import type {
   WalletBuy,
   BundleMode,
@@ -16,6 +15,7 @@ import type {
   BuyBundle,
   BuyResult,
 } from "./types";
+import { parseTransactionBundles, type RawTransactionResponse } from "./transactionParsing";
 import {
   addTradeHistory,
   checkRateLimit,
@@ -85,8 +85,8 @@ const getPartiallyPreparedTransactions = async (
 
   // Use /v2/swap/buy for stablecoins, /v2/sol/buy for SOL
   const endpoint = isNativeSOL
-    ? `${baseUrl}/v2/sol/buy`
-    : `${baseUrl}/v2/swap/buy`;
+    ? `${baseUrl}${API_ENDPOINTS.SOL_BUY}`
+    : `${baseUrl}${API_ENDPOINTS.SWAP_BUY}`;
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -98,12 +98,7 @@ const getPartiallyPreparedTransactions = async (
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
 
-  const data = (await response.json()) as ApiResponse<{
-    bundles?: Array<string[] | BuyBundle>;
-    transactions?: string[];
-    bundlesSent?: number;
-    results?: Array<Record<string, unknown>>;
-  }>;
+  const data = (await response.json()) as RawTransactionResponse;
 
   if (!data.success) {
     throw new Error(
@@ -111,36 +106,7 @@ const getPartiallyPreparedTransactions = async (
     );
   }
 
-  // Handle various response formats
-  if (data.data?.bundles && Array.isArray(data.data.bundles)) {
-    return data.data.bundles.map((bundle: string[] | BuyBundle) =>
-      Array.isArray(bundle) ? { transactions: bundle } : bundle,
-    );
-  }
-
-  if (data.data?.transactions && Array.isArray(data.data.transactions)) {
-    return [{ transactions: data.data.transactions }];
-  }
-
-  if (
-    "transactions" in data &&
-    Array.isArray(
-      (data as unknown as { transactions: string[] }).transactions,
-    )
-  ) {
-    return [
-      {
-        transactions: (data as unknown as { transactions: string[] })
-          .transactions,
-      },
-    ];
-  }
-
-  if (Array.isArray(data)) {
-    return [{ transactions: data as string[] }];
-  }
-
-  throw new Error("No transactions returned from backend");
+  return parseTransactionBundles(data) as BuyBundle[];
 };
 
 // ============================================================================
@@ -192,7 +158,7 @@ const executeBuySingleMode = async (
       if (i < wallets.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, singleDelay));
       }
-    } catch (ignore) {
+    } catch {
       failedWallets++;
     }
   }
@@ -255,7 +221,7 @@ const executeBuyBatchMode = async (
       if (i < batches.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, batchDelay));
       }
-    } catch (ignore) {
+    } catch {
       failedBatches++;
     }
   }

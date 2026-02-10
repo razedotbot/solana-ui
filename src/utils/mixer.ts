@@ -2,8 +2,8 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
 import type { BundleResult } from "./types";
-import { BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
-import { getServerBaseUrl, resolveBaseCurrency, type TransactionBundle } from "./trading";
+import { BASE_CURRENCIES, API_ENDPOINTS, type BaseCurrencyConfig } from "./constants";
+import { getServerBaseUrl, resolveBaseCurrency, prepareTransactionBundles } from "./trading";
 
 interface WalletMixing {
   address: string;
@@ -25,8 +25,8 @@ const getPartiallySignedTransactions = async (
 
   const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const endpoint = isNativeSOL
-    ? `${baseUrl}/v2/sol/mixer`
-    : `${baseUrl}/v2/token/mixer`;
+    ? `${baseUrl}${API_ENDPOINTS.SOL_MIXER}`
+    : `${baseUrl}${API_ENDPOINTS.TOKEN_MIXER}`;
 
   const requestBody: Record<string, unknown> = {
     sender: senderAddress,
@@ -120,19 +120,6 @@ const completeTransactionSigning = (
     // Serialize and encode the fully signed transaction
     return bs58.encode(transaction.serialize());
   });
-};
-
-/**
- * Prepare mixing bundles
- */
-const prepareTransactionBundles = (signedTransactions: string[]): TransactionBundle[] => {
-  // For simplicity, we're putting all transactions in a single bundle
-  // In a production environment, you might want to split these into multiple bundles
-  return [
-    {
-      transactions: signedTransactions,
-    },
-  ];
 };
 
 /**
