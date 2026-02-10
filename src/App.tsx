@@ -1074,19 +1074,9 @@ const WalletManager: React.FC = () => {
         state.baseCurrencyBalances,
         state.tokenBalances,
         {
-          onlyIfZeroOrNull: false, // Always fetch since we clear on token change
-          strategy:
-            (contextConfig?.balanceRefreshStrategy as
-              | "sequential"
-              | "batch"
-              | "parallel") || "batch",
-          batchSize: parseInt(
-            contextConfig?.balanceRefreshBatchSize || "5",
-            10,
-          ),
-          delay: parseInt(contextConfig?.balanceRefreshDelay || "50", 10),
+          onlyIfZeroOrNull: false,
           onRateLimitError: () => {
-            showToast("RPC rate limit reached, check settings", "error");
+            showToast("RPC rate limit reached, falling back to slower mode", "error");
           },
         },
       );
@@ -1130,18 +1120,8 @@ const WalletManager: React.FC = () => {
         state.baseCurrencyBalances,
         state.tokenBalances,
         {
-          strategy:
-            (contextConfig?.balanceRefreshStrategy as
-              | "sequential"
-              | "batch"
-              | "parallel") || "batch",
-          batchSize: parseInt(
-            contextConfig?.balanceRefreshBatchSize || "5",
-            10,
-          ),
-          delay: parseInt(contextConfig?.balanceRefreshDelay || "50", 10),
           onRateLimitError: () => {
-            showToast("RPC rate limit reached, check settings", "error");
+            showToast("RPC rate limit reached, falling back to slower mode", "error");
           },
         },
       );
@@ -1160,9 +1140,6 @@ const WalletManager: React.FC = () => {
     state.tokenBalances,
     memoizedCallbacks,
     showToast,
-    contextConfig?.balanceRefreshStrategy,
-    contextConfig?.balanceRefreshBatchSize,
-    contextConfig?.balanceRefreshDelay,
   ]);
 
   const handleNonWhitelistedTrade = useCallback(

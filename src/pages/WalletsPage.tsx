@@ -24,7 +24,6 @@ import {
   updateMasterWalletAccountCount,
 } from "../utils/wallet";
 import { loadWalletsFromCookies, saveWalletsToCookies } from "../utils/storage";
-import CreateMasterWalletModal from "../components/modals/CreateMasterWalletModal";
 import CreateWalletModal from "../components/modals/CreateWalletModal";
 import ImportWalletModal from "../components/modals/ImportWalletModal";
 import ExportSeedPhraseModal from "../components/modals/ExportSeedPhraseModal";
@@ -36,7 +35,7 @@ import {
 import { useAppContext } from "../contexts";
 import { useToast, useWalletGroups, useActiveWalletGroup } from "../utils/hooks";
 
-import { formatBaseCurrencyBalance } from "../utils/formatting";
+import { formatBaseCurrencyBalance, formatAddress } from "../utils/formatting";
 import type { SortField, ActiveModal, FilterTab } from "../components/wallets";
 import {
   WalletsHeader,
@@ -52,6 +51,150 @@ import {
 } from "../components/wallets";
 import { PageBackground } from "../components/PageBackground";
 import { DEFAULT_GROUP_ID } from "../utils/types";
+import { Wallet, ChevronDown, Download, Trash2 } from "lucide-react";
+import type { BaseCurrencyConfig } from "../utils/constants";
+
+interface MasterWalletsDropdownProps {
+  masterWallets: MasterWallet[];
+  allWallets: WalletType[];
+  baseCurrencyBalances: Map<string, number>;
+  baseCurrency: BaseCurrencyConfig;
+  onExportSeedPhrase: (mw: MasterWallet) => void;
+  onDeleteMasterWallet: (id: string) => void;
+  onCopyToClipboard: (text: string) => void;
+}
+
+const MasterWalletsDropdown: React.FC<MasterWalletsDropdownProps> = ({
+  masterWallets,
+  allWallets,
+  baseCurrencyBalances,
+  baseCurrency,
+  onExportSeedPhrase,
+  onDeleteMasterWallet,
+  onCopyToClipboard,
+}) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent): void => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+        setExpandedId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative ml-auto" ref={dropdownRef}>
+      <button
+        onClick={() => {
+          setShowDropdown(!showDropdown);
+          setExpandedId(null);
+        }}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+          showDropdown
+            ? "bg-app-primary-color text-app-quaternary shadow-sm"
+            : "text-app-secondary-60 hover:text-app-primary hover:bg-app-quaternary"
+        }`}
+        title="Master Wallets"
+      >
+        <Wallet size={14} />
+        <span>Master</span>
+        <span
+          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+            showDropdown
+              ? "bg-white/20 text-white"
+              : "bg-app-primary-15 text-app-secondary-40"
+          }`}
+        >
+          {masterWallets.length}
+        </span>
+        <ChevronDown size={10} className={`transition-transform ${showDropdown ? "rotate-180" : ""}`} />
+      </button>
+
+      {showDropdown && (
+        <div className="absolute right-0 top-full mt-2 z-50 bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[280px]">
+          {masterWallets.map((mw) => {
+            const derivedWallets = allWallets
+              .filter((w) => w.masterWalletId === mw.id)
+              .sort((a, b) => (a.derivationIndex || 0) - (b.derivationIndex || 0));
+            const isExpanded = expandedId === mw.id;
+
+            return (
+              <div key={mw.id} className="border-b border-app-primary-15 last:border-b-0">
+                <div
+                  className="flex items-center justify-between px-3 py-2 hover:bg-app-quaternary/50 cursor-pointer transition-colors"
+                  onClick={() => setExpandedId(isExpanded ? null : mw.id)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Wallet size={13} className="text-app-primary-color" />
+                    <span className="text-xs font-semibold text-app-primary">{mw.name}</span>
+                    <span className="text-[10px] font-mono text-app-secondary-60">{derivedWallets.filter((w) => w.derivationIndex !== 0).length} wallets</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onExportSeedPhrase(mw); }}
+                      className="p-1 rounded hover:bg-app-quaternary transition-colors"
+                      title="Export seed phrase"
+                    >
+                      <Download size={11} className="text-app-secondary-60" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteMasterWallet(mw.id); }}
+                      className="p-1 rounded hover:bg-rose-500/10 transition-colors"
+                      title="Delete master wallet"
+                    >
+                      <Trash2 size={11} className="text-rose-400" />
+                    </button>
+                    <ChevronDown size={11} className={`text-app-secondary-40 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                  </div>
+                </div>
+
+                {isExpanded && derivedWallets.length > 0 && (
+                  <div className="max-h-40 overflow-y-auto px-2 pb-2 space-y-1">
+                    {derivedWallets.map((wallet) => {
+                      const isMaster = wallet.derivationIndex === 0;
+                      const balance = baseCurrencyBalances.get(wallet.address) || 0;
+                      return (
+                        <div
+                          key={wallet.id}
+                          className="flex items-center justify-between py-1 px-2 rounded bg-app-quaternary/50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[10px] font-mono ${
+                                isMaster ? "text-app-primary-color font-bold" : "text-app-secondary-60"
+                              }`}
+                            >
+                              #{wallet.derivationIndex}
+                            </span>
+                            <button
+                              onClick={() => onCopyToClipboard(wallet.address)}
+                              className="text-[10px] text-app-secondary-60 hover:text-app-primary font-mono truncate max-w-[120px]"
+                            >
+                              {formatAddress(wallet.address)}
+                            </button>
+                          </div>
+                          <span className="text-[10px] font-mono text-app-secondary-60">
+                            {formatBaseCurrencyBalance(balance, baseCurrency)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const WalletsPage: React.FC = () => {
   const { showToast } = useToast();
@@ -79,8 +222,6 @@ export const WalletsPage: React.FC = () => {
   const [isCreateWalletModalOpen, setIsCreateWalletModalOpen] = useState(false);
 
   const [masterWallets, setMasterWallets] = useState<MasterWallet[]>([]);
-  const [isCreateMasterWalletModalOpen, setIsCreateMasterWalletModalOpen] =
-    useState(false);
   const [isImportMasterWalletModalOpen, setIsImportMasterWalletModalOpen] =
     useState(false);
   const [exportSeedPhraseMasterWallet, setExportSeedPhraseMasterWallet] =
@@ -712,6 +853,10 @@ export const WalletsPage: React.FC = () => {
     setSelectedWallets(newSelected);
   };
 
+  const selectAllWallets = (walletIds: number[]): void => {
+    setSelectedWallets(new Set(walletIds));
+  };
+
   const clearSelection = (): void => {
     setSelectedWallets(new Set());
   };
@@ -917,7 +1062,13 @@ export const WalletsPage: React.FC = () => {
     showToast("Wallet deleted", "success");
   };
 
-  const nonArchivedWallets = wallets.filter((w) => !w.isArchived);
+  const nonArchivedWallets = wallets.filter((w) => {
+    if (w.isArchived) return false;
+    if (activeGroupId !== "all") {
+      return (w.groupId || DEFAULT_GROUP_ID) === activeGroupId;
+    }
+    return true;
+  });
   const totalSOL = nonArchivedWallets.reduce(
     (sum, wallet) => sum + (baseCurrencyBalances.get(wallet.address) || 0),
     0,
@@ -967,7 +1118,7 @@ export const WalletsPage: React.FC = () => {
             isRefreshing={isRefreshing}
             onCreateWallet={() => setIsCreateWalletModalOpen(true)}
             onImportWallet={() => setIsImportModalOpen(true)}
-            onCreateMasterWallet={() => setIsCreateMasterWalletModalOpen(true)}
+            onCreateMasterWallet={() => setIsCreateWalletModalOpen(true)}
             onImportMasterWallet={() => setIsImportMasterWalletModalOpen(true)}
             onExportKeys={() => downloadAllWallets(wallets)}
             onCleanup={() =>
@@ -981,21 +1132,11 @@ export const WalletsPage: React.FC = () => {
             }
             quickModeSettings={quickModeSettings}
             onUpdateQuickMode={handleUpdateQuickMode}
-            groups={groups}
-            activeGroupId={activeGroupId}
-            onGroupChange={handleGroupChange}
-            masterWallets={masterWallets}
-            wallets={wallets}
-            baseCurrencyBalances={baseCurrencyBalances}
-            baseCurrency={baseCurrency}
-            onExportSeedPhrase={setExportSeedPhraseMasterWallet}
-            onDeleteMasterWallet={handleDeleteMasterWallet}
-            onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
             isConnected={!!connection}
           />
 
           {/* Filter Tabs */}
-          <div className="px-4 py-3 border-b border-app-primary-15">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-app-primary-15">
             <FilterTabs
               activeTab={activeFilterTab}
               onTabChange={(tab) => {
@@ -1026,6 +1167,19 @@ export const WalletsPage: React.FC = () => {
               onDeleteGroup={deleteGroup}
               onUpdateGroupColor={updateGroupColor}
             />
+
+            {/* Master Wallets dropdown */}
+            {masterWallets.length > 0 && (
+              <MasterWalletsDropdown
+                masterWallets={masterWallets}
+                allWallets={wallets}
+                baseCurrencyBalances={baseCurrencyBalances}
+                baseCurrency={baseCurrency}
+                onExportSeedPhrase={setExportSeedPhraseMasterWallet}
+                onDeleteMasterWallet={handleDeleteMasterWallet}
+                onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
+              />
+            )}
           </div>
 
           {/* Wallet Grid */}
@@ -1035,12 +1189,18 @@ export const WalletsPage: React.FC = () => {
               groups={groups}
               selectedWallets={selectedWallets}
               baseCurrencyBalances={baseCurrencyBalances}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onRefresh={refreshBalances}
+              isRefreshing={isRefreshing}
+              isConnected={!!connection}
               editingLabel={editingLabel}
               editLabelValue={editLabelValue}
               draggedWalletId={draggedWalletId}
               dragOverWalletId={dragOverWalletId}
               quickModeSettings={quickModeSettings}
               onToggleSelection={toggleWalletSelection}
+              onSelectAll={selectAllWallets}
               onStartEditingLabel={startEditingLabel}
               onSaveLabel={saveLabel}
               onCancelEditingLabel={cancelEditingLabel}
@@ -1162,15 +1322,6 @@ export const WalletsPage: React.FC = () => {
         </div>
 
         {/* Master Wallet Modals (stay as overlays) */}
-        {isCreateMasterWalletModalOpen && (
-          <CreateMasterWalletModal
-            key="create-master-wallet-modal"
-            isOpen={isCreateMasterWalletModalOpen}
-            onClose={() => setIsCreateMasterWalletModalOpen(false)}
-            onCreateMasterWallet={handleCreateMasterWallet}
-          />
-        )}
-
         {isImportMasterWalletModalOpen && (
           <ImportWalletModal
             key="import-master-wallet-modal"
@@ -1189,6 +1340,7 @@ export const WalletsPage: React.FC = () => {
             onClose={() => setIsCreateWalletModalOpen(false)}
             masterWallets={masterWallets}
             onCreateWallet={handleCreateWallet}
+            onCreateMasterWallet={handleCreateMasterWallet}
           />
         )}
 

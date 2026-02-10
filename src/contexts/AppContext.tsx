@@ -39,16 +39,6 @@ const defaultConfig: ConfigType = {
   bundleMode: "batch",
   singleDelay: "200",
   batchDelay: "1000",
-  balanceRefreshStrategy: "batch",
-  balanceRefreshBatchSize: "5",
-  balanceRefreshDelay: "50",
-  // Transaction sending config
-  sendingMode: "server",
-  customRpcEndpoint: "",
-  customJitoSingleEndpoint: "",
-  customJitoBundleEndpoint: "",
-  singleTxMode: "rpc",
-  multiTxMode: "bundle",
 };
 
 interface AppContextProviderProps {
@@ -202,15 +192,8 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           baseCurrencyBalances,
           tokenBalances,
           {
-            strategy:
-              (config.balanceRefreshStrategy as
-                | "sequential"
-                | "batch"
-                | "parallel") || "batch",
-            batchSize: parseInt(config.balanceRefreshBatchSize || "5", 10),
-            delay: parseInt(config.balanceRefreshDelay || "50", 10),
             onRateLimitError: () => {
-              showToast("RPC rate limit reached, check settings", "error");
+              showToast("RPC rate limit reached, falling back to slower mode", "error");
             },
           },
           baseCurrency,
@@ -224,9 +207,6 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     [
       rpcManager,
       wallets,
-      config.balanceRefreshStrategy,
-      config.balanceRefreshBatchSize,
-      config.balanceRefreshDelay,
       baseCurrencyBalances,
       tokenBalances,
       showToast,

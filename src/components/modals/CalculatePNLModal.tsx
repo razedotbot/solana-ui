@@ -218,7 +218,7 @@ export const PnlModal: React.FC<PnlModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="relative z-10 p-5 space-y-5 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[#02b36d40] scrollbar-track-app-tertiary">
+        <div className="relative z-10 p-5 space-y-5 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--color-primary-40)] scrollbar-track-app-tertiary">
           <div className="space-y-5 animate-[fadeIn_0.3s_ease]">
             {/* Token Information */}
             <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">

@@ -261,25 +261,6 @@ export function loadConfigFromCookies(): ConfigType | null {
         config.rpcEndpoints = JSON.stringify(createDefaultEndpoints());
       }
 
-      // Transaction sending config defaults
-      if (config.sendingMode === undefined) {
-        config.sendingMode = "server";
-      }
-      if (config.customRpcEndpoint === undefined) {
-        config.customRpcEndpoint = "";
-      }
-      if (config.customJitoSingleEndpoint === undefined) {
-        config.customJitoSingleEndpoint = "";
-      }
-      if (config.customJitoBundleEndpoint === undefined) {
-        config.customJitoBundleEndpoint = "";
-      }
-      if (config.singleTxMode === undefined) {
-        config.singleTxMode = "rpc";
-      }
-      if (config.multiTxMode === undefined) {
-        config.multiTxMode = "bundle";
-      }
 
       return config as ConfigType;
     } catch (ignore) {

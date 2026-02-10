@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Check, Zap, RefreshCw } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
 import { getWalletDisplayName } from "../utils/wallet";
 import { formatTokenBalance, formatBaseCurrencyBalance } from "../utils/formatting";
 import type { WalletType } from "../utils/types";
@@ -230,13 +230,6 @@ const WalletSelectorPopup: React.FC<WalletSelectorPopupProps> = ({
                       >
                         {getWalletDisplayName(wallet)}
                       </span>
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-app-secondary-60">
-                        <Zap size={8} className="text-app-secondary-40" />
-                        <span>Off</span>
-                        <span className="text-app-primary-40">
-                          {wallet.address.slice(0, 5)}
-                        </span>
-                      </div>
                     </div>
                   </div>
 

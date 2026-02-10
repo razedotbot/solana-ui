@@ -321,32 +321,14 @@ export class RPCManager {
 export const createDefaultEndpoints = (): RPCEndpoint[] => {
   return [
     {
-      id: "default-1",
-      url: "https://solana.drpc.org",
-      name: "dRPC",
-      isActive: true,
-      priority: 1,
-      weight: 20,
-      failureCount: 0,
-    },
-    {
-      id: "default-2",
+      id: "default",
       url: "https://solana-rpc.publicnode.com",
       name: "PublicNode",
       isActive: true,
-      priority: 2,
-      weight: 60,
+      priority: 1,
+      weight: 100,
       failureCount: 0,
-    },
-    {
-      id: "default-3",
-      url: "https://public.rpc.solanavibestation.com",
-      name: "Solana Vibe Station",
-      isActive: true,
-      priority: 4,
-      weight: 20,
-      failureCount: 0,
-    },
+    }
   ];
 };
 

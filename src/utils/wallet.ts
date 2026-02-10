@@ -337,15 +337,9 @@ export async function refreshWalletBalance(
 }
 
 /**
- * Balance refresh strategy type.
- */
-export type BalanceRefreshStrategy = "sequential" | "batch" | "parallel";
-
-/**
  * Options for balance refresh.
  */
 export interface BalanceRefreshOptions {
-  strategy?: BalanceRefreshStrategy;
   batchSize?: number;
   delay?: number;
   onlyIfZeroOrNull?: boolean;
@@ -355,8 +349,18 @@ export interface BalanceRefreshOptions {
 const isOperationActiveWallet = (wallet: WalletType): boolean =>
   wallet.isActive && !wallet.isArchived;
 
+const isRateLimitErr = (err: unknown): boolean => {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("429") ||
+    msg.toLowerCase().includes("rate limit") ||
+    msg.toLowerCase().includes("too many requests")
+  );
+};
+
 /**
- * Fetch both base currency and token balances for all wallets with configurable refresh strategy.
+ * Fetch both base currency and token balances for all wallets.
+ * Uses auto-fallback: parallel → batch → sequential on RPC rate limit errors.
  */
 export async function fetchWalletBalances(
   connectionOrRpcManager:
@@ -380,14 +384,12 @@ export async function fetchWalletBalances(
       : onlyIfZeroOrNullOrOptions;
 
   const {
-    strategy = "batch",
     batchSize = 5,
     delay = 50,
     onlyIfZeroOrNull = false,
     onRateLimitError,
   } = options;
 
-  // Track if we've shown the rate limit toast to avoid flooding
   let rateLimitToastShown = false;
 
   const newBaseCurrencyBalances = new Map(
@@ -401,7 +403,13 @@ export async function fetchWalletBalances(
     typeof connectionOrRpcManager === "object" &&
     "createConnection" in connectionOrRpcManager;
 
-  const processWallet = async (wallet: WalletType): Promise<void> => {
+  const processedWallets = new Set<string>();
+
+  /**
+   * Process a single wallet. Returns true on success or non-rate-limit error,
+   * false when a rate limit error is detected.
+   */
+  const processWallet = async (wallet: WalletType): Promise<boolean> => {
     try {
       let connection: Connection;
       if (isRpcManager) {
@@ -449,19 +457,20 @@ export async function fetchWalletBalances(
           newTokenBalances.set(wallet.address, tokenBalance);
         }
       }
+
+      processedWallets.add(wallet.address);
+      return true;
     } catch (err) {
-      // Check for rate limit errors (429 or timeout after retries)
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      if (
-        !rateLimitToastShown &&
-        onRateLimitError &&
-        (errorMessage.includes("429") ||
-          errorMessage.toLowerCase().includes("timeout") ||
-          errorMessage.toLowerCase().includes("rate limit"))
-      ) {
-        rateLimitToastShown = true;
-        onRateLimitError();
+      if (isRateLimitErr(err)) {
+        if (!rateLimitToastShown && onRateLimitError) {
+          rateLimitToastShown = true;
+          onRateLimitError();
+        }
+        return false;
       }
+      // Non-rate-limit error: skip wallet but don't trigger fallback
+      processedWallets.add(wallet.address);
+      return true;
     }
   };
 
@@ -472,44 +481,52 @@ export async function fetchWalletBalances(
     }
   };
 
-  switch (strategy) {
-    case "sequential": {
-      for (let i = 0; i < wallets.length; i++) {
-        await processWallet(wallets[i]);
+  const getUnprocessed = (): WalletType[] =>
+    wallets.filter((w) => !processedWallets.has(w.address));
+
+  // Phase 1: Try parallel (all at once)
+  let rateLimitHit = false;
+  const parallelResults = await Promise.all(
+    wallets.map((wallet) => processWallet(wallet)),
+  );
+  updateState();
+
+  if (parallelResults.some((ok) => !ok)) {
+    rateLimitHit = true;
+  }
+
+  // Phase 2: Retry failed wallets in batch mode
+  if (rateLimitHit) {
+    const remaining = getUnprocessed();
+    if (remaining.length > 0) {
+      rateLimitHit = false;
+      for (let i = 0; i < remaining.length; i += batchSize) {
+        const batch = remaining.slice(
+          i,
+          Math.min(i + batchSize, remaining.length),
+        );
+        const batchResults = await Promise.all(
+          batch.map((wallet) => processWallet(wallet)),
+        );
         updateState();
-        if (i < wallets.length - 1 && delay > 0) {
+        if (batchResults.some((ok) => !ok)) {
+          rateLimitHit = true;
+        }
+        if (i + batchSize < remaining.length && delay > 0) {
           await new Promise<void>((resolve) => setTimeout(resolve, delay));
         }
       }
-      break;
     }
+  }
 
-    case "batch": {
-      for (let i = 0; i < wallets.length; i += batchSize) {
-        const batch = wallets.slice(i, Math.min(i + batchSize, wallets.length));
-        await Promise.all(batch.map((wallet) => processWallet(wallet)));
-        updateState();
-        if (i + batchSize < wallets.length && delay > 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, delay));
-        }
-      }
-      break;
-    }
-
-    case "parallel": {
-      await Promise.all(wallets.map((wallet) => processWallet(wallet)));
+  // Phase 3: Retry remaining wallets sequentially
+  if (rateLimitHit) {
+    const remaining = getUnprocessed();
+    for (let i = 0; i < remaining.length; i++) {
+      await processWallet(remaining[i]);
       updateState();
-      break;
-    }
-
-    default: {
-      for (let i = 0; i < wallets.length; i += batchSize) {
-        const batch = wallets.slice(i, Math.min(i + batchSize, wallets.length));
-        await Promise.all(batch.map((wallet) => processWallet(wallet)));
-        updateState();
-        if (i + batchSize < wallets.length && delay > 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, delay));
-        }
+      if (i < remaining.length - 1 && delay > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, delay));
       }
     }
   }

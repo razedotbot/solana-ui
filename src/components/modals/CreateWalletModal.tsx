@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   X,
   AlertCircle,
+  AlertTriangle,
   Wallet,
   Key,
   Sparkles,
@@ -12,9 +13,12 @@ import {
   Check,
   Plus,
   Trash2,
+  RefreshCw,
+  Shield,
 } from "lucide-react";
 import type { MasterWallet, WalletType } from "../../utils/types";
 import { createNewWallet, createHDWalletFromMaster } from "../../utils/wallet";
+import { generateMnemonic } from "../../utils/hdWallet";
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
@@ -23,9 +27,10 @@ interface CreateWalletModalProps {
   onClose: () => void;
   masterWallets: MasterWallet[];
   onCreateWallet: (wallet: WalletType) => Promise<void>;
+  onCreateMasterWallet: (name: string, mnemonic: string) => Promise<void>;
 }
 
-type WalletTypeOption = "im" | "hd" | "vanity";
+type WalletTypeOption = "im" | "hd" | "vanity" | "master";
 
 interface VanityResult {
   address: string;
@@ -52,6 +57,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
   onClose,
   masterWallets,
   onCreateWallet,
+  onCreateMasterWallet,
 }) => {
   const [walletType, setWalletType] = useState<WalletTypeOption>("im");
   const [selectedMasterWalletId, setSelectedMasterWalletId] =
@@ -59,6 +65,14 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
   const [quantity, setQuantity] = useState<string>("1");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Master wallet state
+  const [masterStep, setMasterStep] = useState<"name" | "generate">("name");
+  const [masterWalletName, setMasterWalletName] = useState("");
+  const [wordCount, setWordCount] = useState<12 | 24>(12);
+  const [masterMnemonic, setMasterMnemonic] = useState("");
+  const [confirmedSaved, setConfirmedSaved] = useState(false);
+  const [masterCopied, setMasterCopied] = useState(false);
 
   // Vanity generator state
   const [vanityConfig, setVanityConfig] = useState<VanityConfig>({
@@ -99,6 +113,12 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       setIsSearching(false);
       setSearchStats({ attempts: 0, speed: 0, elapsed: 0 });
       searchAbortRef.current = false;
+      setMasterStep("name");
+      setMasterWalletName("");
+      setWordCount(12);
+      setMasterMnemonic("");
+      setConfirmedSaved(false);
+      setMasterCopied(false);
     }
   }, [isOpen, masterWallets]);
 
@@ -309,6 +329,32 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
     setVanityResults((prev) => prev.filter((r) => r.address !== address));
   };
 
+  const handleGenerateMnemonic = (): void => {
+    const newMnemonic = generateMnemonic(wordCount);
+    setMasterMnemonic(newMnemonic);
+    setMasterStep("generate");
+  };
+
+  const handleCopyMnemonic = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(masterMnemonic);
+      setMasterCopied(true);
+      setTimeout(() => setMasterCopied(false), 2000);
+    } catch (ignore) {
+      // Clipboard error, ignore
+    }
+  };
+
+  const handleCreateMasterWallet = async (): Promise<void> => {
+    if (!confirmedSaved || !masterWalletName.trim() || !masterMnemonic) return;
+    try {
+      await onCreateMasterWallet(masterWalletName.trim(), masterMnemonic);
+      onClose();
+    } catch (ignore) {
+      // Error handling is done in the parent component
+    }
+  };
+
   const handleCreateWallets = async (): Promise<void> => {
     setError(null);
 
@@ -483,6 +529,23 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
                 Vanity
               </div>
             </button>
+            <button
+              onClick={() => {
+                setWalletType("master");
+                setError(null);
+                stopVanitySearch();
+              }}
+              className={`flex-1 px-3 py-2 rounded font-mono text-sm transition-all ${
+                walletType === "master"
+                  ? "bg-app-primary-color text-black"
+                  : "text-app-secondary-80 hover:text-app-primary"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Shield size={16} />
+                Master
+              </div>
+            </button>
           </div>
 
           {/* Quantity Input - only for IM and HD */}
@@ -581,7 +644,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
                     >
                       {masterWallets.map((mw) => (
                         <option key={mw.id} value={mw.id}>
-                          {mw.name} ({mw.accountCount || 0} wallets)
+                          {mw.name} ({Math.max((mw.accountCount || 0) - 1, 0)} wallets)
                         </option>
                       ))}
                     </select>
@@ -907,6 +970,147 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
             </>
           )}
 
+          {walletType === "master" && (
+            <>
+              {masterStep === "name" && (
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-mono text-app-secondary-80 mb-2">
+                      Master Wallet Name
+                    </label>
+                    <input
+                      type="text"
+                      value={masterWalletName}
+                      onChange={(e) => setMasterWalletName(e.target.value)}
+                      placeholder="e.g., Trading Wallets, Main Account"
+                      className="w-full bg-app-quaternary border border-app-primary-20 rounded-lg
+                               px-4 py-3 text-app-primary focus:border-app-primary-60 focus:outline-none
+                               font-mono"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-mono text-app-secondary-80 mb-2">
+                      Seed Phrase Length
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setWordCount(12)}
+                        className={`py-3 px-4 rounded-lg font-mono transition-all duration-200 ${
+                          wordCount === 12
+                            ? "bg-app-primary-color text-black border-2 border-app-primary-color"
+                            : "bg-app-quaternary text-app-primary border border-app-primary-20 hover:border-app-primary-60"
+                        }`}
+                      >
+                        12 Words (Standard)
+                      </button>
+                      <button
+                        onClick={() => setWordCount(24)}
+                        className={`py-3 px-4 rounded-lg font-mono transition-all duration-200 ${
+                          wordCount === 24
+                            ? "bg-app-primary-color text-black border-2 border-app-primary-color"
+                            : "bg-app-quaternary text-app-primary border border-app-primary-20 hover:border-app-primary-60"
+                        }`}
+                      >
+                        24 Words (Extra Security)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={20} className="text-warning-alt flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-app-secondary font-mono">
+                        <p className="font-bold mb-2 text-app-primary">Important:</p>
+                        <ul className="space-y-1">
+                          <li>• Your seed phrase is the master key to all derived wallets</li>
+                          <li>• Anyone with your seed phrase can access all your funds</li>
+                          <li>• Store it securely offline (paper, hardware wallet, etc.)</li>
+                          <li>• Never share it or enter it on untrusted websites</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {masterStep === "generate" && (
+                <div className="space-y-6">
+                  <div className="bg-app-quaternary border-2 border-app-primary-60 rounded-lg p-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-sm font-mono text-app-secondary-80 font-bold">
+                        YOUR SEED PHRASE ({wordCount} WORDS)
+                      </h3>
+                      <button
+                        onClick={handleCopyMnemonic}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-app-primary-color hover:bg-app-primary-dark
+                                 text-black font-mono text-sm rounded transition-all duration-200"
+                      >
+                        {masterCopied ? (
+                          <>
+                            <Check size={16} />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={16} />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      {masterMnemonic.split(" ").map((word, index) => (
+                        <div
+                          key={index}
+                          className="bg-app-primary border border-app-primary-40 rounded px-3 py-2
+                                   font-mono text-sm text-app-primary flex items-center gap-2"
+                        >
+                          <span className="text-app-secondary-60 text-xs">{index + 1}.</span>
+                          <span className="font-bold">{word}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-app-secondary font-mono">
+                        <p className="font-bold mb-2 text-red-400">Critical Security Warning:</p>
+                        <ul className="space-y-1 text-app-secondary-80">
+                          <li>• Write down these words in order on paper</li>
+                          <li>• Store the paper in a secure location</li>
+                          <li>• Never store digitally (screenshots, cloud, email)</li>
+                          <li>• If you lose this, you lose access to all wallets forever</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 bg-app-quaternary border border-app-primary-20 rounded-lg p-4">
+                    <input
+                      type="checkbox"
+                      id="confirmed-saved"
+                      checked={confirmedSaved}
+                      onChange={(e) => setConfirmedSaved(e.target.checked)}
+                      className="w-5 h-5 rounded border-app-primary-40 text-app-primary-color
+                               focus:ring-app-primary-color cursor-pointer"
+                    />
+                    <label
+                      htmlFor="confirmed-saved"
+                      className="text-sm font-mono text-app-primary cursor-pointer select-none"
+                    >
+                      I have securely saved my seed phrase and understand that I cannot recover it if lost
+                    </label>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
           {error && (
             <div className="text-sm font-mono text-error-alt flex items-center gap-2 bg-app-quaternary border border-error-alt rounded-lg p-3">
               <AlertCircle size={16} />
@@ -972,6 +1176,42 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
                 </>
               )}
             </div>
+          ) : walletType === "master" ? (
+            masterStep === "name" ? (
+              <button
+                onClick={handleGenerateMnemonic}
+                disabled={!masterWalletName.trim()}
+                className={`px-6 py-2 font-mono rounded-lg transition-all duration-200 flex items-center gap-2 ${
+                  masterWalletName.trim()
+                    ? "bg-app-primary-color hover:bg-app-primary-dark text-black"
+                    : "bg-app-tertiary text-app-secondary-60 cursor-not-allowed"
+                }`}
+              >
+                <RefreshCw size={16} />
+                Generate Seed Phrase
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMasterStep("name")}
+                  className="px-6 py-2 bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20
+                           hover:border-app-primary-40 text-app-primary font-mono rounded-lg transition-all duration-200"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleCreateMasterWallet}
+                  disabled={!confirmedSaved}
+                  className={`px-6 py-2 font-mono rounded-lg transition-all duration-200 ${
+                    confirmedSaved
+                      ? "bg-app-primary-color hover:bg-app-primary-dark text-black"
+                      : "bg-app-tertiary text-app-secondary-60 cursor-not-allowed"
+                  }`}
+                >
+                  Create Master Wallet
+                </button>
+              </div>
+            )
           ) : (
             <button
               onClick={handleCreateWallets}

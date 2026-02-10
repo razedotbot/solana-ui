@@ -1,5 +1,5 @@
-import React from "react";
-import { Layers } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Layers, Search, X, RefreshCw, CheckSquare, Square } from "lucide-react";
 import { WalletRow } from "./WalletRow";
 import type {
   WalletType,
@@ -14,12 +14,18 @@ export interface WalletListViewProps {
   groups: WalletGroup[];
   selectedWallets: Set<number>;
   baseCurrencyBalances: Map<string, number>;
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
+  onRefresh: () => void;
+  isRefreshing: boolean;
+  isConnected: boolean;
   editingLabel: number | null;
   editLabelValue: string;
   draggedWalletId: number | null;
   dragOverWalletId: number | null;
   quickModeSettings: Record<WalletCategory, CategoryQuickTradeSettings>;
   onToggleSelection: (walletId: number) => void;
+  onSelectAll: (walletIds: number[]) => void;
   onStartEditingLabel: (wallet: WalletType) => void;
   onSaveLabel: (walletId: number) => void;
   onCancelEditingLabel: () => void;
@@ -44,12 +50,18 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
   groups,
   selectedWallets,
   baseCurrencyBalances,
+  searchTerm,
+  onSearchChange,
+  onRefresh,
+  isRefreshing,
+  isConnected,
   editingLabel,
   editLabelValue,
   draggedWalletId,
   dragOverWalletId,
   quickModeSettings,
   onToggleSelection,
+  onSelectAll,
   onStartEditingLabel,
   onSaveLabel,
   onCancelEditingLabel,
@@ -68,6 +80,20 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
   onSaveCustomQuickMode,
   onMoveWalletToGroup,
 }) => {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchOpen]);
+
+  const handleCloseSearch = (): void => {
+    setIsSearchOpen(false);
+    onSearchChange("");
+  };
+
   if (wallets.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center py-16">
@@ -88,11 +114,65 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
     <div className="flex-1 min-h-0 flex flex-col rounded-xl border border-app-primary-15 overflow-hidden bg-app-secondary/10">
       {/* Header row */}
       <div className="hidden md:flex items-center gap-2 px-3 py-2 border-b border-app-primary-15 bg-app-secondary/20 text-[11px] text-app-secondary-40 uppercase tracking-wider font-medium flex-shrink-0">
-        <div className="w-[52px] flex-shrink-0" />
-        <div className="w-[180px] flex-shrink-0">Wallet</div>
+        <div className="w-[52px] flex-shrink-0 flex items-center justify-center">
+          <button
+            onClick={() => {
+              const allSelected = wallets.length > 0 && wallets.every((w) => selectedWallets.has(w.id));
+              onSelectAll(allSelected ? [] : wallets.map((w) => w.id));
+            }}
+            className="p-1 rounded-lg hover:bg-app-quaternary transition-colors"
+            title={wallets.every((w) => selectedWallets.has(w.id)) ? "Deselect all" : "Select all"}
+          >
+            {wallets.length > 0 && wallets.every((w) => selectedWallets.has(w.id)) ? (
+              <CheckSquare size={16} className="color-primary" />
+            ) : (
+              <Square size={16} className="text-app-secondary-40" />
+            )}
+          </button>
+        </div>
+        <div className="w-[180px] flex-shrink-0">
+          {isSearchOpen ? (
+            <div className="flex items-center gap-1">
+              <Search size={11} className="text-app-secondary-40 flex-shrink-0" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") handleCloseSearch(); }}
+                className="w-full bg-transparent border-none text-[11px] text-app-primary placeholder:text-app-secondary-40 focus:outline-none font-mono"
+              />
+              <button onClick={handleCloseSearch} className="p-0.5 hover:bg-app-primary-10 rounded transition-colors flex-shrink-0">
+                <X size={11} className="text-app-secondary-40" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span>Wallet</span>
+              <button onClick={() => setIsSearchOpen(true)} className="p-0.5 hover:bg-app-primary-10 rounded transition-colors">
+                <Search size={11} className="text-app-secondary-40 hover:text-app-primary" />
+              </button>
+            </div>
+          )}
+        </div>
         <div className="w-[80px] flex-shrink-0">QuickMode</div>
         <div className="w-[140px] flex-shrink-0">Buy / Sell</div>
-        <div className="w-[90px] flex-shrink-0 text-right">Balance</div>
+        <div className="w-[90px] flex-shrink-0 text-right flex items-center justify-end gap-1">
+          <span>Balance</span>
+          <button
+            onClick={onRefresh}
+            disabled={!isConnected || isRefreshing}
+            className={`p-0.5 rounded transition-colors ${
+              isRefreshing
+                ? "text-app-secondary-40"
+                : "text-app-secondary-40 hover:text-app-primary"
+            }`}
+            title="Refresh balances"
+          >
+            <RefreshCw size={11} className={isRefreshing ? "animate-spin" : ""} />
+          </button>
+        </div>
         <div className="ml-auto">Actions</div>
       </div>
 

@@ -24,17 +24,29 @@ interface RPCEndpointManagerProps {
 }
 
 const POPULAR_ENDPOINTS = [
-  { name: "dRPC", url: "https://solana.drpc.org" },
+  { name: "Solana Mainnet Beta (Official)", url: "https://api.mainnet-beta.solana.com" },
   { name: "PublicNode", url: "https://solana-rpc.publicnode.com" },
-  {
-    name: "Solana Vibe Station",
-    url: "https://public.rpc.solanavibestation.com",
-  },
+  { name: "PublicNode (Alt)", url: "https://solana.publicnode.com" },
+  { name: "dRPC", url: "https://solana.drpc.org" },
+  { name: "Solana Vibe Station", url: "https://public.rpc.solanavibestation.com" },
+  { name: "Pocket Network", url: "https://solana.api.pocket.network" },
+  { name: "Syndica", url: "https://solana-mainnet.api.syndica.io" },
+  { name: "Phantom", url: "https://solana-mainnet.phantom.app" },
+  { name: "Lava", url: "https://solana.lava.build" },
+  { name: "SolanaTracker", url: "https://rpc.solanatracker.io/public" },
+  { name: "DeBridge Finance", url: "https://solana-rpc.debridge.finance" },
+  { name: "LeoRPC", url: "https://solana.leorpc.com" },
+  { name: "Mainnet (Legacy API)", url: "https://api.mainnet.solana.com" },
+  { name: "Ledger", url: "https://solana.coin.ledger.com" },
+  { name: "Tatum API Node", url: "https://api.tatum.io/v3/blockchain/node/solana-mainnet" },
+  { name: "Tatum Gateway", url: "https://solana-mainnet.gateway.tatum.io" },
+  { name: "PyraChain RPC", url: "https://rpc.pyrachain.io" }
 ];
+
 
 /**
  * Perform a health check on an RPC endpoint
- * Uses getHealth or getSlot to measure latency
+ * Uses getTokenAccountsByOwner to measure latency
  */
 const checkEndpointHealth = async (
   url: string,
@@ -43,7 +55,7 @@ const checkEndpointHealth = async (
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 1000); // 1 second timeout
 
     const response = await fetch(url, {
       method: "POST",
@@ -51,8 +63,12 @@ const checkEndpointHealth = async (
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
-        method: "getSlot",
-        params: [],
+        method: "getTokenAccountsByOwner",
+        params: [
+          "RAZEBaWFBhbZHvVneHjrbhV6n8QquU8rSaCxfVMTVGB",
+          { mint: "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB" },
+          { encoding: "jsonParsed" },
+        ],
       }),
       signal: controller.signal,
     });
@@ -66,7 +82,7 @@ const checkEndpointHealth = async (
     }
 
     const data = (await response.json()) as {
-      result?: number;
+      result?: unknown;
       error?: unknown;
     };
 
@@ -107,6 +123,9 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
     null,
   );
   const [autoMonitoringEnabled, setAutoMonitoringEnabled] = useState(true);
+  const [presetHealthResults, setPresetHealthResults] = useState<
+    Record<string, { latency: number; status: "healthy" | "slow" | "unhealthy" | "checking" }>
+  >({});
   const hasInitializedWeights = useRef(false);
   const hasCheckedHealthOnMount = useRef(false);
   const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -126,7 +145,7 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
 
     if (currentTotal === 0) {
       // Distribute evenly if no weights set
-      const evenWeight = Math.round(100 / active.length);
+      const evenWeight = Math.floor(100 / active.length);
       active.forEach((e) => {
         e.weight = evenWeight;
       });
@@ -137,6 +156,13 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
           e.weight = Math.round((e.weight / currentTotal) * 100);
         }
       });
+    }
+
+    // Fix rounding drift — assign remainder to highest-weight endpoint
+    const roundedTotal = active.reduce((sum, e) => sum + (e.weight || 0), 0);
+    if (roundedTotal !== 100 && active.length > 0) {
+      const largest = active.reduce((a, b) => ((a.weight || 0) >= (b.weight || 0) ? a : b));
+      largest.weight = (largest.weight || 0) + (100 - roundedTotal);
     }
   };
 
@@ -300,6 +326,66 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
     endpoints.length,
     checkAllEndpointsHealth,
   ]);
+
+  // Check popular endpoints health when preset list opens
+  useEffect(() => {
+    if (!showPresets) return;
+
+    const endpointsToCheck = POPULAR_ENDPOINTS.filter(
+      (p) => !endpoints.some((e) => e.url === p.url),
+    );
+
+    // Mark all as checking
+    setPresetHealthResults((prev) => {
+      const next = { ...prev };
+      for (const p of endpointsToCheck) {
+        if (!next[p.url]) {
+          next[p.url] = { latency: 0, status: "checking" };
+        }
+      }
+      return next;
+    });
+
+    // Check each endpoint in parallel
+    for (const preset of endpointsToCheck) {
+      void checkEndpointHealth(preset.url).then((result) => {
+        setPresetHealthResults((prev) => ({
+          ...prev,
+          [preset.url]: result,
+        }));
+      });
+    }
+  }, [showPresets, endpoints]);
+
+  // Quick-add a popular endpoint directly
+  const quickAddPreset = (preset: { name: string; url: string }): void => {
+    const activeCount = endpoints.filter((e) => e.isActive).length;
+    const defaultWeight =
+      activeCount > 0 ? Math.round(100 / (activeCount + 1)) : 100;
+
+    const newEndpoint: RPCEndpoint = {
+      id: `rpc-${Date.now()}`,
+      url: preset.url,
+      name: preset.name,
+      isActive: true,
+      priority: endpoints.length + 1,
+      weight: defaultWeight,
+      failureCount: 0,
+      healthStatus: presetHealthResults[preset.url]?.status === "checking" || !presetHealthResults[preset.url]
+        ? "unknown"
+        : presetHealthResults[preset.url].status as "healthy" | "slow" | "unhealthy",
+      latency: presetHealthResults[preset.url]?.latency,
+    };
+
+    const updatedEndpoints = [...endpoints, newEndpoint];
+    normalizeWeights(updatedEndpoints);
+    onChange(updatedEndpoints);
+
+    // Check health of the new endpoint
+    setTimeout(() => {
+      void checkSingleEndpointHealth(newEndpoint.id);
+    }, 100);
+  };
 
   // Calculate total weight of active endpoints
   const activeEndpoints = endpoints.filter((e) => e.isActive);
@@ -759,7 +845,7 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
 
           {showPresets && (
             <div
-              className="space-y-1 mb-2 p-2 rounded"
+              className="space-y-1 mb-2 p-2 rounded max-h-64 overflow-y-auto custom-scrollbar"
               style={{
                 backgroundColor: "var(--app-quaternary, rgba(5, 10, 14, 0.5))",
               }}
@@ -768,28 +854,92 @@ export const RPCEndpointManager: React.FC<RPCEndpointManagerProps> = ({
                 const alreadyAdded = endpoints.some(
                   (e) => e.url === preset.url,
                 );
+                const health = presetHealthResults[preset.url];
+                const isChecking = health?.status === "checking";
+
                 return (
-                  <button
+                  <div
                     key={preset.url}
-                    type="button"
-                    onClick={() => {
-                      if (!alreadyAdded) {
-                        setNewEndpointName(preset.name);
-                        setNewEndpointUrl(preset.url);
-                      }
-                    }}
-                    disabled={alreadyAdded}
-                    className="w-full text-left px-2 py-1.5 rounded text-[10px] font-mono transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-app-primary-20"
-                    style={{ color: "var(--app-secondary, #7ddfbd)" }}
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all ${
+                      alreadyAdded
+                        ? "opacity-40"
+                        : "hover:bg-app-primary-20"
+                    }`}
                   >
-                    <div className="font-medium">{preset.name}</div>
-                    <div className="opacity-70 truncate">{preset.url}</div>
-                    {alreadyAdded && (
-                      <div className="text-[9px] opacity-60">
-                        (Already added)
+                    {/* Health indicator */}
+                    <div
+                      className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center ${
+                        isChecking
+                          ? "bg-blue-500/20 text-blue-400"
+                          : health?.status === "healthy"
+                            ? "bg-green-500/20 text-green-400"
+                            : health?.status === "slow"
+                              ? "bg-yellow-500/20 text-yellow-400"
+                              : health?.status === "unhealthy"
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-app-secondary-20 text-app-secondary-40"
+                      }`}
+                    >
+                      {isChecking ? (
+                        <RefreshCw size={11} className="animate-spin" />
+                      ) : health?.status === "healthy" ? (
+                        <Wifi size={11} />
+                      ) : health?.status === "slow" ? (
+                        <Activity size={11} />
+                      ) : health?.status === "unhealthy" ? (
+                        <WifiOff size={11} />
+                      ) : (
+                        <Activity size={11} />
+                      )}
+                    </div>
+
+                    {/* Name + URL */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-medium text-app-primary truncate">
+                          {preset.name}
+                        </span>
+                        {health && !isChecking && health.latency > 0 && health.latency !== Infinity && (
+                          <span
+                            className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                              health.status === "healthy"
+                                ? "text-green-400 bg-green-500/10"
+                                : health.status === "slow"
+                                  ? "text-yellow-400 bg-yellow-500/10"
+                                  : "text-red-400 bg-red-500/10"
+                            }`}
+                          >
+                            {health.latency}ms
+                          </span>
+                        )}
+                        {health && !isChecking && (health.latency === Infinity || health.latency === 0) && health.status === "unhealthy" && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded text-red-400 bg-red-500/10">
+                            Timeout
+                          </span>
+                        )}
                       </div>
+                      <div className="text-[9px] text-app-secondary-40 font-mono truncate">
+                        {preset.url}
+                      </div>
+                    </div>
+
+                    {/* Quick-add button */}
+                    {alreadyAdded ? (
+                      <span className="flex-shrink-0 text-[9px] font-mono px-2 py-1 rounded bg-app-primary-color/10 text-app-primary-color border border-app-primary-color/30">
+                        Added
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => quickAddPreset(preset)}
+                        className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded-md bg-app-primary-color/10 text-app-primary-color border border-app-primary-color/30 hover:bg-app-primary-color/20 hover:border-app-primary-color/50 transition-all"
+                        title={`Add ${preset.name}`}
+                      >
+                        <Plus size={11} />
+                        Add
+                      </button>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>

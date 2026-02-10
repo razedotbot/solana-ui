@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Download,
@@ -33,6 +34,19 @@ export const SelectionFooter: React.FC<SelectionFooterProps> = ({
   onMoveToGroup,
 }) => {
   const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const moveButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ bottom: number; right: number } | null>(null);
+
+  // Recalculate dropdown position when menu opens
+  useEffect(() => {
+    if (showMoveMenu && moveButtonRef.current) {
+      const rect = moveButtonRef.current.getBoundingClientRect();
+      setMenuPos({
+        bottom: window.innerHeight - rect.top + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [showMoveMenu]);
 
   if (selectedCount === 0) return null;
 
@@ -66,6 +80,7 @@ export const SelectionFooter: React.FC<SelectionFooterProps> = ({
               {groups.length > 1 && (
                 <div className="relative">
                   <button
+                    ref={moveButtonRef}
                     onClick={() => setShowMoveMenu(!showMoveMenu)}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-30 text-app-primary transition-all"
                   >
@@ -77,34 +92,44 @@ export const SelectionFooter: React.FC<SelectionFooterProps> = ({
                     />
                   </button>
 
-                  {showMoveMenu && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowMoveMenu(false)}
-                      />
-                      <div className="absolute bottom-full right-0 mb-2 z-20 bg-app-primary border border-app-primary-20 rounded-xl shadow-xl py-1.5 min-w-[160px]">
-                        {groups.map((group) => (
-                          <button
-                            key={group.id}
-                            onClick={() => {
-                              onMoveToGroup(group.id);
-                              setShowMoveMenu(false);
+                  {showMoveMenu &&
+                    createPortal(
+                      <>
+                        <div
+                          className="fixed inset-0 z-[9998]"
+                          onClick={() => setShowMoveMenu(false)}
+                        />
+                        {menuPos && (
+                          <div
+                            className="fixed z-[9999] bg-app-primary border border-app-primary-20 rounded-xl shadow-xl py-1.5 min-w-[160px]"
+                            style={{
+                              bottom: menuPos.bottom,
+                              right: menuPos.right,
                             }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-app-secondary-60 hover:text-app-primary hover:bg-app-quaternary transition-colors"
                           >
-                            {group.color && (
-                              <span
-                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: group.color }}
-                              />
-                            )}
-                            <span className="truncate">{group.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                            {groups.map((group) => (
+                              <button
+                                key={group.id}
+                                onClick={() => {
+                                  onMoveToGroup(group.id);
+                                  setShowMoveMenu(false);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-app-secondary-60 hover:text-app-primary hover:bg-app-quaternary transition-colors"
+                              >
+                                {group.color && (
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: group.color }}
+                                  />
+                                )}
+                                <span className="truncate">{group.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>,
+                      document.body,
+                    )}
                 </div>
               )}
 
