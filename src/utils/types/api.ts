@@ -19,7 +19,7 @@ export interface ApiResponse<T = unknown> {
  * Bundle result from Jito block engine
  * Used when sending transaction bundles through the backend proxy
  */
-export interface BundleResult {
+export interface SenderResult {
   jsonrpc: string;
   id: number;
   result?: string;

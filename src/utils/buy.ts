@@ -276,9 +276,9 @@ const executeBuyAllInOneMode = async (
     }
   });
 
-  const bundleResults = await Promise.allSettled(bundlePromises);
+  const senderResults = await Promise.allSettled(bundlePromises);
   const { success, results, successCount, failCount } =
-    processBatchResults(bundleResults);
+    processBatchResults(senderResults);
 
   return {
     success,
@@ -298,16 +298,14 @@ export const executeBuy = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyResult> => {
+  const appConfig = loadConfigFromCookies();
+  const bundleMode = config.bundleMode || "batch";
+  const inputMint =
+    config.inputMint ||
+    appConfig?.baseCurrencyMint ||
+    BASE_CURRENCIES.SOL.mint;
+
   try {
-    const appConfig = loadConfigFromCookies();
-    const bundleMode = config.bundleMode || "batch";
-
-    // Get the input mint for trade history
-    const inputMint =
-      config.inputMint ||
-      appConfig?.baseCurrencyMint ||
-      BASE_CURRENCIES.SOL.mint;
-
     let result: BuyResult;
     switch (bundleMode) {
       case "single":
@@ -337,11 +335,6 @@ export const executeBuy = async (
 
     return result;
   } catch (error) {
-    const appConfig = loadConfigFromCookies();
-    const inputMint =
-      config.inputMint ||
-      appConfig?.baseCurrencyMint ||
-      BASE_CURRENCIES.SOL.mint;
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error executing buy";
 
@@ -354,7 +347,7 @@ export const executeBuy = async (
       baseCurrencyMint: inputMint,
       success: false,
       error: errorMessage,
-      bundleMode: config.bundleMode || "batch",
+      bundleMode,
     });
 
     return { success: false, error: errorMessage };

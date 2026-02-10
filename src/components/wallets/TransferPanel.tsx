@@ -30,6 +30,8 @@ import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
 import type { WindowWithConfig } from "../../utils/trading";
 import { SourceWalletSummary } from "./SourceWalletSummary";
+import { filterAndSortWallets } from "./walletFilterUtils";
+import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
 
 interface TransferPanelProps {
   isOpen: boolean;
@@ -87,9 +89,9 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
   const [batchProcessing, setBatchProcessing] = useState(false);
 
   const [sourceSearchTerm, setSourceSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("address");
-  const [sortDirection, setSortDirection] = useState("asc");
-  const [balanceFilter, setBalanceFilter] = useState("all");
+  const [sortOption, setSortOption] = useState<SortOption>("address");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
 
   const [customTokenBalances, setCustomTokenBalances] = useState<
     Map<string, number>
@@ -486,8 +488,8 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
       tokenAddressInput !== tokenAddress;
     const hasBalanceData = isCustomToken ? balancesFetched : true;
 
-    // Filter based on transfer type and balance
-    let filtered = walletList.filter((wallet) => {
+    // Pre-filter based on transfer type and balance
+    const preFiltered = walletList.filter((wallet) => {
       if (transferType === "SOL") {
         return (getWalletBalance(wallet.address) || 0) > 0;
       } else {
@@ -499,57 +501,20 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
       }
     });
 
-    if (search) {
-      filtered = filtered.filter((wallet) =>
-        wallet.address.toLowerCase().includes(search.toLowerCase()),
-      );
-    }
+    // Use the appropriate balance getter based on transfer type
+    const balanceGetter =
+      transferType === "SOL"
+        ? (address: string) => getWalletBalance(address)
+        : (address: string) => getWalletTokenBalance(address);
 
-    if (balanceFilter !== "all") {
-      if (balanceFilter === "highBalance") {
-        if (transferType === "SOL") {
-          filtered = filtered.filter(
-            (wallet) => (getWalletBalance(wallet.address) || 0) >= 0.1,
-          );
-        } else {
-          filtered = filtered.filter(
-            (wallet) => (getWalletTokenBalance(wallet.address) || 0) >= 1000,
-          );
-        }
-      } else if (balanceFilter === "lowBalance") {
-        if (transferType === "SOL") {
-          filtered = filtered.filter(
-            (wallet) => (getWalletBalance(wallet.address) || 0) < 0.1,
-          );
-        } else {
-          filtered = filtered.filter(
-            (wallet) => (getWalletTokenBalance(wallet.address) || 0) < 1000,
-          );
-        }
-      }
-    }
-
-    // Finally, sort the wallets
-    return filtered.sort((a, b) => {
-      if (sortOption === "address") {
-        return sortDirection === "asc"
-          ? a.address.localeCompare(b.address)
-          : b.address.localeCompare(a.address);
-      } else if (sortOption === "balance") {
-        const balanceA =
-          transferType === "SOL"
-            ? getWalletBalance(a.address) || 0
-            : getWalletTokenBalance(a.address) || 0;
-        const balanceB =
-          transferType === "SOL"
-            ? getWalletBalance(b.address) || 0
-            : getWalletTokenBalance(b.address) || 0;
-        return sortDirection === "asc"
-          ? balanceA - balanceB
-          : balanceB - balanceA;
-      }
-      return 0;
-    });
+    return filterAndSortWallets(
+      preFiltered,
+      search,
+      balanceFilter,
+      sortOption,
+      sortDirection,
+      balanceGetter,
+    );
   };
 
   useEffect(() => {
@@ -884,7 +849,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                       <select
                         className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                         value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value)}
+                        onChange={(e) => setSortOption(e.target.value as SortOption)}
                       >
                         <option value="address">ADDRESS</option>
                         <option value="balance">BALANCE</option>

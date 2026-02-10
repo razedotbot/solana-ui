@@ -22,6 +22,8 @@ import { batchMixBaseCurrency, validateMixingInputs } from "../../utils/mixer";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { SourceWalletSummary } from "./SourceWalletSummary";
 import { BASE_CURRENCIES } from "../../utils/constants";
+import { filterAndSortWallets } from "./walletFilterUtils";
+import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
 
 type FundingMode = "distribute" | "mixer";
 
@@ -67,9 +69,9 @@ export const FundPanel: React.FC<FundPanelProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [senderSearchTerm, setSenderSearchTerm] = useState("");
   const [showInfoTip, setShowInfoTip] = useState(false);
-  const [sortOption, setSortOption] = useState("address");
-  const [sortDirection, setSortDirection] = useState("asc");
-  const [balanceFilter, setBalanceFilter] = useState("all");
+  const [sortOption, setSortOption] = useState<SortOption>("address");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
 
   const useExternalRecipients = inline && selectedWalletIds !== undefined;
 
@@ -343,46 +345,14 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     walletList: WalletType[],
     search: string,
   ): WalletType[] => {
-    let filtered = walletList;
-    if (search) {
-      filtered = filtered.filter((wallet) =>
-        wallet.address.toLowerCase().includes(search.toLowerCase()),
-      );
-    }
-
-    if (balanceFilter !== "all") {
-      if (balanceFilter === "nonZero") {
-        filtered = filtered.filter(
-          (wallet) => (getWalletBalance(wallet.address) || 0) > 0,
-        );
-      } else if (balanceFilter === "highBalance") {
-        filtered = filtered.filter(
-          (wallet) => (getWalletBalance(wallet.address) || 0) >= 0.1,
-        );
-      } else if (balanceFilter === "lowBalance") {
-        filtered = filtered.filter(
-          (wallet) =>
-            (getWalletBalance(wallet.address) || 0) < 0.1 &&
-            (getWalletBalance(wallet.address) || 0) > 0,
-        );
-      }
-    }
-
-    // Finally, sort the wallets
-    return filtered.sort((a, b) => {
-      if (sortOption === "address") {
-        return sortDirection === "asc"
-          ? a.address.localeCompare(b.address)
-          : b.address.localeCompare(a.address);
-      } else if (sortOption === "balance") {
-        const balanceA = getWalletBalance(a.address) || 0;
-        const balanceB = getWalletBalance(b.address) || 0;
-        return sortDirection === "asc"
-          ? balanceA - balanceB
-          : balanceB - balanceA;
-      }
-      return 0;
-    });
+    return filterAndSortWallets(
+      walletList,
+      search,
+      balanceFilter,
+      sortOption,
+      sortDirection,
+      (address) => getWalletBalance(address),
+    );
   };
 
   const formatAddress = (address: string): string => {
@@ -662,7 +632,7 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                     <select
                       className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                       value={sortOption}
-                      onChange={(e) => setSortOption(e.target.value)}
+                      onChange={(e) => setSortOption(e.target.value as SortOption)}
                     >
                       <option value="address">ADDRESS</option>
                       <option value="balance">BALANCE</option>
@@ -783,7 +753,7 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                     <select
                       className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus-border-primary modal-input- font-mono"
                       value={balanceFilter}
-                      onChange={(e) => setBalanceFilter(e.target.value)}
+                      onChange={(e) => setBalanceFilter(e.target.value as BalanceFilter)}
                     >
                       <option value="all">ALL</option>
                       <option value="nonZero">NON-ZERO</option>

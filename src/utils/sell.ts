@@ -102,8 +102,7 @@ const getPartiallyPreparedSellTransactions = async (
 
     if (!data.success) {
       throw new Error(
-        (data.error ? String(data.error) : undefined) ||
-          "Failed to get partially prepared transactions"
+        data.error || "Failed to get partially prepared transactions",
       );
     }
 
@@ -278,9 +277,9 @@ const executeSellAllInOneMode = async (
     }
   });
 
-  const bundleResults = await Promise.allSettled(bundlePromises);
+  const senderResults = await Promise.allSettled(bundlePromises);
   const { success, results, successCount, failCount } =
-    processBatchResults(bundleResults);
+    processBatchResults(senderResults);
 
   return {
     success,
@@ -300,16 +299,20 @@ export const executeSell = async (
   wallets: WalletSell[],
   sellConfig: SellConfig,
 ): Promise<SellResult> => {
+  const appConfig = loadConfigFromCookies();
+  const bundleMode = sellConfig.bundleMode || "batch";
+  const outputMint =
+    sellConfig.outputMint ||
+    appConfig?.baseCurrencyMint ||
+    BASE_CURRENCIES.SOL.mint;
+  const amount =
+    sellConfig.tokensAmount !== undefined
+      ? sellConfig.tokensAmount
+      : sellConfig.sellPercent;
+  const amountType: "base-currency" | "percentage" =
+    sellConfig.tokensAmount !== undefined ? "base-currency" : "percentage";
+
   try {
-    const config = loadConfigFromCookies();
-    const bundleMode = sellConfig.bundleMode || "batch";
-
-    // Get the output mint for trade history
-    const outputMint =
-      sellConfig.outputMint ||
-      config?.baseCurrencyMint ||
-      BASE_CURRENCIES.SOL.mint;
-
     let result: SellResult;
     switch (bundleMode) {
       case "single":
@@ -325,13 +328,6 @@ export const executeSell = async (
         throw new Error(`Invalid bundle mode: ${String(bundleMode)}`);
     }
 
-    const amount =
-      sellConfig.tokensAmount !== undefined
-        ? sellConfig.tokensAmount
-        : sellConfig.sellPercent;
-    const amountType: "base-currency" | "percentage" =
-      sellConfig.tokensAmount !== undefined ? "base-currency" : "percentage";
-
     addTradeHistory({
       type: "sell",
       tokenAddress: sellConfig.tokenAddress,
@@ -346,20 +342,8 @@ export const executeSell = async (
 
     return result;
   } catch (error) {
-    const config = loadConfigFromCookies();
-    const outputMint =
-      sellConfig.outputMint ||
-      config?.baseCurrencyMint ||
-      BASE_CURRENCIES.SOL.mint;
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error executing sell";
-
-    const amount =
-      sellConfig.tokensAmount !== undefined
-        ? sellConfig.tokensAmount
-        : sellConfig.sellPercent;
-    const amountType: "base-currency" | "percentage" =
-      sellConfig.tokensAmount !== undefined ? "base-currency" : "percentage";
 
     addTradeHistory({
       type: "sell",
@@ -370,7 +354,7 @@ export const executeSell = async (
       baseCurrencyMint: outputMint,
       success: false,
       error: errorMessage,
-      bundleMode: sellConfig.bundleMode || "batch",
+      bundleMode,
     });
 
     return { success: false, error: errorMessage };

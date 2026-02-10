@@ -22,6 +22,8 @@ import { BASE_CURRENCIES } from "../../utils/constants";
 import type { WindowWithConfig } from "../../utils/trading";
 import { MODAL_STYLES } from "../shared/modalStyles";
 import { SourceWalletSummary } from "./SourceWalletSummary";
+import { filterAndSortWallets } from "./walletFilterUtils";
+import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
 
 const STEPS_BURN_FULL = ["Token Address", "Select Source", "Burn Details", "Review"];
 const STEPS_BURN_SHORT = ["Token Address", "Burn Details", "Review"];
@@ -68,9 +70,9 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("address");
-  const [sortDirection, setSortDirection] = useState("asc");
-  const [balanceFilter, setBalanceFilter] = useState("all");
+  const [sortOption, setSortOption] = useState<SortOption>("address");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
   const [modalClass, setModalClass] = useState("");
   const [showInfoTip, setShowInfoTip] = useState(false);
   const [tokenBalancesForWallets, setTokenBalancesForWallets] = useState<
@@ -382,65 +384,23 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
     search: string,
   ): typeof wallets => {
     // First filter out wallets with zero token balance (only if token address is set AND balances have been fetched)
-    let filtered = walletList;
+    let preFiltered = walletList;
     if (tokenAddress && tokenBalancesForWallets.size > 0) {
-      filtered = walletList.filter(
+      preFiltered = walletList.filter(
         (wallet): boolean =>
           (tokenBalancesForWallets.get(wallet.address) || 0) > 0,
       );
     }
 
-    if (search) {
-      filtered = filtered.filter((wallet): boolean =>
-        wallet.address.toLowerCase().includes(search.toLowerCase()),
-      );
-    }
-
-    if (balanceFilter !== "all") {
-      if (balanceFilter === "nonZero") {
-        filtered = filtered.filter(
-          (wallet): boolean =>
-            (baseCurrencyBalances.get(wallet.address) || 0) > 0 ||
-            (tokenBalancesForWallets.get(wallet.address) || 0) > 0,
-        );
-      } else if (balanceFilter === "highBalance") {
-        filtered = filtered.filter(
-          (wallet): boolean =>
-            (baseCurrencyBalances.get(wallet.address) || 0) >= 0.1 ||
-            (tokenBalancesForWallets.get(wallet.address) || 0) >= 10,
-        );
-      } else if (balanceFilter === "lowBalance") {
-        filtered = filtered.filter(
-          (wallet): boolean =>
-            ((baseCurrencyBalances.get(wallet.address) || 0) < 0.1 &&
-              (baseCurrencyBalances.get(wallet.address) || 0) > 0) ||
-            ((tokenBalancesForWallets.get(wallet.address) || 0) < 10 &&
-              (tokenBalancesForWallets.get(wallet.address) || 0) > 0),
-        );
-      }
-    }
-
-    // Finally, sort the wallets
-    return filtered.sort((a, b): number => {
-      if (sortOption === "address") {
-        return sortDirection === "asc"
-          ? a.address.localeCompare(b.address)
-          : b.address.localeCompare(a.address);
-      } else if (sortOption === "balance") {
-        const balanceA = baseCurrencyBalances.get(a.address) || 0;
-        const balanceB = baseCurrencyBalances.get(b.address) || 0;
-        return sortDirection === "asc"
-          ? balanceA - balanceB
-          : balanceB - balanceA;
-      } else if (sortOption === "tokenBalance") {
-        const tokenBalanceA = tokenBalancesForWallets.get(a.address) || 0;
-        const tokenBalanceB = tokenBalancesForWallets.get(b.address) || 0;
-        return sortDirection === "asc"
-          ? tokenBalanceA - tokenBalanceB
-          : tokenBalanceB - tokenBalanceA;
-      }
-      return 0;
-    });
+    return filterAndSortWallets(
+      preFiltered,
+      search,
+      balanceFilter,
+      sortOption,
+      sortDirection,
+      (address) => baseCurrencyBalances.get(address) || 0,
+      (address) => tokenBalancesForWallets.get(address) || 0,
+    );
   };
 
   useEffect(() => {
@@ -454,7 +414,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
   }, []);
 
   // If modal is not open, don't render anything
-  if (!isOpen && !inline) return null;
+  if (!isOpen) return null;
 
   const modalContent = (
       <div className={inline ? "relative flex flex-col h-full overflow-hidden" : "relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-2xl overflow-hidden transform modal-content"}>
@@ -664,7 +624,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
                   <select
                     className="bg-app-tertiary border border-app-primary-30 rounded-lg px-3 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                     value={sortOption}
-                    onChange={(e) => setSortOption(e.target.value)}
+                    onChange={(e) => setSortOption(e.target.value as SortOption)}
                   >
                     <option value="address">ADDRESS</option>
                     <option value="balance">{baseCurrency.symbol} BAL</option>
@@ -686,7 +646,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
                   <select
                     className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg p-2 text-sm text-app-primary focus:outline-none focus-border-primary transition-all modal-input- font-mono"
                     value={balanceFilter}
-                    onChange={(e) => setBalanceFilter(e.target.value)}
+                    onChange={(e) => setBalanceFilter(e.target.value as BalanceFilter)}
                   >
                     <option value="all">ALL WALLETS</option>
                     <option value="nonZero">NON-ZERO BALANCE</option>

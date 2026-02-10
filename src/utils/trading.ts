@@ -3,7 +3,7 @@ import bs58 from "bs58";
 import type { WalletType } from "./types";
 import { loadConfigFromCookies } from "./storage";
 import { TRADING, RATE_LIMIT, BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
-import type { BundleResult } from "./types";
+import type { SenderResult } from "./types";
 import { executeBuy, createBuyConfig } from "./buy";
 import type { BundleMode } from "./buy";
 import { executeSell, createSellConfig } from "./sell";
@@ -32,7 +32,7 @@ export interface TransactionBundle {
 
 export interface BatchResult {
   success: boolean;
-  results: BundleResult[];
+  results: SenderResult[];
   successCount: number;
   failCount: number;
 }
@@ -290,16 +290,16 @@ export const getFeeLamports = (
  * Process batch results and return summary
  */
 export const processBatchResults = (
-  bundleResults: PromiseSettledResult<{
+  senderResults: PromiseSettledResult<{
     success: boolean;
-    result?: BundleResult;
+    result?: SenderResult;
   }>[],
 ): BatchResult => {
-  const results: BundleResult[] = [];
+  const results: SenderResult[] = [];
   let successCount = 0;
   let failCount = 0;
 
-  bundleResults.forEach((result, _index) => {
+  senderResults.forEach((result, _index) => {
     if (result.status === "fulfilled") {
       if (result.value.success) {
         if (result.value.result) results.push(result.value.result);

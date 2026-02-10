@@ -22,6 +22,8 @@ import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
 import { MODAL_STYLES } from "../shared/modalStyles";
 import { SourceWalletSummary } from "./SourceWalletSummary";
+import { filterAndSortWallets } from "./walletFilterUtils";
+import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
 
 interface ConsolidatePanelProps {
   isOpen: boolean;
@@ -56,9 +58,9 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
   const [sourceSearchTerm, setSourceSearchTerm] = useState("");
   const [recipientSearchTerm, setRecipientSearchTerm] = useState("");
   const [showInfoTip, setShowInfoTip] = useState(false);
-  const [sortOption, setSortOption] = useState("address");
-  const [sortDirection, setSortDirection] = useState("asc");
-  const [balanceFilter, setBalanceFilter] = useState("all");
+  const [sortOption, setSortOption] = useState<SortOption>("address");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
 
   const useExternalSource = inline && selectedWalletIds !== undefined;
 
@@ -231,40 +233,14 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
     walletList: WalletType[],
     search: string,
   ): WalletType[] => {
-    let filtered = walletList;
-    if (search) {
-      filtered = filtered.filter((wallet) =>
-        wallet.address.toLowerCase().includes(search.toLowerCase()),
-      );
-    }
-
-    if (balanceFilter !== "all") {
-      if (balanceFilter === "highBalance") {
-        filtered = filtered.filter(
-          (wallet) => (getWalletBalance(wallet.address) || 0) >= 0.1,
-        );
-      } else if (balanceFilter === "lowBalance") {
-        filtered = filtered.filter(
-          (wallet) => (getWalletBalance(wallet.address) || 0) < 0.1,
-        );
-      }
-    }
-
-    // Finally, sort the wallets
-    return filtered.sort((a, b) => {
-      if (sortOption === "address") {
-        return sortDirection === "asc"
-          ? a.address.localeCompare(b.address)
-          : b.address.localeCompare(a.address);
-      } else if (sortOption === "balance") {
-        const balanceA = getWalletBalance(a.address) || 0;
-        const balanceB = getWalletBalance(b.address) || 0;
-        return sortDirection === "asc"
-          ? balanceA - balanceB
-          : balanceB - balanceA;
-      }
-      return 0;
-    });
+    return filterAndSortWallets(
+      walletList,
+      search,
+      balanceFilter,
+      sortOption,
+      sortDirection,
+      (address) => getWalletBalance(address),
+    );
   };
 
   useEffect(() => {
@@ -377,7 +353,7 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
                       <select
                         className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                         value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value)}
+                        onChange={(e) => setSortOption(e.target.value as SortOption)}
                       >
                         <option value="address">ADDRESS</option>
                         <option value="balance">BALANCE</option>
@@ -506,7 +482,7 @@ export const ConsolidatePanel: React.FC<ConsolidatePanelProps> = ({
                       <select
                         className="bg-app-tertiary border border-app-primary-30 rounded-lg px-2 text-sm text-app-primary focus:outline-none focus:border-app-primary modal-input- font-mono"
                         value={balanceFilter}
-                        onChange={(e) => setBalanceFilter(e.target.value)}
+                        onChange={(e) => setBalanceFilter(e.target.value as BalanceFilter)}
                       >
                         <option value="all">ALL</option>
                         <option value="highBalance">HIGH</option>

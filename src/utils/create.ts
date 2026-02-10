@@ -1,23 +1,23 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
-import type { BundleResult as SharedBundleResult } from "./types";
-import { API_ENDPOINTS } from "./constants";
-import { getServerBaseUrl, splitLargeBundles } from "./trading";
+import type { SenderResult as SharedSenderResult } from "./types";
+import { API_ENDPOINTS, CREATE_CONFIG, OPERATION_DELAYS } from "./constants";
+import { getServerBaseUrl, splitLargeBundles, createKeypairs } from "./trading";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const MAX_RETRY_ATTEMPTS = 50;
-const MAX_CONSECUTIVE_ERRORS = 3;
-const BASE_RETRY_DELAY = 200;
+const MAX_RETRY_ATTEMPTS = CREATE_CONFIG.MAX_RETRY_ATTEMPTS;
+const MAX_CONSECUTIVE_ERRORS = CREATE_CONFIG.MAX_CONSECUTIVE_ERRORS;
+const BASE_RETRY_DELAY = CREATE_CONFIG.BASE_RETRY_DELAY_MS;
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type BundleResult = SharedBundleResult;
+type SenderResult = SharedSenderResult;
 
 export type PlatformType = "pumpfun" | "bonk" | "meteoraDBC" | "meteoraCPAMM";
 
@@ -95,14 +95,14 @@ export interface StageResult {
   error?: string;
 }
 
-interface SendBundleResult {
+interface SendSenderResult {
   success: boolean;
-  result?: BundleResult;
+  result?: SenderResult;
   bundleId?: string;
   error?: string;
 }
 
-interface BundleResultWithId extends BundleResult {
+interface SenderResultWithId extends SenderResult {
   jito?: string;
   bundleId?: string;
 }
@@ -137,7 +137,7 @@ interface PartiallyPreparedResponse {
 // ============================================================================
 
 const getRetryDelay = (attempt: number): number => {
-  const jitter = 0.85 + Math.random() * 0.3;
+  const jitter = CREATE_CONFIG.JITTER_MIN + Math.random() * CREATE_CONFIG.JITTER_RANGE;
   return Math.floor(BASE_RETRY_DELAY * Math.pow(1.5, attempt) * jitter);
 };
 
@@ -147,12 +147,12 @@ const getRetryDelay = (attempt: number): number => {
  */
 const sendTransactionsWithResult = async (
   transactions: string[],
-): Promise<SendBundleResult> => {
+): Promise<SendSenderResult> => {
   try {
     const result = await sendTransactions(transactions);
 
     // Extract bundle ID from result
-    const resultWithId = result as BundleResultWithId | undefined;
+    const resultWithId = result as SenderResultWithId | undefined;
     const bundleId = resultWithId?.jito || resultWithId?.bundleId;
 
     return {
@@ -173,8 +173,8 @@ const sendTransactionsWithResult = async (
  */
 const waitForLutActivation = async (): Promise<void> => {
 
-  // Always wait exactly 5 seconds instead of using bundle-status to confirm LUT transaction
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  // Always wait for LUT activation instead of using bundle-status to confirm LUT transaction
+  await new Promise((resolve) => setTimeout(resolve, CREATE_CONFIG.LUT_ACTIVATION_WAIT_MS));
 
 };
 
@@ -183,7 +183,7 @@ const waitForLutActivation = async (): Promise<void> => {
  */
 const sendFirstBundle = async (
   transactions: string[],
-): Promise<SendBundleResult> => {
+): Promise<SendSenderResult> => {
   let attempt = 0;
   let consecutiveErrors = 0;
 
@@ -509,7 +509,7 @@ const executeAdvancedModeCreate = async (
 
     // Small delay between stages
     if (i < stages.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, OPERATION_DELAYS.STAGE_DELAY_MS));
     }
   }
 
@@ -551,9 +551,7 @@ export const executeCreate = async (
     } = await getPartiallyPreparedTransactions(wallets, config);
 
     // Create keypairs from private keys
-    const walletKeypairs = wallets.map((wallet) =>
-      Keypair.fromSecretKey(bs58.decode(wallet.privateKey)),
-    );
+    const walletKeypairs = createKeypairs(wallets);
 
     // Create mint keypair if provided (for advanced mode)
     let mintKeypair: Keypair | null = null;
@@ -611,22 +609,22 @@ export const executeCreate = async (
     }
 
     // Send bundles
-    const firstBundleResult = await sendFirstBundle(
+    const firstSenderResult = await sendFirstBundle(
       validSignedBundles[0].transactions,
     );
 
-    if (!firstBundleResult.success) {
+    if (!firstSenderResult.success) {
       return {
         success: false,
         mintAddress: mint,
-        error: `First bundle failed: ${firstBundleResult.error || "Unknown error"}`,
+        error: `First bundle failed: ${firstSenderResult.error || "Unknown error"}`,
       };
     }
 
 
     // Send remaining bundles
-    const results: BundleResult[] = firstBundleResult.result
-      ? [firstBundleResult.result]
+    const results: SenderResult[] = firstSenderResult.result
+      ? [firstSenderResult.result]
       : [];
     let successCount = 1;
     let failureCount = 0;

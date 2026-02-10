@@ -29,17 +29,17 @@ export interface Toast {
 }
 
 /**
- * Tab configuration for preset tabs
+ * Tab configuration for trading preset tabs
  */
 export interface PresetTab {
   /** Unique identifier */
   id: string;
-  /** Display name */
-  name: string;
-  /** Tab configuration */
-  config?: Record<string, unknown>;
-  /** Whether the tab is active */
-  isActive?: boolean;
+  /** Display label */
+  label: string;
+  /** Buy preset amounts (SOL values) */
+  buyPresets: string[];
+  /** Sell preset amounts (percentage values) */
+  sellPresets: string[];
 }
 
 

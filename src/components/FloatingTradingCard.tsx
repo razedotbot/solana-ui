@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, X, Move, Edit3, Check } from "lucide-react";
+import { X, Move, Edit3, Check } from "lucide-react";
 import { toggleWallet } from "../utils/wallet";
 import { saveWalletsToCookies } from "../utils/storage";
 import WalletSelectorPopup from "./WalletSelectorPopup";
-import type { WalletType } from "../utils/types";
+import PresetButton from "./shared/PresetButton";
+import TabButton from "./shared/TabButton";
+import { loadPresetsFromCookies, savePresetsToCookies } from "./shared/presetTabsUtils";
+import type { WalletType, PresetTab } from "../utils/types";
 
 // Hook to detect mobile viewport
 const useIsMobile = (): boolean => {
@@ -22,177 +25,6 @@ const useIsMobile = (): boolean => {
 
   return isMobile;
 };
-
-interface PresetButtonProps {
-  value: string;
-  onExecute: (amount: string) => void;
-  onChange: (newValue: string) => void;
-  isLoading: boolean;
-  variant?: "buy" | "sell";
-  isEditMode: boolean;
-}
-
-// Preset Button component
-const PresetButton = React.memo<PresetButtonProps>(
-  ({ value, onExecute, onChange, isLoading, variant = "buy", isEditMode }) => {
-    const [editValue, setEditValue] = useState(value);
-    const inputRef = useRef(null);
-
-    useEffect(() => {
-      setEditValue(value);
-    }, [value]);
-
-    useEffect(() => {
-      if (isEditMode && inputRef.current) {
-        (inputRef.current as HTMLInputElement)?.focus();
-      }
-    }, [isEditMode]);
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-      if (e.key === "Enter") {
-        const newValue = parseFloat(editValue);
-        if (!isNaN(newValue) && newValue > 0) {
-          onChange(newValue.toString());
-        }
-      } else if (e.key === "Escape") {
-        setEditValue(value);
-      }
-    };
-
-    const handleBlur = (): void => {
-      const newValue = parseFloat(editValue);
-      if (!isNaN(newValue) && newValue > 0) {
-        onChange(newValue.toString());
-      } else {
-        setEditValue(value);
-      }
-    };
-
-    if (isEditMode) {
-      return (
-        <div className="relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={editValue}
-            onChange={(e) =>
-              setEditValue(e.target.value.replace(/[^0-9.]/g, ""))
-            }
-            onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
-            className="w-full h-8 px-2 text-xs font-mono rounded border text-center
-                   bg-app-primary text-app-primary border-app-primary
-                   focus:outline-none focus:ring-1 focus:ring-app-primary-40"
-          />
-        </div>
-      );
-    }
-
-    return (
-      <button
-        onClick={() => onExecute(value)}
-        className={`relative group px-3 py-3 md:px-2 md:py-1.5 text-sm md:text-xs font-mono rounded border transition-all duration-200
-                min-w-[48px] min-h-[48px] md:min-h-[32px] h-auto md:h-8 flex items-center justify-center
-                ${
-                  variant === "buy"
-                    ? "bg-app-primary-60 border-app-primary-40 color-primary hover:bg-primary-20 hover-border-primary"
-                    : "bg-app-primary-60 border-error-alt-40 text-error-alt hover:bg-error-20 hover:border-error-alt"
-                }`}
-      >
-        {isLoading ? (
-          <div className="flex items-center gap-1">
-            <Loader2 size={10} className="animate-spin" />
-            <span>{value}</span>
-          </div>
-        ) : (
-          value
-        )}
-      </button>
-    );
-  },
-);
-PresetButton.displayName = "PresetButton";
-
-interface TabButtonProps {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  onEdit: (newLabel: string) => void;
-  isEditMode: boolean;
-}
-
-// Tab Button component
-const TabButton = React.memo<TabButtonProps>(
-  ({ label, isActive, onClick, onEdit, isEditMode }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(label);
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-      if (isEditing && inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
-    }, [isEditing]);
-
-    const handleEdit = (): void => {
-      if (isEditMode) {
-        setIsEditing(true);
-        setEditValue(label);
-      }
-    };
-
-    const handleSave = (): void => {
-      if (editValue.trim()) {
-        onEdit(editValue.trim());
-      }
-      setIsEditing(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-      if (e.key === "Enter") {
-        handleSave();
-      } else if (e.key === "Escape") {
-        setEditValue(label);
-        setIsEditing(false);
-      }
-    };
-
-    if (isEditing) {
-      return (
-        <div className="flex-1">
-          <input
-            ref={inputRef}
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={handleSave}
-            className="w-full px-2 py-1 text-xs font-mono rounded
-                   bg-app-primary text-app-primary border border-app-primary
-                   focus:outline-none focus:ring-1 focus:ring-app-primary-40"
-          />
-        </div>
-      );
-    }
-
-    return (
-      <button
-        onClick={isEditMode ? handleEdit : onClick}
-        className={`flex-1 px-3 py-1.5 text-xs font-mono rounded transition-all duration-200
-                ${
-                  isActive
-                    ? "bg-primary-20 border border-app-primary color-primary"
-                    : "bg-app-primary-60 border border-app-primary-20 text-app-secondary-60 hover-border-primary-40 hover:text-app-secondary"
-                }
-                ${isEditMode ? "cursor-text" : "cursor-pointer"}`}
-      >
-        {label}
-      </button>
-    );
-  },
-);
-TabButton.displayName = "TabButton";
 
 interface FloatingTradingCardProps {
   isOpen: boolean;
@@ -301,90 +133,6 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
     saveWalletsToCookies(updatedWallets);
   };
 
-  interface PresetTab {
-    id: string;
-    label: string;
-    buyPresets: string[];
-    sellPresets: string[];
-  }
-
-  // Default preset tabs
-  const defaultPresetTabs: PresetTab[] = [
-    {
-      id: "degen",
-      label: "DEGEN",
-      buyPresets: ["0.01", "0.05", "0.1", "0.5"],
-      sellPresets: ["25", "50", "75", "100"],
-    },
-    {
-      id: "diamond",
-      label: "DIAMOND",
-      buyPresets: ["0.001", "0.01", "0.05", "0.1"],
-      sellPresets: ["10", "25", "50", "75"],
-    },
-    {
-      id: "yolo",
-      label: "YOLO",
-      buyPresets: ["0.1", "0.5", "1", "5"],
-      sellPresets: ["50", "75", "90", "100"],
-    },
-  ];
-
-  // Load presets from cookies
-  const loadPresetsFromCookies = (): {
-    tabs: PresetTab[];
-    activeTabId: string;
-  } => {
-    try {
-      const savedPresets = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("tradingPresets="))
-        ?.split("=")[1];
-
-      if (savedPresets) {
-        const decoded = decodeURIComponent(savedPresets);
-        const parsed = JSON.parse(decoded) as {
-          tabs?: unknown;
-          activeTabId?: string;
-        };
-        return {
-          tabs: Array.isArray(parsed.tabs)
-            ? (parsed.tabs as PresetTab[])
-            : defaultPresetTabs,
-          activeTabId:
-            typeof parsed.activeTabId === "string"
-              ? parsed.activeTabId
-              : "degen",
-        };
-      }
-    } catch {
-      // Invalid JSON, use defaults
-    }
-    return {
-      tabs: defaultPresetTabs,
-      activeTabId: "degen",
-    };
-  };
-
-  // Save presets to cookies
-  const savePresetsToCookies = useCallback(
-    (tabs: PresetTab[], activeTabId: string): void => {
-      try {
-        const presetsData = {
-          tabs,
-          activeTabId,
-        };
-        const encoded = encodeURIComponent(JSON.stringify(presetsData));
-        const expires = new Date();
-        expires.setFullYear(expires.getFullYear() + 1); // 1 year expiry
-        document.cookie = `tradingPresets=${encoded}; expires=${expires.toUTCString()}; path=/`;
-      } catch {
-        // Cookie save error, ignore
-      }
-    },
-    [],
-  );
-
   // Initialize presets from cookies
   const initialPresets = loadPresetsFromCookies();
   const [presetTabs, setPresetTabs] = useState<PresetTab[]>(
@@ -400,7 +148,8 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   // Save presets to cookies whenever they change
   useEffect(() => {
     savePresetsToCookies(presetTabs, activeTabId);
-  }, [presetTabs, activeTabId, savePresetsToCookies]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetTabs, activeTabId]);
 
   // Handle tab switching with cookie save
   const handleTabSwitch = (tabId: string): void => {
@@ -660,7 +409,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                       isLoading={isLoading}
                       variant="buy"
                       isEditMode={isEditMode}
-
+                      isMobile
                     />
                   ))}
                 </div>
@@ -690,7 +439,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                         isLoading={isLoading}
                         variant="sell"
                         isEditMode={isEditMode}
-  
+                        isMobile
                       />
                     ),
                   )}

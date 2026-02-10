@@ -13,7 +13,7 @@
 
 export type {
   ApiResponse,
-  BundleResult,
+  SenderResult,
   ServerInfo,
   WindowWithToast,
 } from "./api";

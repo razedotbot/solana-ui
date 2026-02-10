@@ -1,4 +1,4 @@
-import type { ApiResponse, BundleResult } from "./types";
+import type { ApiResponse, SenderResult } from "./types";
 import { API_ENDPOINTS } from "./constants";
 
 // Intentional inline getBaseUrl — cannot import from trading.ts due to circular dependency
@@ -13,7 +13,7 @@ const getBaseUrl = (): string =>
  */
 export const sendTransactions = async (
   transactions: string[],
-): Promise<BundleResult> => {
+): Promise<SenderResult> => {
   const baseUrl = getBaseUrl();
   const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_SEND}`;
 
@@ -25,7 +25,7 @@ export const sendTransactions = async (
     body: JSON.stringify({ transactions }),
   });
 
-  const result = (await response.json()) as ApiResponse<BundleResult>;
+  const result = (await response.json()) as ApiResponse<SenderResult>;
 
   if (!result.success) {
     const errorMessage = result.error || "Unknown error sending transactions";
@@ -33,5 +33,5 @@ export const sendTransactions = async (
     throw new Error(`${errorMessage}${errorDetails}`);
   }
 
-  return result.result as BundleResult;
+  return result.result as SenderResult;
 };

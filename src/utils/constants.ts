@@ -243,6 +243,23 @@ export const PROFILE_DEFAULTS = {
   },
 } as const;
 
+// Operation Delays (consolidate, distribute, mixer)
+export const OPERATION_DELAYS = {
+  INTER_BUNDLE_MS: 500,
+  BATCH_INTERVAL_MS: 3000,
+  STAGE_DELAY_MS: 1000,
+} as const;
+
+// Token Creation Constants
+export const CREATE_CONFIG = {
+  MAX_RETRY_ATTEMPTS: 50,
+  MAX_CONSECUTIVE_ERRORS: 3,
+  BASE_RETRY_DELAY_MS: 200,
+  LUT_ACTIVATION_WAIT_MS: 5000,
+  JITTER_MIN: 0.85,
+  JITTER_RANGE: 0.3,
+} as const;
+
 // Encryption
 export const ENCRYPTION = {
   KEY: "raze-bot-wallet-encryption-key",

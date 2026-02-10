@@ -31,6 +31,7 @@ let db: IDBDatabase | null = null;
 const request = indexedDB.open(DB_NAME, DB_VERSION);
 
 request.onerror = (): void => {
+  // IndexedDB unavailable — wallet data falls back to localStorage/cookies
 };
 
 request.onsuccess = (): void => {

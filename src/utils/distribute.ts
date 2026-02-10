@@ -1,9 +1,10 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { sendTransactions } from "./transactionService";
-import type { BundleResult } from "./types";
-import { BASE_CURRENCIES, API_ENDPOINTS, type BaseCurrencyConfig } from "./constants";
-import { getServerBaseUrl, resolveBaseCurrency, prepareTransactionBundles } from "./trading";
+import type { SenderResult } from "./types";
+import { BASE_CURRENCIES, API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
+import { parseTransactionArray, type RawTransactionResponse } from "./transactionParsing";
+import { getServerBaseUrl, checkRateLimit, resolveBaseCurrency, prepareTransactionBundles } from "./trading";
 
 interface WalletDistribution {
   address: string;
@@ -48,12 +49,7 @@ const getPartiallySignedTransactions = async (
     throw new Error(`HTTP error! Status: ${response.status}`);
   }
 
-  const data = (await response.json()) as {
-    success: boolean;
-    error?: string;
-    transactions?: string[];
-    data?: { transactions?: string[] };
-  };
+  const data = (await response.json()) as RawTransactionResponse;
 
   if (!data.success) {
     throw new Error(
@@ -61,16 +57,7 @@ const getPartiallySignedTransactions = async (
     );
   }
 
-  // Handle different response formats
-  const transactions =
-    (data as unknown as { data?: { transactions?: string[] } }).data
-      ?.transactions || data.transactions;
-
-  if (!transactions || !Array.isArray(transactions)) {
-    throw new Error("No transactions returned from backend");
-  }
-
-  return transactions; // Array of base58 encoded partially signed transactions
+  return parseTransactionArray(data);
 };
 
 /**
@@ -157,15 +144,16 @@ export const distributeBaseCurrency = async (
     );
 
     // Step 5: Send bundles
-    const results: BundleResult[] = [];
+    const results: SenderResult[] = [];
     for (let i = 0; i < distributionBundles.length; i++) {
       const bundle = distributionBundles[i];
+      await checkRateLimit();
       const result = await sendTransactions(bundle.transactions);
       results.push(result);
 
       // Add delay between bundles (except after the last one)
       if (i < distributionBundles.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 500)); // 500ms delay
+        await new Promise((resolve) => setTimeout(resolve, OPERATION_DELAYS.INTER_BUNDLE_MS));
       }
     }
 
@@ -291,7 +279,7 @@ export const batchDistributeBaseCurrency = async (
 
       // Add delay between batches (except after the last one)
       if (i < batches.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 3000)); // 3 second delay between batches
+        await new Promise((resolve) => setTimeout(resolve, OPERATION_DELAYS.BATCH_INTERVAL_MS));
       }
     }
 

@@ -96,3 +96,33 @@ export const parseTransactionBundles = (
 
   throw new Error("No transactions returned from backend");
 };
+
+/**
+ * Parse a backend response into a flat array of transaction strings.
+ *
+ * Used by consolidate / distribute / mixer which expect a simple
+ * string[] rather than bundled TransactionBundleData[].
+ *
+ * Resolution order:
+ *  1. `data.data.transactions`
+ *  2. `data.transactions`
+ */
+export const parseTransactionArray = (
+  data: RawTransactionResponse,
+): string[] => {
+  if (data.data && typeof data.data === "object" && data.data !== null) {
+    const responseData = data.data as { transactions?: string[] };
+    if (
+      responseData.transactions &&
+      Array.isArray(responseData.transactions)
+    ) {
+      return responseData.transactions;
+    }
+  }
+
+  if (data.transactions && Array.isArray(data.transactions)) {
+    return data.transactions;
+  }
+
+  throw new Error("No transactions returned from backend");
+};
