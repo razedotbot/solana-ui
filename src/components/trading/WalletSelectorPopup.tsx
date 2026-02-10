@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Check, RefreshCw } from "lucide-react";
-import { getWalletDisplayName } from "../utils/wallet";
-import { formatTokenBalance, formatBaseCurrencyBalance } from "../utils/formatting";
-import type { WalletType } from "../utils/types";
-import { DEFAULT_GROUP_ID } from "../utils/types";
-import { BASE_CURRENCIES, type BaseCurrencyConfig } from "../utils/constants";
-import { useAppContext } from "../contexts";
-import { loadWalletGroups, saveWalletsToCookies } from "../utils/storage";
-import { useActiveWalletGroup } from "../utils/hooks";
-import { GroupSelector } from "./wallets/GroupSelector";
+import { getWalletDisplayName } from "../../utils/wallet";
+import { formatTokenBalance, formatBaseCurrencyBalance } from "../../utils/formatting";
+import type { WalletType } from "../../utils/types";
+import { DEFAULT_GROUP_ID } from "../../utils/types";
+import { BASE_CURRENCIES, type BaseCurrencyConfig } from "../../utils/constants";
+import { useAppContext } from "../../contexts";
+import { loadWalletGroups, saveWalletsToCookies } from "../../utils/storage";
+import { useActiveWalletGroup } from "../../utils/hooks";
+import { GroupSelector } from "../wallets/GroupSelector";
 
 interface WalletSelectorPopupProps {
   wallets: WalletType[];

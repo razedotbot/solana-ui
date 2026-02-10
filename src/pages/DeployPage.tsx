@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "../contexts";
-import { HorizontalHeader } from "../components/HorizontalHeader";
+import { HorizontalHeader } from "../components/Header";
 import { PageBackground } from "../components/PageBackground";
 import { Rocket, ChevronRight } from "lucide-react";
 import { useToast } from "../utils/hooks";

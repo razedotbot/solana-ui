@@ -5,7 +5,7 @@ import { brand } from "../../utils/brandConfig";
 import { executeTrade } from "../../utils/trading";
 import { useToast } from "../../utils/hooks/useToast";
 import { countActiveWallets } from "../../utils/wallet";
-import FloatingTradingCard from "../FloatingTradingCard";
+import FloatingTradingCard from "../trading/FloatingTradingCard";
 import type { WalletType } from "../../utils/types";
 import { MONITOR_SLOT } from "./constants";
 

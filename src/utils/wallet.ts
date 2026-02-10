@@ -311,32 +311,6 @@ export async function fetchBaseCurrencyBalance(
 }
 
 /**
- * Refresh a wallet's token balance.
- */
-export async function refreshWalletBalance(
-  wallet: WalletType,
-  connection: Connection,
-  tokenAddress?: string,
-): Promise<WalletType> {
-  try {
-    if (!tokenAddress) return wallet;
-
-    const tokenBalance = await fetchTokenBalance(
-      connection,
-      wallet.address,
-      tokenAddress,
-    );
-
-    return {
-      ...wallet,
-      tokenBalance: tokenBalance,
-    };
-  } catch {
-    return wallet;
-  }
-}
-
-/**
  * Options for balance refresh.
  */
 export interface BalanceRefreshOptions {

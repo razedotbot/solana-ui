@@ -40,7 +40,3 @@ export function decryptData(encryptedData: string): string {
     throw new Error('Failed to decrypt data');
   }
 }
-
-// Aliases for backward compatibility
-export const encryptWalletData = encryptData;
-export const decryptWalletData = decryptData;

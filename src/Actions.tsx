@@ -14,9 +14,9 @@ import type { BaseCurrencyConfig } from "./utils/constants";
 import { useToast } from "./utils/hooks";
 import { countActiveWallets, filterActiveWallets, toggleWallet } from "./utils/wallet";
 import { saveWalletsToCookies } from "./utils/storage";
-import FloatingTradingCard from "./components/FloatingTradingCard";
-import TradingCard from "./components/TradingForm";
-import WalletSelectorPopup from "./components/WalletSelectorPopup";
+import FloatingTradingCard from "./components/trading/FloatingTradingCard";
+import TradingCard from "./components/trading/TradingForm";
+import WalletSelectorPopup from "./components/trading/WalletSelectorPopup";
 import { PageBackground } from "./components/PageBackground";
 import { getLatestTrades, type TradeHistoryEntry } from "./utils/trading";
 

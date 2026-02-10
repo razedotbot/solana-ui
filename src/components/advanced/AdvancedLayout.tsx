@@ -19,7 +19,6 @@ import { useWalletGroups, useActiveWalletGroup } from "../../utils/hooks";
 // Left column view type
 type LeftColumnView = "wallets" | "deploy";
 import { brand } from "../../utils/brandConfig";
-import logo from "../../logo.png";
 import Split from "../Split";
 import type { WalletType, IframeData, WalletCategory, CategoryQuickTradeSettings } from "../../utils/types";
 import type { ViewMode } from "../../utils/storage";
@@ -536,7 +535,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
               className="hover:scale-105 active:scale-95 transition-transform"
             >
               <img
-                src={logo}
+                src="/logo.png"
                 alt={brand.altText}
                 className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
               />

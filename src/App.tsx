@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { brand } from "./utils/brandConfig";
 import type { Connection } from "@solana/web3.js";
-import logo from "./logo.png";
 import { initStyles } from "./components/Styles";
 import { fetchWalletBalances } from "./utils/wallet";
 import { saveWalletsToCookies } from "./utils/storage";
@@ -1254,7 +1253,7 @@ const WalletManager: React.FC = () => {
                         className="hover:scale-105 active:scale-95 transition-transform"
                       >
                         <img
-                          src={logo}
+                          src="/logo.png"
                           alt={brand.altText}
                           className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
                         />

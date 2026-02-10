@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { HorizontalHeader } from "../components/HorizontalHeader";
+import { HorizontalHeader } from "../components/Header";
 import bs58 from "bs58";
 import type {
   WalletType,
@@ -43,7 +43,8 @@ import {
   FilterTabs,
   SelectionFooter,
   OperationEmptyState,
-  FundPanel,
+  DistributePanel,
+  MixerPanel,
   ConsolidatePanel,
   TransferPanel,
   FeeClaimPanel,
@@ -1244,15 +1245,25 @@ export const WalletsPage: React.FC = () => {
           <div className={`w-full md:w-1/2 flex flex-col min-h-0 overflow-hidden ${mobileTab === "operations" ? "flex" : "hidden md:flex"}`}>
             {activeModal && connection ? (
               <>
-                {(activeModal === "distribute" || activeModal === "mixer") && (
-                  <FundPanel
+                {activeModal === "distribute" && (
+                  <DistributePanel
                     isOpen={true}
                     inline={true}
                     onClose={() => setActiveModal(null)}
                     wallets={wallets}
                     baseCurrencyBalances={baseCurrencyBalances}
                     connection={connection}
-                    initialMode={activeModal === "mixer" ? "mixer" : "distribute"}
+                    selectedWalletIds={selectedWallets}
+                  />
+                )}
+                {activeModal === "mixer" && (
+                  <MixerPanel
+                    isOpen={true}
+                    inline={true}
+                    onClose={() => setActiveModal(null)}
+                    wallets={wallets}
+                    baseCurrencyBalances={baseCurrencyBalances}
+                    connection={connection}
                     selectedWalletIds={selectedWallets}
                   />
                 )}

@@ -14,7 +14,7 @@ import { Interactive3DLogo } from '../components/InteractiveLogo';
 import { getRecentTokens, clearRecentTokens, formatTimeAgo, removeRecentToken } from '../utils/recentTokens';
 import type { RecentToken } from '../utils/types';
 import { formatAddress } from '../utils/formatting';
-import { HorizontalHeader } from '../components/HorizontalHeader';
+import { HorizontalHeader } from '../components/Header';
 import { PageBackground } from '../components/PageBackground';
 import { OnboardingTutorial } from '../components/OnboardingTutorial';
 import { createConnectionFromConfig } from '../utils/rpcManager';

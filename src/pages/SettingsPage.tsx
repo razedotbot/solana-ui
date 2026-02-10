@@ -20,7 +20,7 @@ import Cookies from "js-cookie";
 import { useAppContext } from "../contexts";
 import { useToast } from "../utils/hooks";
 import { saveConfigToCookies, STORAGE_KEYS } from "../utils/storage";
-import { HorizontalHeader } from "../components/HorizontalHeader";
+import { HorizontalHeader } from "../components/Header";
 import { PageBackground } from "../components/PageBackground";
 import type { ServerInfo } from "../utils/types";
 import { RPCEndpointManager } from "../components/RPCEndpointManager";

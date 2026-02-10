@@ -17,7 +17,6 @@ import { MultichartFrameContainer } from "./MultichartFrameContainer";
 import { MONITOR_SLOT } from "./constants";
 import { getRecentTokens } from "../../utils/recentTokens";
 import { brand } from "../../utils/brandConfig";
-import logo from "../../logo.png";
 import type { WalletType } from "../../utils/types";
 import type { ViewMode } from "../../utils/storage";
 import type { RecentToken } from "../../utils/types";
@@ -236,7 +235,7 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
               className="hover:scale-105 active:scale-95 transition-transform"
             >
               <img
-                src={logo}
+                src="/logo.png"
                 alt={brand.altText}
                 className="h-8 filter drop-shadow-[0_0_8px_var(--color-primary-70)]"
               />

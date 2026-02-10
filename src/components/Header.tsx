@@ -2,7 +2,6 @@ import React, { useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Settings, Blocks, Wallet, TrendingUp, BookOpen, Menu, X, Home } from 'lucide-react';
 import { brand } from '../utils/brandConfig';
-import logo from '../logo.png';
 
 interface HeaderProps {
     tokenAddress?: string;
@@ -72,7 +71,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                 >
                     <div className="relative p-1 overflow-hidden rounded-lg border border-app-primary-30 group-hover:border-app-primary-60 transition-all duration-300">
                         <img
-                            src={logo}
+                            src="/logo.png"
                             alt={brand.altText}
                             className="h-8 w-auto filter drop-shadow-[0_0_5px_var(--color-primary-40)] group-hover:drop-shadow-[0_0_8px_var(--color-primary-60)] transition-all"
                         />
@@ -166,7 +165,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                 >
                     <div className="relative p-1 overflow-hidden rounded-lg border border-app-primary-30 group-hover:border-app-primary-60 transition-all duration-300">
                         <img
-                            src={logo}
+                            src="/logo.png"
                             alt={brand.altText}
                             className="h-8 w-auto filter drop-shadow-[0_0_5px_var(--color-primary-40)] group-hover:drop-shadow-[0_0_8px_var(--color-primary-60)] transition-all"
                         />

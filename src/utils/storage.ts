@@ -120,32 +120,6 @@ export function loadWalletsFromCookies(): WalletType[] {
   }
 }
 
-/**
- * Check if wallet data is encrypted.
- */
-export function isWalletDataEncrypted(): boolean {
-  const encryptedData = localStorage.getItem(STORAGE_KEYS.encryptedWallets);
-  const unencryptedData = localStorage.getItem("wallets");
-  return !!encryptedData && !unencryptedData;
-}
-
-/**
- * Migrate unencrypted data to encrypted storage.
- */
-export function migrateToEncryptedStorage(): boolean {
-  try {
-    const unencryptedData = localStorage.getItem("wallets");
-    if (unencryptedData) {
-      const wallets = JSON.parse(unencryptedData) as WalletType[];
-      saveWalletsToCookies(wallets);
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
 // ============= Master Wallet Storage =============
 
 /**

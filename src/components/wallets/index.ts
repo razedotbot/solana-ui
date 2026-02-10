@@ -18,7 +18,8 @@ export { GroupSelector } from "./GroupSelector";
 export { OperationEmptyState } from "./OperationEmptyState";
 
 
-export { FundPanel } from "./FundPanel";
+export { DistributePanel } from "./DistributePanel";
+export { MixerPanel } from "./MixerPanel";
 export { ConsolidatePanel } from "./ConsolidatePanel";
 export { TransferPanel } from "./TransferPanel";
 export { FeeClaimPanel } from "./FeeClaimPanel";

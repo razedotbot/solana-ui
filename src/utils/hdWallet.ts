@@ -10,7 +10,7 @@ import bs58 from 'bs58';
  * account' = Account index (0, 1, 2, ...)
  * 0' = Change index (always 0 for Solana)
  */
-export const SOLANA_DERIVATION_PATH = "m/44'/501'";
+const SOLANA_DERIVATION_PATH = "m/44'/501'";
 
 /**
  * Generate a new mnemonic phrase
@@ -137,12 +137,4 @@ export const deriveMultipleWallets = (
   return wallets;
 };
 
-/**
- * Format derivation path for display
- * @param accountIndex Account index
- * @returns Formatted derivation path
- */
-export const formatDerivationPath = (accountIndex: number): string => {
-  return buildDerivationPath(accountIndex);
-};
 

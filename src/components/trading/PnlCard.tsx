@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Download } from 'lucide-react';
-import logoImage from '../logo.png';
-import { brand } from '../utils/brandConfig';
+import { brand } from '../../utils/brandConfig';
 
 // Define proper types
 interface PnlCardProps {
@@ -110,7 +109,7 @@ const PnlCard: React.FC<PnlCardProps> = ({
             <div className="flex items-center space-x-3">
               <div className="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden">
                   <img 
-                    src={logoImage} 
+                    src="/logo.png" 
                     alt="Logo" 
                     className="w-12 h-12 object-contain"
                     onError={(e) => {

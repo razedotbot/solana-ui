@@ -61,9 +61,6 @@ declare global {
 const SERVER_URL_COOKIE = "trading_server_url";
 const SERVER_REGION_COOKIE = "trading_server_region";
 
-// TEMPORARY: Set to true to disable server status check
-const DISABLE_SERVER_CHECK = false;
-
 const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
   {
     id: "de",
@@ -467,48 +464,7 @@ export const Root = (): JSX.Element => {
         return average;
       };
 
-      // If server check is disabled, use saved server or default
-      if (DISABLE_SERVER_CHECK) {
-        const savedUrl = Cookies.get(SERVER_URL_COOKIE);
-        const savedRegion = Cookies.get(SERVER_REGION_COOKIE);
-
-        if (savedUrl && savedRegion) {
-          const savedServer = DEFAULT_REGIONAL_SERVERS.find(
-            (s): boolean => s.id === savedRegion && s.url === savedUrl,
-          );
-          if (savedServer) {
-            setServerUrl(savedUrl);
-            window.tradingServerUrl = savedUrl;
-            window.serverRegion = savedServer.region;
-            setAvailableServers([savedServer]);
-            window.availableServers = [savedServer];
-            setIsChecking(false);
-
-            const event = new CustomEvent("serverChanged", {
-              detail: { server: savedServer },
-            });
-            window.dispatchEvent(event);
-            return;
-          }
-        }
-
-        // Use first default server if no saved preference
-        const defaultServer = DEFAULT_REGIONAL_SERVERS[0];
-        setServerUrl(defaultServer.url);
-        window.tradingServerUrl = defaultServer.url;
-        window.serverRegion = defaultServer.region;
-        setAvailableServers(DEFAULT_REGIONAL_SERVERS);
-        window.availableServers = DEFAULT_REGIONAL_SERVERS;
-        setIsChecking(false);
-
-        const event = new CustomEvent("serverChanged", {
-          detail: { server: defaultServer },
-        });
-        window.dispatchEvent(event);
-        return;
-      }
-
-      // Always discover all available servers first
+      // Discover all available servers
       const allServersWithPing = await Promise.all(
         DEFAULT_REGIONAL_SERVERS.map(async (server): Promise<ServerInfo> => {
           const isConnected = await checkServerConnection(server.url);

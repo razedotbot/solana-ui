@@ -64,25 +64,6 @@ export const getBaseCurrencyByMint = (
 };
 
 /**
- * Get base currency config by symbol
- */
-export const getBaseCurrencyBySymbol = (
-  symbol: string,
-): BaseCurrencyConfig | undefined => {
-  const key = symbol.toUpperCase() as BaseCurrencyKey;
-  return BASE_CURRENCIES[key];
-};
-
-/**
- * Check if a mint is a supported base currency
- */
-export const isBaseCurrency = (mint: string): boolean => {
-  return Object.values(BASE_CURRENCIES).some(
-    (currency) => currency.mint === mint,
-  );
-};
-
-/**
  * Default base currency
  */
 export const DEFAULT_BASE_CURRENCY = BASE_CURRENCIES.SOL;

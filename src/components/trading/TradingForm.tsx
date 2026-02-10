@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Move, Edit3, Check } from "lucide-react";
-import { useToast } from "../utils/hooks";
-import { useAppContext } from "../contexts";
-import { filterActiveWallets, toggleWallet } from "../utils/wallet";
-import { saveWalletsToCookies } from "../utils/storage";
-import WalletSelectorPopup from "./WalletSelectorPopup";
-import PresetButton from "./shared/PresetButton";
-import TabButton from "./shared/TabButton";
-import { loadPresetsFromCookies, savePresetsToCookies } from "./shared/presetTabsUtils";
-import type { WalletType, PresetTab } from "../utils/types";
-import type { BaseCurrencyConfig } from "../utils/constants";
+import { useToast } from "../../utils/hooks";
+import { useAppContext } from "../../contexts";
+import { filterActiveWallets, toggleWallet } from "../../utils/wallet";
+import { saveWalletsToCookies } from "../../utils/storage";
+import WalletSelectorPopup from "../trading/WalletSelectorPopup";
+import PresetButton from "../shared/PresetButton";
+import TabButton from "../shared/TabButton";
+import { loadPresetsFromCookies, savePresetsToCookies } from "../shared/presetTabsUtils";
+import type { WalletType, PresetTab } from "../../utils/types";
+import type { BaseCurrencyConfig } from "../../utils/constants";
 
 interface TradingCardProps {
   tokenAddress: string;

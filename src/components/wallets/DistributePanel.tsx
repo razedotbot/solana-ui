@@ -18,43 +18,35 @@ import {
   batchDistributeBaseCurrency,
   validateDistributionInputs,
 } from "../../utils/distribute";
-import { batchMixBaseCurrency, validateMixingInputs } from "../../utils/mixer";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { SourceWalletSummary } from "./SourceWalletSummary";
 import { BASE_CURRENCIES } from "../../utils/constants";
 import { filterAndSortWallets } from "./walletFilterUtils";
 import type { BalanceFilter, SortOption, SortDirection } from "./walletFilterUtils";
 
-type FundingMode = "distribute" | "mixer";
-
-interface FundPanelProps {
+interface DistributePanelProps {
   isOpen: boolean;
   inline?: boolean;
   onClose: () => void;
   wallets: WalletType[];
   baseCurrencyBalances: Map<string, number>;
   connection: Connection;
-  initialMode?: FundingMode;
   baseCurrency?: BaseCurrencyConfig;
   selectedWalletIds?: Set<number>;
 }
 
-// Using ComponentWalletAmount from types (alias for modal form handling)
-
-export const FundPanel: React.FC<FundPanelProps> = ({
+export const DistributePanel: React.FC<DistributePanelProps> = ({
   isOpen,
   inline = false,
   onClose,
   wallets,
   baseCurrencyBalances,
-  initialMode = "distribute",
   baseCurrency = BASE_CURRENCIES.SOL,
   selectedWalletIds,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const [fundingMode, setFundingMode] = useState<FundingMode>(initialMode);
   const { showToast } = useToast();
 
   const [selectedRecipientWallets, setSelectedRecipientWallets] = useState<
@@ -85,7 +77,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     }
   }, [useExternalRecipients, selectedWalletIds, wallets, currentStep]);
 
-  // Get wallet base currency balance by address
   const getWalletBalance = useCallback(
     (address: string): number => {
       return baseCurrencyBalances.has(address)
@@ -105,10 +96,8 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     }
   };
 
-  // Function to highlight recipients with missing amounts
   const hasEmptyAmounts = (): boolean => {
     if (!useCustomAmounts) return false;
-
     return walletAmounts.some(
       (wallet) =>
         selectedRecipientWallets.includes(wallet.address) &&
@@ -135,30 +124,21 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     setBalanceFilter("all");
   }, []);
 
-  // Update wallet amounts based on selected wallets
   const updateWalletAmounts = useCallback((): void => {
     setWalletAmounts((prevWalletAmounts) => {
       if (useCustomAmounts) {
-        // Maintain existing amounts for wallets that remain selected
         const existingAmounts = new Map(
           prevWalletAmounts.map((w) => [w.address, w.amount]),
         );
-
-        // Create a new walletAmounts array with currently selected wallets
-        const newWalletAmounts = selectedRecipientWallets.map((address) => ({
+        return selectedRecipientWallets.map((address) => ({
           address,
           amount: existingAmounts.get(address) || commonAmount || "",
         }));
-
-        return newWalletAmounts;
       } else {
-        // When using common amount, just create entries with the common amount
-        const newWalletAmounts = selectedRecipientWallets.map((address) => ({
+        return selectedRecipientWallets.map((address) => ({
           address,
           amount: commonAmount,
         }));
-
-        return newWalletAmounts;
       }
     });
   }, [useCustomAmounts, selectedRecipientWallets, commonAmount]);
@@ -166,16 +146,13 @@ export const FundPanel: React.FC<FundPanelProps> = ({
   useEffect(() => {
     if (isOpen) {
       resetForm();
-      setFundingMode(initialMode);
     }
-  }, [isOpen, resetForm, initialMode]);
+  }, [isOpen, resetForm]);
 
-  // Update walletAmounts when selectedRecipientWallets change
   useEffect(() => {
     updateWalletAmounts();
   }, [selectedRecipientWallets, updateWalletAmounts]);
 
-  // Update wallet amounts when toggling between common/custom amounts
   useEffect(() => {
     updateWalletAmounts();
   }, [useCustomAmounts, commonAmount, updateWalletAmounts]);
@@ -203,7 +180,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     }
   };
 
-  // Handle fund operation (distribute or mixer)
   const handleFund = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!isConfirmed) return;
@@ -221,10 +197,9 @@ export const FundPanel: React.FC<FundPanelProps> = ({
       const senderWallet = {
         address: selectedSenderWallet,
         privateKey: senderPrivateKey,
-        amount: "0", // Not used for sender
+        amount: "0",
       };
 
-      // Prepare recipient wallets with their private keys and amounts
       const recipientWallets = walletAmounts
         .filter((wallet) => selectedRecipientWallets.includes(wallet.address))
         .map((wallet) => ({
@@ -234,60 +209,37 @@ export const FundPanel: React.FC<FundPanelProps> = ({
         }))
         .filter((wallet) => wallet.privateKey && wallet.amount);
 
-      let validation;
-      if (fundingMode === "distribute") {
-        validation = validateDistributionInputs(
-          senderWallet,
-          recipientWallets,
-          senderBalance,
-          baseCurrency.symbol,
-        );
-      } else {
-        validation = validateMixingInputs(
-          senderWallet,
-          recipientWallets,
-          senderBalance,
-          baseCurrency.symbol,
-        );
-      }
+      const validation = validateDistributionInputs(
+        senderWallet,
+        recipientWallets,
+        senderBalance,
+        baseCurrency.symbol,
+      );
 
       if (!validation.valid) {
-        showToast(validation.error || `Invalid ${fundingMode} data`, "error");
+        showToast(validation.error || "Invalid distribution data", "error");
         setIsSubmitting(false);
         return;
       }
 
-      let result;
-      if (fundingMode === "distribute") {
-        result = await batchDistributeBaseCurrency(
-          senderWallet,
-          recipientWallets,
-          baseCurrency,
-        );
-      } else {
-        result = await batchMixBaseCurrency(
-          senderWallet,
-          recipientWallets,
-          baseCurrency,
-        );
-      }
+      const result = await batchDistributeBaseCurrency(
+        senderWallet,
+        recipientWallets,
+        baseCurrency,
+      );
 
       if (result.success) {
-        const modeText = fundingMode === "distribute" ? "distributed" : "mixed";
-        showToast(`${baseCurrency.symbol} ${modeText} successfully`, "success");
+        showToast(`${baseCurrency.symbol} distributed successfully`, "success");
         resetForm();
         onClose();
       } else {
-        const modeText =
-          fundingMode === "distribute" ? "Distribution" : "Mixing";
-        showToast(result.error || `${modeText} failed`, "error");
+        showToast(result.error || "Distribution failed", "error");
       }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      const modeText = fundingMode === "distribute" ? "Distribution" : "Mixing";
       showToast(
-        `${modeText} failed: ` + (errorMessage || "Unknown error"),
+        "Distribution failed: " + (errorMessage || "Unknown error"),
         "error",
       );
     } finally {
@@ -295,7 +247,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     }
   };
 
-  // Function to handle recipient wallet selection toggles
   const toggleRecipientWalletSelection = (address: string): void => {
     setSelectedRecipientWallets((prev) => {
       if (prev.includes(address)) {
@@ -306,12 +257,10 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     });
   };
 
-  // Get available wallets for recipient selection (exclude sender)
   const getAvailableRecipientWallets = (): WalletType[] => {
     return wallets.filter((wallet) => wallet.address !== selectedSenderWallet);
   };
 
-  // Get available wallets for sender selection (exclude recipients and zero balance wallets)
   const getAvailableSenderWallets = (): WalletType[] => {
     return wallets.filter(
       (wallet) =>
@@ -320,7 +269,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     );
   };
 
-  // Handle select/deselect all for recipient wallets
   const handleSelectAllRecipients = (): void => {
     if (
       selectedRecipientWallets.length === getAvailableRecipientWallets().length
@@ -333,14 +281,12 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     }
   };
 
-  // Apply common amount to all selected wallets
   const applyCommonAmountToAll = (): void => {
     setWalletAmounts((prev) =>
       prev.map((wallet) => ({ ...wallet, amount: commonAmount })),
     );
   };
 
-  // Filter and sort wallets based on search term and other criteria
   const filterWallets = (
     walletList: WalletType[],
     search: string,
@@ -364,43 +310,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
     return wallet ? wallet.amount : "";
   };
 
-  const getModeText = (): {
-    title: string;
-    action: string;
-    summaryTitle: string;
-    totalLabel: string;
-    confirmText: string;
-    infoTip: string;
-  } => {
-    return {
-      title:
-        fundingMode === "distribute"
-          ? `DISTRIBUTE ${baseCurrency.symbol}`
-          : `${baseCurrency.symbol} MIXER`,
-      action:
-        fundingMode === "distribute"
-          ? `DISTRIBUTE ${baseCurrency.symbol}`
-          : `MIX ${baseCurrency.symbol}`,
-      summaryTitle:
-        fundingMode === "distribute"
-          ? "DISTRIBUTION SUMMARY"
-          : "MIXING SUMMARY",
-      totalLabel:
-        fundingMode === "distribute" ? "TOTAL TO SEND:" : "TOTAL TO MIX:",
-      confirmText:
-        fundingMode === "distribute"
-          ? "I CONFIRM THIS DISTRIBUTION OPERATION"
-          : "I CONFIRM THIS MIXING OPERATION",
-      infoTip:
-        fundingMode === "distribute"
-          ? "This amount will be sent to each selected recipient wallet"
-          : "This amount will be mixed to each selected recipient wallet",
-    };
-  };
-
-  const modeText = getModeText();
-
-  // Inject modal styles via useEffect
   useEffect(() => {
     if (!isOpen) return;
     const id = "fund-modal-styles";
@@ -513,54 +422,32 @@ export const FundPanel: React.FC<FundPanelProps> = ({
       64%, 66% { transform: translate(0, 0) skew(-0.33deg); }
     }
 
-    /* Responsive styles */
     @media (max-width: 1024px) {
-      .modal-flex-col-lg {
-        flex-direction: column;
-      }
-      .modal-w-full-lg {
-        width: 100%;
-      }
-      .modal-mt-4-lg {
-        margin-top: 1rem;
-      }
+      .modal-flex-col-lg { flex-direction: column; }
+      .modal-w-full-lg { width: 100%; }
+      .modal-mt-4-lg { margin-top: 1rem; }
     }
 
     @media (max-width: 768px) {
-      .modal-flex-col-md {
-        flex-direction: column;
-      }
-      .modal-w-full-md {
-        width: 100%;
-      }
-      .modal-mt-4-md {
-        margin-top: 1rem;
-      }
+      .modal-flex-col-md { flex-direction: column; }
+      .modal-w-full-md { width: 100%; }
+      .modal-mt-4-md { margin-top: 1rem; }
     }
 
     @media (max-width: 640px) {
-      .modal-text-xs-sm {
-        font-size: 0.75rem;
-      }
-      .modal-p-3-sm {
-        padding: 0.75rem;
-      }
-      .modal-mx-1-sm {
-        margin-left: 0.25rem;
-        margin-right: 0.25rem;
-      }
+      .modal-text-xs-sm { font-size: 0.75rem; }
+      .modal-p-3-sm { padding: 0.75rem; }
+      .modal-mx-1-sm { margin-left: 0.25rem; margin-right: 0.25rem; }
     }
   `;
     document.head.appendChild(el);
     return () => { el.remove(); };
   }, [isOpen]);
 
-  // If modal is not open, don't render anything
   if (!isOpen) return null;
 
   const modalContent = (
     <div className={inline ? "relative flex flex-col h-full overflow-hidden" : "relative bg-app-primary border border-app-primary-40 rounded-lg shadow-lg w-full max-w-6xl overflow-hidden transform modal-content"}>
-        {/* Ambient grid background - only in modal mode, inline uses PageBackground */}
         {!inline && <div className="absolute inset-0 z-0 opacity-10 bg-grid"></div>}
 
         {/* Header */}
@@ -570,7 +457,7 @@ export const FundPanel: React.FC<FundPanelProps> = ({
               <ArrowsUpFromLine size={16} className="color-primary" />
             </div>
             <h2 className="text-lg font-semibold text-app-primary font-mono">
-              <span className="color-primary">/</span> {modeText.title}{" "}
+              <span className="color-primary">/</span> DISTRIBUTE {baseCurrency.symbol}{" "}
               <span className="color-primary">/</span>
             </h2>
           </div>
@@ -594,7 +481,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
         <div className={`relative z-10 p-4 space-y-4 ${inline ? "flex-1 overflow-y-auto" : ""}`}>
           {currentStep === 0 && (
             <div className="animate-[fadeIn_0.3s_ease]">
-              {/* Horizontal Layout of Wallets */}
               <div className="flex flex-col space-y-4">
                 {/* Sender Wallet */}
                 <div className="w-full">
@@ -613,7 +499,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                     )}
                   </div>
 
-                  {/* Sender Search and Filters */}
                   <div className="mb-2 flex space-x-2">
                     <div className="relative flex-grow">
                       <Search
@@ -734,7 +619,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                     </button>
                   </div>
 
-                  {/* Recipient Search and Filters */}
                   <div className="mb-2 flex space-x-2">
                     <div className="relative flex-grow">
                       <Search
@@ -880,7 +764,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
 
               {/* Amount Input and Preview Section */}
               <div className="w-full mx-auto mt-6">
-                {/* Toggle between common and custom amounts */}
                 <div className="flex items-center justify-between mb-2 max-w-md mx-auto">
                   <div className="flex items-center gap-1">
                     <Settings size={14} className="text-app-secondary" />
@@ -903,7 +786,6 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Common amount input and summary - shown when not using custom amounts */}
                 {!useCustomAmounts && (
                   <div className="flex flex-col space-y-4">
                     <div className="w-full">
@@ -925,7 +807,7 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                             />
                             {showInfoTip && (
                               <div className="absolute left-0 bottom-full mb-2 p-2 bg-app-tertiary border border-app-primary-30 rounded shadow-lg text-xs text-app-primary w-48 z-10 font-mono">
-                                {modeText.infoTip}
+                                This amount will be sent to each selected recipient wallet
                               </div>
                             )}
                           </div>
@@ -952,14 +834,13 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Real-time preview - in the same row */}
                     {selectedSenderWallet &&
                       commonAmount &&
                       selectedRecipientWallets.length > 0 && (
                         <div className="w-full bg-app-tertiary rounded-lg p-3 border border-app-primary-30">
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-app-secondary font-mono">
-                              {modeText.totalLabel}
+                              TOTAL TO SEND:
                             </span>
                             <span
                               className={`text-sm font-semibold font-mono ${hasEnoughBalance ? "color-primary" : "text-error-alt"}`}
@@ -989,11 +870,9 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                   </div>
                 )}
 
-                {/* Custom amounts "Apply to All" control */}
                 {useCustomAmounts && selectedRecipientWallets.length > 0 && (
                   <div className="flex flex-col space-y-4 mt-2">
                     <div className="w-full">
-                      {/* Quick set common amount control */}
                       <div className="flex items-center gap-2 mb-2">
                         <div className="relative flex-grow">
                           <DollarSign
@@ -1028,12 +907,11 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Real-time preview for custom amounts */}
                     {selectedSenderWallet && totalAmount > 0 && (
                       <div className="w-full bg-app-tertiary rounded-lg p-3 border border-app-primary-30">
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-app-secondary font-mono">
-                            {modeText.totalLabel}
+                            TOTAL TO SEND:
                           </span>
                           <span
                             className={`text-sm font-semibold font-mono ${hasEnoughBalance ? "color-primary" : "text-error-alt"}`}
@@ -1108,11 +986,10 @@ export const FundPanel: React.FC<FundPanelProps> = ({
 
           {currentStep === 1 && (
             <div className="flex flex-col space-y-4 animate-[fadeIn_0.3s_ease]">
-              {/* Summary */}
               <div className="w-full space-y-4">
                 <div className="bg-app-tertiary rounded-lg p-4 border border-app-primary-30">
                   <h3 className="text-base font-semibold text-app-primary mb-3 font-mono tracking-wider">
-                    {modeText.summaryTitle}
+                    DISTRIBUTION SUMMARY
                   </h3>
 
                   <div className="space-y-3">
@@ -1173,7 +1050,7 @@ export const FundPanel: React.FC<FundPanelProps> = ({
 
                     <div className="pt-2 border-t border-app-primary-20 flex items-center justify-between">
                       <span className="text-sm font-medium text-app-secondary font-mono">
-                        {modeText.totalLabel}
+                        TOTAL TO SEND:
                       </span>
                       <span className="text-sm font-semibold color-primary font-mono">
                         {formatBalance(totalAmount)} {baseCurrency.symbol}
@@ -1216,7 +1093,7 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                       />
                     </div>
                     <span className="text-app-primary text-sm ml-2 cursor-pointer select-none font-mono">
-                      {modeText.confirmText}
+                      I CONFIRM THIS DISTRIBUTION OPERATION
                     </span>
                   </div>
                 </div>
@@ -1301,7 +1178,7 @@ export const FundPanel: React.FC<FundPanelProps> = ({
                     PROCESSING...
                   </>
                 ) : (
-                  modeText.action
+                  `DISTRIBUTE ${baseCurrency.symbol}`
                 )}
               </button>
             </div>

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Move, Edit3, Check } from "lucide-react";
-import { toggleWallet } from "../utils/wallet";
-import { saveWalletsToCookies } from "../utils/storage";
-import WalletSelectorPopup from "./WalletSelectorPopup";
-import PresetButton from "./shared/PresetButton";
-import TabButton from "./shared/TabButton";
-import { loadPresetsFromCookies, savePresetsToCookies } from "./shared/presetTabsUtils";
-import type { WalletType, PresetTab } from "../utils/types";
+import { toggleWallet } from "../../utils/wallet";
+import { saveWalletsToCookies } from "../../utils/storage";
+import WalletSelectorPopup from "../trading/WalletSelectorPopup";
+import PresetButton from "../shared/PresetButton";
+import TabButton from "../shared/TabButton";
+import { loadPresetsFromCookies, savePresetsToCookies } from "../shared/presetTabsUtils";
+import type { WalletType, PresetTab } from "../../utils/types";
 
 // Hook to detect mobile viewport
 const useIsMobile = (): boolean => {

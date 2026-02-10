@@ -5,7 +5,7 @@ export type SortDirection = 'asc' | 'desc';
 /**
  * Shared pure function for filtering and sorting wallet lists.
  *
- * Covers the common logic used across BurnPanel, FundPanel,
+ * Covers the common logic used across BurnPanel, DistributePanel, MixerPanel,
  * ConsolidatePanel, and TransferPanel.
  *
  * @param wallets        - The wallet array to filter/sort (generic, must have `address`)

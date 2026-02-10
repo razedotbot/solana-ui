@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { BarChart2, X } from "lucide-react";
 import { getWallets } from "../../utils/wallet";
-import PnlCard from "../PnlCard";
+import PnlCard from "../trading/PnlCard";
 import type { IframeData } from "../../utils/types";
 import { useTokenMetadata } from "../../utils/hooks";
 
