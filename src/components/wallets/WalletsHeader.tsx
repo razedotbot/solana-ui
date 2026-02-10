@@ -5,7 +5,6 @@ import {
   RefreshCw,
   Plus,
   Key,
-  Layers,
   ChevronDown,
   Zap,
   MoreHorizontal,
@@ -15,19 +14,20 @@ import {
   Trash2,
 } from "lucide-react";
 import type {
+  WalletType,
   WalletCategory,
   CategoryQuickTradeSettings,
   WalletGroup,
+  MasterWallet,
 } from "../../utils/types";
+import type { BaseCurrencyConfig } from "../../utils/constants";
+import { formatAddress, formatBaseCurrencyBalance } from "../../utils/formatting";
 
 export interface WalletsHeaderProps {
-  // Search
   searchTerm: string;
   onSearchChange: (term: string) => void;
-  // Stats
   walletCount: number;
   totalBalance: string;
-  // Actions
   onRefresh: () => void;
   isRefreshing: boolean;
   onCreateWallet: () => void;
@@ -36,15 +36,18 @@ export interface WalletsHeaderProps {
   onImportMasterWallet: () => void;
   onExportKeys: () => void;
   onCleanup: () => void;
-  onOpenGroupDrawer: () => void;
-  // QuickTrade
   quickModeSettings: Record<WalletCategory, CategoryQuickTradeSettings>;
   onUpdateQuickMode: (category: WalletCategory, settings: CategoryQuickTradeSettings) => void;
-  // Group indicator
   groups: WalletGroup[];
   activeGroupId: string;
   onGroupChange: (groupId: string) => void;
-  // Connection
+  masterWallets: MasterWallet[];
+  wallets: WalletType[];
+  baseCurrencyBalances: Map<string, number>;
+  baseCurrency: BaseCurrencyConfig;
+  onExportSeedPhrase: (masterWallet: MasterWallet) => void;
+  onDeleteMasterWallet: (id: string) => void;
+  onCopyToClipboard: (text: string) => void;
   isConnected: boolean;
 }
 
@@ -84,19 +87,27 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
   onImportMasterWallet,
   onExportKeys,
   onCleanup,
-  onOpenGroupDrawer,
   quickModeSettings,
   onUpdateQuickMode,
   groups,
   activeGroupId,
   onGroupChange,
+  masterWallets,
+  wallets,
+  baseCurrencyBalances,
+  baseCurrency,
+  onExportSeedPhrase,
+  onDeleteMasterWallet,
+  onCopyToClipboard,
   isConnected,
 }) => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<WalletCategory | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [activeMasterWalletId, setActiveMasterWalletId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const masterWalletsRef = useRef<HTMLDivElement>(null);
 
   const activeGroup = activeGroupId === "all" ? null : groups.find((g) => g.id === activeGroupId);
 
@@ -107,6 +118,9 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
       }
       if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
         setShowMoreMenu(false);
+      }
+      if (masterWalletsRef.current && !masterWalletsRef.current.contains(event.target as Node)) {
+        setActiveMasterWalletId(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -128,7 +142,7 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
   };
 
   return (
-    <header className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-app-primary-15 bg-app-primary/80 backdrop-blur-sm">
+    <header className="relative z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-app-primary-15 bg-app-primary/80 backdrop-blur-sm">
       {/* Search */}
       <div
         className={`relative transition-all duration-200 ${
@@ -184,7 +198,11 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
               return (
                 <button
                   key={category}
-                  onClick={() => setExpandedCategory(isExpanded ? null : category)}
+                  onClick={() => {
+                    setExpandedCategory(isExpanded ? null : category);
+                    setActiveMasterWalletId(null);
+                    setShowMoreMenu(false);
+                  }}
                   className={`flex items-center gap-1 px-2 py-1 rounded-md border transition-all duration-200
                     ${styles.bg} ${styles.border} ${styles.hoverBg}
                     ${isExpanded ? "ring-1 ring-current" : ""}`}
@@ -359,14 +377,104 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
           <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
         </button>
 
-        {/* Groups Drawer */}
-        <button
-          onClick={onOpenGroupDrawer}
-          className="p-2 rounded-lg hover:bg-app-quaternary text-app-secondary-60 hover:text-app-primary transition-colors"
-          title="Groups & Master Wallets"
-        >
-          <Layers size={16} />
-        </button>
+        {/* Master Wallets - inline near refresh */}
+        {masterWallets.length > 0 && (
+          <div className="relative flex items-center gap-1" ref={masterWalletsRef}>
+            {masterWallets.map((mw) => {
+              const derivedWallets = wallets.filter((w) => w.masterWalletId === mw.id);
+              const isExpanded = activeMasterWalletId === mw.id;
+
+              return (
+                <button
+                  key={mw.id}
+                  onClick={() => {
+                    setActiveMasterWalletId(isExpanded ? null : mw.id);
+                    setExpandedCategory(null);
+                    setShowMoreMenu(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs transition-all ${
+                    isExpanded
+                      ? "bg-app-quaternary border-app-primary-30 text-app-primary"
+                      : "bg-transparent border-app-primary-20 text-app-secondary-60 hover:text-app-primary hover:border-app-primary-30"
+                  }`}
+                  title={`${mw.name} (${derivedWallets.length} wallets)`}
+                >
+                  <Wallet size={13} />
+                  <span className="font-medium truncate max-w-[80px]">{mw.name}</span>
+                  <span className="text-[10px] font-mono opacity-60">{derivedWallets.length}</span>
+                  <ChevronDown size={10} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                </button>
+              );
+            })}
+
+            {/* Expanded Master Wallet Dropdown */}
+            {activeMasterWalletId && (() => {
+              const expandedMw = masterWallets.find((mw) => mw.id === activeMasterWalletId);
+              if (!expandedMw) return null;
+              const derivedWallets = wallets
+                .filter((w) => w.masterWalletId === expandedMw.id)
+                .sort((a, b) => (a.derivationIndex || 0) - (b.derivationIndex || 0));
+
+              return (
+                <div className="absolute left-0 top-full mt-2 z-30 bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[280px]">
+                  <div className="px-3 py-2 border-b border-app-primary-15 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-app-primary">{expandedMw.name}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => onExportSeedPhrase(expandedMw)}
+                        className="p-1.5 rounded hover:bg-app-quaternary transition-colors"
+                        title="Export seed phrase"
+                      >
+                        <Download size={12} className="text-app-secondary-60" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          onDeleteMasterWallet(expandedMw.id);
+                          setActiveMasterWalletId(null);
+                        }}
+                        className="p-1.5 rounded hover:bg-rose-500/10 transition-colors"
+                        title="Delete master wallet"
+                      >
+                        <Trash2 size={12} className="text-rose-400" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+                    {derivedWallets.map((wallet) => {
+                      const isMaster = wallet.derivationIndex === 0;
+                      const balance = baseCurrencyBalances.get(wallet.address) || 0;
+                      return (
+                        <div
+                          key={wallet.id}
+                          className="flex items-center justify-between py-1 px-2 rounded bg-app-quaternary/50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[10px] font-mono ${
+                                isMaster ? "text-app-primary-color font-bold" : "text-app-secondary-60"
+                              }`}
+                            >
+                              #{wallet.derivationIndex}
+                            </span>
+                            <button
+                              onClick={() => onCopyToClipboard(wallet.address)}
+                              className="text-[10px] text-app-secondary-60 hover:text-app-primary font-mono truncate max-w-[120px]"
+                            >
+                              {formatAddress(wallet.address)}
+                            </button>
+                          </div>
+                          <span className="text-[10px] font-mono text-app-secondary-60">
+                            {formatBaseCurrencyBalance(balance, baseCurrency)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Divider */}
         <div className="w-px h-6 bg-app-primary-15 mx-1" />
@@ -397,7 +505,11 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
         {/* More Menu */}
         <div className="relative" ref={moreMenuRef}>
           <button
-            onClick={() => setShowMoreMenu(!showMoreMenu)}
+            onClick={() => {
+              setShowMoreMenu(!showMoreMenu);
+              setActiveMasterWalletId(null);
+              setExpandedCategory(null);
+            }}
             className={`p-2 rounded-lg transition-colors ${
               showMoreMenu
                 ? "bg-app-quaternary text-app-primary"

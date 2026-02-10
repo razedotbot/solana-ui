@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import type { WalletType, WalletGroup } from "../types";
 import { DEFAULT_GROUP_ID } from "../types";
 import { saveWalletGroups, loadWalletGroups } from "../storage";
-import { saveWalletsToCookies } from "../storage";
 
 interface UseWalletGroupsReturn {
   groups: WalletGroup[];
@@ -18,7 +17,9 @@ interface UseWalletGroupsReturn {
 
 export function useWalletGroups(
   wallets: WalletType[],
-  setWallets: (wallets: WalletType[]) => void,
+  setWallets: (
+    wallets: WalletType[] | ((prev: WalletType[]) => WalletType[]),
+  ) => void,
 ): UseWalletGroupsReturn {
   const [groups, setGroups] = useState<WalletGroup[]>(() => loadWalletGroups());
 
@@ -27,19 +28,18 @@ export function useWalletGroups(
     saveWalletGroups(groups);
   }, [groups]);
 
-  // Migrate wallets without groupId on mount
+  // Migrate wallets without groupId whenever wallets change
+  // (runs when wallets are first loaded from AppContext, not just on mount)
   useEffect(() => {
-    const needsMigration = wallets.some((w) => !w.groupId);
-    if (needsMigration && wallets.length > 0) {
-      const migrated = wallets.map((w) => ({
-        ...w,
-        groupId: w.groupId || DEFAULT_GROUP_ID,
-      }));
-      setWallets(migrated);
-      saveWalletsToCookies(migrated);
+    if (wallets.length > 0 && wallets.some((w) => !w.groupId)) {
+      setWallets((prev) =>
+        prev.map((w) => ({
+          ...w,
+          groupId: w.groupId || DEFAULT_GROUP_ID,
+        })),
+      );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [wallets, setWallets]);
 
   const createGroup = useCallback(
     (name: string, color?: string) => {
@@ -63,21 +63,22 @@ export function useWalletGroups(
     );
   }, []);
 
+  // Use functional update to avoid stale closure over wallets
   const deleteGroup = useCallback(
     (groupId: string) => {
       const group = groups.find((g) => g.id === groupId);
       if (!group || group.isDefault) return;
 
-      // Move wallets in this group to default
-      const updated = wallets.map((w) =>
-        w.groupId === groupId ? { ...w, groupId: DEFAULT_GROUP_ID } : w,
+      // Move wallets in this group to default (functional update avoids stale data)
+      setWallets((prev) =>
+        prev.map((w) =>
+          w.groupId === groupId ? { ...w, groupId: DEFAULT_GROUP_ID } : w,
+        ),
       );
-      setWallets(updated);
-      saveWalletsToCookies(updated);
 
       setGroups((prev) => prev.filter((g) => g.id !== groupId));
     },
-    [groups, wallets, setWallets],
+    [groups, setWallets],
   );
 
   const reorderGroups = useCallback((newOrder: WalletGroup[]) => {
@@ -93,27 +94,29 @@ export function useWalletGroups(
     [],
   );
 
+  // Functional update ensures correct state even when called in a loop
   const moveWalletToGroup = useCallback(
     (walletId: number, targetGroupId: string) => {
-      const updated = wallets.map((w) =>
-        w.id === walletId ? { ...w, groupId: targetGroupId } : w,
+      setWallets((prev) =>
+        prev.map((w) =>
+          w.id === walletId ? { ...w, groupId: targetGroupId } : w,
+        ),
       );
-      setWallets(updated);
-      saveWalletsToCookies(updated);
     },
-    [wallets, setWallets],
+    [setWallets],
   );
 
+  // Functional update ensures all wallets are moved atomically
   const moveWalletsToGroup = useCallback(
     (walletIds: number[], targetGroupId: string) => {
       const idSet = new Set(walletIds);
-      const updated = wallets.map((w) =>
-        idSet.has(w.id) ? { ...w, groupId: targetGroupId } : w,
+      setWallets((prev) =>
+        prev.map((w) =>
+          idSet.has(w.id) ? { ...w, groupId: targetGroupId } : w,
+        ),
       );
-      setWallets(updated);
-      saveWalletsToCookies(updated);
     },
-    [wallets, setWallets],
+    [setWallets],
   );
 
   const getWalletsForGroup = useCallback(

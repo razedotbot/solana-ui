@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Move, Edit3, Check } from "lucide-react";
 import { useToast } from "../utils/hooks";
-import { toggleWallet } from "../utils/wallet";
+import { useAppContext } from "../contexts";
+import { filterActiveWallets, toggleWallet } from "../utils/wallet";
 import { saveWalletsToCookies } from "../utils/storage";
 import WalletSelectorPopup from "./WalletSelectorPopup";
 import type { WalletType } from "../utils/types";
@@ -235,6 +236,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
   solPrice,
 }) => {
   const { showToast } = useToast();
+  const { config, setConfig } = useAppContext();
   const [activeTradeType, setActiveTradeType] = useState<"buy" | "sell">("buy");
   const [isEditMode, setIsEditMode] = useState(false);
   const walletSelectorRef = useRef<HTMLDivElement>(null);
@@ -446,7 +448,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       const sellPercentage = parseFloat(sellAmount) / 100;
 
       // Calculate total token amount across all active wallets
-      const activeWallets = wallets.filter((wallet) => wallet.isActive);
+      const activeWallets = filterActiveWallets(wallets);
       const totalTokenAmount = activeWallets.reduce(
         (sum: number, wallet: WalletType) => {
           return sum + (tokenBalances.get(wallet.address) || 0);
@@ -666,11 +668,40 @@ const TradingCard: React.FC<TradingCardProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-mono tracking-wider text-app-secondary uppercase">
-                AMOUNT
+                {activeTradeType === "buy" ? "SOL" : "PERCENT"}
+                <span className="text-[10px] text-app-secondary-60 font-mono ml-1">
+                  /WALLET
+                </span>
               </label>
-              <span className="text-xs text-app-secondary-60 font-mono">
-                {activeTradeType === "buy" ? "SOL/WALLET" : "% TOKENS"}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-0.5 bg-app-primary-80-alpha rounded px-1.5 py-0.5 border border-app-primary-30">
+                  <span className="text-[10px] text-app-secondary-60 font-mono">SLIP</span>
+                  <input
+                    type="text"
+                    value={config.slippageBps ? (parseFloat(config.slippageBps) / 100).toFixed(0) : "99"}
+                    onChange={(e) => {
+                      const pct = parseFloat(e.target.value.replace(/[^0-9.]/g, ""));
+                      if (!isNaN(pct)) {
+                        setConfig({ ...config, slippageBps: Math.round(pct * 100).toString() });
+                      }
+                    }}
+                    className="w-7 bg-transparent text-[10px] text-app-primary font-mono text-right focus:outline-none"
+                  />
+                  <span className="text-[10px] text-app-secondary-60 font-mono">%</span>
+                </div>
+                <div className="flex items-center gap-0.5 bg-app-primary-80-alpha rounded px-1.5 py-0.5 border border-app-primary-30">
+                  <span className="text-[10px] text-app-secondary-60 font-mono">FEE</span>
+                  <input
+                    type="text"
+                    value={config.transactionFee || "0.001"}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9.]/g, "");
+                      setConfig({ ...config, transactionFee: val });
+                    }}
+                    className="w-10 bg-transparent text-[10px] text-app-primary font-mono text-right focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-2">

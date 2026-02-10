@@ -1788,3 +1788,192 @@ iframe:active {
   50% { width: 60%; left: 20%; }
   100% { width: 0%; left: 100%; }
 }
+
+/* ========================================
+   Interactive 3D Logo Component
+   ======================================== */
+
+.i3d-container {
+  position: relative;
+  width: clamp(220px, 45vw, 360px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+/* Ambient grid */
+.i3d-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(2,179,109,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2,179,109,0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 30%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 30%, transparent 70%);
+}
+
+
+/* Data streams */
+.i3d-stream {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  z-index: 1;
+  background: linear-gradient(180deg, transparent, rgba(2,179,109,0.25), transparent);
+  animation: i3dStreamFlow 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes i3dStreamFlow {
+  0% { transform: translateY(-100%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(400px); opacity: 0; }
+}
+
+/* Glow base - pulsing radial glow behind logo */
+.i3d-glow-base {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 65%;
+  height: 65%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(2,179,109,0.15) 0%, rgba(2,179,109,0.05) 40%, transparent 70%);
+  border-radius: 50%;
+  animation: i3dGlowPulse 3s ease-in-out infinite;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.i3d-hovered .i3d-glow-base {
+  animation: i3dGlowPulseHover 2s ease-in-out infinite;
+}
+
+@keyframes i3dGlowPulse {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+@keyframes i3dGlowPulseHover {
+  0%, 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.05); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* Orbit rings */
+.i3d-orbit-a,
+.i3d-orbit-b {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  border-radius: 50%;
+  border: 1px solid rgba(2,179,109,0.12);
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(2,179,109,0.06);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.i3d-orbit-a {
+  width: 85%;
+  height: 85%;
+  margin-left: -42.5%;
+  margin-top: -42.5%;
+  animation: i3dOrbitA 8s linear infinite;
+}
+
+.i3d-orbit-b {
+  width: 70%;
+  height: 70%;
+  margin-left: -35%;
+  margin-top: -35%;
+  animation: i3dOrbitB 6s linear infinite;
+}
+
+.i3d-hovered .i3d-orbit-a {
+  border-color: rgba(2,179,109,0.3);
+  box-shadow: 0 0 12px rgba(2,179,109,0.15);
+}
+
+.i3d-hovered .i3d-orbit-b {
+  border-color: rgba(2,179,109,0.25);
+  box-shadow: 0 0 10px rgba(2,179,109,0.12);
+}
+
+@keyframes i3dOrbitA {
+  0% { transform: rotateX(70deg) rotateZ(0deg); }
+  100% { transform: rotateX(70deg) rotateZ(360deg); }
+}
+
+@keyframes i3dOrbitB {
+  0% { transform: rotateX(55deg) rotateZ(360deg); }
+  100% { transform: rotateX(55deg) rotateZ(0deg); }
+}
+
+/* 3D Model wrapper with parallax + float */
+.i3d-model-wrapper {
+  position: absolute;
+  inset: 10%;
+  z-index: 5;
+  animation: i3dFloat 3.5s ease-in-out infinite;
+  transform: translate3d(var(--mx, 0px), var(--my, 0px), 0);
+  will-change: transform;
+  transition: transform 0.15s ease-out;
+}
+
+.i3d-hovered .i3d-model-wrapper {
+  filter: drop-shadow(0 0 20px rgba(2,179,109,0.2));
+}
+
+@keyframes i3dFloat {
+  0%, 100% { transform: translate3d(var(--mx, 0px), var(--my, 0px), 0) translateY(0); }
+  50% { transform: translate3d(var(--mx, 0px), var(--my, 0px), 0) translateY(-10px); }
+}
+
+/* Portal glow under logo */
+.i3d-portal {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  width: 55%;
+  height: 20px;
+  z-index: 6;
+  transform: translateX(-50%) perspective(200px) rotateX(70deg);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(2,179,109,0.3) 0%, rgba(2,179,109,0.08) 50%, transparent 70%);
+  animation: i3dPortalPulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.i3d-hovered .i3d-portal {
+  animation: i3dPortalPulseHover 2s ease-in-out infinite;
+}
+
+@keyframes i3dPortalPulse {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) perspective(200px) rotateX(70deg) scale(1); }
+  50% { opacity: 0.8; transform: translateX(-50%) perspective(200px) rotateX(70deg) scale(1.05); }
+}
+
+@keyframes i3dPortalPulseHover {
+  0%, 100% { opacity: 0.9; transform: translateX(-50%) perspective(200px) rotateX(70deg) scale(1.1); }
+  50% { opacity: 1; transform: translateX(-50%) perspective(200px) rotateX(70deg) scale(1.2); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .i3d-stream,
+  .i3d-orbit-a,
+  .i3d-orbit-b {
+    animation: none !important;
+  }
+  .i3d-model-wrapper {
+    animation: none !important;
+    transform: none !important;
+  }
+}

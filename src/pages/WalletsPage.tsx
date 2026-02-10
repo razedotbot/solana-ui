@@ -34,7 +34,7 @@ import {
   getMnemonicWordCount,
 } from "../utils/hdWallet";
 import { useAppContext } from "../contexts";
-import { useToast, useWalletGroups } from "../utils/hooks";
+import { useToast, useWalletGroups, useActiveWalletGroup } from "../utils/hooks";
 
 import { formatBaseCurrencyBalance } from "../utils/formatting";
 import type { SortField, ActiveModal, FilterTab } from "../components/wallets";
@@ -42,13 +42,12 @@ import {
   WalletsHeader,
   WalletListView,
   FilterTabs,
-  GroupDrawer,
   SelectionFooter,
   OperationEmptyState,
   FundPanel,
   ConsolidatePanel,
   TransferPanel,
-  DepositPanel,
+  FeeClaimPanel,
   BurnPanel,
 } from "../components/wallets";
 import { PageBackground } from "../components/PageBackground";
@@ -80,9 +79,6 @@ export const WalletsPage: React.FC = () => {
   const [isCreateWalletModalOpen, setIsCreateWalletModalOpen] = useState(false);
 
   const [masterWallets, setMasterWallets] = useState<MasterWallet[]>([]);
-  const [expandedMasterWallets, setExpandedMasterWallets] = useState<
-    Set<string>
-  >(new Set());
   const [isCreateMasterWalletModalOpen, setIsCreateMasterWalletModalOpen] =
     useState(false);
   const [isImportMasterWalletModalOpen, setIsImportMasterWalletModalOpen] =
@@ -90,7 +86,6 @@ export const WalletsPage: React.FC = () => {
   const [exportSeedPhraseMasterWallet, setExportSeedPhraseMasterWallet] =
     useState<MasterWallet | null>(null);
   const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>("all");
-  const [isGroupDrawerOpen, setIsGroupDrawerOpen] = useState(false);
 
   const [mobileTab, setMobileTab] = useState<"wallets" | "operations">("wallets");
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -110,17 +105,14 @@ export const WalletsPage: React.FC = () => {
     reorderGroups: _reorderGroups,
     updateGroupColor,
     moveWalletToGroup,
-    moveWalletsToGroup: _moveWalletsToGroup,
+    moveWalletsToGroup,
   } = useWalletGroups(wallets, setWallets);
 
-  const [activeGroupId, setActiveGroupId] = useState<string>(() => {
-    return localStorage.getItem("wallets_page_active_group") || "all";
-  });
+  const [activeGroupId, setActiveGroup] = useActiveWalletGroup();
 
   const handleGroupChange = (groupId: string): void => {
-    setActiveGroupId(groupId);
+    setActiveGroup(groupId);
     setSelectedWallets(new Set());
-    localStorage.setItem("wallets_page_active_group", groupId);
   };
 
   // Quick mode settings (loaded from localStorage)
@@ -613,15 +605,6 @@ export const WalletsPage: React.FC = () => {
     showToast("Master wallet deleted", "success");
   };
 
-  const toggleMasterWalletExpansion = (masterWalletId: string): void => {
-    const newExpanded = new Set(expandedMasterWallets);
-    if (newExpanded.has(masterWalletId)) {
-      newExpanded.delete(masterWalletId);
-    } else {
-      newExpanded.add(masterWalletId);
-    }
-    setExpandedMasterWallets(newExpanded);
-  };
 
   const handleUpdateQuickMode = (
     category: WalletCategory,
@@ -996,12 +979,18 @@ export const WalletsPage: React.FC = () => {
                 showToast,
               )
             }
-            onOpenGroupDrawer={() => setIsGroupDrawerOpen(true)}
             quickModeSettings={quickModeSettings}
             onUpdateQuickMode={handleUpdateQuickMode}
             groups={groups}
             activeGroupId={activeGroupId}
             onGroupChange={handleGroupChange}
+            masterWallets={masterWallets}
+            wallets={wallets}
+            baseCurrencyBalances={baseCurrencyBalances}
+            baseCurrency={baseCurrency}
+            onExportSeedPhrase={setExportSeedPhraseMasterWallet}
+            onDeleteMasterWallet={handleDeleteMasterWallet}
+            onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
             isConnected={!!connection}
           />
 
@@ -1017,12 +1006,25 @@ export const WalletsPage: React.FC = () => {
                   setShowArchived(false);
                 }
               }}
-              counts={{
-                all: wallets.filter((w) => !w.isArchived).length,
-                hd: wallets.filter((w) => !w.isArchived && w.source === "hd-derived").length,
-                imported: wallets.filter((w) => !w.isArchived && (w.source === "imported" || !w.source)).length,
-                archived: wallets.filter((w) => w.isArchived).length,
-              }}
+              counts={(() => {
+                const gw = activeGroupId === "all"
+                  ? wallets
+                  : wallets.filter((w) => (w.groupId || DEFAULT_GROUP_ID) === activeGroupId);
+                return {
+                  all: gw.filter((w) => !w.isArchived).length,
+                  hd: gw.filter((w) => !w.isArchived && w.source === "hd-derived").length,
+                  imported: gw.filter((w) => !w.isArchived && (w.source === "imported" || !w.source)).length,
+                  archived: gw.filter((w) => w.isArchived).length,
+                };
+              })()}
+              groups={groups}
+              activeGroupId={activeGroupId}
+              onGroupChange={handleGroupChange}
+              walletCounts={new Map(groups.map((g) => [g.id, wallets.filter((w) => (w.groupId || DEFAULT_GROUP_ID) === g.id && !w.isArchived).length]))}
+              onCreateGroup={createGroup}
+              onRenameGroup={renameGroup}
+              onDeleteGroup={deleteGroup}
+              onUpdateGroupColor={updateGroupColor}
             />
           </div>
 
@@ -1070,41 +1072,12 @@ export const WalletsPage: React.FC = () => {
             onUnarchiveSelected={unarchiveSelectedWallets}
             onDeleteSelected={deleteSelectedWallets}
             onMoveToGroup={(groupId) => {
-              selectedWallets.forEach((walletId) => {
-                moveWalletToGroup(walletId, groupId);
-              });
+              moveWalletsToGroup(Array.from(selectedWallets), groupId);
               showToast(`Moved ${selectedWallets.size} wallet(s) to group`, "success");
               clearSelection();
             }}
           />
 
-          {/* Group Drawer */}
-          <GroupDrawer
-            isOpen={isGroupDrawerOpen}
-            onClose={() => setIsGroupDrawerOpen(false)}
-            groups={groups}
-            activeGroupId={activeGroupId}
-            walletCounts={new Map(groups.map((g) => [g.id, wallets.filter((w) => (w.groupId || DEFAULT_GROUP_ID) === g.id && !w.isArchived).length]))}
-            onGroupChange={(groupId) => {
-              handleGroupChange(groupId);
-              setIsGroupDrawerOpen(false);
-            }}
-            onCreateGroup={createGroup}
-            onRenameGroup={renameGroup}
-            onDeleteGroup={deleteGroup}
-            onUpdateGroupColor={updateGroupColor}
-            masterWallets={masterWallets}
-            wallets={wallets}
-            baseCurrencyBalances={baseCurrencyBalances}
-            baseCurrency={baseCurrency}
-            expandedMasterWallets={expandedMasterWallets}
-            onToggleMasterExpansion={toggleMasterWalletExpansion}
-            onCreateMasterWallet={() => setIsCreateMasterWalletModalOpen(true)}
-            onImportMasterWallet={() => setIsImportMasterWalletModalOpen(true)}
-            onExportSeedPhrase={setExportSeedPhraseMasterWallet}
-            onDeleteMasterWallet={handleDeleteMasterWallet}
-            onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
-          />
           </div>
 
           {/* RIGHT PANEL: Operation panel */}
@@ -1145,14 +1118,13 @@ export const WalletsPage: React.FC = () => {
                     selectedWalletIds={selectedWallets}
                   />
                 )}
-                {activeModal === "deposit" && (
-                  <DepositPanel
+                {activeModal === "fee-claim" && (
+                  <FeeClaimPanel
                     isOpen={true}
                     inline={true}
                     onClose={() => setActiveModal(null)}
                     wallets={wallets}
                     baseCurrencyBalances={baseCurrencyBalances}
-                    setBaseCurrencyBalances={setBaseCurrencyBalances}
                     connection={connection}
                     selectedWalletIds={selectedWallets}
                   />
@@ -1178,7 +1150,7 @@ export const WalletsPage: React.FC = () => {
                 onMixer={() => setActiveModal("mixer")}
                 onConsolidate={() => setActiveModal("consolidate")}
                 onTransfer={() => setActiveModal("transfer")}
-                onDeposit={() => setActiveModal("deposit")}
+                onFeeClaim={() => setActiveModal("fee-claim")}
                 onBurn={() => {
                   setBurnTokenAddress("");
                   setActiveModal("burn");

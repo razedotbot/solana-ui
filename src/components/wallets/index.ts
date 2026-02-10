@@ -10,9 +10,6 @@ export type { FilterTabsProps, FilterTab } from "./FilterTabs";
 export { WalletsHeader } from "./WalletsHeader";
 export type { WalletsHeaderProps } from "./WalletsHeader";
 
-export { GroupDrawer } from "./GroupDrawer";
-export type { GroupDrawerProps } from "./GroupDrawer";
-
 export { SelectionFooter } from "./SelectionFooter";
 export type { SelectionFooterProps } from "./SelectionFooter";
 
@@ -20,10 +17,11 @@ export { GroupSelector } from "./GroupSelector";
 
 export { OperationEmptyState } from "./OperationEmptyState";
 
+
 export { FundPanel } from "./FundPanel";
 export { ConsolidatePanel } from "./ConsolidatePanel";
 export { TransferPanel } from "./TransferPanel";
-export { DepositPanel } from "./DepositPanel";
+export { FeeClaimPanel } from "./FeeClaimPanel";
 export { BurnPanel } from "./BurnPanel";
 
 export type {

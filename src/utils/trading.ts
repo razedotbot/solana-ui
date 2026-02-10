@@ -7,6 +7,7 @@ import type { BundleResult } from "./types";
 import { executeBuy, createBuyConfig } from "./buy";
 import type { BundleMode } from "./buy";
 import { executeSell, createSellConfig } from "./sell";
+import { filterActiveWallets } from "./wallet";
 
 // Re-export sendTransactions from transactionService for convenience
 export { sendTransactions } from "./transactionService";
@@ -220,6 +221,8 @@ export const createKeypairs = (
 // Request Body Helpers
 // ============================================================================
 
+const LAMPORTS_PER_SOL = 1_000_000_000;
+
 /**
  * Get slippage value from config or use default
  */
@@ -230,7 +233,10 @@ export const getSlippageBps = (configSlippage?: number): number => {
 
   const appConfig = loadConfigFromCookies();
   if (appConfig?.slippageBps) {
-    return parseInt(appConfig.slippageBps);
+    const parsed = Number.parseInt(appConfig.slippageBps, 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
   }
 
   return TRADING.DEFAULT_SLIPPAGE_BPS;
@@ -245,19 +251,20 @@ export const getFeeLamports = (
   transactionsFeeLamports?: number,
 ): { jitoTipLamports?: number; transactionsFeeLamports?: number } => {
   const appConfig = loadConfigFromCookies();
-  const feeInSol = parseFloat(
-    appConfig?.transactionFee || String(TRADING.DEFAULT_TRANSACTION_FEE_SOL),
-  );
+  const parsedFeeInSol = Number.parseFloat(appConfig?.transactionFee ?? "");
+  const feeInSol = Number.isFinite(parsedFeeInSol)
+    ? parsedFeeInSol
+    : TRADING.DEFAULT_TRANSACTION_FEE_SOL;
 
   if (walletCount < 2) {
     return {
       transactionsFeeLamports:
-        transactionsFeeLamports ?? Math.floor((feeInSol / 3) * 1_000_000_000),
+        transactionsFeeLamports ?? Math.floor((feeInSol / 3) * LAMPORTS_PER_SOL),
     };
   }
 
   return {
-    jitoTipLamports: jitoTipLamports ?? Math.floor(feeInSol * 1_000_000_000),
+    jitoTipLamports: jitoTipLamports ?? Math.floor(feeInSol * LAMPORTS_PER_SOL),
   };
 };
 
@@ -336,6 +343,58 @@ export interface TradingResult {
   error?: string;
 }
 
+const parseOptionalInt = (value?: string): number | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const parseOptionalFeeInSol = (value?: string): number | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const resolveExecutionOverrides = (
+  config: TradingConfig,
+  slippageBps?: number,
+  jitoTipLamports?: number,
+  transactionsFeeLamports?: number,
+): {
+  slippageBps?: number;
+  jitoTipLamports?: number;
+  transactionsFeeLamports?: number;
+  bundleMode?: BundleMode;
+  batchDelay?: number;
+  singleDelay?: number;
+} => {
+  const appConfig = loadConfigFromCookies();
+  const configuredFeeInSol = parseOptionalFeeInSol(appConfig?.transactionFee);
+
+  return {
+    slippageBps: slippageBps ?? parseOptionalInt(appConfig?.slippageBps),
+    jitoTipLamports:
+      jitoTipLamports ??
+      (configuredFeeInSol !== undefined
+        ? Math.floor(configuredFeeInSol * LAMPORTS_PER_SOL)
+        : undefined),
+    transactionsFeeLamports:
+      transactionsFeeLamports ??
+      (configuredFeeInSol !== undefined
+        ? Math.floor((configuredFeeInSol / 3) * LAMPORTS_PER_SOL)
+        : undefined),
+    bundleMode: config.bundleMode ?? (appConfig?.bundleMode as BundleMode | undefined),
+    batchDelay: config.batchDelay ?? parseOptionalInt(appConfig?.batchDelay),
+    singleDelay: config.singleDelay ?? parseOptionalInt(appConfig?.singleDelay),
+  };
+};
+
 // Unified buy function using the new buy.ts
 const executeUnifiedBuy = async (
   wallets: FormattedWallet[],
@@ -345,61 +404,22 @@ const executeUnifiedBuy = async (
   transactionsFeeLamports?: number,
 ): Promise<TradingResult> => {
   try {
-    // Load config once for all settings
-    const { loadConfigFromCookies } = await import("./storage");
-    const appConfig = loadConfigFromCookies();
-
-    // Use provided slippage or fall back to config default
-    let finalSlippageBps = slippageBps;
-    if (finalSlippageBps === undefined && appConfig?.slippageBps) {
-      finalSlippageBps = parseInt(appConfig.slippageBps);
-    }
-
-    // Use provided jito tip or fall back to config default
-    let finalJitoTipLamports = jitoTipLamports;
-    if (finalJitoTipLamports === undefined && appConfig?.transactionFee) {
-      const feeInSol = appConfig.transactionFee;
-      finalJitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
-    }
-
-    // Use provided transactions fee or calculate from config
-    let finalTransactionsFeeLamports = transactionsFeeLamports;
-    if (
-      finalTransactionsFeeLamports === undefined &&
-      appConfig?.transactionFee
-    ) {
-      const feeInSol = appConfig.transactionFee;
-      finalTransactionsFeeLamports = Math.floor(
-        (parseFloat(feeInSol) / 3) * 1_000_000_000,
-      );
-    }
-
-    // Use provided bundle mode or fall back to config default
-    let finalBundleMode = config.bundleMode;
-    if (finalBundleMode === undefined && appConfig?.bundleMode) {
-      finalBundleMode = appConfig.bundleMode as BundleMode;
-    }
-
-    // Use provided delays or fall back to config defaults
-    let finalBatchDelay = config.batchDelay;
-    if (finalBatchDelay === undefined && appConfig?.batchDelay) {
-      finalBatchDelay = parseInt(appConfig.batchDelay);
-    }
-
-    let finalSingleDelay = config.singleDelay;
-    if (finalSingleDelay === undefined && appConfig?.singleDelay) {
-      finalSingleDelay = parseInt(appConfig.singleDelay);
-    }
+    const overrides = resolveExecutionOverrides(
+      config,
+      slippageBps,
+      jitoTipLamports,
+      transactionsFeeLamports,
+    );
 
     const buyConfig = createBuyConfig({
       tokenAddress: config.tokenAddress,
       amount: config.solAmount!,
-      slippageBps: finalSlippageBps,
-      jitoTipLamports: finalJitoTipLamports,
-      transactionsFeeLamports: finalTransactionsFeeLamports,
-      bundleMode: finalBundleMode,
-      batchDelay: finalBatchDelay,
-      singleDelay: finalSingleDelay,
+      slippageBps: overrides.slippageBps,
+      jitoTipLamports: overrides.jitoTipLamports,
+      transactionsFeeLamports: overrides.transactionsFeeLamports,
+      bundleMode: overrides.bundleMode,
+      batchDelay: overrides.batchDelay,
+      singleDelay: overrides.singleDelay,
     });
 
     return await executeBuy(wallets, buyConfig);
@@ -421,63 +441,24 @@ const executeUnifiedSell = async (
   transactionsFeeLamports?: number,
 ): Promise<TradingResult> => {
   try {
-    // Load config once for all settings
-    const { loadConfigFromCookies } = await import("./storage");
-    const appConfig = loadConfigFromCookies();
-
-    // Use provided slippage or fall back to config default
-    let finalSlippageBps = slippageBps;
-    if (finalSlippageBps === undefined && appConfig?.slippageBps) {
-      finalSlippageBps = parseInt(appConfig.slippageBps);
-    }
-
-    // Use provided jito tip or fall back to config default
-    let finalJitoTipLamports = jitoTipLamports;
-    if (finalJitoTipLamports === undefined && appConfig?.transactionFee) {
-      const feeInSol = appConfig.transactionFee;
-      finalJitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
-    }
-
-    // Use provided transactions fee or calculate from config
-    let finalTransactionsFeeLamports = transactionsFeeLamports;
-    if (
-      finalTransactionsFeeLamports === undefined &&
-      appConfig?.transactionFee
-    ) {
-      const feeInSol = appConfig.transactionFee;
-      finalTransactionsFeeLamports = Math.floor(
-        (parseFloat(feeInSol) / 3) * 1_000_000_000,
-      );
-    }
-
-    // Use provided bundle mode or fall back to config default
-    let finalBundleMode = config.bundleMode;
-    if (finalBundleMode === undefined && appConfig?.bundleMode) {
-      finalBundleMode = appConfig.bundleMode as BundleMode;
-    }
-
-    // Use provided delays or fall back to config defaults
-    let finalBatchDelay = config.batchDelay;
-    if (finalBatchDelay === undefined && appConfig?.batchDelay) {
-      finalBatchDelay = parseInt(appConfig.batchDelay);
-    }
-
-    let finalSingleDelay = config.singleDelay;
-    if (finalSingleDelay === undefined && appConfig?.singleDelay) {
-      finalSingleDelay = parseInt(appConfig.singleDelay);
-    }
+    const overrides = resolveExecutionOverrides(
+      config,
+      slippageBps,
+      jitoTipLamports,
+      transactionsFeeLamports,
+    );
 
     const sellConfig = createSellConfig({
       tokenAddress: config.tokenAddress,
       sellPercent: config.sellPercent,
       tokensAmount: config.tokensAmount,
-      slippageBps: finalSlippageBps,
+      slippageBps: overrides.slippageBps,
       outputMint,
-      jitoTipLamports: finalJitoTipLamports,
-      transactionsFeeLamports: finalTransactionsFeeLamports,
-      bundleMode: finalBundleMode,
-      batchDelay: finalBatchDelay,
-      singleDelay: finalSingleDelay,
+      jitoTipLamports: overrides.jitoTipLamports,
+      transactionsFeeLamports: overrides.transactionsFeeLamports,
+      bundleMode: overrides.bundleMode,
+      batchDelay: overrides.batchDelay,
+      singleDelay: overrides.singleDelay,
     });
 
     return await executeSell(wallets, sellConfig);
@@ -497,7 +478,7 @@ export const executeTrade = async (
   isBuyMode: boolean,
   _solBalances: Map<string, number>,
 ): Promise<TradingResult> => {
-  const activeWallets = wallets.filter((wallet) => wallet.isActive);
+  const activeWallets = filterActiveWallets(wallets);
 
   if (activeWallets.length === 0) {
     return { success: false, error: "Please activate at least one wallet" };

@@ -12,8 +12,7 @@ import * as SwitchPrimitive from "@radix-ui/react-switch";
 import type { WalletType, IframeData } from "./utils/types";
 import type { BaseCurrencyConfig } from "./utils/constants";
 import { useToast } from "./utils/hooks";
-import { countActiveWallets } from "./utils/wallet";
-import { toggleWallet } from "./utils/wallet";
+import { countActiveWallets, filterActiveWallets, toggleWallet } from "./utils/wallet";
 import { saveWalletsToCookies } from "./utils/storage";
 import FloatingTradingCard from "./components/FloatingTradingCard";
 import TradingCard from "./components/TradingForm";
@@ -698,7 +697,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           lastProcessedMessageRef.current = { tokenMint, timestamp: now };
 
           // Get active wallets
-          const activeWallets = wallets.filter((wallet) => wallet.isActive);
+          const activeWallets = filterActiveWallets(wallets);
 
           if (activeWallets.length > 0) {
             // Execute buy with the specified amount and token address from the message

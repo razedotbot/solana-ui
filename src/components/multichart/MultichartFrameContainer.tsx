@@ -4,6 +4,7 @@ import { useMultichart } from "../../contexts/useMultichart";
 import { brand } from "../../utils/brandConfig";
 import { executeTrade } from "../../utils/trading";
 import { useToast } from "../../utils/hooks/useToast";
+import { countActiveWallets } from "../../utils/wallet";
 import FloatingTradingCard from "../FloatingTradingCard";
 import type { WalletType } from "../../utils/types";
 import { MONITOR_SLOT } from "./constants";
@@ -247,11 +248,6 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
     setTradingCardToken(address);
     setTradingCardPosition({ x: 20, y: 40 }); // Reset position for new token
     setTradingCardOpen(true);
-  }, []);
-
-  // Count active wallets
-  const countActiveWallets = useCallback((walletList: WalletType[]): number => {
-    return walletList.filter((w) => w.isActive && !w.isArchived).length;
   }, []);
 
   // Handle trade submission - executes actual trades

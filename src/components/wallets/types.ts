@@ -5,7 +5,7 @@ export type ActiveModal =
   | "distribute"
   | "consolidate"
   | "transfer"
-  | "deposit"
+  | "fee-claim"
   | "mixer"
   | "burn"
   | null;

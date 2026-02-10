@@ -67,7 +67,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
   const [selectedToken, setSelectedToken] = useState("");
   const [tokenAddressInput, setTokenAddressInput] = useState(""); // Local token address input
   const [amount, setAmount] = useState("");
-  const [transferType, setTransferType] = useState<"BASE" | "TOKEN">("BASE");
+  const [transferType, setTransferType] = useState<"SOL" | "TOKEN">("SOL");
   const [distributionMode, setDistributionMode] = useState<
     "percentage" | "amount"
   >("amount"); // How to distribute amounts
@@ -122,7 +122,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
   useEffect(() => {
     if (transferType === "TOKEN" && tokenAddressInput) {
       setSelectedToken(tokenAddressInput);
-    } else if (transferType === "BASE") {
+    } else if (transferType === "SOL") {
       setSelectedToken("");
     }
   }, [transferType, tokenAddressInput]);
@@ -276,7 +276,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
         if (!wallet) return "0";
 
         const balance =
-          transferType === "BASE"
+          transferType === "SOL"
             ? getWalletBalance(wallet.address)
             : getWalletTokenBalance(wallet.address);
 
@@ -323,7 +323,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
     setSelectedToken("");
     setTokenAddressInput("");
     setAmount("");
-    setTransferType("BASE");
+    setTransferType("SOL");
     setDistributionMode("amount");
     setTransferQueue([]);
     setCurrentTransferIndex(0);
@@ -488,7 +488,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
 
     // Filter based on transfer type and balance
     let filtered = walletList.filter((wallet) => {
-      if (transferType === "BASE") {
+      if (transferType === "SOL") {
         return (getWalletBalance(wallet.address) || 0) > 0;
       } else {
         // For custom tokens without fetched balances, show all wallets
@@ -507,7 +507,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
 
     if (balanceFilter !== "all") {
       if (balanceFilter === "highBalance") {
-        if (transferType === "BASE") {
+        if (transferType === "SOL") {
           filtered = filtered.filter(
             (wallet) => (getWalletBalance(wallet.address) || 0) >= 0.1,
           );
@@ -517,7 +517,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           );
         }
       } else if (balanceFilter === "lowBalance") {
-        if (transferType === "BASE") {
+        if (transferType === "SOL") {
           filtered = filtered.filter(
             (wallet) => (getWalletBalance(wallet.address) || 0) < 0.1,
           );
@@ -537,11 +537,11 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           : b.address.localeCompare(a.address);
       } else if (sortOption === "balance") {
         const balanceA =
-          transferType === "BASE"
+          transferType === "SOL"
             ? getWalletBalance(a.address) || 0
             : getWalletTokenBalance(a.address) || 0;
         const balanceB =
-          transferType === "BASE"
+          transferType === "SOL"
             ? getWalletBalance(b.address) || 0
             : getWalletTokenBalance(b.address) || 0;
         return sortDirection === "asc"
@@ -745,9 +745,9 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                     <div className="flex space-x-3">
                       <button
                         type="button"
-                        onClick={() => setTransferType("BASE")}
+                        onClick={() => setTransferType("SOL")}
                         className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 font-mono modal-btn- ${
-                          transferType === "BASE"
+                          transferType === "SOL"
                             ? "bg-primary-20 border-app-primary color-primary shadow-md shadow-app-primary-40"
                             : "bg-app-tertiary border-app-primary-30 text-app-secondary hover-border-primary hover:color-primary"
                         }`}
@@ -936,7 +936,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                                   {getWalletDisplayName(wallet)}
                                 </span>
                                 <div className="flex items-center mt-0.5">
-                                  {transferType === "BASE" ? (
+                                  {transferType === "SOL" ? (
                                     <>
                                       <DollarSign
                                         size={12}
@@ -1044,7 +1044,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                               <span className="font-mono text-sm text-app-primary">
                                 {formatAddress(address)}
                               </span>
-                              {transferType === "BASE" &&
+                              {transferType === "SOL" &&
                                 baseCurrencyBalances.has(address) && (
                                   <div className="flex items-center mt-0.5">
                                     <DollarSign
@@ -1156,12 +1156,12 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                       placeholder={
                         distributionMode === "percentage"
                           ? "ENTER %"
-                          : `ENTER ${transferType === "BASE" ? baseCurrency.symbol : "TOKEN"}`
+                          : `ENTER ${transferType === "SOL" ? baseCurrency.symbol : "TOKEN"}`
                       }
                       step={
                         distributionMode === "percentage"
                           ? "0.1"
-                          : transferType === "BASE"
+                          : transferType === "SOL"
                             ? "0.0001"
                             : "1"
                       }
@@ -1182,7 +1182,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
                                 const wallet =
                                   getWalletByPrivateKey(privateKey);
                                 if (!wallet) return 0;
-                                return transferType === "BASE"
+                                return transferType === "SOL"
                                   ? getWalletBalance(wallet.address) || 0
                                   : getWalletTokenBalance(wallet.address) || 0;
                               }),

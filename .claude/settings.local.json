@@ -4,7 +4,9 @@
       "Bash(findstr:*)",
       "Bash(npm install:*)",
       "Bash(grep:*)",
-      "Bash(npx vite build:*)"
+      "Bash(npx vite build:*)",
+      "Bash(npm run build:*)",
+      "Bash(echo:*)"
     ]
   }
 }

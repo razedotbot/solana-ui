@@ -1,9 +1,10 @@
 import React from "react";
+import { Interactive3DLogo } from "../InteractiveLogo";
 import {
   Share,
   GitMerge,
   Send,
-  Download,
+  Coins,
   Flame,
   Shuffle,
 } from "lucide-react";
@@ -13,7 +14,7 @@ interface OperationEmptyStateProps {
   onMixer: () => void;
   onConsolidate: () => void;
   onTransfer: () => void;
-  onDeposit: () => void;
+  onFeeClaim: () => void;
   onBurn: () => void;
   isConnected: boolean;
 }
@@ -23,7 +24,7 @@ const operations = [
   { label: "Mixer", icon: Shuffle, action: "onMixer" as const, description: "Mix SOL between wallets" },
   { label: "Consolidate", icon: GitMerge, action: "onConsolidate" as const, description: "Merge funds to one wallet" },
   { label: "Transfer", icon: Send, action: "onTransfer" as const, description: "Send between wallets" },
-  { label: "Deposit", icon: Download, action: "onDeposit" as const, description: "Add funds from external" },
+  { label: "Fee Claim", icon: Coins, action: "onFeeClaim" as const, description: "Claim platform fees" },
   { label: "Burn", icon: Flame, action: "onBurn" as const, description: "Burn unwanted tokens" },
 ];
 
@@ -31,13 +32,11 @@ export const OperationEmptyState: React.FC<OperationEmptyStateProps> = (props) =
   const { isConnected } = props;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
+    <div className="flex-1 flex flex-col items-center justify-start pt-0 px-8 pb-8">
+      <Interactive3DLogo />
       <h3 className="text-lg font-semibold text-app-primary font-mono mb-2">
         <span className="color-primary">/</span> WALLET OPERATIONS <span className="color-primary">/</span>
       </h3>
-      <p className="text-sm text-app-secondary mb-8 text-center">
-        Select an operation to get started
-      </p>
       <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
         {operations.map((op) => (
           <button

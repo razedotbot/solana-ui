@@ -352,6 +352,9 @@ export interface BalanceRefreshOptions {
   onRateLimitError?: () => void;
 }
 
+const isOperationActiveWallet = (wallet: WalletType): boolean =>
+  wallet.isActive && !wallet.isArchived;
+
 /**
  * Fetch both base currency and token balances for all wallets with configurable refresh strategy.
  */
@@ -655,8 +658,7 @@ export function downloadAllWallets(wallets: WalletType[]): void {
  * @returns Number of active wallets (excludes archived wallets)
  */
 export const countActiveWallets = (wallets: WalletType[]): number => {
-  return wallets.filter((wallet) => wallet.isActive && !wallet.isArchived)
-    .length;
+  return wallets.filter(isOperationActiveWallet).length;
 };
 
 /**
@@ -666,7 +668,7 @@ export const countActiveWallets = (wallets: WalletType[]): number => {
  * @returns Array of active wallets (excludes archived wallets)
  */
 export const filterActiveWallets = (wallets: WalletType[]): WalletType[] => {
-  return wallets.filter((wallet) => wallet.isActive && !wallet.isArchived);
+  return wallets.filter(isOperationActiveWallet);
 };
 
 // Re-export storage functions for convenience

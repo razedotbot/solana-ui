@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, lazy, Suspense } from "react";
+import React, { useState, useCallback, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { DeployForm } from "./DeployForm";
 import { GroupSelector } from "../wallets/GroupSelector";
-import { useWalletGroups } from "../../utils/hooks";
+import { useWalletGroups, useActiveWalletGroup } from "../../utils/hooks";
 
 // Left column view type
 type LeftColumnView = "wallets" | "deploy";
@@ -225,7 +225,7 @@ const ToolsDropdown: React.FC = () => {
 
 export interface AdvancedLayoutProps {
   wallets: WalletType[];
-  setWallets: (wallets: WalletType[]) => void;
+  setWallets: (wallets: WalletType[] | ((prev: WalletType[]) => WalletType[])) => void;
   tokenAddress: string;
   setTokenAddress: (address: string) => void;
   isRefreshing: boolean;
@@ -316,23 +316,8 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
   // Wallet groups
   const { groups } = useWalletGroups(wallets, setWallets);
 
-  // Active group state
-  const [activeGroupId, setActiveGroupId] = useState<string>(() => {
-    return localStorage.getItem("advanced_layout_active_group") || "all";
-  });
-
-  const handleGroupChange = (groupId: string): void => {
-    setActiveGroupId(groupId);
-    localStorage.setItem("advanced_layout_active_group", groupId);
-  };
-
-  // Filter wallets based on active group
-  const filteredWallets = useMemo(() => {
-    if (activeGroupId === "all") {
-      return wallets;
-    }
-    return wallets.filter((wallet) => wallet.groupId === activeGroupId);
-  }, [wallets, activeGroupId]);
+  // Active group state (shared across all components)
+  const [activeGroupId, handleGroupChange] = useActiveWalletGroup();
 
   // Store advanced sizes separately so we can restore them when switching back from simple mode
   const [savedAdvancedSizes, setSavedAdvancedSizes] = useState<number[]>([25, 75]);
@@ -478,9 +463,10 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
               !!connection && (
                 <Suspense fallback={<div className="flex-1 flex items-center justify-center"><RefreshCw className="animate-spin color-primary" size={20} /></div>}>
                   <WalletsListSidebar
-                    wallets={filteredWallets}
+                    wallets={wallets}
                     setWallets={setWallets}
                     tokenAddress={tokenAddress}
+                    activeGroupId={activeGroupId}
                     baseCurrencyBalances={baseCurrencyBalances}
                     baseCurrency={baseCurrency}
                     tokenBalances={tokenBalances}

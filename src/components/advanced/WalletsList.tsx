@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   copyToClipboard,
+  filterActiveWallets,
   toggleWallet,
   getWalletDisplayName,
 } from "../../utils/wallet";
@@ -25,6 +26,7 @@ import type {
   WalletCategory,
   CategoryQuickTradeSettings,
 } from "../../utils/types";
+import { DEFAULT_GROUP_ID } from "../../utils/types";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { formatTokenBalance } from "../../utils/formatting";
 import { useToast } from "../../utils/hooks";
@@ -368,6 +370,8 @@ const WalletList: React.FC<WalletRowData> = (props) => {
   const [listHeight, setListHeight] = useState(400);
 
   // Update list height based on container size
+  // Deps include wallets.length so height recalculates when crossing the
+  // virtualization threshold (e.g. switching from a small group to "All Groups")
   useEffect(() => {
     const updateHeight = (): void => {
       if (containerRef.current) {
@@ -377,10 +381,11 @@ const WalletList: React.FC<WalletRowData> = (props) => {
       }
     };
 
-    updateHeight();
+    // RAF ensures the containerRef div has been painted after a render-mode switch
+    requestAnimationFrame(updateHeight);
     window.addEventListener("resize", updateHeight);
     return () => window.removeEventListener("resize", updateHeight);
-  }, []);
+  }, [wallets.length]);
 
   // If fewer than 15 wallets, render without virtualization for simplicity
   if (wallets.length < 15) {
@@ -418,6 +423,7 @@ interface WalletsListSidebarProps {
   wallets: WalletType[];
   setWallets: (wallets: WalletType[]) => void;
   tokenAddress: string;
+  activeGroupId?: string;
 
   // Balance props
   baseCurrencyBalances?: Map<string, number>;
@@ -449,6 +455,7 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
   wallets,
   setWallets,
   tokenAddress,
+  activeGroupId,
 
   // Balance props with defaults
   baseCurrencyBalances: externalBaseCurrencyBalances,
@@ -600,28 +607,54 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [balancesSerialized, wallets]); // Only depend on serialized string and wallets - solBalances/tokenBalances accessed via closure
 
-  // Calculate balances and update external state
+  // Deselect all wallets when switching groups
+  const prevGroupIdRef = useRef(activeGroupId);
+  useEffect(() => {
+    if (prevGroupIdRef.current !== activeGroupId) {
+      prevGroupIdRef.current = activeGroupId;
+      const hasActive = wallets.some((w) => w.isActive);
+      if (hasActive) {
+        const deselected = wallets.map((w) => ({ ...w, isActive: false }));
+        setWallets(deselected);
+        saveWalletsToCookies(deselected);
+      }
+    }
+  }, [activeGroupId, wallets, setWallets]);
+
+  // Filter wallets for display (by group + archived status)
+  const visibleWallets = useMemo(
+    () => wallets.filter((wallet) => {
+      if (wallet.isArchived) return false;
+      if (activeGroupId && activeGroupId !== "all") {
+        return (wallet.groupId || DEFAULT_GROUP_ID) === activeGroupId;
+      }
+      return true;
+    }),
+    [wallets, activeGroupId],
+  );
+
+  // Calculate balances scoped to visible wallets (current group)
   const calculatedTotalSol = useMemo(
     () =>
-      Array.from(solBalances.values()).reduce(
-        (sum, balance) => sum + balance,
+      visibleWallets.reduce(
+        (sum, wallet) => sum + (solBalances.get(wallet.address) || 0),
         0,
       ),
-    [solBalances],
+    [visibleWallets, solBalances],
   );
 
   const calculatedTotalTokens = useMemo(
     () =>
-      Array.from(tokenBalances.values()).reduce(
-        (sum, balance) => sum + balance,
+      visibleWallets.reduce(
+        (sum, wallet) => sum + (tokenBalances.get(wallet.address) || 0),
         0,
       ),
-    [tokenBalances],
+    [visibleWallets, tokenBalances],
   );
 
   const activeWallets = useMemo(
-    () => wallets.filter((wallet) => wallet.isActive),
-    [wallets],
+    () => filterActiveWallets(visibleWallets),
+    [visibleWallets],
   );
 
   // Create a stable key from active wallet IDs to ensure recalculation when wallets change
@@ -797,6 +830,22 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
     }
   };
 
+  // Sort only visible wallets in-place within the full array, preserving other groups
+  const sortVisibleInPlace = (
+    sorted: WalletType[],
+  ): WalletType[] => {
+    const visibleIdSet = new Set(visibleWallets.map((w) => w.id));
+    const positions: number[] = [];
+    wallets.forEach((w, i) => {
+      if (visibleIdSet.has(w.id)) positions.push(i);
+    });
+    const result = [...wallets];
+    positions.forEach((pos, i) => {
+      result[pos] = sorted[i];
+    });
+    return result;
+  };
+
   // Handler for sorting wallets by SOL balance
   const handleSortBySol = (e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -805,13 +854,13 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
     setSortType("sol");
     setSortDirection(newDirection);
 
-    const sortedWallets = [...wallets].sort((a, b) => {
+    const sortedVisible = [...visibleWallets].sort((a, b) => {
       const balanceA = solBalances.get(a.address) || 0;
       const balanceB = solBalances.get(b.address) || 0;
       return newDirection === "asc" ? balanceA - balanceB : balanceB - balanceA;
     });
 
-    setWallets(sortedWallets);
+    setWallets(sortVisibleInPlace(sortedVisible));
   };
 
   // Handler for sorting wallets by token balance
@@ -827,19 +876,19 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
     setSortType("token");
     setSortDirection(newDirection);
 
-    const sortedWallets = [...wallets].sort((a, b) => {
+    const sortedVisible = [...visibleWallets].sort((a, b) => {
       const balanceA = tokenBalances.get(a.address) || 0;
       const balanceB = tokenBalances.get(b.address) || 0;
       return newDirection === "asc" ? balanceA - balanceB : balanceB - balanceA;
     });
 
-    setWallets(sortedWallets);
+    setWallets(sortVisibleInPlace(sortedVisible));
   };
 
-  // Handler for selecting/deselecting all wallets with SOL balance
+  // Handler for selecting/deselecting all wallets with SOL balance (scoped to visible group)
   const handleSelectAllWithSol = (e: React.MouseEvent): void => {
     e.stopPropagation();
-    const walletsWithSol = wallets.filter((wallet) => {
+    const walletsWithSol = visibleWallets.filter((wallet) => {
       const balance = solBalances.get(wallet.address) || 0;
       return balance > 0;
     });
@@ -849,17 +898,17 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
       return;
     }
 
-    // Check if all wallets with SOL are already active
+    // Check if all visible wallets with SOL are already active
     const allActive = walletsWithSol.every((wallet) => wallet.isActive);
 
-    // Toggle: if all wallets with SOL are active, deselect ALL wallets; otherwise, select all wallets with SOL
+    // Only modify wallets in the visible group, leave others untouched
+    const visibleIds = new Set(visibleWallets.map((w) => w.id));
     const updatedWallets = wallets.map((wallet) => {
+      if (!visibleIds.has(wallet.id)) return wallet;
       const hasSol = (solBalances.get(wallet.address) || 0) > 0;
       if (allActive) {
-        // Deselect all wallets
         return { ...wallet, isActive: false };
       } else {
-        // Select only wallets with SOL balance
         if (hasSol) {
           return { ...wallet, isActive: true };
         }
@@ -879,7 +928,7 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
     }
   };
 
-  // Handler for selecting/deselecting all wallets with token balance
+  // Handler for selecting/deselecting all wallets with token balance (scoped to visible group)
   const handleSelectAllWithTokens = (e: React.MouseEvent): void => {
     e.stopPropagation();
     if (!tokenAddress) {
@@ -887,7 +936,7 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
       return;
     }
 
-    const walletsWithTokens = wallets.filter((wallet) => {
+    const walletsWithTokens = visibleWallets.filter((wallet) => {
       const balance = tokenBalances.get(wallet.address) || 0;
       return balance > 0;
     });
@@ -897,17 +946,17 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
       return;
     }
 
-    // Check if all wallets with tokens are already active
+    // Check if all visible wallets with tokens are already active
     const allActive = walletsWithTokens.every((wallet) => wallet.isActive);
 
-    // Toggle: if all wallets with tokens are active, deselect ALL wallets; otherwise, select all wallets with tokens
+    // Only modify wallets in the visible group, leave others untouched
+    const visibleIds = new Set(visibleWallets.map((w) => w.id));
     const updatedWallets = wallets.map((wallet) => {
+      if (!visibleIds.has(wallet.id)) return wallet;
       const hasTokens = (tokenBalances.get(wallet.address) || 0) > 0;
       if (allActive) {
-        // Deselect all wallets
         return { ...wallet, isActive: false };
       } else {
-        // Select only wallets with token balance
         if (hasTokens) {
           return { ...wallet, isActive: true };
         }
@@ -1026,12 +1075,6 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
       setSellingWalletId(null);
     }
   };
-
-  // Filter out archived wallets for display
-  const visibleWallets = useMemo(
-    () => wallets.filter((wallet) => !wallet.isArchived),
-    [wallets],
-  );
 
   // Handler for wallet row click (toggle selection)
   const handleWalletClick = useCallback(

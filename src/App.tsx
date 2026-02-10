@@ -684,6 +684,10 @@ const WalletManager: React.FC = () => {
 
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  // Ref to latest wallets for resolving functional updates without stale closures
+  const walletsRef = useRef(state.wallets);
+  walletsRef.current = state.wallets;
+
   // Memoized callbacks to prevent unnecessary re-renders
   const memoizedCallbacks = useMemo(
     () => ({
@@ -712,9 +716,12 @@ const WalletManager: React.FC = () => {
       },
       setCurrentPage: (page: "chart" | "actions"): void =>
         dispatch({ type: "SET_CURRENT_PAGE", payload: page }),
-      setWallets: (wallets: WalletType[]): void => {
-        dispatch({ type: "SET_WALLETS", payload: wallets });
-        setContextWallets(wallets);
+      setWallets: (walletsOrFn: WalletType[] | ((prev: WalletType[]) => WalletType[])): void => {
+        const resolved = typeof walletsOrFn === "function"
+          ? walletsOrFn(walletsRef.current)
+          : walletsOrFn;
+        dispatch({ type: "SET_WALLETS", payload: resolved });
+        setContextWallets(resolved);
       },
       setIsRefreshing: (refreshing: boolean): void =>
         dispatch({ type: "SET_REFRESHING", payload: refreshing }),

@@ -9,7 +9,7 @@ import {
   Trash2,
   Search
 } from 'lucide-react';
-import '@google/model-viewer';
+import { Interactive3DLogo } from '../components/InteractiveLogo';
 
 import { getRecentTokens, clearRecentTokens, formatTimeAgo, removeRecentToken } from '../utils/recentTokens';
 import type { RecentToken } from '../utils/types';
@@ -275,33 +275,8 @@ export const Homepage: React.FC = () => {
             ))}
 
 
-            {/* Static glow under logo */}
-            <div className="hero-portal-static" />
-
             {/* 3D Model */}
-            <div className="relative z-10" style={{ width: '320px', height: '320px', marginTop: '-20px' }}>
-              {/* @ts-expect-error model-viewer is a web component */}
-              <model-viewer
-                src="/logo3d.glb"
-                environment-image="/logo3d-env.hdr"
-                interaction-prompt="none"
-                auto-rotate
-                auto-rotate-delay="0"
-                rotation-per-second="30deg"
-                tone-mapping="neutral"
-                shadow-intensity="0"
-                loading="eager"
-                reveal="auto"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: 'transparent',
-                  '--poster-color': 'transparent',
-                  '--progress-bar-color': 'transparent',
-                  '--progress-bar-height': '0px',
-                } as React.CSSProperties}
-              />
-            </div>
+            <Interactive3DLogo />
 
           </div>
 
