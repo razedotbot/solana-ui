@@ -1,7 +1,8 @@
 import type { RecentToken } from './types';
+import { STORAGE_KEYS, RECENT_TOKENS } from './constants';
 
-const STORAGE_KEY = 'raze_recent_tokens';
-const MAX_RECENT_TOKENS = 10;
+const STORAGE_KEY = STORAGE_KEYS.recentTokens;
+const MAX_RECENT_TOKENS = RECENT_TOKENS.MAX_COUNT;
 
 /**
  * Add a token to recent history
@@ -29,7 +30,6 @@ export const addRecentToken = (address: string): void => {
   } catch (error) {
     if (error instanceof DOMException && error.name === 'QuotaExceededError') {
       // Storage quota exceeded - clear old data and retry
-      console.warn('localStorage quota exceeded, clearing recent tokens');
       clearRecentTokens();
       try {
         const newToken: RecentToken = {
@@ -37,11 +37,11 @@ export const addRecentToken = (address: string): void => {
           lastViewed: Date.now()
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify([newToken]));
-      } catch (retryError) {
-        console.error('Error adding recent token after clearing:', retryError);
+      } catch {
+        // Failed to save even after clearing, ignore
       }
     } else {
-      console.error('Error adding recent token:', error);
+      // Other storage error, ignore
     }
   }
 };
@@ -58,7 +58,6 @@ export const getRecentTokens = (): RecentToken[] => {
     
     // Validate data structure
     if (!Array.isArray(parsed)) {
-      console.warn('Invalid recent tokens data structure, clearing');
       clearRecentTokens();
       return [];
     }
@@ -83,8 +82,7 @@ export const getRecentTokens = (): RecentToken[] => {
     }
     
     return validated;
-  } catch (error) {
-    console.error('Error loading recent tokens:', error);
+  } catch {
     // Clear corrupted data
     clearRecentTokens();
     return [];
@@ -97,8 +95,8 @@ export const getRecentTokens = (): RecentToken[] => {
 export const clearRecentTokens = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.error('Error clearing recent tokens:', error);
+  } catch {
+    // Failed to clear storage, ignore
   }
 };
 
@@ -115,8 +113,8 @@ export const removeRecentToken = (address: string): void => {
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     }
-  } catch (error) {
-    console.error('Error removing recent token:', error);
+  } catch {
+    // Failed to remove token, ignore
   }
 };
 

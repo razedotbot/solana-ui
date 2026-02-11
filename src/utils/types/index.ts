@@ -1,35 +1,105 @@
 /**
  * Central Type Exports
- * 
+ *
  * This module re-exports all types from the type system.
  * Import types from this file for convenience.
- * 
+ *
  * @example
  * import type { WalletType, BuyConfig, TradingStrategy } from '@/utils/types';
  * // or
  * import type { WalletType } from '../utils/types';
  */
 
-// ============================================================================
-// API Types
-// ============================================================================
+// --- API types (inlined from api.ts) ---
 
-export type {
-  ApiResponse,
-  BundleResult,
-  SimpleBundleResult,
-  TokenCreationResult,
-  ServerConfig,
-  ServerInfo,
-  BundleResponse,
-  TokenCreationResponse,
-  WindowWithToast,
-  PresetTab as ApiPresetTab,
-} from './api';
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  details?: string;
+  result?: T;
+}
 
-// ============================================================================
-// Wallet Types
-// ============================================================================
+export interface SenderResult {
+  jsonrpc: string;
+  id: number;
+  result?: string;
+  error?: {
+    code: number;
+    message: string;
+  };
+}
+
+export interface ServerInfo {
+  id: string;
+  name: string;
+  url: string;
+  region: string;
+  flag: string;
+  ping?: number;
+}
+
+export interface WindowWithToast extends Window {
+  showToast?: (message: string, type: "success" | "error") => void;
+}
+
+// --- Multichart types (inlined from multichart.ts) ---
+
+export interface MultichartToken {
+  address: string;
+  addedAt: number;
+  label?: string;
+  symbol?: string;
+  imageUrl?: string;
+}
+
+export interface MultichartState {
+  tokens: MultichartToken[];
+  activeTokenIndex: number;
+}
+
+export interface MultichartTokenStats {
+  address: string;
+  price: number | null;
+  marketCap: number | null;
+  pnl: { bought: number; sold: number; net: number; trades: number } | null;
+}
+
+// --- Token metadata types (inlined from tokenMetadata.ts) ---
+
+export interface TokenOnChainMetadata {
+  name: string;
+  symbol: string;
+  uri: string;
+  source: string;
+}
+
+export interface TokenOffChainMetadata {
+  name?: string;
+  symbol?: string;
+  description?: string;
+  image?: string;
+}
+
+export interface TokenMetadataApiResponse {
+  success: boolean;
+  metadata: {
+    tokenMint: string;
+    onChain: TokenOnChainMetadata | null;
+    offChain: TokenOffChainMetadata | null;
+    metadataSource?: string;
+    timestamp?: string;
+  };
+}
+
+export interface TokenMetadataInfo {
+  mint: string;
+  name: string;
+  symbol: string;
+  image: string;
+  fetchedAt: number;
+}
+
 
 export type {
   WalletCategory,
@@ -38,6 +108,7 @@ export type {
   CustomQuickTradeSettings,
   QuickBuyPreferences,
   WalletType,
+  WalletGroup,
   ConfigType,
   RecentToken,
   CategoryQuickTradeSettings,
@@ -46,23 +117,17 @@ export type {
   WalletImportResult,
   WalletExportData,
   WalletSelectionState,
-  WalletSortDirection,
-  WalletSortField,
-  WalletFilterOptions,
-} from './wallet';
+} from "./wallet";
 
-// ============================================================================
-// Trading Types
-// ============================================================================
+export { DEFAULT_GROUP_ID } from "./wallet";
+
 
 export type {
   BundleMode,
-  ScriptType,
   WalletBuy,
   WalletSell,
   BuyConfig,
   SellConfig,
-  ServerResponse,
   BuyBundle,
   SellBundle,
   BuyResult,
@@ -76,155 +141,22 @@ export type {
   TokenMarketData,
   QuickTradeParams,
   QuickTradeResult,
-} from './trading';
+} from "./trading";
 
-// ============================================================================
-// WebSocket Types
-// ============================================================================
-
-export type {
-  WebSocketWelcomeMessage,
-  WebSocketConnectionMessage,
-  WebSocketSubscriptionMessage,
-  WebSocketTradeMessage,
-  WebSocketErrorMessage,
-  WebSocketMessage,
-  TradeTransactionData,
-  AutomateTrade,
-  AutomateWebSocketConfig,
-  MultiTokenWebSocketConfig,
-  CopyTradeData as WebSocketCopyTradeData,
-  CopyTradeWebSocketConfig,
-  WebSocketConnectionState,
-  WebSocketStatus,
-  TokenSubscriptionRequest,
-  SignerSubscriptionRequest,
-  WebSocketSubscriptionRequest,
-  WebSocketEventHandlers,
-  WebSocketConstants,
-  WebSocketPriceInfo,
-  WebSocketAuthConfig,
-  WebSocketAuthErrorCode,
-  WebSocketAuthError,
-} from './websocket';
-
-// ============================================================================
-// Automation Types
-// ============================================================================
-
-export type {
-  TradingConditionType,
-  ConditionOperator,
-  TradingCondition,
-  ActionAmountType,
-  VolumeType,
-  ActionPriority,
-  TradingAction,
-  ConditionLogic,
-  CooldownUnit,
-  TradingStrategy,
-  WalletList,
-  CopyTradeMode,
-  TokenFilterMode,
-  CopyTradeConditionType,
-  CopyTradeCondition,
-  CopyTradeAmountType,
-  CopyTradeAction,
-  SimpleModeCopyConfig,
-  CopyTradeProfile,
-  CopyTradeData,
-  CopyTradeExecutionLog,
-  StrategyExecutionLog,
-  CopyTradeProfileStorage,
-  TradingStrategyStorage,
-  WhitelistEntry,
-  WhitelistConfig,
-} from './automation';
-
-// ============================================================================
-// Component Types
-// ============================================================================
 
 export type {
   ToastType,
   Toast,
   PresetTab,
-  FundingMode,
-  FundModalProps,
-  TransferModalProps,
-  MixerModalProps,
-  ConsolidateModalProps,
-  DistributeModalProps,
-  DepositModalProps,
   CreateWalletModalProps,
   ImportWalletModalProps,
-  CreateMasterWalletModalProps,
-  ExportSeedPhraseModalProps,
-  BurnModalProps,
-  QuickTradeModalProps,
-  WalletQuickTradeModalProps,
   CalculatePNLModalProps,
   MobilePage,
   MobileLayoutProps,
-  WalletsPageProps,
-  DeployPageProps,
-  SettingsPageProps,
-  PresetButtonProps,
-  TabButtonProps,
-  ServiceButtonProps,
   WalletAmount as ComponentWalletAmount,
-  TransferStatus,
-  TransferQueueItem,
-  BalanceFilter,
-  SortOption,
-  SortDirection,
-  WalletListFilterState,
-  ModalStep,
-  ModalState,
-  MenuItem,
-  HeaderProps,
-  NotificationItem,
-  NotificationsProps,
-} from './components';
+} from "./components";
 
-// ============================================================================
-// Iframe Types
-// ============================================================================
 
 export type {
-  ViewType,
-  NavigateMessage,
-  AddWalletsMessage,
-  ClearWalletsMessage,
-  GetWalletsMessage,
-  WalletMessage,
-  ToggleNonWhitelistedTradesMessage,
-  SetQuickBuyConfigMessage,
-  QuickBuyActivateMessage,
-  QuickBuyDeactivateMessage,
-  IframeMessage,
-  IframeReadyResponse,
-  WalletsAddedResponse,
-  WalletsClearedResponse,
-  CurrentWalletsResponse,
-  WhitelistTradingStatsResponse,
-  SolPriceUpdateResponse,
-  WhitelistTradeResponse,
-  TokenPriceUpdateResponse,
-  TokenSelectedResponse,
-  NonWhitelistedTradeResponse,
-  HoldingsOpenedResponse,
-  TokenClearedResponse,
-  NavigationCompleteResponse,
-  IframeResponse,
-  TradingStats,
-  IframeWallet,
-  IframeRecentTrade,
-  IframeTokenPrice,
   IframeData,
-  ViewState,
-  IframeStateContextType,
-  QueuedMessage,
-  IframeManagerState,
-  FrameProps,
-} from './iframe';
+} from "./iframe";

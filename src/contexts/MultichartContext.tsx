@@ -1,0 +1,270 @@
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import type { MultichartToken, MultichartTokenStats } from '../utils/types';
+import {
+  saveMultichartTokens,
+  loadMultichartTokens,
+  saveMultichartActiveIndex,
+  loadMultichartActiveIndex,
+  getMaxMultichartTokens,
+} from '../utils/storage';
+import { getTokenMetadataSync, prefetchTokenMetadata } from '../utils/hooks/useTokenMetadata';
+
+export interface MultichartContextType {
+  tokens: MultichartToken[];
+  activeTokenIndex: number;
+  tokenStats: Map<string, MultichartTokenStats>;
+  addToken: (address: string, metadata?: Partial<MultichartToken>) => boolean;
+  removeToken: (address: string) => void;
+  setActiveToken: (index: number) => void;
+  updateTokenStats: (address: string, stats: MultichartTokenStats) => void;
+  updateTokenMetadata: (address: string, metadata: Partial<MultichartToken>) => void;
+  reorderTokens: (fromIndex: number, toIndex: number) => void;
+  replaceToken: (oldAddress: string, newAddress: string) => void;
+  maxTokens: number;
+}
+
+export const MultichartContext = createContext<MultichartContextType | undefined>(undefined);
+
+export function useMultichart(): MultichartContextType {
+  const context = useContext(MultichartContext);
+  if (context === undefined) {
+    throw new Error('useMultichart must be used within a MultichartProvider');
+  }
+  return context;
+}
+
+export function MultichartProvider({ children }: { children: React.ReactNode }): React.ReactElement {
+  const [tokens, setTokens] = useState<MultichartToken[]>(() => loadMultichartTokens());
+  const [activeTokenIndex, setActiveTokenIndex] = useState<number>(() => {
+    const savedIndex = loadMultichartActiveIndex();
+    const loadedTokens = loadMultichartTokens();
+    // Ensure index is valid, -1 means no active token (monitor view)
+    if (savedIndex === -1) return -1;
+    return savedIndex < loadedTokens.length ? savedIndex : -1;
+  });
+  const [tokenStats, setTokenStats] = useState<Map<string, MultichartTokenStats>>(new Map());
+
+  const maxTokens = getMaxMultichartTokens();
+
+  // Persist tokens to localStorage whenever they change
+  useEffect(() => {
+    saveMultichartTokens(tokens);
+  }, [tokens]);
+
+  // Persist active index to cookies whenever it changes
+  useEffect(() => {
+    saveMultichartActiveIndex(activeTokenIndex);
+  }, [activeTokenIndex]);
+
+  // Auto-enrich tokens with metadata from the cache/API
+  const enrichedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const unenriched = tokens.filter(
+      (t) => !t.symbol && !enrichedRef.current.has(t.address),
+    );
+    if (unenriched.length === 0) return;
+
+    // Kick off prefetch for any tokens not yet cached
+    prefetchTokenMetadata(unenriched.map((t) => t.address));
+
+    // Check sync cache immediately + schedule a delayed check for API results
+    const enrichFromCache = (): void => {
+      for (const token of unenriched) {
+        const meta = getTokenMetadataSync(token.address);
+        if (meta && (meta.symbol || meta.name)) {
+          enrichedRef.current.add(token.address);
+          setTokens((prev) =>
+            prev.map((t) =>
+              t.address === token.address && !t.symbol
+                ? { ...t, symbol: meta.symbol, imageUrl: meta.image }
+                : t,
+            ),
+          );
+        }
+      }
+    };
+
+    enrichFromCache();
+    // Retry after API has had time to respond
+    const timer = setTimeout(enrichFromCache, 2000);
+    return () => clearTimeout(timer);
+  }, [tokens]);
+
+  const addToken = useCallback(
+    (address: string, metadata?: Partial<MultichartToken>): boolean => {
+      // Check if token already exists
+      if (tokens.some((t) => t.address === address)) {
+        // Switch to existing token
+        const existingIndex = tokens.findIndex((t) => t.address === address);
+        setActiveTokenIndex(existingIndex);
+        return false;
+      }
+
+      // Check max tokens limit
+      if (tokens.length >= maxTokens) {
+        return false;
+      }
+
+      // Try to enrich with cached metadata immediately
+      const cachedMeta = getTokenMetadataSync(address);
+      const newToken: MultichartToken = {
+        address,
+        addedAt: Date.now(),
+        ...(cachedMeta && { symbol: cachedMeta.symbol, imageUrl: cachedMeta.image }),
+        ...metadata,
+      };
+
+      setTokens((prev) => [...prev, newToken]);
+      setActiveTokenIndex(tokens.length); // Set to the new token's index
+      return true;
+    },
+    [tokens, maxTokens],
+  );
+
+  const removeToken = useCallback(
+    (address: string) => {
+      const indexToRemove = tokens.findIndex((t) => t.address === address);
+      if (indexToRemove === -1) return;
+
+      setTokens((prev) => prev.filter((t) => t.address !== address));
+
+      // Remove stats for this token
+      setTokenStats((prev) => {
+        const newStats = new Map(prev);
+        newStats.delete(address);
+        return newStats;
+      });
+
+      // Adjust active index if needed
+      if (activeTokenIndex !== -1 && activeTokenIndex >= indexToRemove) {
+        const newIndex = Math.max(-1, activeTokenIndex - 1);
+        setActiveTokenIndex(newIndex);
+      }
+    },
+    [tokens, activeTokenIndex],
+  );
+
+  const setActiveToken = useCallback(
+    (index: number) => {
+      // Allow -1 for "no active token" (monitor view)
+      if (index === -1 || (index >= 0 && index < tokens.length)) {
+        setActiveTokenIndex(index);
+      }
+    },
+    [tokens.length],
+  );
+
+  const updateTokenStats = useCallback((address: string, stats: MultichartTokenStats) => {
+    setTokenStats((prev) => {
+      const existing = prev.get(address);
+      // Only update if data actually changed to prevent infinite loops
+      if (existing &&
+          existing.price === stats.price &&
+          existing.marketCap === stats.marketCap &&
+          existing.pnl?.bought === stats.pnl?.bought &&
+          existing.pnl?.sold === stats.pnl?.sold &&
+          existing.pnl?.net === stats.pnl?.net &&
+          existing.pnl?.trades === stats.pnl?.trades) {
+        return prev; // Return same reference to prevent re-render
+      }
+      const newStats = new Map(prev);
+      newStats.set(address, stats);
+      return newStats;
+    });
+  }, []);
+
+  const updateTokenMetadata = useCallback((address: string, metadata: Partial<MultichartToken>) => {
+    setTokens((prev) =>
+      prev.map((token) =>
+        token.address === address ? { ...token, ...metadata } : token
+      )
+    );
+  }, []);
+
+  const reorderTokens = useCallback((fromIndex: number, toIndex: number) => {
+    setTokens((prev) => {
+      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) {
+        return prev;
+      }
+      const newTokens = [...prev];
+      const [movedToken] = newTokens.splice(fromIndex, 1);
+      newTokens.splice(toIndex, 0, movedToken);
+      return newTokens;
+    });
+
+    // Adjust activeTokenIndex if needed
+    setActiveTokenIndex((prevIndex) => {
+      if (prevIndex === fromIndex) {
+        return toIndex;
+      }
+      if (fromIndex < prevIndex && toIndex >= prevIndex) {
+        return prevIndex - 1;
+      }
+      if (fromIndex > prevIndex && toIndex <= prevIndex) {
+        return prevIndex + 1;
+      }
+      return prevIndex;
+    });
+  }, []);
+
+  const replaceToken = useCallback((oldAddress: string, newAddress: string) => {
+    // Don't replace if new token already exists
+    if (tokens.some((t) => t.address === newAddress)) {
+      // Just switch to existing token
+      const existingIndex = tokens.findIndex((t) => t.address === newAddress);
+      setActiveTokenIndex(existingIndex);
+      return;
+    }
+
+    setTokens((prev) => {
+      const index = prev.findIndex((t) => t.address === oldAddress);
+      if (index === -1) return prev;
+
+      const newTokens = [...prev];
+      newTokens[index] = {
+        address: newAddress,
+        addedAt: Date.now(),
+      };
+      return newTokens;
+    });
+
+    // Update stats map - remove old, keep new slot empty
+    setTokenStats((prev) => {
+      const newStats = new Map(prev);
+      newStats.delete(oldAddress);
+      return newStats;
+    });
+  }, [tokens]);
+
+  const value = useMemo(
+    () => ({
+      tokens,
+      activeTokenIndex,
+      tokenStats,
+      addToken,
+      removeToken,
+      setActiveToken,
+      updateTokenStats,
+      updateTokenMetadata,
+      reorderTokens,
+      replaceToken,
+      maxTokens,
+    }),
+    [
+      tokens,
+      activeTokenIndex,
+      tokenStats,
+      addToken,
+      removeToken,
+      setActiveToken,
+      updateTokenStats,
+      updateTokenMetadata,
+      reorderTokens,
+      replaceToken,
+      maxTokens,
+    ],
+  );
+
+  return <MultichartContext.Provider value={value}>{children}</MultichartContext.Provider>;
+}

@@ -61,28 +61,27 @@ const getCacheTTL = (view: ViewType): number => {
 
 export const IframeStateProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [viewStates, setViewStates] = useState<Map<string, ViewState>>(new Map());
+  // Use a ref to access viewStates without adding it to dependencies
+  const viewStatesRef = React.useRef(viewStates);
+  viewStatesRef.current = viewStates;
 
   const getViewState = useCallback((view: ViewType, tokenMint?: string): ViewState | null => {
     const key = getViewKey(view, tokenMint);
-    const state = viewStates.get(key);
-    
+    const state = viewStatesRef.current.get(key);
+
     if (!state) return null;
-    
+
     // Check if cache is still valid (use view-specific TTL)
     const now = Date.now();
     const ttl = getCacheTTL(view);
     if (now - state.timestamp > ttl) {
-      // Cache expired, remove it
-      setViewStates(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(key);
-        return newMap;
-      });
+      // Cache expired, remove it (don't trigger re-render in getViewState)
+      // The next setViewState call will clean it up
       return null;
     }
-    
+
     return state;
-  }, [viewStates]);
+  }, []);
 
   const setViewState = useCallback((
     view: ViewType,
@@ -101,22 +100,22 @@ export const IframeStateProvider: React.FC<{ children: ReactNode }> = ({ childre
         marketCap: null,
         timestamp: Date.now(),
       };
-      
+
       newMap.set(key, {
         ...existing,
         ...partialState,
         timestamp: Date.now(),
       });
-      
+
       // Enforce cache size limit - remove oldest entries
       if (newMap.size > MAX_CACHE_ENTRIES) {
         const entries = Array.from(newMap.entries())
           .sort((a, b) => a[1].timestamp - b[1].timestamp);
-        
+
         const entriesToRemove = entries.slice(0, newMap.size - MAX_CACHE_ENTRIES);
         entriesToRemove.forEach(([entryKey]) => newMap.delete(entryKey));
       }
-      
+
       return newMap;
     });
   }, []);
@@ -156,4 +155,3 @@ export const useIframeState = (): IframeStateContextType => {
   }
   return context;
 };
-

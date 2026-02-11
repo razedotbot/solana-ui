@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, ChevronRight, Check, Sparkles } from 'lucide-react';
-import logo from '../logo.png';
 
 interface Step {
     target: string; // ID of the target element
@@ -234,14 +233,13 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
                 }}
             >
 
-                
                 {/* Header with Logo */}
                 <div className="flex items-start justify-between relative">
                     <div className="flex items-center gap-3">
                         {/* Logo */}
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-app-primary-20 to-app-primary-40 flex items-center justify-center border border-app-primary-40 shadow-[0_0_15px_rgba(2,179,109,0.2)]">
                             <img 
-                                src={logo} 
+                                src="/logo.png" 
                                 alt="Raze" 
                                 className="h-6 w-6 object-contain filter drop-shadow-[0_0_4px_var(--color-primary-70)]" 
                             />

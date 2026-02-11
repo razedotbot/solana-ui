@@ -135,8 +135,32 @@ export interface WalletType {
   /** Custom quick trade settings (overrides category settings) */
   customQuickTradeSettings?: CustomQuickTradeSettings;
 
+  /** ID of the wallet group this wallet belongs to */
+  groupId?: string;
+
   /** Allow additional properties for extensibility */
   [key: string]: unknown;
+}
+
+// ============================================================================
+// Wallet Group Types
+// ============================================================================
+
+/** Default group ID for wallets that haven't been assigned to a group */
+export const DEFAULT_GROUP_ID = "default";
+
+/** User-created wallet group for organizational purposes */
+export interface WalletGroup {
+  /** Unique identifier */
+  id: string;
+  /** User-defined display name */
+  name: string;
+  /** Sort order position for column layout */
+  order: number;
+  /** Optional color for visual distinction */
+  color?: string;
+  /** Whether this is the default group (cannot be deleted) */
+  isDefault?: boolean;
 }
 
 // ============================================================================
@@ -156,10 +180,12 @@ export interface ConfigType {
   selectedDex: string;
   /** UI state for dropdown menu */
   isDropdownOpen: boolean;
-  /** Default buy amount in SOL */
+  /** Default buy amount in base currency */
   buyAmount: string;
   /** Default sell percentage */
   sellAmount: string;
+  /** Base currency mint address for trading (SOL, USDC, USD1) */
+  baseCurrencyMint: string;
   /** Slippage tolerance in basis points (e.g., "100" = 1%) */
   slippageBps: string;
   /** Default bundle mode preference ('single', 'batch', 'all-in-one') */
@@ -168,18 +194,6 @@ export interface ConfigType {
   singleDelay: string;
   /** Delay between batches in batch mode (milliseconds) */
   batchDelay: string;
-  /** Whether to use self-hosted trading server ('true' or 'false') */
-  tradingServerEnabled: string;
-  /** URL of the self-hosted trading server */
-  tradingServerUrl: string;
-  /** API key for WebSocket stream authentication */
-  streamApiKey: string;
-  /** Balance refresh strategy ('sequential', 'batch', 'parallel') */
-  balanceRefreshStrategy: string;
-  /** Number of wallets to process per batch in batch mode */
-  balanceRefreshBatchSize: string;
-  /** Delay between balance refresh operations (milliseconds) */
-  balanceRefreshDelay: string;
 }
 
 // ============================================================================
@@ -300,28 +314,3 @@ export interface WalletSelectionState {
   selectedCount: number;
 }
 
-/**
- * Sort direction for wallet list
- */
-export type WalletSortDirection = "asc" | "desc";
-
-/**
- * Sort field for wallet list
- */
-export type WalletSortField = "balance" | "label" | "category" | "address";
-
-/**
- * Wallet filter options
- */
-export interface WalletFilterOptions {
-  /** Filter by category */
-  category?: WalletCategory;
-  /** Filter by source */
-  source?: WalletSource;
-  /** Filter by master wallet ID */
-  masterWalletId?: string;
-  /** Show archived wallets */
-  showArchived?: boolean;
-  /** Search query for address or label */
-  searchQuery?: string;
-}

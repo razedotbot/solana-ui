@@ -1,6 +1,6 @@
 /**
  * Trading Type Definitions
- * 
+ *
  * This module contains all trading-related type definitions
  * for the Solana trading application, including buy/sell operations,
  * bundle configurations, and trading results.
@@ -16,21 +16,7 @@
  * - 'batch': Process wallets in batches of 5 with delay between batches
  * - 'all-in-one': Process all wallets simultaneously
  */
-export type BundleMode = 'single' | 'batch' | 'all-in-one';
-
-// ============================================================================
-// Script Types
-// ============================================================================
-
-/**
- * Script types for different DEX and operation combinations
- * Used to determine which backend endpoint to call
- */
-export type ScriptType = 
-  | 'buy' | 'sell'
-  | 'consolidate' | 'distribute' | 'mixer' | 'cleaner'
-  | 'bonkcreate' | 'cookcreate' | 'pumpcreate' | 'mooncreate' | 'boopcreate'
-  | 'deploy';
+export type BundleMode = "single" | "batch" | "all-in-one";
 
 // ============================================================================
 // Wallet Trading Types
@@ -69,16 +55,16 @@ export interface WalletSell {
 export interface BuyConfig {
   /** Token mint address to buy (base58 encoded) */
   tokenAddress: string;
-  /** Amount of SOL to spend per wallet */
-  solAmount: number;
-  /** Optional custom amounts per wallet (overrides solAmount) */
+  /** Amount of base currency to spend per wallet (SOL, USDC, or USD1) */
+  amount: number;
+  /** Input mint address for base currency (SOL, USDC, USD1) */
+  inputMint?: string;
+  /** Optional custom amounts per wallet (overrides amount) */
   amounts?: number[];
   /** Slippage tolerance in basis points (e.g., 100 = 1%) */
   slippageBps?: number;
-  /** Custom Jito tip in lamports (for multi-wallet bundles) */
-  jitoTipLamports?: number;
-  /** Transaction fee in lamports (for single wallet operations) */
-  transactionsFeeLamports?: number;
+  /** Fee tip in lamports (min 0.001 SOL = 1,000,000 lamports) */
+  feeTipLamports?: number;
   /** Bundle execution mode */
   bundleMode?: BundleMode;
   /** Delay between batches in milliseconds (for batch mode) */
@@ -106,10 +92,8 @@ export interface SellConfig {
   slippageBps?: number;
   /** Output token mint (usually SOL) - mainly for Auto */
   outputMint?: string;
-  /** Custom Jito tip in lamports (for multi-wallet bundles) */
-  jitoTipLamports?: number;
-  /** Transaction fee in lamports (for single wallet operations) */
-  transactionsFeeLamports?: number;
+  /** Fee tip in lamports (min 0.001 SOL = 1,000,000 lamports) */
+  feeTipLamports?: number;
   /** Bundle execution mode */
   bundleMode?: BundleMode;
   /** Delay between batches in milliseconds (for batch mode) */
@@ -123,33 +107,12 @@ export interface SellConfig {
 // ============================================================================
 
 /**
- * Server response from trading operations
- * Contains results from self-hosted server or backend
- */
-export interface ServerResponse {
-  /** Whether the operation was successful */
-  success?: boolean;
-  /** Response data from the server */
-  data?: unknown;
-  /** Error message if operation failed */
-  error?: string;
-  /** Number of bundles sent */
-  bundlesSent?: number;
-  /** Array of individual results */
-  results?: Array<Record<string, unknown>>;
-  /** Allow additional properties */
-  [key: string]: unknown;
-}
-
-/**
  * Transaction bundle for buy operations
  * Contains base58 encoded transactions ready for signing
  */
 export interface BuyBundle {
   /** Array of base58 encoded transaction data */
   transactions: string[];
-  /** Server response for self-hosted server operations */
-  serverResponse?: ServerResponse;
 }
 
 /**
@@ -159,8 +122,6 @@ export interface BuyBundle {
 export interface SellBundle {
   /** Array of base58 encoded transaction data */
   transactions: string[];
-  /** Server response for self-hosted server operations */
-  serverResponse?: ServerResponse;
 }
 
 // ============================================================================
@@ -202,15 +163,17 @@ export interface TradeHistoryEntry {
   /** Unique identifier for the trade */
   id: string;
   /** Type of trade operation */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Token mint address */
   tokenAddress: string;
   /** Number of wallets involved */
   walletsCount: number;
-  /** Amount traded (SOL for buy, percentage or tokens for sell) */
+  /** Amount traded (base currency for buy, percentage or tokens for sell) */
   amount: number;
-  /** Type of amount ('sol' or 'percentage') */
-  amountType: 'sol' | 'percentage';
+  /** Type of amount ('base-currency' or 'percentage') */
+  amountType: "base-currency" | "percentage";
+  /** Base currency mint used for the trade */
+  baseCurrencyMint?: string;
   /** Whether the trade was successful */
   success: boolean;
   /** Error message if trade failed */
@@ -226,7 +189,7 @@ export interface TradeHistoryEntry {
  */
 export interface AddTradeHistoryInput {
   /** Type of trade operation */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Token mint address */
   tokenAddress: string;
   /** Number of wallets involved */
@@ -234,7 +197,9 @@ export interface AddTradeHistoryInput {
   /** Amount traded */
   amount: number;
   /** Type of amount */
-  amountType: 'sol' | 'percentage';
+  amountType: "base-currency" | "percentage";
+  /** Base currency mint used */
+  baseCurrencyMint?: string;
   /** Whether the trade was successful */
   success: boolean;
   /** Error message if trade failed */
@@ -268,7 +233,7 @@ export interface TradingState {
   /** Whether a trade is currently in progress */
   isTrading: boolean;
   /** Current operation type */
-  operationType?: 'buy' | 'sell';
+  operationType?: "buy" | "sell";
   /** Progress percentage (0-100) */
   progress?: number;
   /** Status message */
@@ -281,7 +246,7 @@ export interface TradingState {
 export interface TradingFormValues {
   /** Token address to trade */
   tokenAddress: string;
-  /** Amount for buy (in SOL) */
+  /** Amount for buy (in base currency) */
   buyAmount: string;
   /** Percentage for sell (0-100) */
   sellPercentage: string;
@@ -344,7 +309,7 @@ export interface QuickTradeParams {
   /** Token address to trade */
   tokenAddress: string;
   /** Trade type */
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   /** Amount (SOL for buy, percentage for sell) */
   amount: number;
   /** Wallets to use for the trade */

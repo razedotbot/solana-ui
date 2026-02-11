@@ -10,7 +10,7 @@ import bs58 from 'bs58';
  * account' = Account index (0, 1, 2, ...)
  * 0' = Change index (always 0 for Solana)
  */
-export const SOLANA_DERIVATION_PATH = "m/44'/501'";
+const SOLANA_DERIVATION_PATH = "m/44'/501'";
 
 /**
  * Generate a new mnemonic phrase
@@ -137,21 +137,4 @@ export const deriveMultipleWallets = (
   return wallets;
 };
 
-/**
- * Get the next available account index for a master wallet
- * @param currentMaxIndex Current maximum account index used
- * @returns Next available account index
- */
-export const getNextAccountIndex = (currentMaxIndex: number): number => {
-  return currentMaxIndex + 1;
-};
-
-/**
- * Format derivation path for display
- * @param accountIndex Account index
- * @returns Formatted derivation path
- */
-export const formatDerivationPath = (accountIndex: number): string => {
-  return buildDerivationPath(accountIndex);
-};
 

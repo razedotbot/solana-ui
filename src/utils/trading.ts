@@ -1,7 +1,358 @@
-import type { WalletType } from '../Utils';
-import { executeBuy, createBuyConfig } from './buy';
-import type { BundleMode } from './buy';
-import { executeSell, createSellConfig } from './sell';
+import { Keypair, VersionedTransaction } from "@solana/web3.js";
+import bs58 from "bs58";
+import type { WalletType } from "./types";
+import { loadConfigFromCookies } from "./storage";
+import { TRADING, RATE_LIMIT, BASE_CURRENCIES, API_ENDPOINTS, type BaseCurrencyConfig } from "./constants";
+import type { SenderResult, ApiResponse } from "./types";
+import { executeBuy, createBuyConfig } from "./buy";
+import type { BundleMode } from "./buy";
+import { executeSell, createSellConfig } from "./sell";
+import { filterActiveWallets } from "./wallet";
+
+// ============================================================================
+// Shared Trading Types
+// ============================================================================
+
+export interface WindowWithConfig {
+  tradingServerUrl?: string;
+}
+
+export interface RateLimitState {
+  count: number;
+  lastReset: number;
+  maxBundlesPerSecond: number;
+}
+
+export interface TransactionBundle {
+  transactions: string[];
+}
+
+export interface BatchResult {
+  success: boolean;
+  results: SenderResult[];
+  successCount: number;
+  failCount: number;
+}
+
+// ============================================================================
+// Rate Limiting
+// ============================================================================
+
+const rateLimitState: RateLimitState = {
+  count: 0,
+  lastReset: Date.now(),
+  maxBundlesPerSecond: TRADING.MAX_BUNDLES_PER_SECOND,
+};
+
+/**
+ * Check rate limit and wait if necessary
+ */
+export const checkRateLimit = async (): Promise<void> => {
+  const now = Date.now();
+
+  if (now - rateLimitState.lastReset >= RATE_LIMIT.RESET_INTERVAL_MS) {
+    rateLimitState.count = 0;
+    rateLimitState.lastReset = now;
+  }
+
+  if (rateLimitState.count >= rateLimitState.maxBundlesPerSecond) {
+    const waitTime =
+      RATE_LIMIT.RESET_INTERVAL_MS - (now - rateLimitState.lastReset);
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
+    rateLimitState.count = 0;
+    rateLimitState.lastReset = Date.now();
+  }
+
+  rateLimitState.count++;
+};
+
+// ============================================================================
+// Server URL Resolution
+// ============================================================================
+
+/**
+ * Get the base URL for trading server
+ */
+export const getServerBaseUrl = (): string => {
+  return (
+    (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || ""
+  );
+};
+
+// ============================================================================
+// Transaction Sending
+// ============================================================================
+
+/**
+ * Sends transactions via the trading server's /v2/sol/send endpoint
+ * @param transactions - Array of base64-encoded serialized transactions
+ * @returns Result from the server
+ */
+export const sendTransactions = async (
+  transactions: string[],
+): Promise<SenderResult> => {
+  const baseUrl = getServerBaseUrl();
+  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_SEND}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ transactions }),
+  });
+
+  const result = (await response.json()) as ApiResponse<SenderResult>;
+
+  if (!result.success) {
+    const errorMessage = result.error || "Unknown error sending transactions";
+    const errorDetails = result.details ? `: ${result.details}` : "";
+    throw new Error(`${errorMessage}${errorDetails}`);
+  }
+
+  return result.result as SenderResult;
+};
+
+// ============================================================================
+// Base Currency Resolution
+// ============================================================================
+
+/**
+ * Resolve base currency from parameter or config, defaulting to SOL
+ */
+export const resolveBaseCurrency = (
+  baseCurrency?: BaseCurrencyConfig,
+): BaseCurrencyConfig => {
+  if (baseCurrency) return baseCurrency;
+  const config = loadConfigFromCookies();
+  if (config?.baseCurrencyMint) {
+    const found = Object.values(BASE_CURRENCIES).find(
+      (c) => c.mint === config.baseCurrencyMint,
+    );
+    if (found) return found;
+  }
+  return BASE_CURRENCIES.SOL;
+};
+
+// ============================================================================
+// Transaction Signing
+// ============================================================================
+
+/**
+ * Sign a transaction with the provided keypairs
+ */
+export const signTransaction = (
+  txBase58: string,
+  walletKeypairs: Keypair[],
+): string | null => {
+  try {
+    let txBuffer: Uint8Array;
+    try {
+      txBuffer = bs58.decode(txBase58);
+    } catch {
+      txBuffer = new Uint8Array(Buffer.from(txBase58, "base64"));
+    }
+
+    const transaction = VersionedTransaction.deserialize(txBuffer);
+
+    const signers: Keypair[] = [];
+    for (const accountKey of transaction.message.staticAccountKeys) {
+      const pubkeyStr = accountKey.toBase58();
+      const matchingKeypair = walletKeypairs.find(
+        (kp) => kp.publicKey.toBase58() === pubkeyStr,
+      );
+      if (matchingKeypair && !signers.includes(matchingKeypair)) {
+        signers.push(matchingKeypair);
+      }
+    }
+
+    if (signers.length === 0) {
+      return null;
+    }
+
+    transaction.sign(signers);
+    return bs58.encode(transaction.serialize());
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Complete bundle signing for all transactions
+ */
+export const completeBundleSigning = (
+  bundle: TransactionBundle,
+  walletKeypairs: Keypair[],
+): TransactionBundle => {
+  if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
+    return { transactions: [] };
+  }
+
+  const signedTransactions = bundle.transactions
+    .map((tx) => signTransaction(tx, walletKeypairs))
+    .filter((tx): tx is string => tx !== null);
+
+  return { transactions: signedTransactions };
+};
+
+// ============================================================================
+// Bundle Splitting
+// ============================================================================
+
+/**
+ * Split large bundles into smaller ones with maximum transactions per bundle
+ */
+export const splitLargeBundles = (
+  bundles: TransactionBundle[],
+  maxPerBundle: number = TRADING.MAX_TRANSACTIONS_PER_BUNDLE,
+): TransactionBundle[] => {
+  const result: TransactionBundle[] = [];
+
+  for (const bundle of bundles) {
+    if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
+      continue;
+    }
+
+    if (bundle.transactions.length <= maxPerBundle) {
+      result.push(bundle);
+      continue;
+    }
+
+    for (let i = 0; i < bundle.transactions.length; i += maxPerBundle) {
+      const chunkTransactions = bundle.transactions.slice(i, i + maxPerBundle);
+      result.push({ transactions: chunkTransactions });
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Wrap an array of signed transactions into a single TransactionBundle.
+ * Used by distribute and mixer flows that send all transactions together.
+ */
+export const prepareTransactionBundles = (
+  signedTransactions: string[],
+): TransactionBundle[] => {
+  return [
+    {
+      transactions: signedTransactions,
+    },
+  ];
+};
+
+// ============================================================================
+// Keypair Creation
+// ============================================================================
+
+/**
+ * Create keypairs from wallet objects
+ */
+export const createKeypairs = (
+  wallets: { privateKey: string }[],
+): Keypair[] => {
+  return wallets.map((wallet) =>
+    Keypair.fromSecretKey(bs58.decode(wallet.privateKey)),
+  );
+};
+
+// ============================================================================
+// Request Body Helpers
+// ============================================================================
+
+const LAMPORTS_PER_SOL = 1_000_000_000;
+const MIN_FEE_TIP_LAMPORTS = 1_000_000; // 0.001 SOL
+
+/**
+ * Get slippage value from config or use default
+ */
+export const getSlippageBps = (configSlippage?: number): number => {
+  if (configSlippage !== undefined) {
+    return configSlippage;
+  }
+
+  const appConfig = loadConfigFromCookies();
+  if (appConfig?.slippageBps) {
+    const parsed = Number.parseInt(appConfig.slippageBps, 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return TRADING.DEFAULT_SLIPPAGE_BPS;
+};
+
+/**
+ * Get fee tip in lamports from settings (min 0.001 SOL = 1,000,000 lamports)
+ */
+export const getFeeTipLamports = (feeTipLamports?: number): number => {
+  if (feeTipLamports !== undefined) {
+    return Math.max(feeTipLamports, MIN_FEE_TIP_LAMPORTS);
+  }
+
+  const appConfig = loadConfigFromCookies();
+  const parsedFeeInSol = Number.parseFloat(appConfig?.transactionFee ?? "");
+  const feeInSol = Number.isFinite(parsedFeeInSol)
+    ? parsedFeeInSol
+    : TRADING.DEFAULT_TRANSACTION_FEE_SOL;
+
+  return Math.max(Math.floor(feeInSol * LAMPORTS_PER_SOL), MIN_FEE_TIP_LAMPORTS);
+};
+
+// ============================================================================
+// Result Processing
+// ============================================================================
+
+/**
+ * Process batch results and return summary
+ */
+export const processBatchResults = (
+  senderResults: PromiseSettledResult<{
+    success: boolean;
+    result?: SenderResult;
+  }>[],
+): BatchResult => {
+  const results: SenderResult[] = [];
+  let successCount = 0;
+  let failCount = 0;
+
+  senderResults.forEach((result, _index) => {
+    if (result.status === "fulfilled") {
+      if (result.value.success) {
+        if (result.value.result) results.push(result.value.result);
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } else {
+      failCount++;
+    }
+  });
+
+  return {
+    success: successCount > 0,
+    results,
+    successCount,
+    failCount,
+  };
+};
+
+/**
+ * Create error message from batch results
+ */
+export const createBatchErrorMessage = (
+  successCount: number,
+  failCount: number,
+): string | undefined => {
+  if (failCount > 0) {
+    return `${failCount} failed, ${successCount} succeeded`;
+  }
+  return undefined;
+};
+
+// ============================================================================
+// Trading Configuration Types
+// ============================================================================
 
 export interface TradingConfig {
   tokenAddress: string;
@@ -23,70 +374,59 @@ export interface TradingResult {
   error?: string;
 }
 
+const parseOptionalInt = (value?: string): number | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const resolveExecutionOverrides = (
+  config: TradingConfig,
+): {
+  slippageBps?: number;
+  feeTipLamports: number;
+  bundleMode?: BundleMode;
+  batchDelay?: number;
+  singleDelay?: number;
+} => {
+  const appConfig = loadConfigFromCookies();
+
+  return {
+    slippageBps: parseOptionalInt(appConfig?.slippageBps),
+    feeTipLamports: getFeeTipLamports(),
+    bundleMode: config.bundleMode ?? (appConfig?.bundleMode as BundleMode | undefined),
+    batchDelay: config.batchDelay ?? parseOptionalInt(appConfig?.batchDelay),
+    singleDelay: config.singleDelay ?? parseOptionalInt(appConfig?.singleDelay),
+  };
+};
+
 // Unified buy function using the new buy.ts
 const executeUnifiedBuy = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
-  slippageBps?: number,
-  jitoTipLamports?: number,
-  transactionsFeeLamports?: number
 ): Promise<TradingResult> => {
   try {
-    // Load config once for all settings
-    const { loadConfigFromCookies } = await import('../Utils');
-    const appConfig = loadConfigFromCookies();
-
-    // Use provided slippage or fall back to config default
-    let finalSlippageBps = slippageBps;
-    if (finalSlippageBps === undefined && appConfig?.slippageBps) {
-      finalSlippageBps = parseInt(appConfig.slippageBps);
-    }
-
-    // Use provided jito tip or fall back to config default
-    let finalJitoTipLamports = jitoTipLamports;
-    if (finalJitoTipLamports === undefined && appConfig?.transactionFee) {
-      const feeInSol = appConfig.transactionFee;
-      finalJitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
-    }
-
-    // Use provided transactions fee or calculate from config
-    let finalTransactionsFeeLamports = transactionsFeeLamports;
-    if (finalTransactionsFeeLamports === undefined && appConfig?.transactionFee) {
-      const feeInSol = appConfig.transactionFee;
-      finalTransactionsFeeLamports = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
-    }
-
-    // Use provided bundle mode or fall back to config default
-    let finalBundleMode = config.bundleMode;
-    if (finalBundleMode === undefined && appConfig?.bundleMode) {
-      finalBundleMode = appConfig.bundleMode as BundleMode;
-    }
-
-    // Use provided delays or fall back to config defaults
-    let finalBatchDelay = config.batchDelay;
-    if (finalBatchDelay === undefined && appConfig?.batchDelay) {
-      finalBatchDelay = parseInt(appConfig.batchDelay);
-    }
-
-    let finalSingleDelay = config.singleDelay;
-    if (finalSingleDelay === undefined && appConfig?.singleDelay) {
-      finalSingleDelay = parseInt(appConfig.singleDelay);
-    }
+    const overrides = resolveExecutionOverrides(config);
 
     const buyConfig = createBuyConfig({
       tokenAddress: config.tokenAddress,
-      solAmount: config.solAmount!,
-      slippageBps: finalSlippageBps,
-      jitoTipLamports: finalJitoTipLamports,
-      transactionsFeeLamports: finalTransactionsFeeLamports,
-      bundleMode: finalBundleMode,
-      batchDelay: finalBatchDelay,
-      singleDelay: finalSingleDelay
+      amount: config.solAmount!,
+      slippageBps: overrides.slippageBps,
+      feeTipLamports: overrides.feeTipLamports,
+      bundleMode: overrides.bundleMode,
+      batchDelay: overrides.batchDelay,
+      singleDelay: overrides.singleDelay,
     });
 
     return await executeBuy(wallets, buyConfig);
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 };
 
@@ -94,69 +434,27 @@ const executeUnifiedBuy = async (
 const executeUnifiedSell = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
-  slippageBps?: number,
-  outputMint?: string,
-  jitoTipLamports?: number,
-  transactionsFeeLamports?: number
 ): Promise<TradingResult> => {
   try {
-    // Load config once for all settings
-    const { loadConfigFromCookies } = await import('../Utils');
-    const appConfig = loadConfigFromCookies();
-
-    // Use provided slippage or fall back to config default
-    let finalSlippageBps = slippageBps;
-    if (finalSlippageBps === undefined && appConfig?.slippageBps) {
-      finalSlippageBps = parseInt(appConfig.slippageBps);
-    }
-
-    // Use provided jito tip or fall back to config default
-    let finalJitoTipLamports = jitoTipLamports;
-    if (finalJitoTipLamports === undefined && appConfig?.transactionFee) {
-      const feeInSol = appConfig.transactionFee;
-      finalJitoTipLamports = Math.floor(parseFloat(feeInSol) * 1_000_000_000);
-    }
-
-    // Use provided transactions fee or calculate from config
-    let finalTransactionsFeeLamports = transactionsFeeLamports;
-    if (finalTransactionsFeeLamports === undefined && appConfig?.transactionFee) {
-      const feeInSol = appConfig.transactionFee;
-      finalTransactionsFeeLamports = Math.floor((parseFloat(feeInSol) / 3) * 1_000_000_000);
-    }
-
-    // Use provided bundle mode or fall back to config default
-    let finalBundleMode = config.bundleMode;
-    if (finalBundleMode === undefined && appConfig?.bundleMode) {
-      finalBundleMode = appConfig.bundleMode as BundleMode;
-    }
-
-    // Use provided delays or fall back to config defaults
-    let finalBatchDelay = config.batchDelay;
-    if (finalBatchDelay === undefined && appConfig?.batchDelay) {
-      finalBatchDelay = parseInt(appConfig.batchDelay);
-    }
-
-    let finalSingleDelay = config.singleDelay;
-    if (finalSingleDelay === undefined && appConfig?.singleDelay) {
-      finalSingleDelay = parseInt(appConfig.singleDelay);
-    }
+    const overrides = resolveExecutionOverrides(config);
 
     const sellConfig = createSellConfig({
       tokenAddress: config.tokenAddress,
       sellPercent: config.sellPercent,
       tokensAmount: config.tokensAmount,
-      slippageBps: finalSlippageBps,
-      outputMint,
-      jitoTipLamports: finalJitoTipLamports,
-      transactionsFeeLamports: finalTransactionsFeeLamports,
-      bundleMode: finalBundleMode,
-      batchDelay: finalBatchDelay,
-      singleDelay: finalSingleDelay
+      slippageBps: overrides.slippageBps,
+      feeTipLamports: overrides.feeTipLamports,
+      bundleMode: overrides.bundleMode,
+      batchDelay: overrides.batchDelay,
+      singleDelay: overrides.singleDelay,
     });
 
     return await executeSell(wallets, sellConfig);
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 };
 
@@ -166,34 +464,31 @@ export const executeTrade = async (
   wallets: WalletType[],
   config: TradingConfig,
   isBuyMode: boolean,
-  solBalances: Map<string, number>
+  _solBalances: Map<string, number>,
 ): Promise<TradingResult> => {
-  const activeWallets = wallets.filter(wallet => wallet.isActive);
-  
+  const activeWallets = filterActiveWallets(wallets);
+
   if (activeWallets.length === 0) {
-    return { success: false, error: 'Please activate at least one wallet' };
+    return { success: false, error: "Please activate at least one wallet" };
   }
-  
-  const formattedWallets = activeWallets.map(wallet => ({
+
+  const formattedWallets = activeWallets.map((wallet) => ({
     address: wallet.address,
-    privateKey: wallet.privateKey
+    privateKey: wallet.privateKey,
   }));
-  
-  const walletBalances = new Map<string, number>();
-  activeWallets.forEach(wallet => {
-    const balance = solBalances.get(wallet.address) || 0;
-    walletBalances.set(wallet.address, balance);
-  });
+
   try {
     if (isBuyMode) {
       return await executeUnifiedBuy(formattedWallets, config);
     } else {
       return await executeUnifiedSell(formattedWallets, config);
     }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
-
 };
 
 /**
@@ -203,18 +498,19 @@ export const executeTrade = async (
 
 export interface TradeHistoryEntry {
   id: string;
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   tokenAddress: string;
   timestamp: number;
   walletsCount: number;
   amount: number;
-  amountType: 'sol' | 'percentage';
+  amountType: "sol" | "percentage" | "base-currency";
+  baseCurrencyMint?: string;
   success: boolean;
   error?: string;
-  bundleMode?: 'single' | 'batch' | 'all-in-one';
+  bundleMode?: "single" | "batch" | "all-in-one";
 }
 
-const STORAGE_KEY = 'raze_trade_history';
+const STORAGE_KEY = "raze_trade_history";
 const MAX_HISTORY_ENTRIES = 50; // Keep last 50 trades
 
 /**
@@ -224,12 +520,11 @@ export const getTradeHistory = (): TradeHistoryEntry[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
-    
+
     const history = JSON.parse(stored) as TradeHistoryEntry[];
     // Sort by timestamp descending (newest first)
     return history.sort((a, b) => b.timestamp - a.timestamp);
-  } catch (error) {
-    console.error('Error reading trade history:', error);
+  } catch {
     return [];
   }
 };
@@ -237,28 +532,32 @@ export const getTradeHistory = (): TradeHistoryEntry[] => {
 /**
  * Add a new trade entry to history
  */
-export const addTradeHistory = (entry: Omit<TradeHistoryEntry, 'id' | 'timestamp'>): void => {
+export const addTradeHistory = (
+  entry: Omit<TradeHistoryEntry, "id" | "timestamp">,
+): void => {
   try {
     const history = getTradeHistory();
-    
+
     const newEntry: TradeHistoryEntry = {
       ...entry,
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-    
+
     // Add to beginning of array (newest first)
     history.unshift(newEntry);
-    
+
     // Keep only the last MAX_HISTORY_ENTRIES entries
     const trimmedHistory = history.slice(0, MAX_HISTORY_ENTRIES);
-    
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmedHistory));
-    
+
     // Dispatch custom event for real-time updates
-    window.dispatchEvent(new CustomEvent('tradeHistoryUpdated', { detail: newEntry }));
-  } catch (error) {
-    console.error('Error saving trade history:', error);
+    window.dispatchEvent(
+      new CustomEvent("tradeHistoryUpdated", { detail: newEntry }),
+    );
+  } catch {
+    // Intentionally ignored
   }
 };
 
@@ -268,9 +567,9 @@ export const addTradeHistory = (entry: Omit<TradeHistoryEntry, 'id' | 'timestamp
 export const clearTradeHistory = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    window.dispatchEvent(new CustomEvent('tradeHistoryUpdated'));
-  } catch (error) {
-    console.error('Error clearing trade history:', error);
+    window.dispatchEvent(new CustomEvent("tradeHistoryUpdated"));
+  } catch {
+    // Intentionally ignored
   }
 };
 
@@ -285,7 +584,9 @@ export const getLatestTrades = (limit: number = 10): TradeHistoryEntry[] => {
 /**
  * Get trades for a specific token
  */
-export const getTradesForToken = (tokenAddress: string): TradeHistoryEntry[] => {
+export const getTradesForToken = (
+  tokenAddress: string,
+): TradeHistoryEntry[] => {
   const history = getTradeHistory();
-  return history.filter(trade => trade.tokenAddress === tokenAddress);
+  return history.filter((trade) => trade.tokenAddress === tokenAddress);
 };

@@ -45,7 +45,10 @@ module.exports = {
   ],
   ignorePatterns: ['dist', 'node_modules', 'public'],
   rules: {
-    'react-refresh/only-export-components': 'warn',
+    'react-refresh/only-export-components': [
+      'warn',
+      { allowConstantExport: true },
+    ],
     '@typescript-eslint/no-unused-vars': [
       'error',
       {

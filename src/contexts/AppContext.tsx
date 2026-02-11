@@ -1,4 +1,7 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, {
+  createContext,
+  useContext,
   useState,
   useEffect,
   useCallback,
@@ -6,21 +9,24 @@ import React, {
   type ReactNode,
 } from "react";
 import type { Connection } from "@solana/web3.js";
+import { fetchWalletBalances } from "../utils/wallet";
 import {
   loadWalletsFromCookies,
   loadConfigFromCookies,
   saveConfigToCookies,
   saveWalletsToCookies,
-  fetchWalletBalances,
-  type WalletType,
-  type ConfigType,
-} from "../Utils";
-import { AppContext } from "./AppContextInstance";
+} from "../utils/storage";
+import type { WalletType, ConfigType } from "../utils/types";
 import {
   RPCManager,
   createDefaultEndpoints,
   type RPCEndpoint,
 } from "../utils/rpcManager";
+import {
+  BASE_CURRENCIES,
+  getBaseCurrencyByMint,
+  type BaseCurrencyConfig,
+} from "../utils/constants";
 
 export interface AppContextType {
   // Wallet state
@@ -40,14 +46,17 @@ export interface AppContextType {
   rpcManager: RPCManager | null;
 
   // Balance state
-  solBalances: Map<string, number>;
-  setSolBalances: (
+  baseCurrencyBalances: Map<string, number>;
+  setBaseCurrencyBalances: (
     balances:
       | Map<string, number>
       | ((prev: Map<string, number>) => Map<string, number>),
   ) => void;
   tokenBalances: Map<string, number>;
   setTokenBalances: (balances: Map<string, number>) => void;
+
+  // Base currency
+  baseCurrency: BaseCurrencyConfig;
 
   // Refresh state
   isRefreshing: boolean;
@@ -57,6 +66,16 @@ export interface AppContextType {
   showToast: (message: string, type: "success" | "error") => void;
 }
 
+export const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const useAppContext = (): AppContextType => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error("useAppContext must be used within AppContextProvider");
+  }
+  return context;
+};
+
 const defaultConfig: ConfigType = {
   rpcEndpoints: JSON.stringify(createDefaultEndpoints()),
   transactionFee: "0.001",
@@ -64,16 +83,11 @@ const defaultConfig: ConfigType = {
   isDropdownOpen: false,
   buyAmount: "",
   sellAmount: "",
+  baseCurrencyMint: BASE_CURRENCIES.SOL.mint,
   slippageBps: "9900",
   bundleMode: "batch",
   singleDelay: "200",
   batchDelay: "1000",
-  tradingServerEnabled: "false",
-  tradingServerUrl: "https://localhost:4444",
-  streamApiKey: "",
-  balanceRefreshStrategy: "batch",
-  balanceRefreshBatchSize: "5",
-  balanceRefreshDelay: "50",
 };
 
 interface AppContextProviderProps {
@@ -89,14 +103,21 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
   const [wallets, setWalletsState] = useState<WalletType[]>([]);
   const [config, setConfigState] = useState<ConfigType>(defaultConfig);
   const [connection, setConnection] = useState<Connection | null>(null);
-  const [solBalances, setSolBalances] = useState<Map<string, number>>(
-    new Map(),
-  );
+  const [baseCurrencyBalances, setBaseCurrencyBalances] = useState<
+    Map<string, number>
+  >(new Map());
   const [tokenBalances, setTokenBalances] = useState<Map<string, number>>(
     new Map(),
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [rpcManager, setRpcManager] = useState<RPCManager | null>(null);
+
+  // Compute current base currency config
+  const baseCurrency = useMemo<BaseCurrencyConfig>(() => {
+    return (
+      getBaseCurrencyByMint(config.baseCurrencyMint) || BASE_CURRENCIES.SOL
+    );
+  }, [config.baseCurrencyMint]);
 
   // Load initial data from cookies
   useEffect(() => {
@@ -125,16 +146,15 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
             .then((conn) => {
               setConnection(conn);
             })
-            .catch((error) => {
-              console.error("Error creating initial connection:", error);
+            .catch((_error) => {
               showToast("Failed to connect to RPC endpoints", "error");
             });
-        } catch (error) {
-          console.error("Error creating RPC manager:", error);
+        } catch {
+          // RPC connection error, already handled
         }
       }
-    } catch (error) {
-      console.error("Error loading initial data:", error);
+    } catch {
+      // RPC endpoints parse error, ignore
     }
   }, [showToast]);
 
@@ -152,12 +172,11 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           .then((conn) => {
             setConnection(conn);
           })
-          .catch((error) => {
-            console.error("Error creating connection:", error);
+          .catch((_error) => {
             showToast("Failed to connect to RPC endpoints", "error");
           });
-      } catch (error) {
-        console.error("Error updating RPC manager:", error);
+      } catch {
+        // RPC endpoints parse error, ignore
       }
     }
   }, [config.rpcEndpoints, showToast]);
@@ -176,13 +195,13 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
   );
 
   // Balance setters with functional update support
-  const setSolBalancesWrapper = useCallback(
+  const setBaseCurrencyBalancesWrapper = useCallback(
     (
       newBalances:
         | Map<string, number>
         | ((prev: Map<string, number>) => Map<string, number>),
     ) => {
-      setSolBalances((prev) => {
+      setBaseCurrencyBalances((prev) => {
         return typeof newBalances === "function"
           ? newBalances(prev)
           : newBalances;
@@ -217,22 +236,18 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           rpcManager,
           wallets,
           tokenAddress || "",
-          setSolBalancesWrapper,
+          setBaseCurrencyBalancesWrapper,
           setTokenBalances,
-          solBalances,
+          baseCurrencyBalances,
           tokenBalances,
           {
-            strategy:
-              (config.balanceRefreshStrategy as
-                | "sequential"
-                | "batch"
-                | "parallel") || "batch",
-            batchSize: parseInt(config.balanceRefreshBatchSize || "5", 10),
-            delay: parseInt(config.balanceRefreshDelay || "50", 10),
+            onRateLimitError: () => {
+              showToast("RPC rate limit reached, falling back to slower mode", "error");
+            },
           },
+          baseCurrency,
         );
-      } catch (error) {
-        console.error("Error refreshing balances:", error);
+      } catch {
         showToast("Failed to refresh balances", "error");
       } finally {
         setIsRefreshing(false);
@@ -241,13 +256,11 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     [
       rpcManager,
       wallets,
-      config.balanceRefreshStrategy,
-      config.balanceRefreshBatchSize,
-      config.balanceRefreshDelay,
-      solBalances,
+      baseCurrencyBalances,
       tokenBalances,
       showToast,
-      setSolBalancesWrapper,
+      setBaseCurrencyBalancesWrapper,
+      baseCurrency,
     ],
   );
 
@@ -262,10 +275,11 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       connection,
       setConnection,
       rpcManager,
-      solBalances,
-      setSolBalances: setSolBalancesWrapper,
+      baseCurrencyBalances,
+      setBaseCurrencyBalances: setBaseCurrencyBalancesWrapper,
       tokenBalances,
       setTokenBalances,
+      baseCurrency,
       isRefreshing,
       refreshBalances,
       showToast,
@@ -278,12 +292,13 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       updateConfig,
       connection,
       rpcManager,
-      solBalances,
+      baseCurrencyBalances,
       tokenBalances,
+      baseCurrency,
       isRefreshing,
       refreshBalances,
       showToast,
-      setSolBalancesWrapper,
+      setBaseCurrencyBalancesWrapper,
     ],
   );
 
