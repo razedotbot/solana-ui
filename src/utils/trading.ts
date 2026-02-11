@@ -204,6 +204,7 @@ export const completeBundleSigning = (
  */
 export const splitLargeBundles = (
   bundles: TransactionBundle[],
+  maxPerBundle: number = TRADING.MAX_TRANSACTIONS_PER_BUNDLE,
 ): TransactionBundle[] => {
   const result: TransactionBundle[] = [];
 
@@ -212,20 +213,13 @@ export const splitLargeBundles = (
       continue;
     }
 
-    if (bundle.transactions.length <= TRADING.MAX_TRANSACTIONS_PER_BUNDLE) {
+    if (bundle.transactions.length <= maxPerBundle) {
       result.push(bundle);
       continue;
     }
 
-    for (
-      let i = 0;
-      i < bundle.transactions.length;
-      i += TRADING.MAX_TRANSACTIONS_PER_BUNDLE
-    ) {
-      const chunkTransactions = bundle.transactions.slice(
-        i,
-        i + TRADING.MAX_TRANSACTIONS_PER_BUNDLE,
-      );
+    for (let i = 0; i < bundle.transactions.length; i += maxPerBundle) {
+      const chunkTransactions = bundle.transactions.slice(i, i + maxPerBundle);
       result.push({ transactions: chunkTransactions });
     }
   }
@@ -267,6 +261,7 @@ export const createKeypairs = (
 // ============================================================================
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
+const MIN_FEE_TIP_LAMPORTS = 1_000_000; // 0.001 SOL
 
 /**
  * Get slippage value from config or use default
@@ -288,29 +283,20 @@ export const getSlippageBps = (configSlippage?: number): number => {
 };
 
 /**
- * Get fee in lamports based on wallet count
+ * Get fee tip in lamports from settings (min 0.001 SOL = 1,000,000 lamports)
  */
-export const getFeeLamports = (
-  walletCount: number,
-  jitoTipLamports?: number,
-  transactionsFeeLamports?: number,
-): { jitoTipLamports?: number; transactionsFeeLamports?: number } => {
+export const getFeeTipLamports = (feeTipLamports?: number): number => {
+  if (feeTipLamports !== undefined) {
+    return Math.max(feeTipLamports, MIN_FEE_TIP_LAMPORTS);
+  }
+
   const appConfig = loadConfigFromCookies();
   const parsedFeeInSol = Number.parseFloat(appConfig?.transactionFee ?? "");
   const feeInSol = Number.isFinite(parsedFeeInSol)
     ? parsedFeeInSol
     : TRADING.DEFAULT_TRANSACTION_FEE_SOL;
 
-  if (walletCount < 2) {
-    return {
-      transactionsFeeLamports:
-        transactionsFeeLamports ?? Math.floor((feeInSol / 3) * LAMPORTS_PER_SOL),
-    };
-  }
-
-  return {
-    jitoTipLamports: jitoTipLamports ?? Math.floor(feeInSol * LAMPORTS_PER_SOL),
-  };
+  return Math.max(Math.floor(feeInSol * LAMPORTS_PER_SOL), MIN_FEE_TIP_LAMPORTS);
 };
 
 // ============================================================================
@@ -397,43 +383,20 @@ const parseOptionalInt = (value?: string): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const parseOptionalFeeInSol = (value?: string): number | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-};
-
 const resolveExecutionOverrides = (
   config: TradingConfig,
-  slippageBps?: number,
-  jitoTipLamports?: number,
-  transactionsFeeLamports?: number,
 ): {
   slippageBps?: number;
-  jitoTipLamports?: number;
-  transactionsFeeLamports?: number;
+  feeTipLamports: number;
   bundleMode?: BundleMode;
   batchDelay?: number;
   singleDelay?: number;
 } => {
   const appConfig = loadConfigFromCookies();
-  const configuredFeeInSol = parseOptionalFeeInSol(appConfig?.transactionFee);
 
   return {
-    slippageBps: slippageBps ?? parseOptionalInt(appConfig?.slippageBps),
-    jitoTipLamports:
-      jitoTipLamports ??
-      (configuredFeeInSol !== undefined
-        ? Math.floor(configuredFeeInSol * LAMPORTS_PER_SOL)
-        : undefined),
-    transactionsFeeLamports:
-      transactionsFeeLamports ??
-      (configuredFeeInSol !== undefined
-        ? Math.floor((configuredFeeInSol / 3) * LAMPORTS_PER_SOL)
-        : undefined),
+    slippageBps: parseOptionalInt(appConfig?.slippageBps),
+    feeTipLamports: getFeeTipLamports(),
     bundleMode: config.bundleMode ?? (appConfig?.bundleMode as BundleMode | undefined),
     batchDelay: config.batchDelay ?? parseOptionalInt(appConfig?.batchDelay),
     singleDelay: config.singleDelay ?? parseOptionalInt(appConfig?.singleDelay),
@@ -444,24 +407,15 @@ const resolveExecutionOverrides = (
 const executeUnifiedBuy = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
-  slippageBps?: number,
-  jitoTipLamports?: number,
-  transactionsFeeLamports?: number,
 ): Promise<TradingResult> => {
   try {
-    const overrides = resolveExecutionOverrides(
-      config,
-      slippageBps,
-      jitoTipLamports,
-      transactionsFeeLamports,
-    );
+    const overrides = resolveExecutionOverrides(config);
 
     const buyConfig = createBuyConfig({
       tokenAddress: config.tokenAddress,
       amount: config.solAmount!,
       slippageBps: overrides.slippageBps,
-      jitoTipLamports: overrides.jitoTipLamports,
-      transactionsFeeLamports: overrides.transactionsFeeLamports,
+      feeTipLamports: overrides.feeTipLamports,
       bundleMode: overrides.bundleMode,
       batchDelay: overrides.batchDelay,
       singleDelay: overrides.singleDelay,
@@ -480,27 +434,16 @@ const executeUnifiedBuy = async (
 const executeUnifiedSell = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
-  slippageBps?: number,
-  outputMint?: string,
-  jitoTipLamports?: number,
-  transactionsFeeLamports?: number,
 ): Promise<TradingResult> => {
   try {
-    const overrides = resolveExecutionOverrides(
-      config,
-      slippageBps,
-      jitoTipLamports,
-      transactionsFeeLamports,
-    );
+    const overrides = resolveExecutionOverrides(config);
 
     const sellConfig = createSellConfig({
       tokenAddress: config.tokenAddress,
       sellPercent: config.sellPercent,
       tokensAmount: config.tokensAmount,
       slippageBps: overrides.slippageBps,
-      outputMint,
-      jitoTipLamports: overrides.jitoTipLamports,
-      transactionsFeeLamports: overrides.transactionsFeeLamports,
+      feeTipLamports: overrides.feeTipLamports,
       bundleMode: overrides.bundleMode,
       batchDelay: overrides.batchDelay,
       singleDelay: overrides.singleDelay,

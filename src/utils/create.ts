@@ -38,19 +38,16 @@ export interface TokenMetadata {
 
 export interface MeteoraDBCConfig {
   configAddress?: string;
-  jitoTipAmountSOL?: number;
 }
 
 export interface MeteoraCPAMMConfig {
   configAddress?: string;
-  jitoTipAmountSOL?: number;
   initialLiquiditySOL?: number;
   initialTokenPercent?: number;
 }
 
-export interface BonkConfig {
-  jitoTipAmountSOL?: number;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface BonkConfig {}
 
 export interface CreateConfig {
   platform: PlatformType;

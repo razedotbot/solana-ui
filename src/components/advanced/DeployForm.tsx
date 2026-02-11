@@ -30,7 +30,6 @@ import {
   METEORA_DBC_CONFIGS,
   METEORA_CPAMM_CONFIGS,
 } from "../../utils/create";
-import { loadConfigFromCookies } from "../../utils/storage";
 import { addRecentToken } from "../../utils/recentTokens";
 import { getWalletDisplayName } from "../../utils/wallet";
 import type { WalletType, TokenMetadataApiResponse } from "../../utils/types";
@@ -90,12 +89,6 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
 
   const toggleSection = (section: SectionKey): void => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  // Computed values
-  const getJitoTipFromSettings = (): number => {
-    const appConfig = loadConfigFromCookies();
-    return appConfig?.transactionFee ? parseFloat(appConfig.transactionFee) / 1e9 : 0.001;
   };
 
   const MAX_WALLETS = MAX_WALLETS_ADVANCED;
@@ -248,14 +241,12 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
         pumpAdvanced: selectedPlatform === "pumpfun" ? isAdv : undefined,
         bonkType: selectedPlatform === "bonk" ? bonkType : undefined,
         bonkAdvanced: selectedPlatform === "bonk" ? isAdv : undefined,
-        bonkConfig: selectedPlatform === "bonk" ? { jitoTipAmountSOL: getJitoTipFromSettings() } : undefined,
+        bonkConfig: selectedPlatform === "bonk" ? {} : undefined,
         meteoraDBCConfig: selectedPlatform === "meteoraDBC" ? {
           configAddress: meteoraDBCConfigAddress || METEORA_DBC_CONFIGS.standard,
-          jitoTipAmountSOL: getJitoTipFromSettings(),
         } : undefined,
         meteoraCPAMMConfig: selectedPlatform === "meteoraCPAMM" ? {
           configAddress: meteoraCPAMMConfigAddress || METEORA_CPAMM_CONFIGS.standard,
-          jitoTipAmountSOL: getJitoTipFromSettings(),
           initialLiquiditySOL: parseFloat(meteoraCPAMMInitialLiquidity) || 1,
           initialTokenPercent: parseFloat(meteoraCPAMMInitialTokenPercent) || 80,
         } : undefined,

@@ -13,7 +13,6 @@ import {
   METEORA_DBC_CONFIGS,
   METEORA_CPAMM_CONFIGS,
 } from "../utils/create";
-import { loadConfigFromCookies } from "../utils/storage";
 import { addRecentToken } from "../utils/recentTokens";
 import {
   type TokenMetadata,
@@ -70,12 +69,6 @@ export const DeployPage: React.FC = () => {
   const [additionalTokens, setAdditionalTokens] = useState<AdditionalToken[]>([]);
   const [deploymentProgress, setDeploymentProgress] = useState<DeploymentProgressItem[]>([]);
   const [isMultiDeploying, setIsMultiDeploying] = useState(false);
-
-  // Computed values
-  const getJitoTipFromSettings = (): number => {
-    const appConfig = loadConfigFromCookies();
-    return appConfig?.transactionFee ? parseFloat(appConfig.transactionFee) / 1e9 : 0.001;
-  };
 
   // Always allow up to 20 wallets, mode is auto-detected based on count
   const MAX_WALLETS = MAX_WALLETS_ADVANCED;
@@ -146,14 +139,12 @@ export const DeployPage: React.FC = () => {
         pumpAdvanced: platform === "pumpfun" ? isAdv : undefined,
         bonkType: platform === "bonk" ? settings.bonkType : undefined,
         bonkAdvanced: platform === "bonk" ? isAdv : undefined,
-        bonkConfig: platform === "bonk" ? { jitoTipAmountSOL: getJitoTipFromSettings() } : undefined,
+        bonkConfig: platform === "bonk" ? {} : undefined,
         meteoraDBCConfig: platform === "meteoraDBC" ? {
           configAddress: settings.meteoraDBCConfigAddress || METEORA_DBC_CONFIGS.standard,
-          jitoTipAmountSOL: getJitoTipFromSettings(),
         } : undefined,
         meteoraCPAMMConfig: platform === "meteoraCPAMM" ? {
           configAddress: settings.meteoraCPAMMConfigAddress || METEORA_CPAMM_CONFIGS.standard,
-          jitoTipAmountSOL: getJitoTipFromSettings(),
           initialLiquiditySOL: parseFloat(settings.meteoraCPAMMInitialLiquidity || "1") || 1,
           initialTokenPercent: parseFloat(settings.meteoraCPAMMInitialTokenPercent || "80") || 80,
         } : undefined,

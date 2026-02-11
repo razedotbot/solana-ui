@@ -63,10 +63,8 @@ export interface BuyConfig {
   amounts?: number[];
   /** Slippage tolerance in basis points (e.g., 100 = 1%) */
   slippageBps?: number;
-  /** Custom Jito tip in lamports (for multi-wallet bundles) */
-  jitoTipLamports?: number;
-  /** Transaction fee in lamports (for single wallet operations) */
-  transactionsFeeLamports?: number;
+  /** Fee tip in lamports (min 0.001 SOL = 1,000,000 lamports) */
+  feeTipLamports?: number;
   /** Bundle execution mode */
   bundleMode?: BundleMode;
   /** Delay between batches in milliseconds (for batch mode) */
@@ -94,10 +92,8 @@ export interface SellConfig {
   slippageBps?: number;
   /** Output token mint (usually SOL) - mainly for Auto */
   outputMint?: string;
-  /** Custom Jito tip in lamports (for multi-wallet bundles) */
-  jitoTipLamports?: number;
-  /** Transaction fee in lamports (for single wallet operations) */
-  transactionsFeeLamports?: number;
+  /** Fee tip in lamports (min 0.001 SOL = 1,000,000 lamports) */
+  feeTipLamports?: number;
   /** Bundle execution mode */
   bundleMode?: BundleMode;
   /** Delay between batches in milliseconds (for batch mode) */

@@ -24,7 +24,7 @@ import {
   splitLargeBundles,
   createKeypairs,
   getSlippageBps,
-  getFeeLamports,
+  getFeeTipLamports,
   processBatchResults,
   createBatchErrorMessage,
   sendTransactions,
@@ -75,13 +75,7 @@ const getPartiallyPreparedTransactions = async (
   }
 
   requestBody["slippageBps"] = getSlippageBps(config.slippageBps);
-
-  const fees = getFeeLamports(
-    wallets.length,
-    config.jitoTipLamports,
-    config.transactionsFeeLamports,
-  );
-  Object.assign(requestBody, fees);
+  requestBody["feeTipLamports"] = getFeeTipLamports(config.feeTipLamports);
 
   // Use /v2/swap/buy for stablecoins, /v2/sol/buy for SOL
   const endpoint = isNativeSOL
@@ -177,7 +171,7 @@ const executeBuyBatchMode = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyResult> => {
-  const batchSize = TRADING.DEFAULT_BATCH_SIZE;
+  const batchSize = TRADING.MAX_TRANSACTIONS_PER_BUNDLE;
   const batchDelay = config.batchDelay || TRADING.DEFAULT_BATCH_DELAY_MS;
   const results: unknown[] = [];
   let successfulBatches = 0;
@@ -203,7 +197,7 @@ const executeBuyBatchMode = async (
       }
 
       const walletKeypairs = createKeypairs(batch);
-      const splitBundles = splitLargeBundles(partiallyPreparedBundles);
+      const splitBundles = splitLargeBundles(partiallyPreparedBundles, 4);
       const signedBundles = splitBundles.map((bundle) =>
         completeBundleSigning(bundle, walletKeypairs),
       );
@@ -250,7 +244,7 @@ const executeBuyAllInOneMode = async (
   }
 
   const walletKeypairs = createKeypairs(wallets);
-  const splitBundles = splitLargeBundles(partiallyPreparedBundles);
+  const splitBundles = splitLargeBundles(partiallyPreparedBundles, 4);
   const signedBundles = splitBundles.map((bundle) =>
     completeBundleSigning(bundle, walletKeypairs),
   );
@@ -434,8 +428,7 @@ export const createBuyConfig = (config: {
   inputMint?: string;
   amounts?: number[];
   slippageBps?: number;
-  jitoTipLamports?: number;
-  transactionsFeeLamports?: number;
+  feeTipLamports?: number;
   bundleMode?: BundleMode;
   batchDelay?: number;
   singleDelay?: number;
@@ -445,8 +438,7 @@ export const createBuyConfig = (config: {
   inputMint: config.inputMint,
   amounts: config.amounts,
   slippageBps: config.slippageBps,
-  jitoTipLamports: config.jitoTipLamports,
-  transactionsFeeLamports: config.transactionsFeeLamports,
+  feeTipLamports: config.feeTipLamports,
   bundleMode: config.bundleMode || "batch",
   batchDelay: config.batchDelay,
   singleDelay: config.singleDelay,
