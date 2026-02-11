@@ -833,75 +833,58 @@ const WalletManager: React.FC = () => {
   // Monitor iframe data for whitelist trades and update wallet balances
   useEffect(() => {
     if (
-      state.iframeData?.recentTrades &&
-      state.iframeData.recentTrades.length > 0
+      !state.iframeData?.recentTrades ||
+      state.iframeData.recentTrades.length === 0
     ) {
-      const latestTrade = state.iframeData.recentTrades[0];
+      return;
+    }
 
-      // Create a unique key for this trade (address + signature + timestamp)
-      const tradeKey = `${latestTrade.address}-${latestTrade.signature}-${latestTrade.timestamp}`;
+    // Collect all unprocessed trades
+    const unprocessedTrades = state.iframeData.recentTrades.filter((trade) => {
+      const tradeKey = `${trade.address}-${trade.signature}-${trade.timestamp}`;
+      return !processedTradesRef.current.has(tradeKey);
+    });
 
-      // Skip if we've already processed this trade
-      if (processedTradesRef.current.has(tradeKey)) {
-        return;
+    if (unprocessedTrades.length === 0) return;
+
+    // Accumulate balance deltas per wallet to handle simultaneous trades correctly
+    const balanceDeltas = new Map<string, { solDelta: number; tokenDelta: number }>();
+
+    for (const trade of unprocessedTrades) {
+      if (!state.wallets.some((w) => w.address === trade.address)) continue;
+
+      const existing = balanceDeltas.get(trade.address) || { solDelta: 0, tokenDelta: 0 };
+
+      if (trade.type === "buy") {
+        existing.solDelta -= trade.solAmount;
+        existing.tokenDelta += trade.tokensAmount;
+      } else if (trade.type === "sell") {
+        existing.solDelta += trade.solAmount;
+        existing.tokenDelta -= trade.tokensAmount;
       }
 
-      // Find the wallet that made the trade
-      const tradingWallet = state.wallets.find(
-        (wallet) => wallet.address === latestTrade.address,
-      );
+      balanceDeltas.set(trade.address, existing);
 
-      if (tradingWallet) {
-        // Get current balances
-        const currentSolBalance =
-          state.baseCurrencyBalances.get(latestTrade.address) || 0;
-        const currentTokenBalance =
-          state.tokenBalances.get(latestTrade.address) || 0;
+      const tradeKey = `${trade.address}-${trade.signature}-${trade.timestamp}`;
+      processedTradesRef.current.add(tradeKey);
+    }
 
-        // Calculate new balances based on trade type
-        let newSolBalance = currentSolBalance;
-        let newTokenBalance = currentTokenBalance;
+    // Apply accumulated deltas to current balances
+    for (const [address, deltas] of balanceDeltas) {
+      const currentSolBalance = state.baseCurrencyBalances.get(address) || 0;
+      const currentTokenBalance = state.tokenBalances.get(address) || 0;
 
-        if (latestTrade.type === "buy") {
-          // For buy trades: decrease SOL, increase tokens
-          newSolBalance = Math.max(
-            0,
-            currentSolBalance - latestTrade.solAmount,
-          );
-          newTokenBalance = currentTokenBalance + latestTrade.tokensAmount;
-        } else if (latestTrade.type === "sell") {
-          // For sell trades: increase SOL, decrease tokens
-          newSolBalance = currentSolBalance + latestTrade.solAmount;
-          newTokenBalance = Math.max(
-            0,
-            currentTokenBalance - latestTrade.tokensAmount,
-          );
-        }
+      const newSolBalance = Math.max(0, currentSolBalance + deltas.solDelta);
+      const newTokenBalance = Math.max(0, currentTokenBalance + deltas.tokenDelta);
 
-        // Update balances if they changed
-        if (
-          newSolBalance !== currentSolBalance ||
-          newTokenBalance !== currentTokenBalance
-        ) {
-          // Mark this trade as processed before dispatching
-          processedTradesRef.current.add(tradeKey);
-
-          dispatch({
-            type: "UPDATE_BALANCE",
-            payload: {
-              address: latestTrade.address,
-              solBalance: newSolBalance,
-              tokenBalance: newTokenBalance,
-            },
-          });
-        } else {
-          // Mark as processed even if balances didn't change (to avoid reprocessing)
-          processedTradesRef.current.add(tradeKey);
-        }
+      if (newSolBalance !== currentSolBalance || newTokenBalance !== currentTokenBalance) {
+        dispatch({
+          type: "UPDATE_BALANCE",
+          payload: { address, solBalance: newSolBalance, tokenBalance: newTokenBalance },
+        });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.iframeData?.recentTrades, state.wallets]);
+  }, [state.iframeData?.recentTrades, state.wallets, state.baseCurrencyBalances, state.tokenBalances]);
 
   // Monitor iframe data for market cap updates
   useEffect(() => {

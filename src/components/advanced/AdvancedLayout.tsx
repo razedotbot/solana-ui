@@ -496,18 +496,27 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                     setTokenAddress(mintAddress);
                     setLeftColumnView("wallets");
                     return new Promise<void>((resolve) => {
+                      let resolved = false;
+                      const done = (): void => {
+                        if (resolved) return;
+                        resolved = true;
+                        window.removeEventListener("message", handler);
+                        resolve();
+                      };
+                      const readySignals = [
+                        "NAVIGATION_COMPLETE",
+                        "GET_WALLETS",
+                        "CURRENT_WALLETS",
+                        "WHITELIST_TRADING_STATS",
+                        "TOKEN_PRICE_UPDATE",
+                      ];
                       const handler = (event: MessageEvent<{ type: string }>): void => {
-                        if (event.data?.type === "NAVIGATION_COMPLETE") {
-                          window.removeEventListener("message", handler);
-                          resolve();
+                        if (readySignals.includes(event.data?.type)) {
+                          done();
                         }
                       };
                       window.addEventListener("message", handler);
-                      // Safety timeout if iframe never responds
-                      setTimeout(() => {
-                        window.removeEventListener("message", handler);
-                        resolve();
-                      }, 15000);
+                      setTimeout(done, 5000);
                     });
                   }}
                 />

@@ -552,7 +552,7 @@ export const executeCreate = async (
     if (mint && onMintReady) {
       await Promise.resolve(onMintReady(mint));
       // Extra delay to let iframe/chart fully settle after navigation
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
     // Create keypairs from private keys
