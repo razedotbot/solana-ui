@@ -533,6 +533,7 @@ const executeAdvancedModeCreate = async (
 export const executeCreate = async (
   wallets: WalletForCreate[],
   config: CreateConfig,
+  onMintReady?: (mintAddress: string) => void,
 ): Promise<CreateResult> => {
   try {
     // Step 1: Get partially prepared bundles/stages from backend
@@ -545,6 +546,11 @@ export const executeCreate = async (
       mintPrivateKey,
       isAdvancedMode,
     } = await getPartiallyPreparedTransactions(wallets, config);
+
+    // Notify caller of mint address before signing/sending bundles
+    if (mint && onMintReady) {
+      onMintReady(mint);
+    }
 
     // Create keypairs from private keys
     const walletKeypairs = createKeypairs(wallets);

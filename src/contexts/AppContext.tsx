@@ -78,7 +78,7 @@ export const useAppContext = (): AppContextType => {
 
 const defaultConfig: ConfigType = {
   rpcEndpoints: JSON.stringify(createDefaultEndpoints()),
-  transactionFee: "0.001",
+  transactionFee: "0.005",
   selectedDex: "auto",
   isDropdownOpen: false,
   buyAmount: "",

@@ -254,14 +254,16 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
     };
 
     try {
-      const result = await executeCreate(buildWallets(selectedWallets, walletAmounts), buildConfig());
+      const handleMintReady = (mintAddress: string): void => {
+        addRecentToken(mintAddress);
+        onTokenDeployed?.(mintAddress);
+      };
+
+      const result = await executeCreate(buildWallets(selectedWallets, walletAmounts), buildConfig(), handleMintReady);
       if (result.success && result.mintAddress) {
-        addRecentToken(result.mintAddress);
         showToast(`Token deployed: ${result.mintAddress.slice(0, 8)}...`, "success");
         resetForm();
         void refreshBalances();
-        // Set deployed token as active
-        onTokenDeployed?.(result.mintAddress);
       } else { throw new Error(result.error || "Deployment failed"); }
     } catch (err) {
       showToast(`Deploy failed: ${err instanceof Error ? err.message : String(err)}`, "error");

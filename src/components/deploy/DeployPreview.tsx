@@ -6,6 +6,7 @@ import {
   Check,
   Rocket,
   RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import type { TokenMetadata } from "./constants";
 
@@ -16,6 +17,8 @@ interface DeployPreviewProps {
   totalDeploys: number;
   isConfirmed: boolean;
   setIsConfirmed: (value: boolean) => void;
+  autoRedirect: boolean;
+  setAutoRedirect: (value: boolean) => void;
   canDeploy: boolean;
   isSubmitting: boolean;
   onDeploy: () => void;
@@ -28,6 +31,8 @@ export const DeployPreview: React.FC<DeployPreviewProps> = ({
   totalDeploys,
   isConfirmed,
   setIsConfirmed,
+  autoRedirect,
+  setAutoRedirect,
   canDeploy,
   isSubmitting,
   onDeploy,
@@ -101,6 +106,23 @@ export const DeployPreview: React.FC<DeployPreviewProps> = ({
           <span className="text-xs text-app-secondary-60 font-mono leading-relaxed">
             I confirm <span className="color-primary font-medium">{totalDeploys} deploy{totalDeploys !== 1 ? "s" : ""}</span> with metadata <span className="text-app-primary font-medium">{tokenData.name || "unnamed"}</span>.
             This action cannot be undone.
+          </span>
+        </label>
+
+        {/* Auto-redirect */}
+        <label className="flex items-start gap-3 mb-4 cursor-pointer">
+          <button
+            type="button"
+            onClick={() => setAutoRedirect(!autoRedirect)}
+            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+              autoRedirect ? "bg-app-primary-color border-app-primary-color" : "border-app-primary-30 hover:border-app-primary-color"
+            }`}
+          >
+            {autoRedirect && <Check size={12} className="text-black" />}
+          </button>
+          <span className="text-xs text-app-secondary-60 font-mono leading-relaxed flex items-center gap-1">
+            <ExternalLink size={10} className="color-primary shrink-0" />
+            Auto-redirect to token page after deploy
           </span>
         </label>
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../contexts/AppContext";
 import { HorizontalHeader } from "../components/Header";
 import { PageBackground } from "../components/Styles";
@@ -34,6 +35,8 @@ import { MultiDeployModal } from "../components/deploy/MultiDeployModal";
 export const DeployPage: React.FC = () => {
   const { wallets: propWallets, baseCurrencyBalances, refreshBalances } = useAppContext();
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const autoRedirectRef = useRef(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<DeployTab>("platform");
@@ -63,6 +66,10 @@ export const DeployPage: React.FC = () => {
     telegram: "",
     website: "",
   });
+
+  // Auto-redirect option
+  const [autoRedirect, setAutoRedirect] = useState(false);
+  autoRedirectRef.current = autoRedirect;
 
   // Success/Multi-deploy state
   const [deployedMintAddress, setDeployedMintAddress] = useState<string | null>(null);
@@ -183,8 +190,15 @@ export const DeployPage: React.FC = () => {
         })),
       ];
 
+      const handleMintReady = (mintAddress: string): void => {
+        if (autoRedirectRef.current) {
+          addRecentToken(mintAddress);
+          navigate(`/tokens/${mintAddress}`);
+        }
+      };
+
       if (deployments.length === 1) {
-        const result = await executeCreate(deployments[0].wallets, deployments[0].config);
+        const result = await executeCreate(deployments[0].wallets, deployments[0].config, handleMintReady);
         if (result.success && result.mintAddress) {
           addRecentToken(result.mintAddress);
           setDeployedMintAddress(result.mintAddress);
@@ -204,7 +218,7 @@ export const DeployPage: React.FC = () => {
         await Promise.all(
           deployments.map(async (deployment, i) => {
             try {
-              const result = await executeCreate(deployment.wallets, deployment.config);
+              const result = await executeCreate(deployment.wallets, deployment.config, i === 0 ? handleMintReady : undefined);
               if (result.success && result.mintAddress) {
                 addRecentToken(result.mintAddress);
               }
@@ -409,6 +423,8 @@ export const DeployPage: React.FC = () => {
                 totalDeploys={totalDeploys}
                 isConfirmed={isConfirmed}
                 setIsConfirmed={setIsConfirmed}
+                autoRedirect={autoRedirect}
+                setAutoRedirect={setAutoRedirect}
                 canDeploy={canDeploy}
                 isSubmitting={isSubmitting}
                 onDeploy={() => void handleDeploy()}

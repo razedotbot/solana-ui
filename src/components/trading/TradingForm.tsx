@@ -436,10 +436,16 @@ const TradingCard: React.FC<TradingCardProps> = ({
                   <span className="text-[10px] text-app-secondary-60 font-mono">FEE</span>
                   <input
                     type="text"
-                    value={config.transactionFee || "0.001"}
+                    value={config.transactionFee || "0.005"}
                     onChange={(e) => {
                       const val = e.target.value.replace(/[^0-9.]/g, "");
                       setConfig({ ...config, transactionFee: val });
+                    }}
+                    onBlur={() => {
+                      const num = parseFloat(config.transactionFee || "0");
+                      if (isNaN(num) || num < 0.001) {
+                        setConfig({ ...config, transactionFee: "0.001" });
+                      }
                     }}
                     className="w-10 bg-transparent text-[10px] text-app-primary font-mono text-right focus:outline-none"
                   />

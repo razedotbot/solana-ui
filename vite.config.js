@@ -74,13 +74,6 @@ export default defineConfig({
             if (id.includes('react-dom') || id.includes('/react/')) return 'vendor-react';
             if (id.includes('react-router')) return 'vendor-router';
             if (id.includes('@solana/web3.js') || id.includes('@solana/spl-token')) return 'vendor-solana';
-            // Let 3d libs split naturally into the lazy-loaded Interactive3DLogo chunk
-            // Separate crypto polyfills for better caching (used everywhere via Solana)
-            if (
-              id.includes('elliptic') || id.includes('hash.js') ||
-              id.includes('bn.js') || id.includes('brorand') ||
-              id.includes('hmac-drbg') || id.includes('minimalistic-')
-            ) return 'vendor-crypto-polyfill';
           }
         },
         
@@ -96,7 +89,6 @@ export default defineConfig({
     minify: 'esbuild', // Use esbuild instead of terser for better compatibility
     // Note: esbuild minification is faster and more reliable than terser
     
-    // Largest chunks are lazy-loaded (3D) or cacheable (crypto polyfills)
     chunkSizeWarningLimit: 1024,
     
     // Enable CSS code splitting
