@@ -59,4 +59,3 @@ pnpm-lock.yaml
 shrinkwrap.yaml
 /.kiro
 /.vercel
-.claude/settings.local.json
