@@ -1,7 +1,7 @@
-import React, { useRef, useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import "@google/model-viewer";
 
-export const Interactive3DLogo: React.FC<{ className?: string }> = ({ className }) => {
+const Interactive3DLogo: React.FC<{ className?: string }> = ({ className }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
 
@@ -97,3 +97,5 @@ export const Interactive3DLogo: React.FC<{ className?: string }> = ({ className 
     </div>
   );
 };
+
+export default Interactive3DLogo;

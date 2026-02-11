@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -9,17 +9,17 @@ import {
   Trash2,
   Search
 } from 'lucide-react';
-import { Interactive3DLogo } from '../components/InteractiveLogo';
+const Interactive3DLogo = lazy(() => import('../components/Interactive3DLogo'));
 
 import { getRecentTokens, clearRecentTokens, formatTimeAgo, removeRecentToken } from '../utils/recentTokens';
 import type { RecentToken } from '../utils/types';
 import { formatAddress } from '../utils/formatting';
 import { HorizontalHeader } from '../components/Header';
-import { PageBackground } from '../components/PageBackground';
+import { PageBackground } from '../components/Styles';
 import { OnboardingTutorial } from '../components/OnboardingTutorial';
 import { createConnectionFromConfig } from '../utils/rpcManager';
-import { useTokenMetadata, prefetchTokenMetadata } from '../utils/hooks';
-import { useMultichart } from '../contexts/useMultichart';
+import { useTokenMetadata, prefetchTokenMetadata } from '../utils/hooks/useTokenMetadata';
+import { useMultichart } from '../contexts/MultichartContext';
 import { loadViewModeFromCookies } from '../utils/storage';
 
 interface NetworkStats {
@@ -276,7 +276,7 @@ export const Homepage: React.FC = () => {
 
 
             {/* 3D Model */}
-            <Interactive3DLogo />
+            <Suspense fallback={null}><Interactive3DLogo /></Suspense>
 
           </div>
 

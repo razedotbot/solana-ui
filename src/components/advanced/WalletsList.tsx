@@ -29,15 +29,15 @@ import type {
 import { DEFAULT_GROUP_ID } from "../../utils/types";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { formatTokenBalance } from "../../utils/formatting";
-import { useToast } from "../../utils/hooks";
+import { useToast } from "../Notifications";
 import { executeBuy, createBuyConfig, validateBuyInputs } from "../../utils/buy";
 import {
   executeSell,
   createSellConfig,
   validateSellInputs,
 } from "../../utils/sell";
-import { Tooltip } from "../Tooltip";
-import { PageBackground } from "../PageBackground";
+import { WalletTooltip as Tooltip } from "../Styles";
+import { PageBackground } from "../Styles";
 
 // ============================================================================
 // Virtualized Wallet List Component

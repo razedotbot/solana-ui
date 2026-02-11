@@ -15,11 +15,11 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { Buffer } from "buffer";
-import { useToast } from "../../utils/hooks";
+import { useToast } from "../Notifications";
 import type { WalletType } from "../../utils/types";
+import { sendTransactions } from "../../utils/trading";
 import type { WindowWithConfig } from "../../utils/trading";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary } from "./PanelShared";
-import { sendTransactions } from "../../utils/transactionService";
 
 // ─── Platform registry (add new platforms here) ───────────────────────────
 

@@ -5,10 +5,10 @@ import { formatTokenBalance, formatBaseCurrencyBalance } from "../../utils/forma
 import type { WalletType } from "../../utils/types";
 import { DEFAULT_GROUP_ID } from "../../utils/types";
 import { BASE_CURRENCIES, type BaseCurrencyConfig } from "../../utils/constants";
-import { useAppContext } from "../../contexts";
+import { useAppContext } from "../../contexts/AppContext";
 import { loadWalletGroups, saveWalletsToCookies } from "../../utils/storage";
-import { useActiveWalletGroup } from "../../utils/hooks";
-import { GroupSelector } from "../wallets/GroupSelector";
+import { useActiveWalletGroup } from "../../utils/hooks/useWalletGroups";
+import { GroupSelector } from "../wallets/WalletsHeader";
 
 interface WalletSelectorPopupProps {
   wallets: WalletType[];

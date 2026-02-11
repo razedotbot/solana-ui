@@ -10,13 +10,12 @@ export default defineConfig({
   plugins: [
     react(),
     nodePolyfills({
-      // Enable polyfills for specific globals and modules
       globals: {
         Buffer: true,
         global: true,
         process: true,
       },
-      // Enable polyfills for specific modules (e.g., crypto, stream, etc.)
+      // vm polyfill uses eval by design; safe since app never calls vm.runInThisContext
       protocolImports: true,
     }),
     checker({
@@ -63,13 +62,26 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === 'EVAL' && warning.id?.includes('vm-browserify')) return;
+        warn(warning);
+      },
       output: {
         // Simplified chunking - only split truly independent ESM libraries
         // Avoid splitting CommonJS modules which can break require() calls
-        manualChunks: {
-          // Only split pure ESM libraries that are safe to chunk
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-router': ['react-router-dom'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('/react/')) return 'vendor-react';
+            if (id.includes('react-router')) return 'vendor-router';
+            if (id.includes('@solana/web3.js') || id.includes('@solana/spl-token')) return 'vendor-solana';
+            // Let 3d libs split naturally into the lazy-loaded Interactive3DLogo chunk
+            // Separate crypto polyfills for better caching (used everywhere via Solana)
+            if (
+              id.includes('elliptic') || id.includes('hash.js') ||
+              id.includes('bn.js') || id.includes('brorand') ||
+              id.includes('hmac-drbg') || id.includes('minimalistic-')
+            ) return 'vendor-crypto-polyfill';
+          }
         },
         
         // Optimize chunk size

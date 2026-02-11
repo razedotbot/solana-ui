@@ -13,14 +13,20 @@ import {
   Rocket,
 } from "lucide-react";
 import { DeployForm } from "./DeployForm";
-import { GroupSelector } from "../wallets/GroupSelector";
-import { useWalletGroups, useActiveWalletGroup } from "../../utils/hooks";
+import { GroupSelector } from "../wallets/WalletsHeader";
+import { useWalletGroups, useActiveWalletGroup } from "../../utils/hooks/useWalletGroups";
 
 // Left column view type
 type LeftColumnView = "wallets" | "deploy";
-import { brand } from "../../utils/brandConfig";
-import Split from "../Split";
+import { brand } from "../../utils/constants";
+import OriginalSplit from 'react-split';
+import type { SplitProps } from 'react-split';
 import type { WalletType, IframeData, WalletCategory, CategoryQuickTradeSettings } from "../../utils/types";
+
+const Split: React.FC<SplitProps> = (props) => {
+  return <OriginalSplit {...props} />;
+};
+
 import type { ViewMode } from "../../utils/storage";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { getWalletDisplayName } from "../../utils/wallet";
 import type { WalletType } from "../../utils/types";
-import { useToast } from "../../utils/hooks";
+import { useToast } from "../Notifications";
 
 interface WalletPreset {
   id: string;

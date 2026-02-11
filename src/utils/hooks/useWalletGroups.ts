@@ -1,4 +1,32 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+
+const ACTIVE_GROUP_STORAGE_KEY = "active_wallet_group";
+const ACTIVE_GROUP_EVENT_NAME = "wallet-group-changed";
+
+export function useActiveWalletGroup(): [string, (groupId: string) => void] {
+  const [activeGroupId, setActiveGroupId] = useState<string>(() => {
+    return localStorage.getItem(ACTIVE_GROUP_STORAGE_KEY) || "all";
+  });
+
+  const setGroup = useCallback((groupId: string) => {
+    setActiveGroupId(groupId);
+    localStorage.setItem(ACTIVE_GROUP_STORAGE_KEY, groupId);
+    window.dispatchEvent(new CustomEvent(ACTIVE_GROUP_EVENT_NAME, { detail: groupId }));
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const groupId = (e as CustomEvent<string>).detail;
+      setActiveGroupId(groupId);
+    };
+    window.addEventListener(ACTIVE_GROUP_EVENT_NAME, handler);
+    return () => window.removeEventListener(ACTIVE_GROUP_EVENT_NAME, handler);
+  }, []);
+
+  return [activeGroupId, setGroup];
+}
+
+// --- useWalletGroups ---
 import type { WalletType, WalletGroup } from "../types";
 import { DEFAULT_GROUP_ID } from "../types";
 import { saveWalletGroups, loadWalletGroups } from "../storage";

@@ -1,6 +1,16 @@
-import React, { useEffect, useState, useRef } from "react"
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useEffect, useState, useRef } from "react"
 import { AlertCircle, X, ZapIcon } from "lucide-react"
-import { ToastContext } from "./ToastContext"
+
+export const ToastContext = createContext<{
+  showToast: (message: string, type: 'success' | 'error') => void
+}>({
+  showToast: () => {},
+})
+
+export const useToast = (): { showToast: (message: string, type: 'success' | 'error') => void } => {
+  return useContext(ToastContext)
+}
 
 interface Toast {
   id: number

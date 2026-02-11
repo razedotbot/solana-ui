@@ -11,7 +11,7 @@ import {
   Settings,
 } from "lucide-react";
 import type { Connection } from "@solana/web3.js";
-import { useToast } from "../../utils/hooks";
+import { useToast } from "../Notifications";
 import { getWalletDisplayName } from "../../utils/wallet";
 import type { WalletType, ComponentWalletAmount } from "../../utils/types";
 import { batchMixBaseCurrency, validateMixingInputs } from "../../utils/mixer";

@@ -7,7 +7,7 @@ import {
   Rocket,
   RefreshCw,
 } from "lucide-react";
-import type { TokenMetadata } from "./types";
+import type { TokenMetadata } from "./constants";
 
 interface DeployPreviewProps {
   tokenData: TokenMetadata;

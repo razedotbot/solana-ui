@@ -7,17 +7,17 @@ import {
   ArrowDownRight,
   Clock,
 } from "lucide-react";
-import { brand } from "./utils/brandConfig";
+import { brand } from "./utils/constants";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import type { WalletType, IframeData } from "./utils/types";
 import type { BaseCurrencyConfig } from "./utils/constants";
-import { useToast } from "./utils/hooks";
+import { useToast } from "./components/Notifications";
 import { countActiveWallets, filterActiveWallets, toggleWallet } from "./utils/wallet";
 import { saveWalletsToCookies } from "./utils/storage";
 import FloatingTradingCard from "./components/trading/FloatingTradingCard";
 import TradingCard from "./components/trading/TradingForm";
 import WalletSelectorPopup from "./components/trading/WalletSelectorPopup";
-import { PageBackground } from "./components/PageBackground";
+import { PageBackground } from "./components/Styles";
 import { getLatestTrades, type TradeHistoryEntry } from "./utils/trading";
 
 import { executeTrade } from "./utils/trading";

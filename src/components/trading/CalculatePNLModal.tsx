@@ -4,7 +4,7 @@ import { BarChart2, X } from "lucide-react";
 import { getWallets } from "../../utils/wallet";
 import PnlCard from "./PnlCard";
 import type { IframeData } from "../../utils/types";
-import { useTokenMetadata } from "../../utils/hooks";
+import { useTokenMetadata } from "../../utils/hooks/useTokenMetadata";
 
 interface BasePnlModalProps {
   isOpen: boolean;

@@ -10,7 +10,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { Connection } from "@solana/web3.js";
-import { useToast } from "../../utils/hooks";
+import { useToast } from "../Notifications";
 import type { WalletType } from "../../utils/types";
 import { getWalletDisplayName } from "../../utils/wallet";
 import { formatAddress } from "../../utils/formatting";

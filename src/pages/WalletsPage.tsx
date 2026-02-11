@@ -31,25 +31,25 @@ import {
   validateMnemonic,
   getMnemonicWordCount,
 } from "../utils/hdWallet";
-import { useAppContext } from "../contexts";
-import { useToast, useWalletGroups, useActiveWalletGroup } from "../utils/hooks";
+import { useAppContext } from "../contexts/AppContext";
+import { useToast } from "../components/Notifications";
+import { useWalletGroups, useActiveWalletGroup } from "../utils/hooks/useWalletGroups";
 
 import { formatBaseCurrencyBalance, formatAddress } from "../utils/formatting";
-import type { SortField, ActiveModal, FilterTab } from "../components/wallets";
-import {
-  WalletsHeader,
-  WalletListView,
-  FilterTabs,
-  SelectionFooter,
-  OperationEmptyState,
-  DistributePanel,
-  MixerPanel,
-  ConsolidatePanel,
-  TransferPanel,
-  FeeClaimPanel,
-  BurnPanel,
-} from "../components/wallets";
-import { PageBackground } from "../components/PageBackground";
+import { WalletsHeader } from "../components/wallets/WalletsHeader";
+import { WalletListView } from "../components/wallets/WalletListView";
+import { FilterTabs, type FilterTab } from "../components/wallets/FilterTabs";
+import { SelectionFooter, OperationEmptyState } from "../components/wallets/SelectionFooter";
+import { DistributePanel } from "../components/wallets/DistributePanel";
+import { MixerPanel } from "../components/wallets/MixerPanel";
+import { ConsolidatePanel } from "../components/wallets/ConsolidatePanel";
+import { TransferPanel } from "../components/wallets/TransferPanel";
+import { FeeClaimPanel } from "../components/wallets/FeeClaimPanel";
+import { BurnPanel } from "../components/wallets/BurnPanel";
+
+type SortField = "solBalance";
+type ActiveModal = "distribute" | "consolidate" | "transfer" | "fee-claim" | "mixer" | "burn" | null;
+import { PageBackground } from "../components/Styles";
 import { DEFAULT_GROUP_ID } from "../utils/types";
 import { Wallet, ChevronDown, Download, Trash2 } from "lucide-react";
 import type { BaseCurrencyConfig } from "../utils/constants";

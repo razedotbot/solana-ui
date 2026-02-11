@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { BarChart } from 'lucide-react';
 import type { WalletType } from './utils/types';
-import { brand } from './utils/brandConfig';
+import { brand } from './utils/constants';
 import { useIframeState, type ViewType } from './contexts/IframeStateContext';
 
 interface FrameProps {

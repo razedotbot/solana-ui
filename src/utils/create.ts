@@ -1,9 +1,8 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
-import { sendTransactions } from "./transactionService";
 import type { SenderResult as SharedSenderResult } from "./types";
 import { API_ENDPOINTS, CREATE_CONFIG, OPERATION_DELAYS } from "./constants";
-import { getServerBaseUrl, splitLargeBundles, createKeypairs } from "./trading";
+import { sendTransactions, getServerBaseUrl, splitLargeBundles, createKeypairs } from "./trading";
 
 // ============================================================================
 // Constants

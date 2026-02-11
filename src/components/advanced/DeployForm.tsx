@@ -19,8 +19,8 @@ import {
   ChevronDown,
   Wallet,
 } from "lucide-react";
-import { useAppContext } from "../../contexts";
-import { useToast } from "../../utils/hooks";
+import { useAppContext } from "../../contexts/AppContext";
+import { useToast } from "../Notifications";
 import {
   executeCreate,
   createDeployConfig,
@@ -34,11 +34,10 @@ import { loadConfigFromCookies } from "../../utils/storage";
 import { addRecentToken } from "../../utils/recentTokens";
 import { getWalletDisplayName } from "../../utils/wallet";
 import type { WalletType, TokenMetadataApiResponse } from "../../utils/types";
-import type { TokenMetadata } from "../deploy/types";
-import { PlatformIcons, PLATFORMS } from "../deploy/constants";
+import type { TokenMetadata } from "../deploy/constants";
+import { PlatformIcons, PLATFORMS, MIN_WALLETS, MAX_WALLETS_ADVANCED } from "../deploy/constants";
 import { API_URLS } from "../../utils/constants";
-import { MIN_WALLETS, MAX_WALLETS_ADVANCED } from "../deploy/types";
-import { PageBackground } from "../PageBackground";
+import { PageBackground } from "../Styles";
 
 interface DeployFormProps {
   onTokenDeployed?: (mintAddress: string) => void;

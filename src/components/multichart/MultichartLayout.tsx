@@ -12,15 +12,15 @@ import {
   Settings,
   Clock,
 } from "lucide-react";
-import { useMultichart } from "../../contexts/useMultichart";
+import { useMultichart } from "../../contexts/MultichartContext";
 import { MultichartFrameContainer } from "./MultichartFrameContainer";
-import { MONITOR_SLOT } from "./constants";
+import { MONITOR_SLOT } from "./MultichartFrameContainer";
 import { getRecentTokens } from "../../utils/recentTokens";
-import { brand } from "../../utils/brandConfig";
+import { brand } from "../../utils/constants";
 import type { WalletType } from "../../utils/types";
 import type { ViewMode } from "../../utils/storage";
 import type { RecentToken } from "../../utils/types";
-import { useTokenMetadata, prefetchTokenMetadata } from "../../utils/hooks";
+import { useTokenMetadata, prefetchTokenMetadata } from "../../utils/hooks/useTokenMetadata";
 
 interface MultichartLayoutProps {
   wallets: WalletType[];

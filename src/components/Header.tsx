@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Settings, Blocks, Wallet, TrendingUp, BookOpen, Menu, X, Home } from 'lucide-react';
-import { brand } from '../utils/brandConfig';
+import { brand } from '../utils/constants';
 
 interface HeaderProps {
     tokenAddress?: string;
@@ -252,3 +252,4 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
         </header>
     );
 };
+

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useAppContext } from "../contexts";
+import { useAppContext } from "../contexts/AppContext";
 import { HorizontalHeader } from "../components/Header";
-import { PageBackground } from "../components/PageBackground";
+import { PageBackground } from "../components/Styles";
 import { Rocket, ChevronRight } from "lucide-react";
-import { useToast } from "../utils/hooks";
+import { useToast } from "../components/Notifications";
 import {
   executeCreate,
   createDeployConfig,
@@ -24,14 +24,13 @@ import {
   MAX_WALLETS_STANDARD,
   MAX_WALLETS_ADVANCED,
   TABS,
-  PlatformTab,
-  TokenTab,
-  WalletsTab,
-  DeploysTab,
-  DeployPreview,
-  SuccessModal,
-  MultiDeployModal,
-} from "../components/deploy";
+} from "../components/deploy/constants";
+import { PlatformTab } from "../components/deploy/PlatformTab";
+import { TokenTab } from "../components/deploy/TokenTab";
+import { WalletsTab } from "../components/deploy/WalletsTab";
+import { DeploysTab, SuccessModal } from "../components/deploy/DeploysTab";
+import { DeployPreview } from "../components/deploy/DeployPreview";
+import { MultiDeployModal } from "../components/deploy/MultiDeployModal";
 
 export const DeployPage: React.FC = () => {
   const { wallets: propWallets, baseCurrencyBalances, refreshBalances } = useAppContext();

@@ -4,9 +4,9 @@
  */
 
 import Cookies from "js-cookie";
-import { encryptData, decryptData } from "./encryption";
+import CryptoJS from 'crypto-js';
 import { createDefaultEndpoints } from "./rpcManager";
-import { INDEXED_DB, STORAGE_KEYS } from "./constants";
+import { ENCRYPTION, INDEXED_DB, STORAGE_KEYS } from "./constants";
 import type {
   WalletType,
   ConfigType,
@@ -15,9 +15,47 @@ import type {
   WalletGroup,
 } from "./types";
 import { DEFAULT_GROUP_ID } from "./types";
-import type { MultichartToken } from "./types/multichart";
+import type { MultichartToken } from "./types";
 
 export { STORAGE_KEYS };
+
+// ============= Encryption =============
+
+// Encryption key from centralized constants
+const ENCRYPTION_KEY = ENCRYPTION.KEY;
+
+/**
+ * Encrypts a string using AES encryption.
+ * @param data - The plaintext string to encrypt
+ * @returns The encrypted string
+ * @throws Error if encryption fails
+ */
+export function encryptData(data: string): string {
+  try {
+    return CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
+  } catch {
+    throw new Error('Failed to encrypt data');
+  }
+}
+
+/**
+ * Decrypts an AES-encrypted string.
+ * @param encryptedData - The encrypted string to decrypt
+ * @returns The decrypted plaintext string
+ * @throws Error if decryption fails
+ */
+export function decryptData(encryptedData: string): string {
+  try {
+    const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
+    const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+    if (!decryptedData) {
+      throw new Error('Failed to decrypt data - invalid key or corrupted data');
+    }
+    return decryptedData;
+  } catch {
+    throw new Error('Failed to decrypt data');
+  }
+}
 
 // Database constants (from centralized constants)
 const DB_NAME = INDEXED_DB.NAME;

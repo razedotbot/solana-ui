@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -15,7 +15,7 @@ import {
   Shuffle,
 } from "lucide-react";
 import type { WalletGroup } from "../../utils/types";
-import { Interactive3DLogo } from "../InteractiveLogo";
+const Interactive3DLogo = lazy(() => import("../Interactive3DLogo"));
 
 export interface SelectionFooterProps {
   selectedCount: number;
@@ -184,8 +184,6 @@ export const SelectionFooter: React.FC<SelectionFooterProps> = ({
   );
 };
 
-// --- OperationEmptyState (merged from OperationEmptyState.tsx) ---
-
 interface OperationEmptyStateProps {
   onDistribute: () => void;
   onMixer: () => void;
@@ -210,7 +208,7 @@ export const OperationEmptyState: React.FC<OperationEmptyStateProps> = (props) =
 
   return (
     <div className="flex-1 flex flex-col items-center justify-start pt-0 px-8 pb-8">
-      <Interactive3DLogo />
+      <Suspense fallback={null}><Interactive3DLogo /></Suspense>
       <h3 className="text-lg font-semibold text-app-primary font-mono mb-2">
         <span className="color-primary">/</span> WALLET OPERATIONS <span className="color-primary">/</span>
       </h3>

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Download } from 'lucide-react';
-import { brand } from '../../utils/brandConfig';
+import { brand } from '../../utils/constants';
 
 // Define proper types
 interface PnlCardProps {

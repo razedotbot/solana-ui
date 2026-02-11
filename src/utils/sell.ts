@@ -25,8 +25,8 @@ import {
   getFeeLamports,
   processBatchResults,
   createBatchErrorMessage,
+  sendTransactions,
 } from "./trading";
-import { sendTransactions } from "./transactionService";
 
 export type {
   WalletSell,

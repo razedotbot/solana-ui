@@ -2,15 +2,12 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { WalletType } from "./types";
 import { loadConfigFromCookies } from "./storage";
-import { TRADING, RATE_LIMIT, BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
-import type { SenderResult } from "./types";
+import { TRADING, RATE_LIMIT, BASE_CURRENCIES, API_ENDPOINTS, type BaseCurrencyConfig } from "./constants";
+import type { SenderResult, ApiResponse } from "./types";
 import { executeBuy, createBuyConfig } from "./buy";
 import type { BundleMode } from "./buy";
 import { executeSell, createSellConfig } from "./sell";
 import { filterActiveWallets } from "./wallet";
-
-// Re-export sendTransactions from transactionService for convenience
-export { sendTransactions } from "./transactionService";
 
 // ============================================================================
 // Shared Trading Types
@@ -80,6 +77,40 @@ export const getServerBaseUrl = (): string => {
   return (
     (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || ""
   );
+};
+
+// ============================================================================
+// Transaction Sending
+// ============================================================================
+
+/**
+ * Sends transactions via the trading server's /v2/sol/send endpoint
+ * @param transactions - Array of base64-encoded serialized transactions
+ * @returns Result from the server
+ */
+export const sendTransactions = async (
+  transactions: string[],
+): Promise<SenderResult> => {
+  const baseUrl = getServerBaseUrl();
+  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_SEND}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ transactions }),
+  });
+
+  const result = (await response.json()) as ApiResponse<SenderResult>;
+
+  if (!result.success) {
+    const errorMessage = result.error || "Unknown error sending transactions";
+    const errorDetails = result.details ? `: ${result.details}` : "";
+    throw new Error(`${errorMessage}${errorDetails}`);
+  }
+
+  return result.result as SenderResult;
 };
 
 // ============================================================================

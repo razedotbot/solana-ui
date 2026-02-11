@@ -2,10 +2,10 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, RefreshCw, X, ExternalLink, LayoutGrid } from "lucide-react";
 import type { PlatformType } from "../../utils/create";
-import type { DeploymentProgressItem, AdditionalToken } from "./types";
+import type { DeploymentProgressItem, AdditionalToken } from "./constants";
 import { PlatformIcons, PLATFORMS } from "./constants";
-import { useMultichart } from "../../contexts/useMultichart";
-import { useToast } from "../../utils/hooks";
+import { useMultichart } from "../../contexts/MultichartContext";
+import { useToast } from "../Notifications";
 
 interface MultiDeployModalProps {
   isSubmitting: boolean;

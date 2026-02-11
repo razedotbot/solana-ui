@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { GripVertical, X, Maximize2, Minimize2, Zap } from "lucide-react";
-import { useMultichart } from "../../contexts/useMultichart";
-import { brand } from "../../utils/brandConfig";
+import { useMultichart } from "../../contexts/MultichartContext";
+import { brand } from "../../utils/constants";
 import { executeTrade } from "../../utils/trading";
-import { useToast } from "../../utils/hooks/useToast";
+import { useToast } from "../Notifications";
 import { countActiveWallets } from "../../utils/wallet";
 import FloatingTradingCard from "../trading/FloatingTradingCard";
 import type { WalletType } from "../../utils/types";
-import { MONITOR_SLOT } from "./constants";
+export const MONITOR_SLOT = "__MONITOR__";
 
 interface MultichartFrameContainerProps {
   wallets: WalletType[];

@@ -1,10 +1,9 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
-import { sendTransactions } from "./transactionService";
 import type { SenderResult } from "./types";
 import { BASE_CURRENCIES, API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
 import { parseTransactionArray, type RawTransactionResponse } from "./transactionParsing";
-import { getServerBaseUrl, checkRateLimit, resolveBaseCurrency, prepareTransactionBundles } from "./trading";
+import { sendTransactions, getServerBaseUrl, checkRateLimit, resolveBaseCurrency, prepareTransactionBundles } from "./trading";
 
 interface WalletMixing {
   address: string;

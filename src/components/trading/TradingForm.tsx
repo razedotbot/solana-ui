@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Move, Edit3, Check } from "lucide-react";
-import { useToast } from "../../utils/hooks";
-import { useAppContext } from "../../contexts";
+import { useToast } from "../Notifications";
+import { useAppContext } from "../../contexts/AppContext";
 import { filterActiveWallets, toggleWallet } from "../../utils/wallet";
 import { saveWalletsToCookies } from "../../utils/storage";
 import WalletSelectorPopup from "../trading/WalletSelectorPopup";

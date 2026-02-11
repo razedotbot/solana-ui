@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import React, { Component, type ErrorInfo, useState, useEffect, useCallback, Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Buffer } from "buffer";
 import Cookies from "js-cookie";
 window.Buffer = Buffer;
-import { brand } from "./utils/brandConfig";
+import { brand } from "./utils/constants";
 import type { WindowWithToast, ServerInfo } from "./utils/types";
-import { AppContextProvider } from "./contexts";
+import { AppContextProvider } from "./contexts/AppContext";
 import { IframeStateProvider } from "./contexts/IframeStateContext";
 import { MultichartProvider } from "./contexts/MultichartContext";
 
@@ -24,9 +24,8 @@ const loadBrandCSS = async (): Promise<void> => {
 // Load brand CSS immediately
 void loadBrandCSS();
 import ToastProvider from "./components/Notifications";
-import { useToast } from "./utils/hooks";
-import BeRightBack from "./components/BeRightBack";
-import ErrorBoundary from "./components/ErrorBoundary";
+import { useToast } from "./components/Notifications";
+import { Wallet, Settings, AlertTriangle, Home, RefreshCw } from 'lucide-react';
 
 // Lazy load page components
 const App = lazy(() => import("./App"));
@@ -47,6 +46,188 @@ const SettingsPage = lazy(() =>
 const preloadApp = (): void => {
   void import("./App");
 };
+
+// --- BeRightBack component (inlined) ---
+
+interface BeRightBackProps {
+  onOpenWallets: () => void;
+  onOpenSettings: () => void;
+}
+
+const BeRightBack: React.FC<BeRightBackProps> = ({ onOpenWallets, onOpenSettings }) => {
+  return (
+    <div className="fixed inset-0 bg-app-primary flex items-center justify-center p-4 overflow-hidden">
+      {/* Animated grid background */}
+      <div className="absolute inset-0 bg-grid opacity-10"></div>
+
+      {/* Main content */}
+      <div className="relative z-10 text-center max-w-2xl w-full">
+        {/* Glowing title */}
+        <h1
+          className="text-6xl md:text-8xl font-bold mb-6 text-app-primary"
+          style={{
+            textShadow: '0 0 10px rgba(2, 179, 109, 0.5), 0 0 20px rgba(2, 179, 109, 0.3), 0 0 30px rgba(2, 179, 109, 0.2)'
+          }}
+        >
+          BE RIGHT BACK
+        </h1>
+
+        {/* Subtitle */}
+        <p className="text-xl md:text-2xl text-app-secondary mb-8">
+          We're currently performing maintenance
+        </p>
+
+        {/* Animated loading indicator */}
+        <div className="flex justify-center items-center mb-8">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-t-2 spinner-app-primary"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-8 w-8 bg-app-primary-color rounded-full animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Decorative elements */}
+        <div className="flex justify-center gap-4 text-app-primary-40 text-2xl mb-8">
+          <span className="animate-pulse" style={{ animationDelay: '0s' }}>▮</span>
+          <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>▮</span>
+          <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>▮</span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+          <button
+            onClick={onOpenWallets}
+            className="px-6 py-3 bg-app-primary-color hover:bg-app-primary-dark text-black font-bold rounded btn font-mono tracking-wider transition-all duration-300 flex items-center gap-2"
+          >
+            <Wallet size={18} />
+            WALLETS
+          </button>
+          <button
+            onClick={onOpenSettings}
+            className="px-6 py-3 bg-app-tertiary border border-app-primary-40 hover-border-primary text-app-primary font-bold rounded btn font-mono tracking-wider transition-all duration-300 flex items-center gap-2"
+          >
+            <Settings size={18} />
+            SETTINGS
+          </button>
+        </div>
+
+        {/* Bottom message */}
+        <p className="text-app-muted text-sm md:text-base">
+          Please check back soon
+        </p>
+      </div>
+
+      {/* Scanline effect overlay */}
+      <div className="scanline absolute inset-0 pointer-events-none"></div>
+    </div>
+  );
+};
+
+// --- ErrorBoundary component (inlined) ---
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: (error: Error, errorInfo: ErrorInfo, reset: () => void) => React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null
+    };
+  }
+
+  static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
+    return { hasError: true };
+  }
+
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    this.setState({
+      error,
+      errorInfo
+    });
+  }
+
+  resetError = (): void => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null
+    });
+  };
+
+  override render(): React.ReactNode {
+    if (this.state.hasError) {
+      if (this.props.fallback && this.state.error && this.state.errorInfo) {
+        return this.props.fallback(this.state.error, this.state.errorInfo, this.resetError);
+      }
+
+      // Default error UI
+      return (
+        <div className="min-h-screen bg-app-primary flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-app-secondary border border-app-primary-40 rounded-lg p-6 shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+            </div>
+
+            <h1 className="text-xl font-bold text-app-primary text-center mb-2 font-mono">
+              Something went wrong
+            </h1>
+
+            <p className="text-sm text-app-tertiary text-center mb-6 font-mono">
+              An unexpected error occurred. Please try refreshing the page or return to the homepage.
+            </p>
+
+            {this.state.error && import.meta.env.DEV && (
+              <div className="mb-6 p-4 bg-app-primary rounded border border-app-primary-40 overflow-auto max-h-48">
+                <p className="text-xs font-mono text-red-400 mb-2">
+                  {this.state.error.toString()}
+                </p>
+                {this.state.errorInfo && (
+                  <pre className="text-xs font-mono text-app-secondary whitespace-pre-wrap">
+                    {this.state.errorInfo.componentStack}
+                  </pre>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => window.location.href = '/'}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-app-primary-10 hover:bg-app-primary-20 border border-app-primary-40 rounded-lg transition-colors font-mono text-sm"
+              >
+                <Home size={16} />
+                <span>Go Home</span>
+              </button>
+
+              <button
+                onClick={() => window.location.reload()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-app-primary-color hover:bg-app-primary-dark text-app-primary border border-app-primary rounded-lg transition-colors font-mono text-sm"
+              >
+                <RefreshCw size={16} />
+                <span>Reload</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 declare global {
   interface Window {

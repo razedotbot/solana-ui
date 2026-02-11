@@ -18,16 +18,17 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { useToast, useTokenMetadata } from "../../utils/hooks";
+import { useToast } from "../Notifications";
+import { useTokenMetadata } from "../../utils/hooks/useTokenMetadata";
 import type { WalletType } from "../../utils/types";
 import { getWalletDisplayName, fetchTokenBalance } from "../../utils/wallet";
 import { loadConfigFromCookies } from "../../utils/storage";
 import { formatAddress, formatTokenBalance } from "../../utils/formatting";
 import { Buffer } from "buffer";
-import { sendTransactions } from "../../utils/transactionService";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
+import { sendTransactions } from "../../utils/trading";
 import type { WindowWithConfig } from "../../utils/trading";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
 import * as PU from "./PanelShared";

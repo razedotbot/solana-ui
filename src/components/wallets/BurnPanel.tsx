@@ -10,15 +10,16 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { getWallets, getWalletDisplayName } from "../../utils/wallet";
-import { useToast, useTokenMetadata } from "../../utils/hooks";
+import { useToast } from "../Notifications";
+import { useTokenMetadata } from "../../utils/hooks/useTokenMetadata";
 import { loadConfigFromCookies } from "../../utils/storage";
 import * as web3 from "@solana/web3.js";
 import bs58 from "bs58";
-import { sendTransactions } from "../../utils/transactionService";
 import type { ApiResponse } from "../../utils/types";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES } from "../../utils/constants";
+import { sendTransactions } from "../../utils/trading";
 import type { WindowWithConfig } from "../../utils/trading";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
 import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";

@@ -12,8 +12,8 @@ import {
   Download,
   ChevronDown,
 } from "lucide-react";
-import { useToast } from "../../utils/hooks";
-import type { TokenMetadata } from "./types";
+import { useToast } from "../Notifications";
+import type { TokenMetadata } from "./constants";
 import type { TokenMetadataApiResponse } from "../../utils/types";
 
 interface TokenTabProps {

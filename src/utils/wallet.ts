@@ -6,10 +6,11 @@
 import type { Connection } from "@solana/web3.js";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
-import { encryptData, decryptData } from "./encryption";
 import { deriveWalletFromMnemonic } from "./hdWallet";
 import { formatAddress } from "./formatting";
 import {
+  encryptData,
+  decryptData,
   loadWalletsFromCookies,
   saveMasterWallets,
   loadMasterWallets,

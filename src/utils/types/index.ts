@@ -10,13 +10,95 @@
  * import type { WalletType } from '../utils/types';
  */
 
+// --- API types (inlined from api.ts) ---
 
-export type {
-  ApiResponse,
-  SenderResult,
-  ServerInfo,
-  WindowWithToast,
-} from "./api";
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  details?: string;
+  result?: T;
+}
+
+export interface SenderResult {
+  jsonrpc: string;
+  id: number;
+  result?: string;
+  error?: {
+    code: number;
+    message: string;
+  };
+}
+
+export interface ServerInfo {
+  id: string;
+  name: string;
+  url: string;
+  region: string;
+  flag: string;
+  ping?: number;
+}
+
+export interface WindowWithToast extends Window {
+  showToast?: (message: string, type: "success" | "error") => void;
+}
+
+// --- Multichart types (inlined from multichart.ts) ---
+
+export interface MultichartToken {
+  address: string;
+  addedAt: number;
+  label?: string;
+  symbol?: string;
+  imageUrl?: string;
+}
+
+export interface MultichartState {
+  tokens: MultichartToken[];
+  activeTokenIndex: number;
+}
+
+export interface MultichartTokenStats {
+  address: string;
+  price: number | null;
+  marketCap: number | null;
+  pnl: { bought: number; sold: number; net: number; trades: number } | null;
+}
+
+// --- Token metadata types (inlined from tokenMetadata.ts) ---
+
+export interface TokenOnChainMetadata {
+  name: string;
+  symbol: string;
+  uri: string;
+  source: string;
+}
+
+export interface TokenOffChainMetadata {
+  name?: string;
+  symbol?: string;
+  description?: string;
+  image?: string;
+}
+
+export interface TokenMetadataApiResponse {
+  success: boolean;
+  metadata: {
+    tokenMint: string;
+    onChain: TokenOnChainMetadata | null;
+    offChain: TokenOffChainMetadata | null;
+    metadataSource?: string;
+    timestamp?: string;
+  };
+}
+
+export interface TokenMetadataInfo {
+  mint: string;
+  name: string;
+  symbol: string;
+  image: string;
+  fetchedAt: number;
+}
 
 
 export type {
@@ -78,11 +160,3 @@ export type {
 export type {
   IframeData,
 } from "./iframe";
-
-
-export type {
-  TokenOnChainMetadata,
-  TokenOffChainMetadata,
-  TokenMetadataApiResponse,
-  TokenMetadataInfo,
-} from "./tokenMetadata";

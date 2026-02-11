@@ -18,7 +18,7 @@ import {
   BookOpen,
   Columns2,
 } from "lucide-react";
-import { brand } from "./utils/brandConfig";
+import { brand } from "./utils/constants";
 import type { Connection } from "@solana/web3.js";
 import { initStyles } from "./components/Styles";
 import { fetchWalletBalances } from "./utils/wallet";
@@ -40,12 +40,12 @@ import type {
   CategoryQuickTradeSettings,
 } from "./utils/types";
 import { addRecentToken } from "./utils/recentTokens";
-import { useAppContext } from "./contexts";
-import { useToast } from "./utils/hooks/useToast";
+import { useAppContext } from "./contexts/AppContext";
+import { useToast } from "./components/Notifications";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
 import { MultichartLayout } from "./components/multichart/MultichartLayout";
-import { AdvancedLayout } from "./components/advanced";
-import { useMultichart } from "./contexts/useMultichart";
+import { AdvancedLayout } from "./components/advanced/AdvancedLayout";
+import { useMultichart } from "./contexts/MultichartContext";
 
 // Lazy loaded components
 const Frame = lazy(() =>

@@ -17,11 +17,11 @@ import {
   Shield,
 } from "lucide-react";
 import Cookies from "js-cookie";
-import { useAppContext } from "../contexts";
-import { useToast } from "../utils/hooks";
+import { useAppContext } from "../contexts/AppContext";
+import { useToast } from "../components/Notifications";
 import { saveConfigToCookies, STORAGE_KEYS } from "../utils/storage";
 import { HorizontalHeader } from "../components/Header";
-import { PageBackground } from "../components/PageBackground";
+import { PageBackground } from "../components/Styles";
 import type { ServerInfo } from "../utils/types";
 import { RPCEndpointManager } from "../components/RPCEndpointManager";
 import { createDefaultEndpoints, type RPCEndpoint } from "../utils/rpcManager";

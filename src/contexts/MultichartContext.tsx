@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import type { MultichartToken, MultichartTokenStats } from '../utils/types/multichart';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import type { MultichartToken, MultichartTokenStats } from '../utils/types';
 import {
   saveMultichartTokens,
   loadMultichartTokens,
@@ -7,8 +8,31 @@ import {
   loadMultichartActiveIndex,
   getMaxMultichartTokens,
 } from '../utils/storage';
-import { MultichartContext } from './MultichartContextDef';
-import { getTokenMetadataSync, prefetchTokenMetadata } from '../utils/hooks';
+import { getTokenMetadataSync, prefetchTokenMetadata } from '../utils/hooks/useTokenMetadata';
+
+export interface MultichartContextType {
+  tokens: MultichartToken[];
+  activeTokenIndex: number;
+  tokenStats: Map<string, MultichartTokenStats>;
+  addToken: (address: string, metadata?: Partial<MultichartToken>) => boolean;
+  removeToken: (address: string) => void;
+  setActiveToken: (index: number) => void;
+  updateTokenStats: (address: string, stats: MultichartTokenStats) => void;
+  updateTokenMetadata: (address: string, metadata: Partial<MultichartToken>) => void;
+  reorderTokens: (fromIndex: number, toIndex: number) => void;
+  replaceToken: (oldAddress: string, newAddress: string) => void;
+  maxTokens: number;
+}
+
+export const MultichartContext = createContext<MultichartContextType | undefined>(undefined);
+
+export function useMultichart(): MultichartContextType {
+  const context = useContext(MultichartContext);
+  if (context === undefined) {
+    throw new Error('useMultichart must be used within a MultichartProvider');
+  }
+  return context;
+}
 
 export function MultichartProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [tokens, setTokens] = useState<MultichartToken[]>(() => loadMultichartTokens());
