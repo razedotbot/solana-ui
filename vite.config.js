@@ -96,8 +96,8 @@ export default defineConfig({
     minify: 'esbuild', // Use esbuild instead of terser for better compatibility
     // Note: esbuild minification is faster and more reliable than terser
     
-    // Set chunk size warning limit (increased to 600KB since we're splitting more)
-    chunkSizeWarningLimit: 600,
+    // Largest chunks are lazy-loaded (3D) or cacheable (crypto polyfills)
+    chunkSizeWarningLimit: 1024,
     
     // Enable CSS code splitting
     cssCodeSplit: true,
