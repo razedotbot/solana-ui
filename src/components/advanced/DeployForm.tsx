@@ -39,7 +39,7 @@ import { API_URLS } from "../../utils/constants";
 import { PageBackground } from "../Styles";
 
 interface DeployFormProps {
-  onTokenDeployed?: (mintAddress: string) => void;
+  onTokenDeployed?: (mintAddress: string) => void | Promise<void>;
 }
 
 export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
@@ -254,9 +254,9 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
     };
 
     try {
-      const handleMintReady = (mintAddress: string): void => {
+      const handleMintReady = async (mintAddress: string): Promise<void> => {
         addRecentToken(mintAddress);
-        onTokenDeployed?.(mintAddress);
+        await Promise.resolve(onTokenDeployed?.(mintAddress));
       };
 
       const result = await executeCreate(buildWallets(selectedWallets, walletAmounts), buildConfig(), handleMintReady);

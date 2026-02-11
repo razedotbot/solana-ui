@@ -495,6 +495,20 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                   onTokenDeployed={(mintAddress) => {
                     setTokenAddress(mintAddress);
                     setLeftColumnView("wallets");
+                    return new Promise<void>((resolve) => {
+                      const handler = (event: MessageEvent<{ type: string }>): void => {
+                        if (event.data?.type === "NAVIGATION_COMPLETE") {
+                          window.removeEventListener("message", handler);
+                          resolve();
+                        }
+                      };
+                      window.addEventListener("message", handler);
+                      // Safety timeout if iframe never responds
+                      setTimeout(() => {
+                        window.removeEventListener("message", handler);
+                        resolve();
+                      }, 15000);
+                    });
                   }}
                 />
               </Suspense>
