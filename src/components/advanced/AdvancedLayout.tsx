@@ -434,15 +434,14 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                 </button>
               </div>
 
-              {/* Quick Mode S/M/H */}
-              <QuickModeDropdown
-                quickModeSettings={categorySettings}
-                onUpdateQuickMode={onUpdateCategorySettings}
-              />
+              {/* Refresh, Quick Mode & Group Selector */}
+              <div className="flex items-center gap-1">
+                <QuickModeDropdown
+                  quickModeSettings={categorySettings}
+                  onUpdateQuickMode={onUpdateCategorySettings}
+                />
 
-              {/* Refresh & Group Selector - Only show in wallets view */}
-              {leftColumnView === "wallets" && (
-                <div className="flex items-center gap-1">
+                {leftColumnView === "wallets" && (
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing || !connection}
@@ -454,18 +453,18 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                       className={`color-primary ${isRefreshing ? "animate-spin" : ""}`}
                     />
                   </button>
+                )}
 
-                  {/* Group Selector - right after refresh button */}
-                  {groups.length > 0 && (
-                    <GroupSelector
-                      groups={groups}
-                      activeGroupId={activeGroupId}
-                      onGroupChange={handleGroupChange}
-                      showAllOption={true}
-                    />
-                  )}
-                </div>
-              )}
+                {/* Group Selector */}
+                {leftColumnView === "wallets" && groups.length > 0 && (
+                  <GroupSelector
+                    groups={groups}
+                    activeGroupId={activeGroupId}
+                    onGroupChange={handleGroupChange}
+                    showAllOption={true}
+                  />
+                )}
+              </div>
             </div>
           </nav>
 

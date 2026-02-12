@@ -262,12 +262,36 @@ export const QuickModeDropdown: React.FC<{
   const [presets, setPresets] = useState<QuickModePreset[]>(loadPresets);
   const [isNaming, setIsNaming] = useState(false);
   const [presetName, setPresetName] = useState("");
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const [portalPos, setPortalPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  const updatePortalPos = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPortalPos({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePortalPos();
+    }
+  }, [isOpen, updatePortalPos]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent): void => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        buttonRef.current && !buttonRef.current.contains(event.target as Node) &&
+        portalRef.current && !portalRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+        setIsNaming(false);
+      } else if (
+        buttonRef.current && !buttonRef.current.contains(event.target as Node) &&
+        !portalRef.current
+      ) {
         setIsOpen(false);
         setIsNaming(false);
       }
@@ -315,7 +339,7 @@ export const QuickModeDropdown: React.FC<{
   const s = quickModeSettings[activeTab];
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div ref={buttonRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${isOpen ? "border-primary-60" : ""}`}
@@ -324,8 +348,12 @@ export const QuickModeDropdown: React.FC<{
         <Zap size={14} className="color-primary" />
       </button>
 
-      {isOpen && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[260px]">
+      {isOpen && createPortal(
+        <div
+          ref={portalRef}
+          className="fixed z-[9999] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[260px]"
+          style={{ top: portalPos.top, left: portalPos.left }}
+        >
           {/* S / M / H tabs */}
           <div className="flex border-b border-app-primary-40">
             {categories.map((category) => {
@@ -422,13 +450,14 @@ export const QuickModeDropdown: React.FC<{
           </div>
 
           {/* Settings form for active tab */}
-          <div className={`border-t border-app-primary-40`}>
+          <div className="border-t border-app-primary-40">
             <QuickModeSettingsForm
               settings={s}
               onUpdate={(field, value) => onUpdateQuickMode(activeTab, { ...s, [field]: value })}
             />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
