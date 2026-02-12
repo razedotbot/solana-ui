@@ -336,6 +336,17 @@ const WalletManager: React.FC = () => {
     };
   }, []);
 
+  const handleUpdateCategorySettings = useCallback(
+    (category: WalletCategory, settings: CategoryQuickTradeSettings) => {
+      setCategorySettings((prev) => {
+        const newSettings = { ...prev, [category]: settings };
+        localStorage.setItem("categoryQuickTradeSettings", JSON.stringify(newSettings));
+        return newSettings;
+      });
+    },
+    [],
+  );
+
   // Save split sizes to cookies when they change (debounced) - only in advanced mode
   useEffect(() => {
     if (viewMode === "advanced" && splitSizes[0] > 5) {
@@ -1194,6 +1205,7 @@ const WalletManager: React.FC = () => {
                 iframeData={state.iframeData}
                 setIframeData={memoizedCallbacks.setIframeData}
                 categorySettings={categorySettings}
+                onUpdateCategorySettings={handleUpdateCategorySettings}
                 viewMode={viewMode}
                 onViewModeChange={handleViewModeChange}
                 onNonWhitelistedTrade={handleNonWhitelistedTrade}

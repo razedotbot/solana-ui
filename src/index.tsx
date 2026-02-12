@@ -327,6 +327,22 @@ export const ServerCheckLoading = (): JSX.Element => {
   );
 };
 
+// Defined OUTSIDE Root to prevent full child-tree remounts on Root re-renders
+const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}): JSX.Element => {
+  const { showToast } = useToast();
+
+  useEffect((): (() => void) => {
+    (window as WindowWithToast).showToast = showToast;
+    return (): void => {
+      delete (window as WindowWithToast).showToast;
+    };
+  }, [showToast]);
+
+  return <>{children}</>;
+};
+
 export const Root = (): JSX.Element => {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
@@ -735,23 +751,6 @@ export const Root = (): JSX.Element => {
       return (): void => clearTimeout(timeoutId);
     }
   }, [isChecking, serverUrl]);
-
-  // Toast wrapper
-  const ToastWrapper: React.FC<{ children: React.ReactNode }> = ({
-    children,
-  }): JSX.Element => {
-    const { showToast } = useToast();
-
-    // Expose showToast globally for modals
-    useEffect((): (() => void) => {
-      (window as WindowWithToast).showToast = showToast;
-      return (): void => {
-        delete (window as WindowWithToast).showToast;
-      };
-    }, [showToast]);
-
-    return <>{children}</>;
-  };
 
   if (isChecking) {
     return <ServerCheckLoading />;

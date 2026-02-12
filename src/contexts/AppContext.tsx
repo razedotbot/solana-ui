@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import type { Connection } from "@solana/web3.js";
@@ -112,6 +113,10 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [rpcManager, setRpcManager] = useState<RPCManager | null>(null);
 
+  // Stable ref for showToast so effects don't re-fire on reference changes
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+
   // Compute current base currency config
   const baseCurrency = useMemo<BaseCurrencyConfig>(() => {
     return (
@@ -119,7 +124,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     );
   }, [config.baseCurrencyMint]);
 
-  // Load initial data from cookies
+  // Load initial data from cookies — runs once on mount
   useEffect(() => {
     try {
       const savedWallets = loadWalletsFromCookies();
@@ -146,8 +151,8 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
             .then((conn) => {
               setConnection(conn);
             })
-            .catch((_error) => {
-              showToast("Failed to connect to RPC endpoints", "error");
+            .catch(() => {
+              showToastRef.current("Failed to connect to RPC endpoints", "error");
             });
         } catch {
           // RPC connection error, already handled
@@ -156,7 +161,8 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     } catch {
       // RPC endpoints parse error, ignore
     }
-  }, [showToast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update RPC manager and connection when endpoints change
   useEffect(() => {
@@ -172,14 +178,14 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           .then((conn) => {
             setConnection(conn);
           })
-          .catch((_error) => {
-            showToast("Failed to connect to RPC endpoints", "error");
+          .catch(() => {
+            showToastRef.current("Failed to connect to RPC endpoints", "error");
           });
       } catch {
         // RPC endpoints parse error, ignore
       }
     }
-  }, [config.rpcEndpoints, showToast]);
+  }, [config.rpcEndpoints]);
 
   // Wallet setters with cookie persistence
   const setWallets = useCallback(

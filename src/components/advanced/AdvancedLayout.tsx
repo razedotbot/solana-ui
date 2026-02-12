@@ -13,7 +13,7 @@ import {
   Rocket,
 } from "lucide-react";
 import { DeployForm } from "./DeployForm";
-import { GroupSelector } from "../wallets/WalletsHeader";
+import { GroupSelector, QuickModeDropdown } from "../wallets/WalletsHeader";
 import { useWalletGroups, useActiveWalletGroup } from "../../utils/hooks/useWalletGroups";
 
 // Left column view type
@@ -259,6 +259,7 @@ export interface AdvancedLayoutProps {
   iframeData: IframeData | null;
   setIframeData: (data: IframeData | null) => void;
   categorySettings: Record<WalletCategory, CategoryQuickTradeSettings>;
+  onUpdateCategorySettings: (category: WalletCategory, settings: CategoryQuickTradeSettings) => void;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onNonWhitelistedTrade: (trade: {
@@ -307,6 +308,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
   iframeData,
   setIframeData,
   categorySettings,
+  onUpdateCategorySettings,
   viewMode,
   onViewModeChange,
   onNonWhitelistedTrade,
@@ -431,6 +433,12 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                   )}
                 </button>
               </div>
+
+              {/* Quick Mode S/M/H */}
+              <QuickModeDropdown
+                quickModeSettings={categorySettings}
+                onUpdateQuickMode={onUpdateCategorySettings}
+              />
 
               {/* Refresh & Group Selector - Only show in wallets view */}
               {leftColumnView === "wallets" && (
