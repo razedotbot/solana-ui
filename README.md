@@ -14,7 +14,7 @@ You can deploy **Raze.bot** instantly using either **Vercel** or **Netlify** wit
 
 </div>
 
-![Raze.bot image](https://raze
+[![Raze.bot image](https://raze
 .bot/logo.png)
 
 **Raze.bot** is a comprehensive, open-source multi-wallet trading platform designed for the Solana blockchain.  
