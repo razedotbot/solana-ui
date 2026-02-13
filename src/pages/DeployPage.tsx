@@ -335,19 +335,19 @@ export const DeployPage: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 pb-[max(env(safe-area-inset-bottom),1rem)] bg-app-primary">
         {/* Background */}
         <PageBackground />
 
-        <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
+        <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
           {/* Page Header */}
-          <div className="mb-6 flex flex-wrap items-center gap-4 justify-between pb-4 border-b border-app-primary-20">
+          <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-3 sm:gap-4 justify-between pb-4 border-b border-app-primary-20">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-app-primary-color/30 to-app-primary-color/10 border border-app-primary-color/40 flex items-center justify-center shadow-[0_0_30px_rgba(2,179,109,0.2)]">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-app-primary-color/30 to-app-primary-color/10 border border-app-primary-color/40 flex items-center justify-center shadow-[0_0_30px_rgba(2,179,109,0.2)]">
                 <Rocket size={28} className="color-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-app-primary font-mono tracking-wide">DEPLOY TOKEN</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-app-primary font-mono tracking-wide">DEPLOY TOKEN</h1>
                 <p className="text-xs text-app-secondary-60 font-mono">Launch your token across multiple platforms</p>
               </div>
             </div>
@@ -376,15 +376,15 @@ export const DeployPage: React.FC = () => {
           </div>
 
           {/* Main Layout */}
-          <div className="flex flex-col xl:flex-row gap-6">
+          <div className="flex flex-col xl:flex-row gap-4 sm:gap-6">
             {/* Sidebar Tabs */}
-            <div className="xl:w-56 flex-shrink-0">
-              <div className="xl:sticky xl:top-6 space-y-1">
+            <div className="xl:w-56 flex-shrink-0 overflow-x-auto xl:overflow-visible pb-2 xl:pb-0">
+              <div className="xl:sticky xl:top-6 flex xl:block gap-2 xl:gap-0 min-w-max xl:min-w-0">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-mono text-sm transition-all duration-200 group ${
+                    className={`w-[210px] xl:w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-xl font-mono text-sm transition-all duration-200 group ${
                       activeTab === tab.id
                         ? "bg-app-primary-color text-black font-bold shadow-[0_0_20px_rgba(2,179,109,0.3)]"
                         : "bg-app-tertiary/50 hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-40 text-app-primary"
@@ -409,7 +409,7 @@ export const DeployPage: React.FC = () => {
 
             {/* Content Area */}
             <div className="flex-1 min-w-0">
-              <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-6 shadow-xl">
+              <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-3 sm:p-6 shadow-xl">
                 {renderTabContent()}
               </div>
             </div>

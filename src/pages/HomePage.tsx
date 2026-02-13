@@ -87,10 +87,18 @@ const RecentTokenCard: React.FC<{
           </div>
         </div>
         <div className="shrink-0 flex items-center gap-1">
-          <span className="text-[10px] font-mono text-app-secondary-60 group-hover:hidden flex items-center gap-1">
+          <span className="hidden md:flex text-[10px] font-mono text-app-secondary-60 group-hover:hidden items-center gap-1">
             <Clock size={10} />{formatTimeAgo(token.lastViewed)}
           </span>
-          <div className="hidden group-hover:flex items-center gap-1">
+          <div className="hidden md:group-hover:flex items-center gap-1">
+            <button onClick={handleCopy} className={`p-1 rounded transition-colors ${copied ? 'text-green-400' : 'text-app-secondary-60 hover:text-app-primary hover:bg-app-primary-10'}`} title={copied ? 'Copied!' : 'Copy'}>
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </button>
+            <button onClick={(e) => onRemove(e, token.address)} className="p-1 rounded text-app-secondary-60 hover:text-red-500 hover:bg-red-500/10 transition-colors" title="Remove">
+              <X size={12} />
+            </button>
+          </div>
+          <div className="flex md:hidden items-center gap-1">
             <button onClick={handleCopy} className={`p-1 rounded transition-colors ${copied ? 'text-green-400' : 'text-app-secondary-60 hover:text-app-primary hover:bg-app-primary-10'}`} title={copied ? 'Copied!' : 'Copy'}>
               {copied ? <Check size={12} /> : <Copy size={12} />}
             </button>
@@ -234,10 +242,10 @@ export const Homepage: React.FC = () => {
       <OnboardingTutorial autoShowForNewUsers={true} />
       <HorizontalHeader />
 
-      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 pb-[max(env(safe-area-inset-bottom),1rem)] bg-app-primary">
         <PageBackground />
 
-        <div className="relative z-10 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="relative z-10 px-3 py-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-5 md:space-y-6">
           <div className="hero-section">
             {/* Vertical light beam */}
             <div className="hero-beam" />

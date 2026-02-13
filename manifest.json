@@ -1,10 +1,17 @@
 {
-    "name": "Fury Bundler",
-    "short_name": "Fury",
-    "display": "standalone",
-    "orientation": "portrait",
-    "theme_color": "#041726",
-    "background_color": "#041726",
-    "start_url": "/",
-    "icons": []
-  }
+  "name": "Fury Bundler",
+  "short_name": "Fury",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#041726",
+  "background_color": "#041726",
+  "start_url": "/?source=pwa",
+  "icons": [],
+  "scope": "/",
+  "id": "/?source=pwa",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ]
+}

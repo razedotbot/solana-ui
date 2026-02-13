@@ -17,6 +17,7 @@ import {
   Wallet,
   BookOpen,
   Columns2,
+  Home,
 } from "lucide-react";
 import { brand } from "./utils/constants";
 import type { Connection } from "@solana/web3.js";
@@ -1240,8 +1241,8 @@ const WalletManager: React.FC = () => {
               ActionsPage: (
                 <div className="h-full flex flex-col">
                   {/* Top Navigation - Mobile */}
-                  <nav className="relative z-20 border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99">
-                    <div className="flex items-center justify-between gap-2">
+                  <nav className="relative z-20 border-b border-app-primary-70 px-2 py-2 backdrop-blur-sm bg-app-primary-99 pt-[max(env(safe-area-inset-top),0.5rem)]">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       {/* Logo button that redirects to home */}
                       <button
                         onClick={() => navigate("/")}
@@ -1278,16 +1279,30 @@ const WalletManager: React.FC = () => {
 
                         {/* Mobile: Inline buttons, Desktop: Dropdown */}
                         {isMobile ? (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            <button
+                              onClick={() => navigate("/")}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                              title="Home"
+                            >
+                              <Home size={14} className="color-primary" />
+                              <span className="text-xs font-mono color-primary">HOME</span>
+                            </button>
                             <button
                               onClick={() => navigate("/wallets")}
                               className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
                               title="Wallets"
                             >
                               <Wallet size={14} className="color-primary" />
-                              <span className="text-xs font-mono color-primary">
-                                WALLETS
-                              </span>
+                              <span className="text-xs font-mono color-primary">WALLETS</span>
+                            </button>
+                            <button
+                              onClick={() => navigate("/deploy")}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                              title="Deploy"
+                            >
+                              <Blocks size={14} className="color-primary" />
+                              <span className="text-xs font-mono color-primary">DEPLOY</span>
                             </button>
                             <button
                               onClick={() => navigate("/settings")}
@@ -1295,9 +1310,7 @@ const WalletManager: React.FC = () => {
                               title="Settings"
                             >
                               <Settings size={14} className="color-primary" />
-                              <span className="text-xs font-mono color-primary">
-                                SETTINGS
-                              </span>
+                              <span className="text-xs font-mono color-primary">SETTINGS</span>
                             </button>
                           </div>
                         ) : (

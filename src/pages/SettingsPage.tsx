@@ -861,19 +861,19 @@ export const SettingsPage: React.FC = () => {
     <div className="min-h-screen bg-app-primary text-app-tertiary flex flex-col">
       <HorizontalHeader />
 
-      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 bg-app-primary">
+      <div className="relative flex-1 overflow-y-auto overflow-x-hidden w-full pt-16 pb-[max(env(safe-area-inset-bottom),1rem)] bg-app-primary">
         {/* Background */}
         <PageBackground />
 
-        <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
+        <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
           {/* Page Header */}
-          <div className="mb-6 flex flex-wrap items-center gap-4 justify-between pb-4 border-b border-app-primary-20">
+          <div className="mb-4 sm:mb-6 flex flex-wrap items-center gap-3 sm:gap-4 justify-between pb-4 border-b border-app-primary-20">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-app-primary-color/30 to-app-primary-color/10 border border-app-primary-color/40 flex items-center justify-center shadow-[0_0_30px_rgba(2,179,109,0.2)]">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-app-primary-color/30 to-app-primary-color/10 border border-app-primary-color/40 flex items-center justify-center shadow-[0_0_30px_rgba(2,179,109,0.2)]">
                 <Settings size={28} className="color-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-app-primary font-mono tracking-wide">
+                <h1 className="text-xl sm:text-2xl font-bold text-app-primary font-mono tracking-wide">
                   SETTINGS
                 </h1>
                 <p className="text-xs text-app-secondary-60 font-mono">
@@ -907,15 +907,15 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Main Layout */}
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
             {/* Sidebar Tabs */}
-            <div className="lg:w-56 flex-shrink-0">
-              <div className="lg:sticky lg:top-6 space-y-1">
+            <div className="lg:w-56 flex-shrink-0 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
+              <div className="lg:sticky lg:top-6 flex lg:block gap-2 lg:gap-0 min-w-max lg:min-w-0">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-mono text-sm transition-all duration-200 group ${
+                    className={`w-[200px] lg:w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-xl font-mono text-sm transition-all duration-200 group ${
                       activeTab === tab.id
                         ? "bg-app-primary-color text-black font-bold shadow-[0_0_20px_rgba(2,179,109,0.3)]"
                         : "bg-app-tertiary/50 hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-40 text-app-primary"
@@ -944,15 +944,15 @@ export const SettingsPage: React.FC = () => {
 
             {/* Content Area */}
             <div className="flex-1 min-w-0">
-              <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-6 shadow-xl">
+              <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-3 sm:p-6 shadow-xl">
                 {renderTabContent()}
               </div>
 
               {/* Save Button */}
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-stretch sm:justify-end">
                 <button
                   onClick={handleSaveAndClose}
-                  className="group relative px-8 py-3 bg-app-primary-color hover:bg-app-primary-dark text-black font-bold font-mono tracking-wide rounded-xl shadow-[0_0_20px_rgba(2,179,109,0.4)] hover:shadow-[0_0_30px_rgba(2,179,109,0.6)] flex items-center gap-3 text-sm transition-all duration-300 overflow-hidden"
+                  className="group relative w-full sm:w-auto px-5 sm:px-8 py-3 bg-app-primary-color hover:bg-app-primary-dark text-black font-bold font-mono tracking-wide rounded-xl shadow-[0_0_20px_rgba(2,179,109,0.4)] hover:shadow-[0_0_30px_rgba(2,179,109,0.6)] flex items-center gap-3 text-sm transition-all duration-300 overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                   <Save size={18} />

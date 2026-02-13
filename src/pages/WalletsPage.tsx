@@ -1076,11 +1076,11 @@ export const WalletsPage: React.FC = () => {
     <div className="h-full min-h-screen md:h-screen bg-app-primary text-app-tertiary flex flex-col overflow-hidden">
       <HorizontalHeader />
 
-      <div className="relative flex-1 overflow-hidden w-full pt-16 bg-app-primary flex flex-col">
+      <div className="relative flex-1 overflow-hidden w-full pt-16 pb-[max(env(safe-area-inset-bottom),0px)] bg-app-primary flex flex-col">
         <PageBackground />
 
         {/* Mobile Tab Bar */}
-        <div className="md:hidden relative z-10 flex border-b border-app-primary-20 bg-app-primary">
+        <div className="md:hidden sticky top-0 relative z-20 flex border-b border-app-primary-20 bg-app-primary/95 backdrop-blur">
           <button
             onClick={() => setMobileTab("wallets")}
             className={`flex-1 py-2.5 text-xs font-mono font-semibold uppercase tracking-wider transition-colors ${
@@ -1190,7 +1190,7 @@ export const WalletsPage: React.FC = () => {
           </div>
 
           {/* Wallet Grid */}
-          <div className="flex-1 min-h-0 flex flex-col p-4 pb-24">
+          <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-4 pb-28 md:pb-24">
             <WalletListView
               wallets={filteredAndSortedWallets}
               groups={groups}
@@ -1248,7 +1248,7 @@ export const WalletsPage: React.FC = () => {
           </div>
 
           {/* RIGHT PANEL: Operation panel */}
-          <div className={`w-full md:w-1/2 flex flex-col min-h-0 overflow-hidden ${mobileTab === "operations" ? "flex" : "hidden md:flex"}`}>
+          <div className={`w-full md:w-1/2 flex flex-col min-h-0 overflow-y-auto md:overflow-hidden ${mobileTab === "operations" ? "flex" : "hidden md:flex"}`}>
             {activeModal && connection ? (
               <>
                 {activeModal === "distribute" && (
