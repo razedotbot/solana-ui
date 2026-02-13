@@ -884,7 +884,7 @@ export const SettingsPage: React.FC = () => {
 
             {/* Quick Status */}
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-6 px-4 py-2 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
+              <div className="flex items-center gap-3 sm:gap-6 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
                 <div className="text-center">
                   <div className="text-xs font-mono color-primary font-bold">
                     {config.bundleMode?.toUpperCase() || "BATCH"}
@@ -910,12 +910,12 @@ export const SettingsPage: React.FC = () => {
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Sidebar Tabs */}
             <div className="lg:w-56 flex-shrink-0">
-              <div className="lg:sticky lg:top-6 space-y-1">
+              <div className="lg:sticky lg:top-6 flex lg:flex-col gap-1 overflow-x-auto pb-2 lg:pb-0 no-scrollbar">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-mono text-sm transition-all duration-200 group ${
+                    className={`flex-shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl font-mono text-sm transition-all duration-200 group ${
                       activeTab === tab.id
                         ? "bg-app-primary-color text-black font-bold shadow-[0_0_20px_rgba(2,179,109,0.3)]"
                         : "bg-app-tertiary/50 hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-40 text-app-primary"
@@ -927,15 +927,15 @@ export const SettingsPage: React.FC = () => {
                       {tab.icon}
                     </span>
                     <div className="text-left">
-                      <div className="font-bold">{tab.label}</div>
+                      <div className="font-bold whitespace-nowrap">{tab.label}</div>
                       <div
-                        className={`text-[10px] ${activeTab === tab.id ? "text-black/60" : "text-app-secondary-40"}`}
+                        className={`text-[10px] whitespace-nowrap ${activeTab === tab.id ? "text-black/60" : "text-app-secondary-40"}`}
                       >
                         {tab.description}
                       </div>
                     </div>
                     {activeTab === tab.id && (
-                      <ChevronRight size={16} className="ml-auto text-black" />
+                      <ChevronRight size={16} className="ml-auto text-black hidden lg:block" />
                     )}
                   </button>
                 ))}
@@ -944,7 +944,7 @@ export const SettingsPage: React.FC = () => {
 
             {/* Content Area */}
             <div className="flex-1 min-w-0">
-              <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-6 shadow-xl">
+              <div className="bg-app-secondary/80 backdrop-blur-sm rounded-2xl border border-app-primary-20 p-3 sm:p-6 shadow-xl">
                 {renderTabContent()}
               </div>
 

@@ -142,24 +142,28 @@ export const WalletRow: React.FC<WalletRowProps> = ({
       const spaceAbove = rect.top - 8;
       const rightEdge = window.innerWidth - rect.right;
 
+      // Clamp horizontal positions to viewport
+      const clampLeft = (l: number): number => Math.max(8, Math.min(l, window.innerWidth - 160));
+      const clampRight = (r: number): number => Math.max(8, r);
+
       switch (placement) {
         case "below-left": {
           if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
-            return { bottom: window.innerHeight - rect.top + 4, left: rect.left, maxHeight: spaceAbove };
+            return { bottom: window.innerHeight - rect.top + 4, left: clampLeft(rect.left), maxHeight: spaceAbove };
           }
-          return { top: rect.bottom + 4, left: rect.left, maxHeight: spaceBelow };
+          return { top: rect.bottom + 4, left: clampLeft(rect.left), maxHeight: spaceBelow };
         }
         case "below-right": {
           if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
-            return { bottom: window.innerHeight - rect.top + 4, right: rightEdge, maxHeight: spaceAbove };
+            return { bottom: window.innerHeight - rect.top + 4, right: clampRight(rightEdge), maxHeight: spaceAbove };
           }
-          return { top: rect.bottom + 4, right: rightEdge, maxHeight: spaceBelow };
+          return { top: rect.bottom + 4, right: clampRight(rightEdge), maxHeight: spaceBelow };
         }
         case "above-right": {
           if (spaceAbove < estimatedHeight && spaceBelow > spaceAbove) {
-            return { top: rect.bottom + 4, right: rightEdge, maxHeight: spaceBelow };
+            return { top: rect.bottom + 4, right: clampRight(rightEdge), maxHeight: spaceBelow };
           }
-          return { bottom: window.innerHeight - rect.top + 4, right: rightEdge, maxHeight: spaceAbove };
+          return { bottom: window.innerHeight - rect.top + 4, right: clampRight(rightEdge), maxHeight: spaceAbove };
         }
       }
     },
@@ -377,7 +381,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
           </button>
 
           {showCategoryPicker && createPortal(
-              <div data-wallet-dropdown className="fixed z-[100] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-y-auto min-w-[140px]" style={getDropdownPos(categoryBtnRef, "below-left")}>
+              <div data-wallet-dropdown className="fixed z-[100] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-y-auto min-w-[140px] max-w-[calc(100vw-1rem)]" style={getDropdownPos(categoryBtnRef, "below-left")}>
                 {/* Header */}
                 <div className="px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
                   <span className="text-[10px] font-mono uppercase text-app-secondary">Quick Mode</span>
@@ -435,7 +439,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
 
                 {/* Inline custom editor */}
                 {showCustomEditor && customDraft && (
-                  <div className="border-t border-app-primary-40 px-3 pt-2.5 pb-2.5 min-w-[260px] bg-app-primary-60">
+                  <div className="border-t border-app-primary-40 px-3 pt-2.5 pb-2.5 min-w-[260px] max-w-[calc(100vw-1rem)] bg-app-primary-60">
                     {/* Buy section */}
                     <div className="mb-2.5">
                       <div className="flex items-center justify-between mb-1.5">
@@ -614,7 +618,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
                 <FolderInput size={14} />
               </button>
               {showGroupPicker && createPortal(
-                  <div data-wallet-dropdown className="fixed z-[100] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-y-auto min-w-[170px]" style={getDropdownPos(groupBtnRef, "below-right")}>
+                  <div data-wallet-dropdown className="fixed z-[100] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-y-auto min-w-[170px] max-w-[calc(100vw-1rem)]" style={getDropdownPos(groupBtnRef, "below-right")}>
                     {/* Header */}
                     <div className="px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
                       <span className="text-[10px] font-mono uppercase text-app-secondary">Move to Group</span>
@@ -675,7 +679,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
               <MoreHorizontal size={14} />
             </button>
             {showMenu && createPortal(
-                <div data-wallet-dropdown className="fixed z-[100] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-y-auto min-w-[140px]" style={getDropdownPos(menuBtnRef, "above-right")}>
+                <div data-wallet-dropdown className="fixed z-[100] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black-80 overflow-y-auto min-w-[140px] max-w-[calc(100vw-1rem)]" style={getDropdownPos(menuBtnRef, "above-right")}>
                   <div>
                     {wallet.isArchived ? (
                       <button

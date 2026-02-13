@@ -212,8 +212,8 @@ export const QuickModeButtons: React.FC<{
         return (
           <div
             ref={dropdownPortalRef}
-            className="fixed z-[9999] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[260px]"
-            style={{ top: dropdownPos.top, left: dropdownPos.left }}
+            className="fixed z-[9999] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[260px] max-w-[calc(100vw-1rem)]"
+            style={{ top: dropdownPos.top, left: Math.min(dropdownPos.left, window.innerWidth - 276) }}
           >
             <div className="px-3 py-2 border-b border-app-primary-40 bg-app-primary-60">
               <h4 className={`text-[10px] font-mono font-bold ${styles.text} uppercase`}>
@@ -351,8 +351,8 @@ export const QuickModeDropdown: React.FC<{
       {isOpen && createPortal(
         <div
           ref={portalRef}
-          className="fixed z-[9999] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[260px]"
-          style={{ top: portalPos.top, left: portalPos.left }}
+          className="fixed z-[9999] bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[260px] max-w-[calc(100vw-1rem)]"
+          style={{ top: portalPos.top, left: Math.min(portalPos.left, window.innerWidth - 276) }}
         >
           {/* S / M / H tabs */}
           <div className="flex border-b border-app-primary-40">
@@ -481,7 +481,7 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
   isConnected,
 }) => {
   return (
-    <header className="relative z-20 flex items-center gap-2 px-4 py-3 border-b border-app-primary-15 bg-app-primary/80 backdrop-blur-sm">
+    <header className="relative z-20 flex flex-wrap items-center gap-2 px-4 py-3 border-b border-app-primary-15 bg-app-primary/80 backdrop-blur-sm">
       {/* Quick Stats + QuickTrade Pills */}
       <div className="hidden md:flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-1.5 bg-app-quaternary/50 rounded-lg border border-app-primary-15 min-w-0 overflow-hidden">
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -530,6 +530,36 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
           <span className="hidden 2xl:inline">Import</span>
         </button>
 
+      </div>
+
+      {/* Mobile Action Buttons */}
+      <div className="flex md:hidden items-center gap-2 w-full pt-2 border-t border-app-primary-15 mt-1">
+        <div className="flex items-center gap-1.5 text-xs text-app-secondary-60 min-w-0 overflow-hidden">
+          <span className="font-mono font-bold color-primary">{walletCount}</span>
+          <span className="flex-shrink-0">wallets</span>
+          <span className="text-app-primary-20 flex-shrink-0">|</span>
+          <span className="font-mono font-bold text-yellow-400 truncate">{totalBalance}</span>
+        </div>
+        <div className="flex-1" />
+        <button
+          onClick={onCreateWallet}
+          disabled={!isConnected}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex-shrink-0 ${
+            isConnected
+              ? "bg-app-primary-color hover:brightness-110 text-app-quaternary"
+              : "bg-app-quaternary text-app-secondary-40 cursor-not-allowed"
+          }`}
+        >
+          <Plus size={14} strokeWidth={2.5} />
+          <span>Create</span>
+        </button>
+        <button
+          onClick={onImportWallet}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 text-app-primary transition-all flex-shrink-0"
+        >
+          <Key size={14} />
+          <span>Import</span>
+        </button>
       </div>
     </header>
   );

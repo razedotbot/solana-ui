@@ -117,7 +117,7 @@ const MasterWalletsDropdown: React.FC<MasterWalletsDropdownProps> = ({
       </button>
 
       {showDropdown && (
-        <div className="absolute right-0 top-full mt-2 z-50 bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[280px]">
+        <div className="absolute right-0 top-full mt-2 z-50 bg-app-primary border border-app-primary-40 rounded-lg shadow-xl shadow-black/80 overflow-hidden min-w-[250px] max-w-[calc(100vw-2rem)]">
           {masterWallets.map((mw) => {
             const derivedWallets = allWallets
               .filter((w) => w.masterWalletId === mw.id)

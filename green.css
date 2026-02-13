@@ -1390,6 +1390,15 @@ iframe::-webkit-scrollbar {
   display: none;
 }
 
+/* Hide scrollbar utility for horizontal tab strips */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 iframe {
   border: none !important;
   outline: none !important;
