@@ -139,7 +139,7 @@ export const ToastProvider = ({ children }: ToastProviderProps): JSX.Element => 
       }, 2000) // Increased duration to 5 seconds to enjoy the  effects
       return () => clearTimeout(timer)
     }
-    return undefined
+    return
   }, [toasts])
   return (
     <ToastContext.Provider value={{ showToast }}>

@@ -300,7 +300,7 @@ export const QuickModeDropdown: React.FC<{
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-    return undefined;
+    return;
   }, [isOpen]);
 
   useEffect(() => {
@@ -561,7 +561,7 @@ export const GroupSelector: React.FC<GroupSelectorProps> = ({
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-    return undefined;
+    return;
   }, [isOpen]);
 
   const activeGroup = activeGroupId === "all"

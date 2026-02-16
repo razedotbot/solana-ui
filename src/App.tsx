@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Settings,
   Wrench,
-  Bot,
   Blocks,
   Wallet,
   BookOpen,
@@ -121,19 +120,6 @@ const ToolsDropdown: React.FC = () => {
                     <Wallet size={14} className="color-primary" />
                   </div>
                   <span className="text-xs font-mono font-medium">Wallets</span>
-                </button>
-
-                {/* Tools */}
-                <button
-                  onClick={() => handleItemClick(() => navigate("/tools"))}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
-                >
-                  <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
-                    <Bot size={14} className="color-primary" />
-                  </div>
-                  <span className="text-xs font-mono font-medium">
-                    Tools
-                  </span>
                 </button>
 
                 {/* Deploy */}
@@ -359,7 +345,7 @@ const WalletManager: React.FC = () => {
         clearTimeout(timeoutId);
       };
     }
-    return undefined;
+    return;
   }, [splitSizes, viewMode]);
 
   // Save view mode to cookies when it changes

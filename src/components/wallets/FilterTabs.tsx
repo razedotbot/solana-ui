@@ -82,7 +82,7 @@ export const FilterTabs: React.FC<FilterTabsProps> = ({
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-    return undefined;
+    return;
   }, [showGroupsDropdown]);
 
   const handleAddGroup = (): void => {

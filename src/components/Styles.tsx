@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// Tooltip Component with  styling
+// Tooltip Component with custom styling
 export const WalletTooltip: React.FC<{ 
   children: React.ReactNode;
   content: string;

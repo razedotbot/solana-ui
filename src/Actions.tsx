@@ -18,11 +18,9 @@ import FloatingTradingCard from "./components/trading/FloatingTradingCard";
 import TradingCard from "./components/trading/TradingForm";
 import WalletSelectorPopup from "./components/trading/WalletSelectorPopup";
 import { PageBackground } from "./components/Styles";
-import { getLatestTrades, type TradeHistoryEntry } from "./utils/trading";
+import { getLatestTrades, executeTrade, type TradeHistoryEntry } from "./utils/trading";
 
-import { executeTrade } from "./utils/trading";
-
-//  styled Switch component (simplified)
+// Styled Switch component (simplified)
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
@@ -376,7 +374,7 @@ const LatestTrades: React.FC<{
 
       return () => clearTimeout(timer);
     }
-    return undefined;
+    return;
   }, [tradeAppearedAt]);
 
   const formatTimeAgo = (timestamp: number): string => {

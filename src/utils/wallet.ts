@@ -135,18 +135,6 @@ export function getActiveWallets(): WalletType[] {
   }
 }
 
-/**
- * Get private keys of all active wallets as comma-separated string.
- */
-export function getActiveWalletPrivateKeys(): string {
-  try {
-    const activeWallets = getActiveWallets();
-    return activeWallets.map((wallet) => wallet.privateKey).join(",");
-  } catch {
-    return "";
-  }
-}
-
 // ============= Master Wallet Operations =============
 
 /**

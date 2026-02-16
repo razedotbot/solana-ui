@@ -348,7 +348,7 @@ export const WalletsPage: React.FC = () => {
     if (wallets.length > 0) {
       hasAttemptedLoadRef.current = false;
     }
-    return undefined;
+    return;
   }, [wallets.length, setWallets]);
 
   useEffect(() => {

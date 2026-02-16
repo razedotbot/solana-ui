@@ -121,7 +121,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
 
       return () => clearTimeout(timer);
     }
-    return undefined;
+    return;
   }, [isOpen, resetForm]);
 
   useEffect(() => {

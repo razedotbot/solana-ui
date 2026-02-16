@@ -61,7 +61,7 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
         if (forceShow) {
             setCurrentStepIndex(0);
             setIsVisible(true);
-            return undefined;
+            return;
         }
         // Only auto-show for new users if explicitly enabled
         if (autoShowForNewUsers) {
@@ -74,7 +74,7 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
                 return () => clearTimeout(timer);
             }
         }
-        return undefined;
+        return;
     }, [forceShow, autoShowForNewUsers]);
 
     // Update target position when step changes or window resizes
@@ -105,7 +105,7 @@ export const OnboardingTutorial: React.FC<OnboardingTutorialProps> = ({
             window.addEventListener('resize', updateTargetPosition);
             return () => window.removeEventListener('resize', updateTargetPosition);
         }
-        return undefined;
+        return;
     }, [isVisible, currentStepIndex, updateTargetPosition]);
 
     const handleNext = (): void => {

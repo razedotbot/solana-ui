@@ -701,7 +701,7 @@ export const Frame: React.FC<FrameProps> = ({
 
     // Subsequent changes: send immediately
     sendMessage();
-    return undefined;
+    return;
   }, [isIframeReady, quickBuyEnabled, sendMessageToIframe]);
 
   // Handle iframe load completion

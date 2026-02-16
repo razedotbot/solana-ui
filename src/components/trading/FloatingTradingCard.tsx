@@ -284,7 +284,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
         document.removeEventListener("mouseup", handleMouseUp);
       };
     }
-    return undefined;
+    return;
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   if (!isOpen) return null;
