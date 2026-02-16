@@ -27,9 +27,8 @@ import { formatAddress, formatTokenBalance } from "../../utils/formatting";
 import { Buffer } from "buffer";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
-import { BASE_CURRENCIES } from "../../utils/constants";
-import { sendTransactions } from "../../utils/trading";
-import type { WindowWithConfig } from "../../utils/trading";
+import { BASE_CURRENCIES, API_ENDPOINTS } from "../../utils/constants";
+import { sendTransactions, getServerBaseUrl } from "../../utils/trading";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
 import * as PU from "./PanelShared";
 import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
@@ -360,12 +359,8 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           }
 
           // Step 1: Request the transaction from the backend
-          const baseUrl =
-            (window as WindowWithConfig).tradingServerUrl?.replace(
-              /\/+$/,
-              "",
-            ) || "";
-          const buildResponse = await fetch(`${baseUrl}/v2/sol/transfer`, {
+          const baseUrl = getServerBaseUrl();
+          const buildResponse = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_TRANSFER}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

@@ -49,15 +49,7 @@ const getPartiallyPreparedTransactions = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyBundle[]> => {
-  const appConfig = loadConfigFromCookies();
   const baseUrl = getServerBaseUrl();
-
-  // Determine if using SOL or stablecoin as input
-  const inputMint =
-    config.inputMint ||
-    appConfig?.baseCurrencyMint ||
-    BASE_CURRENCIES.SOL.mint;
-  const isNativeSOL = inputMint === BASE_CURRENCIES.SOL.mint;
 
   const requestBody: Record<string, unknown> = {
     tokenAddress: config.tokenAddress,
@@ -65,22 +57,15 @@ const getPartiallyPreparedTransactions = async (
     walletAddresses: wallets.map((wallet) => wallet.address),
   };
 
-  // Add inputMint for non-SOL base currencies
-  if (!isNativeSOL) {
-    requestBody["inputMint"] = inputMint;
-  }
-
   if (config.amounts) {
     requestBody["amounts"] = config.amounts;
   }
 
   requestBody["slippageBps"] = getSlippageBps(config.slippageBps);
   requestBody["feeTipLamports"] = getFeeTipLamports(config.feeTipLamports);
+  requestBody["encoding"] = "base64";
 
-  // Use /v2/swap/buy for stablecoins, /v2/sol/buy for SOL
-  const endpoint = isNativeSOL
-    ? `${baseUrl}${API_ENDPOINTS.SOL_BUY}`
-    : `${baseUrl}${API_ENDPOINTS.SWAP_BUY}`;
+  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_BUY}`;
 
   const response = await fetch(endpoint, {
     method: "POST",

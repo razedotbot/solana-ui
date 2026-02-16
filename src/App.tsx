@@ -449,11 +449,6 @@ const WalletManager: React.FC = () => {
     sortDirection: "asc" | "desc";
     tickEffect: boolean;
 
-    automateCard: {
-      isOpen: boolean;
-      position: { x: number; y: number };
-      isDragging: boolean;
-    };
     quickBuyEnabled: boolean;
     quickBuyAmount: number;
     quickBuyMinAmount: number;
@@ -503,9 +498,6 @@ const WalletManager: React.FC = () => {
           tokenBalance?: number;
         };
       }
-    | { type: "SET_AUTOMATE_CARD_OPEN"; payload: boolean }
-    | { type: "SET_AUTOMATE_CARD_POSITION"; payload: { x: number; y: number } }
-    | { type: "SET_AUTOMATE_CARD_DRAGGING"; payload: boolean }
     | { type: "SET_QUICK_BUY_ENABLED"; payload: boolean }
     | { type: "SET_QUICK_BUY_AMOUNT"; payload: number }
     | { type: "SET_QUICK_BUY_MIN_AMOUNT"; payload: number }
@@ -555,11 +547,6 @@ const WalletManager: React.FC = () => {
     sortDirection: "asc",
     tickEffect: false,
 
-    automateCard: {
-      isOpen: false,
-      position: { x: 200, y: 200 },
-      isDragging: false,
-    },
     quickBuyEnabled: true,
     quickBuyAmount: 0.01,
     quickBuyMinAmount: 0.01,
@@ -629,30 +616,6 @@ const WalletManager: React.FC = () => {
         }
         return newState;
       }
-      case "SET_AUTOMATE_CARD_OPEN":
-        return {
-          ...state,
-          automateCard: {
-            ...state.automateCard,
-            isOpen: action.payload,
-          },
-        };
-      case "SET_AUTOMATE_CARD_POSITION":
-        return {
-          ...state,
-          automateCard: {
-            ...state.automateCard,
-            position: action.payload,
-          },
-        };
-      case "SET_AUTOMATE_CARD_DRAGGING":
-        return {
-          ...state,
-          automateCard: {
-            ...state.automateCard,
-            isDragging: action.payload,
-          },
-        };
       case "SET_QUICK_BUY_ENABLED":
         return { ...state, quickBuyEnabled: action.payload };
       case "SET_QUICK_BUY_AMOUNT":
@@ -750,10 +713,6 @@ const WalletManager: React.FC = () => {
       setTickEffect: (effect: boolean): void =>
         dispatch({ type: "SET_TICK_EFFECT", payload: effect }),
 
-      setAutomateCardPosition: (position: { x: number; y: number }): void =>
-        dispatch({ type: "SET_AUTOMATE_CARD_POSITION", payload: position }),
-      setAutomateCardDragging: (dragging: boolean): void =>
-        dispatch({ type: "SET_AUTOMATE_CARD_DRAGGING", payload: dragging }),
       setQuickBuyEnabled: (enabled: boolean): void =>
         dispatch({ type: "SET_QUICK_BUY_ENABLED", payload: enabled }),
       setQuickBuyAmount: (amount: number): void =>
@@ -1188,11 +1147,6 @@ const WalletManager: React.FC = () => {
                 transactionFee={state.config.transactionFee}
                 currentMarketCap={state.currentMarketCap}
                 setCalculatePNLModalOpen={memoizedCallbacks.setCalculatePNLModalOpen}
-                automateCardPosition={state.automateCard.position}
-                setAutomateCardPosition={memoizedCallbacks.setAutomateCardPosition}
-                isAutomateCardOpen={state.automateCard.isOpen}
-                isAutomateCardDragging={state.automateCard.isDragging}
-                setAutomateCardDragging={memoizedCallbacks.setAutomateCardDragging}
                 quickBuyEnabled={state.quickBuyEnabled}
                 quickBuyAmount={state.quickBuyAmount}
                 quickBuyMinAmount={state.quickBuyMinAmount}
@@ -1322,15 +1276,6 @@ const WalletManager: React.FC = () => {
                       setCalculatePNLModalOpen={
                         memoizedCallbacks.setCalculatePNLModalOpen
                       }
-                      isAutomateCardOpen={state.automateCard.isOpen}
-                      automateCardPosition={state.automateCard.position}
-                      setAutomateCardPosition={
-                        memoizedCallbacks.setAutomateCardPosition
-                      }
-                      isAutomateCardDragging={state.automateCard.isDragging}
-                      setAutomateCardDragging={
-                        memoizedCallbacks.setAutomateCardDragging
-                      }
                       iframeData={state.iframeData}
                     />
                   </div>
@@ -1351,7 +1296,6 @@ const WalletManager: React.FC = () => {
         tokenBalances={state.tokenBalances}
       />
 
-      {/* AutomateFloatingCard is now rendered globally in index.tsx and persists across all views */}
     </div>
   );
 };

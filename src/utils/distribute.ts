@@ -23,11 +23,9 @@ const getPartiallySignedTransactions = async (
 ): Promise<string[]> => {
   const baseUrl = getServerBaseUrl();
 
-  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
-  const endpoint = isNativeSOL
-    ? `${baseUrl}${API_ENDPOINTS.SOL_DISTRIBUTE}`
-    : `${baseUrl}${API_ENDPOINTS.TOKEN_DISTRIBUTE}`;
+  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_DISTRIBUTE}`;
 
+  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const requestBody: Record<string, unknown> = {
     sender: senderAddress,
     recipients: recipients,

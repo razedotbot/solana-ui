@@ -94,7 +94,7 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
     onSearchChange("");
   };
 
-  if (wallets.length === 0) {
+  if (wallets.length === 0 && !searchTerm) {
     return (
       <div className="flex-1 flex items-center justify-center py-16">
         <div className="text-center">
@@ -178,7 +178,14 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
 
       {/* Wallet rows - scrollable */}
       <div className="flex-1 overflow-y-auto">
-      {wallets.map((wallet) => (
+      {wallets.length === 0 && searchTerm ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Search size={24} className="mx-auto mb-2 text-app-secondary-40" />
+            <p className="text-sm text-app-secondary-60">No wallets matching "{searchTerm}"</p>
+          </div>
+        </div>
+      ) : wallets.map((wallet) => (
         <WalletRow
           key={wallet.id}
           wallet={wallet}
@@ -211,6 +218,7 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
         />
       ))}
       </div>
+
     </div>
   );
 };

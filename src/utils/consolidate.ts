@@ -22,11 +22,9 @@ const getPartiallyPreparedTransactions = async (
 ): Promise<string[]> => {
   const baseUrl = getServerBaseUrl();
 
-  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
-  const endpoint = isNativeSOL
-    ? `${baseUrl}${API_ENDPOINTS.SOL_CONSOLIDATE}`
-    : `${baseUrl}${API_ENDPOINTS.TOKEN_CONSOLIDATE}`;
+  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_CONSOLIDATE}`;
 
+  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const requestBody: Record<string, unknown> = {
     sourceAddresses,
     receiverAddress,

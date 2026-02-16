@@ -22,12 +22,6 @@ const TUTORIAL_STEPS: Step[] = [
         position: 'bottom',
     },
     {
-        target: 'nav-automate',
-        title: 'Automation Tools',
-        content: 'Access powerful automation tools like Sniper Bot and Copy Trading to maximize your trading efficiency.',
-        position: 'bottom',
-    },
-    {
         target: 'nav-trade',
         title: 'Trade',
         content: 'Execute trades, view charts, and monitor your positions in real-time with advanced trading tools.',

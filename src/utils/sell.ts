@@ -48,15 +48,7 @@ const getPartiallyPreparedSellTransactions = async (
   sellConfig: SellConfig,
 ): Promise<SellBundle[]> => {
 
-    const config = loadConfigFromCookies();
     const baseUrl = getServerBaseUrl();
-
-    // Determine output mint (what to sell tokens for)
-    const outputMint =
-      sellConfig.outputMint ||
-      config?.baseCurrencyMint ||
-      BASE_CURRENCIES.SOL.mint;
-    const isNativeSOL = outputMint === BASE_CURRENCIES.SOL.mint;
 
     const requestBody: Record<string, unknown> = {
       tokenAddress: sellConfig.tokenAddress,
@@ -71,16 +63,9 @@ const getPartiallyPreparedSellTransactions = async (
 
     requestBody["slippageBps"] = getSlippageBps(sellConfig.slippageBps);
     requestBody["feeTipLamports"] = getFeeTipLamports(sellConfig.feeTipLamports);
+    requestBody["encoding"] = "base64";
 
-    // Always include outputMint for non-SOL base currencies
-    if (!isNativeSOL) {
-      requestBody["outputMint"] = outputMint;
-    }
-
-    // Use /v2/swap/sell for stablecoins, /v2/sol/sell for SOL
-    const endpoint = isNativeSOL
-      ? `${baseUrl}${API_ENDPOINTS.SOL_SELL}`
-      : `${baseUrl}${API_ENDPOINTS.SWAP_SELL}`;
+    const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_SELL}`;
 
     const response = await fetch(endpoint, {
       method: "POST",

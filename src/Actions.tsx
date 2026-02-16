@@ -62,12 +62,6 @@ interface ActionsPageProps {
   baseCurrency: BaseCurrencyConfig;
   currentMarketCap: number | null;
   setCalculatePNLModalOpen: (open: boolean) => void;
-  // Automate card state props
-  isAutomateCardOpen: boolean;
-  automateCardPosition: { x: number; y: number };
-  setAutomateCardPosition: (position: { x: number; y: number }) => void;
-  isAutomateCardDragging: boolean;
-  setAutomateCardDragging: (dragging: boolean) => void;
   iframeData: IframeData | null;
 }
 

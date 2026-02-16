@@ -242,11 +242,6 @@ export interface AdvancedLayoutProps {
   transactionFee: string;
   currentMarketCap: number | null;
   setCalculatePNLModalOpen: (open: boolean) => void;
-  automateCardPosition: { x: number; y: number };
-  setAutomateCardPosition: (position: { x: number; y: number }) => void;
-  isAutomateCardOpen: boolean;
-  isAutomateCardDragging: boolean;
-  setAutomateCardDragging: (dragging: boolean) => void;
   quickBuyEnabled: boolean;
   quickBuyAmount: number;
   quickBuyMinAmount: number;
@@ -291,11 +286,6 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
   transactionFee,
   currentMarketCap,
   setCalculatePNLModalOpen,
-  automateCardPosition,
-  setAutomateCardPosition,
-  isAutomateCardOpen,
-  isAutomateCardDragging,
-  setAutomateCardDragging,
   quickBuyEnabled,
   quickBuyAmount,
   quickBuyMinAmount,
@@ -625,11 +615,6 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
           tokenBalances={tokenBalances}
           currentMarketCap={currentMarketCap}
           setCalculatePNLModalOpen={setCalculatePNLModalOpen}
-          isAutomateCardOpen={isAutomateCardOpen}
-          automateCardPosition={automateCardPosition}
-          setAutomateCardPosition={setAutomateCardPosition}
-          isAutomateCardDragging={isAutomateCardDragging}
-          setAutomateCardDragging={setAutomateCardDragging}
           iframeData={iframeData}
         />
       </div>

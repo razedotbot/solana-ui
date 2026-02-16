@@ -7,7 +7,6 @@ import {
   Wallet,
   Columns2,
   ChevronDown,
-  Bot,
   Blocks,
   Settings,
   Clock,
@@ -307,14 +306,6 @@ export const MultichartLayout: React.FC<MultichartLayoutProps> = ({
               title="Wallets"
             >
               <Wallet size={14} className="color-primary" />
-            </button>
-
-            <button
-              onClick={() => navigate("/automate")}
-              className="hidden md:flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
-              title="Automate"
-            >
-              <Bot size={14} className="color-primary" />
             </button>
 
             <button

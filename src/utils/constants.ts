@@ -76,30 +76,29 @@ export const API_URLS = {
 // API Endpoint Paths
 export const API_ENDPOINTS = {
   // Buy
-  SOL_BUY: "/v2/sol/buy",
-  SWAP_BUY: "/v2/swap/buy",
+  SOL_BUY: "/v3/sol/buy",
 
   // Sell
-  SOL_SELL: "/v2/sol/sell",
-  SWAP_SELL: "/v2/swap/sell",
+  SOL_SELL: "/v3/sol/sell",
 
   // Create
   SOL_CREATE: "/v2/sol/create",
 
   // Distribute
   SOL_DISTRIBUTE: "/v2/sol/distribute",
-  TOKEN_DISTRIBUTE: "/v2/token/distribute",
-
-  // Consolidate
-  SOL_CONSOLIDATE: "/v2/sol/consolidate",
-  TOKEN_CONSOLIDATE: "/v2/token/consolidate",
 
   // Mixer
   SOL_MIXER: "/v2/sol/mixer",
-  TOKEN_MIXER: "/v2/token/mixer",
+  
+  // Consolidate
+  SOL_CONSOLIDATE: "/v2/sol/consolidate",
+
+
+  // Transfer
+  SOL_TRANSFER: "/v2/sol/transfer",
 
   // Send
-  SOL_SEND: "/v2/sol/send",
+  SOL_SEND: "/v3/sol/send",
 } as const;
 
 // Trading Constants
@@ -147,19 +146,6 @@ export const STORAGE_KEYS = {
   encryptedWallets: "encrypted_wallets",
   encryptedMasterWallets: "encrypted_master_wallets",
 
-  // Sniper Bot
-  sniperProfiles: "sniperBotProfiles",
-  sniperExecutionLogs: "sniperBotExecutionLogs",
-
-  // Copy Trade
-  copytradeProfiles: "copytradeProfiles",
-  copytradeWalletLists: "copytradeWalletLists",
-  copytradeExecutionLogs: "copytradeExecutionLogs",
-
-  // Automate
-  automateStrategies: "automateStrategies",
-  automateWhitelistLists: "whitelistLists",
-
   // Multichart
   multichartTokens: "multichart_tokens",
   multichartActiveIndex: "multichartActiveIndex",
@@ -195,32 +181,6 @@ export const WALLET_DEFAULTS = {
   CATEGORY: "Medium" as const,
   SOURCE_IMPORTED: "imported" as const,
   SOURCE_HD_DERIVED: "hd-derived" as const,
-} as const;
-
-// Default Values for Profiles
-export const PROFILE_DEFAULTS = {
-  SNIPER: {
-    BUY_AMOUNT: 0.01,
-    SLIPPAGE: 15,
-    PRIORITY: "high" as const,
-    COOLDOWN: 1000,
-    COOLDOWN_UNIT: "milliseconds" as const,
-  },
-  COPYTRADE: {
-    AMOUNT_MULTIPLIER: 1.0,
-    SLIPPAGE: 5,
-    PRIORITY: "medium" as const,
-    COOLDOWN: 5,
-    COOLDOWN_UNIT: "seconds" as const,
-  },
-  AUTOMATE: {
-    COOLDOWN: 5,
-    COOLDOWN_UNIT: "minutes" as const,
-    DEFAULT_CONDITION_VALUE: 1000000,
-    DEFAULT_TIMEFRAME: 5,
-    DEFAULT_ACTION_AMOUNT: 10,
-    DEFAULT_VOLUME_MULTIPLIER: 0.1,
-  },
 } as const;
 
 // Operation Delays (consolidate, distribute, mixer)
