@@ -1,7 +1,7 @@
 import { Zap, Sparkles, Wallet, Layers } from "lucide-react";
 import type { PlatformType } from "../../utils/create";
 
-export const MIN_WALLETS = 1;
+export const MIN_WALLETS = 2;
 export const MAX_WALLETS_STANDARD = 5;
 export const MAX_WALLETS_ADVANCED = 20;
 export const MAX_TOKENS_PER_DEPLOY = 20; // Total max tokens across all platforms
@@ -21,6 +21,7 @@ export interface TokenMetadata {
 export interface AdditionalToken {
   platform: PlatformType;
   pumpType: boolean;
+  cashBack: boolean;
   pumpMode: "simple" | "advanced";
   bonkType: "meme" | "tech";
   bonkMode: "simple" | "advanced";

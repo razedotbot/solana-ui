@@ -55,6 +55,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
 
   // Platform options
   const [pumpType, setPumpType] = useState<boolean>(false);
+  const [cashBack, setCashBack] = useState<boolean>(false);
   const [bonkType, setBonkType] = useState<"meme" | "tech">("meme");
   const [meteoraDBCConfigAddress, setMeteoraDBCConfigAddress] = useState(METEORA_DBC_CONFIGS.standard);
   const [meteoraCPAMMConfigAddress, setMeteoraCPAMMConfigAddress] = useState(METEORA_CPAMM_CONFIGS.standard);
@@ -134,7 +135,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
         name: offChain?.name || onChain?.name || "",
         symbol: offChain?.symbol || onChain?.symbol || "",
         description: offChain?.description || "",
-        imageUrl: offChain?.image || onChain?.uri || "",
+        imageUrl: offChain?.image ? `${API_URLS.RAZE_PUBLIC}/image?url=${encodeURIComponent(offChain.image)}` : "",
       }));
       setImportMint("");
       showToast("Metadata cloned", "success");
@@ -238,6 +239,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
           website: tokenData.website || undefined,
         },
         pumpType: selectedPlatform === "pumpfun" ? pumpType : undefined,
+        cashBack: selectedPlatform === "pumpfun" ? cashBack : undefined,
         pumpAdvanced: selectedPlatform === "pumpfun" ? isAdv : undefined,
         bonkType: selectedPlatform === "bonk" ? bonkType : undefined,
         bonkAdvanced: selectedPlatform === "bonk" ? isAdv : undefined,
@@ -343,6 +345,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
           {expandedSections.platform && (
             <>
           {selectedPlatform === "pumpfun" && (
+            <>
             <div className="flex items-center justify-between px-3 py-2 bg-app-tertiary/30">
               <span className="text-xs font-mono text-app-secondary">Mayhem Mode</span>
               <button
@@ -352,6 +355,16 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
                 <span className={`block w-3 h-3 rounded-full bg-white shadow transition-all ${pumpType ? "ml-4" : "ml-0.5"}`} />
               </button>
             </div>
+            <div className="flex items-center justify-between px-3 py-2 bg-app-tertiary/30">
+              <span className="text-xs font-mono text-app-secondary">Cash Back</span>
+              <button
+                onClick={() => setCashBack(!cashBack)}
+                className={`w-8 h-4 rounded-full transition-all ${cashBack ? "bg-app-primary-color" : "bg-app-quaternary"}`}
+              >
+                <span className={`block w-3 h-3 rounded-full bg-white shadow transition-all ${cashBack ? "ml-4" : "ml-0.5"}`} />
+              </button>
+            </div>
+            </>
           )}
           {selectedPlatform === "bonk" && (
             <div className="flex items-center gap-2 px-3 py-2 bg-app-tertiary/30">

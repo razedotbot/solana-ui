@@ -13,6 +13,8 @@ interface PlatformTabProps {
   setSelectedPlatform: (platform: PlatformType) => void;
   pumpType: boolean;
   setPumpType: (value: boolean) => void;
+  cashBack: boolean;
+  setCashBack: (value: boolean) => void;
   bonkType: "meme" | "tech";
   setBonkType: (type: "meme" | "tech") => void;
   meteoraDBCConfigAddress: string;
@@ -30,6 +32,8 @@ export const PlatformTab: React.FC<PlatformTabProps> = ({
   setSelectedPlatform,
   pumpType,
   setPumpType,
+  cashBack,
+  setCashBack,
   bonkType,
   setBonkType,
   meteoraDBCConfigAddress,
@@ -118,6 +122,26 @@ export const PlatformTab: React.FC<PlatformTabProps> = ({
                 }`}
               >
                 <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${pumpType ? "left-5" : "left-0.5"}`} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-app-primary-10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                  <Sparkles size={16} className="text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-app-primary font-mono">Cash Back</p>
+                  <p className="text-[10px] text-app-secondary-40 font-mono">Reward traders</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCashBack(!cashBack)}
+                className={`relative w-11 h-6 rounded-full transition-all duration-300 ${
+                  cashBack ? "bg-app-primary-color" : "bg-app-quaternary border border-app-primary-30"
+                }`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${cashBack ? "left-5" : "left-0.5"}`} />
               </button>
             </div>
           </div>

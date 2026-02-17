@@ -63,6 +63,7 @@ export const DeploysTab: React.FC<DeploysTabProps> = ({
     setAdditionalTokens((prev) => [...prev, {
       platform,
       pumpType: false,
+      cashBack: false,
       pumpMode: "simple",
       bonkType: "meme",
       bonkMode: "simple",
@@ -488,6 +489,7 @@ export const DeploysTab: React.FC<DeploysTabProps> = ({
                     <div className="px-3 pb-3 space-y-3 border-t border-app-primary-20 pt-3 mt-0">
                       {/* Platform-Specific Settings */}
                       {token.platform === "pumpfun" && (
+                        <>
                         <div className="flex items-center justify-between p-2.5 rounded-lg bg-app-quaternary/50">
                           <div className="flex items-center gap-2">
                             <Settings size={14} className="color-primary" />
@@ -503,6 +505,22 @@ export const DeploysTab: React.FC<DeploysTabProps> = ({
                             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300 ${token.pumpType ? "left-5" : "left-0.5"}`} />
                           </button>
                         </div>
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-app-quaternary/50">
+                          <div className="flex items-center gap-2">
+                            <Settings size={14} className="color-primary" />
+                            <span className="text-xs font-mono text-app-primary">Cash Back</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateTokenSetting(index, "cashBack", !token.cashBack)}
+                            className={`relative w-10 h-5 rounded-full transition-all duration-300 ${
+                              token.cashBack ? "bg-app-primary-color" : "bg-app-tertiary border border-app-primary-30"
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300 ${token.cashBack ? "left-5" : "left-0.5"}`} />
+                          </button>
+                        </div>
+                        </>
                       )}
 
                       {token.platform === "bonk" && (

@@ -66,7 +66,7 @@ async function fetchMetadata(mint: string): Promise<TokenMetadataInfo | null> {
         mint,
         name: offChain?.name || onChain?.name || "",
         symbol: offChain?.symbol || onChain?.symbol || "",
-        image: offChain?.image || "",
+        image: offChain?.image ? `${API_URLS.RAZE_PUBLIC}/image?url=${encodeURIComponent(offChain.image)}` : "",
         fetchedAt: Date.now(),
       };
 

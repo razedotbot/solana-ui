@@ -63,7 +63,8 @@ export const TokenTab: React.FC<TokenTabProps> = ({ tokenData, setTokenData }) =
       const name = offChain?.name || onChain?.name || "";
       const symbol = offChain?.symbol || onChain?.symbol || "";
       const description = offChain?.description || "";
-      const imageUrl = offChain?.image || onChain?.uri || "";
+      const rawImage = offChain?.image || onChain?.uri || "";
+      const imageUrl = rawImage ? `${API_URLS.RAZE_PUBLIC}/image?url=${encodeURIComponent(rawImage)}` : "";
 
       setTokenData((prev) => ({
         ...prev,

@@ -50,6 +50,7 @@ export const DeployPage: React.FC = () => {
 
   // Platform options
   const [pumpType, setPumpType] = useState<boolean>(false);
+  const [cashBack, setCashBack] = useState<boolean>(false);
   const [bonkType, setBonkType] = useState<"meme" | "tech">("meme");
   const [meteoraDBCConfigAddress, setMeteoraDBCConfigAddress] = useState(METEORA_DBC_CONFIGS.standard);
   const [meteoraCPAMMConfigAddress, setMeteoraCPAMMConfigAddress] = useState(METEORA_CPAMM_CONFIGS.standard);
@@ -143,6 +144,7 @@ export const DeployPage: React.FC = () => {
           website: tokenData.website || undefined,
         },
         pumpType: platform === "pumpfun" ? settings.pumpType : undefined,
+        cashBack: platform === "pumpfun" ? settings.cashBack : undefined,
         pumpAdvanced: platform === "pumpfun" ? isAdv : undefined,
         bonkType: platform === "bonk" ? settings.bonkType : undefined,
         bonkAdvanced: platform === "bonk" ? isAdv : undefined,
@@ -162,6 +164,7 @@ export const DeployPage: React.FC = () => {
       // Primary token uses the Platform tab settings
       const primarySettings: Partial<AdditionalToken> = {
         pumpType,
+        cashBack,
         pumpMode: isAdvancedMode ? "advanced" : "simple",
         bonkType,
         bonkMode: isAdvancedMode ? "advanced" : "simple",
@@ -268,6 +271,8 @@ export const DeployPage: React.FC = () => {
             setSelectedPlatform={setSelectedPlatform}
             pumpType={pumpType}
             setPumpType={setPumpType}
+            cashBack={cashBack}
+            setCashBack={setCashBack}
             bonkType={bonkType}
             setBonkType={setBonkType}
             meteoraDBCConfigAddress={meteoraDBCConfigAddress}

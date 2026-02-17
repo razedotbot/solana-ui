@@ -53,6 +53,7 @@ export interface CreateConfig {
   platform: PlatformType;
   token: TokenMetadata;
   pumpType?: boolean;
+  cashBack?: boolean;
   pumpAdvanced?: boolean;
   bonkType?: "meme" | "tech";
   bonkAdvanced?: boolean;
@@ -235,6 +236,9 @@ const getPartiallyPreparedTransactions = async (
   if (config.platform === "pumpfun") {
     if (config.pumpType !== undefined) {
       requestBody["pumpType"] = config.pumpType;
+    }
+    if (config.cashBack !== undefined) {
+      requestBody["cashBack"] = config.cashBack;
     }
     if (config.pumpAdvanced !== undefined) {
       requestBody["pumpAdvanced"] = config.pumpAdvanced;
@@ -739,6 +743,7 @@ export const createDeployConfig = (params: {
   platform: PlatformType;
   token: TokenMetadata;
   pumpType?: boolean;
+  cashBack?: boolean;
   pumpAdvanced?: boolean;
   bonkType?: "meme" | "tech";
   meteoraDBCConfig?: MeteoraDBCConfig;
@@ -750,6 +755,7 @@ export const createDeployConfig = (params: {
     platform: params.platform,
     token: params.token,
     pumpType: params.pumpType,
+    cashBack: params.cashBack,
     pumpAdvanced: params.pumpAdvanced,
     bonkType: params.bonkType,
     bonkAdvanced: params.bonkAdvanced,
