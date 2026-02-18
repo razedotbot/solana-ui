@@ -1,0 +1,804 @@
+openapi: 3.0.3
+info:
+  title: Raze Utilities API
+  description: Utility endpoints for Solana token creation and wallet operations
+  version: 3.0.0
+
+servers:
+  - url: https://de.raze.sh
+    description: Germany server
+  - url: https://us.raze.sh
+    description: US server
+  - url: https://jp.raze.sh
+    description: Japan server
+
+security: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+      required:
+        - success
+        - error
+
+    TransactionsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        transactions:
+          type: array
+          items:
+            type: string
+          description: Partially-prepared transactions to be signed and submitted
+      required:
+        - success
+        - transactions
+
+paths:
+  /v3/sol/create:
+    post:
+      summary: Create token
+      description: |
+        Deploy a new token on one of four platforms. Auth optional.
+
+        **Platforms:**
+        - `pumpfun` —  up to 21 wallets (Multi-stage mode above 5 wallets)
+        - `bonk` —  up to 21 wallets (Multi-stage mode above 5 wallets)
+        - `meteoraDBC` —  up to 21 wallets (Multi-stage mode above 5 wallets)
+        - `meteoraCPAMM` —  up to 21 wallets (Multi-stage mode above 5 wallets)
+
+        Simple deployments return `transactions[]`. Multi-stage deployments return `stages[]`.
+      operationId: create
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                platform:
+                  type: string
+                  enum: [pumpfun, bonk, meteoraDBC, meteoraCPAMM]
+                wallets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      address:
+                        type: string
+                      amount:
+                        oneOf:
+                          - type: number
+                          - type: string
+                        description: Initial buy amount in SOL
+                    required:
+                      - address
+                      - amount
+                  minItems: 1
+                  description: First wallet is the deployer/owner
+                token:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    symbol:
+                      type: string
+                    imageUrl:
+                      type: string
+                      format: uri
+                    description:
+                      type: string
+                    twitter:
+                      type: string
+                    telegram:
+                      type: string
+                    website:
+                      type: string
+                  required:
+                    - name
+                    - symbol
+                    - imageUrl
+                jitoTipAmountSOL:
+                  type: number
+                  default: 0.001
+                  example: 0.001
+                encoding:
+                  type: string
+                  enum: [base58, base64]
+                  default: base58
+                pumpType:
+                  type: boolean
+                  description: Pump.fun mayhem mode
+                  default: false
+                cashBack:
+                  type: boolean
+                  description: Pump.fun cashback mode
+                  default: false
+                bonkType:
+                  type: string
+                  enum: [meme, tech]
+                  description: Bonk token type
+                  default: meme
+                configAddress:
+                  type: string
+                  description: Meteora config PDA address. Uses platform default if omitted.
+                initialLiquiditySOL:
+                  type: number
+                  description: Initial liquidity in SOL (meteoraCPAMM only)
+                  default: 1
+                initialTokenPercent:
+                  type: number
+                  description: Percentage of token supply in initial liquidity pool (meteoraCPAMM only)
+                  default: 80
+                  minimum: 1
+                  maximum: 100
+              required:
+                - platform
+                - wallets
+                - token
+            examples:
+              pumpfun:
+                summary: Pump.fun — 2 wallets
+                value:
+                  platform: "pumpfun"
+                  wallets:
+                    - address: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                      amount: 0.5
+                    - address: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                      amount: 0.2
+                  token:
+                    name: "My Token"
+                    symbol: "MTK"
+                    imageUrl: "https://example.com/image.png"
+                    description: "A great token"
+                  jitoTipAmountSOL: 0.001
+              bonk:
+                summary: Bonk — meme type
+                value:
+                  platform: "bonk"
+                  wallets:
+                    - address: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                      amount: 1.0
+                    - address: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                      amount: 0.5
+                  token:
+                    name: "My Token"
+                    symbol: "MTK"
+                    imageUrl: "https://example.com/image.png"
+                  bonkType: "meme"
+              meteoraDBC:
+                summary: Meteora DBC
+                value:
+                  platform: "meteoraDBC"
+                  wallets:
+                    - address: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                      amount: 2.0
+                  token:
+                    name: "My Token"
+                    symbol: "MTK"
+                    imageUrl: "https://example.com/image.png"
+              meteoraCPAMM:
+                summary: Meteora CPAMM
+                value:
+                  platform: "meteoraCPAMM"
+                  wallets:
+                    - address: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                      amount: 2.0
+                  token:
+                    name: "My Token"
+                    symbol: "MTK"
+                    imageUrl: "https://example.com/image.png"
+                  initialLiquiditySOL: 1
+                  initialTokenPercent: 80
+      responses:
+        '200':
+          description: Token deployment transactions generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  platform:
+                    type: string
+                  mint:
+                    type: string
+                    description: Token mint address
+                  poolAddress:
+                    type: string
+                    description: Pool address (bonk, meteoraDBC, meteoraCPAMM)
+                  positionAddress:
+                    type: string
+                    description: Position address (meteoraCPAMM only)
+                  lookupTableAddress:
+                    type: string
+                  isAdvancedMode:
+                    type: boolean
+                  mintPrivateKey:
+                    type: string
+                    description: Mint keypair private key (meteoraDBC/CPAMM advanced mode)
+                  positionNftPrivateKey:
+                    type: string
+                    description: Position NFT private key (meteoraCPAMM only)
+                  transactions:
+                    type: array
+                    items:
+                      type: string
+                    description: Present in standard mode
+                  stages:
+                    type: array
+                    items:
+                      type: object
+                    description: Present in advanced/staged mode
+              examples:
+                standard:
+                  summary: Standard mode response
+                  value:
+                    success: true
+                    platform: "pumpfun"
+                    mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                    isAdvancedMode: false
+                    transactions:
+                      - "4hXTCkRzt9..."
+                advanced:
+                  summary: Advanced/staged mode response
+                  value:
+                    success: true
+                    platform: "bonk"
+                    mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                    poolAddress: "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX"
+                    lookupTableAddress: "9fArjEQGBMRkFiLH..."
+                    isAdvancedMode: true
+                    stages:
+                      - transactions: ["4hXTCkRzt9..."]
+                      - transactions: ["5mYUDkRzt9..."]
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/distribute:
+    post:
+      summary: Distribute SOL
+      description: |
+        Build partially-signed transactions to distribute SOL from one sender to many recipients.
+
+        Transactions are partially signed by the pool authenticator. The sender must sign each transaction before submitting via `/v3/sol/send`.
+      operationId: distribute
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sender:
+                  type: string
+                  description: Sender wallet address
+                  example: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                recipients:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      address:
+                        type: string
+                      amount:
+                        oneOf:
+                          - type: number
+                          - type: string
+                        description: Amount in SOL
+                    required:
+                      - address
+                      - amount
+                  minItems: 1
+                feeTipLamports:
+                  type: number
+                  description: Tip in lamports. API key — tip only. Public — tip + 0.001 SOL.
+                  example: 1000000
+                encoding:
+                  type: string
+                  enum: [base58, base64]
+                  default: base58
+              required:
+                - sender
+                - recipients
+            example:
+              sender: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+              recipients:
+                - address: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                  amount: 0.1
+                - address: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"
+                  amount: 0.2
+              feeTipLamports: 1000000
+      responses:
+        '200':
+          description: Distribution transactions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9..."
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/consolidate:
+    post:
+      summary: Consolidate SOL
+      description: |
+        Build partially-signed transactions to sweep SOL from many wallets into one receiver.
+
+        Each wallet produces one transaction. Each wallet must sign its own transaction before submitting.
+      operationId: consolidate
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wallets:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  description: Source wallet addresses
+                  example: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+                receiver:
+                  type: string
+                  description: Destination wallet address
+                  example: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"
+                percentage:
+                  type: number
+                  description: Percentage of each wallet's balance to sweep (1–100)
+                  minimum: 1
+                  maximum: 100
+                  example: 90
+                feeTipLamports:
+                  type: number
+                  example: 1000000
+                encoding:
+                  type: string
+                  enum: [base58, base64]
+                  default: base58
+              required:
+                - wallets
+                - receiver
+                - percentage
+            example:
+              wallets:
+                - "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                - "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+              receiver: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"
+              percentage: 90
+      responses:
+        '200':
+          description: Consolidation transactions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9..."
+                  - "5mYUDkRzt9..."
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/mixer:
+    post:
+      summary: Mixer
+      description: |
+        Build a two-step privacy transfer from sender to receiver via an intermediate pool wallet.
+
+        Returns two transactions:
+        - `tx[0]` — sender → pool (sender must sign)
+        - `tx[1]` — pool → receiver (pre-signed by pool)
+      operationId: mixer
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sender:
+                  type: string
+                  example: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                receiver:
+                  type: string
+                  example: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                amount:
+                  oneOf:
+                    - type: number
+                    - type: string
+                  description: SOL amount to transfer (must be > 0.01)
+                  example: 0.5
+                feeTipLamports:
+                  type: number
+                  example: 1000000
+                encoding:
+                  type: string
+                  enum: [base58, base64]
+                  default: base58
+              required:
+                - sender
+                - receiver
+                - amount
+            example:
+              sender: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+              receiver: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+              amount: 0.5
+              feeTipLamports: 1000000
+      responses:
+        '200':
+          description: Mixer transactions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9..."
+                  - "5mYUDkRzt9..."
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/transfer:
+    post:
+      summary: Transfer SOL or token
+      description: Build a transfer transaction for native SOL or any SPL token. Auth optional.
+      operationId: transfer
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sender:
+                  type: string
+                  description: Sender wallet public key
+                  example: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                receiver:
+                  type: string
+                  description: Receiver wallet address
+                  example: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                tokenAddress:
+                  type: string
+                  description: SPL token mint address. Omit for native SOL transfer.
+                  example: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                amount:
+                  oneOf:
+                    - type: number
+                    - type: string
+                  description: Amount in SOL (SOL transfer) or token units (SPL transfer)
+                  example: 1.5
+                feeTipLamports:
+                  type: number
+                  example: 1000000
+                encoding:
+                  type: string
+                  enum: [base58, base64]
+                  default: base58
+              required:
+                - sender
+                - receiver
+                - amount
+            examples:
+              solTransfer:
+                summary: Transfer SOL
+                value:
+                  sender: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                  receiver: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                  amount: 1.5
+                  feeTipLamports: 1000000
+              tokenTransfer:
+                summary: Transfer SPL token
+                value:
+                  sender: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                  receiver: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  amount: 10000
+      responses:
+        '200':
+          description: Transfer transaction generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9..."
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/burn:
+    post:
+      summary: Burn tokens
+      description: Build a transaction to burn SPL tokens. Auth optional.
+      operationId: burn
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wallet:
+                  type: string
+                  description: Wallet holding the tokens
+                  example: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                tokenAddress:
+                  type: string
+                  description: Token mint address
+                  example: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                amount:
+                  oneOf:
+                    - type: number
+                    - type: string
+                  description: Amount to burn in token units
+                  example: 1000000
+                feeTipLamports:
+                  type: number
+                  example: 1000000
+                encoding:
+                  type: string
+                  enum: [base58, base64]
+                  default: base58
+              required:
+                - wallet
+                - tokenAddress
+                - amount
+            example:
+              wallet: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+              tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+              amount: 1000000
+              feeTipLamports: 1000000
+      responses:
+        '200':
+          description: Burn transaction generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9..."
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/fee-claim:
+    post:
+      summary: Claim fees
+      description: |
+        Build a transaction to claim creator or partner fees. Auth optional.
+
+        Returns `{ success, transactions[] }` for all platforms. Sign and submit each transaction via `/v3/sol/send`.
+      operationId: feeClaim
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                platform:
+                  type: string
+                  enum: [pumpfun, meteora]
+                wallet:
+                  type: string
+                  description: Fee claimer / coin creator wallet
+                  example: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                feeType:
+                  type: string
+                  enum: [creator, partner]
+                  description: Required for meteora
+                pool:
+                  type: string
+                  description: Pool address. Required for meteora.
+                  example: "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX"
+                maxBaseAmount:
+                  oneOf:
+                    - type: number
+                    - type: string
+                  description: Max base token amount to claim. Required for meteora.
+                  example: 1000000
+                maxQuoteAmount:
+                  oneOf:
+                    - type: number
+                    - type: string
+                  description: Max quote token amount to claim. Required for meteora.
+                  example: 1000000
+                receiver:
+                  type: string
+                  description: Destination wallet (optional, defaults to wallet)
+                feeTipLamports:
+                  type: number
+                  example: 1000000
+                encoding:
+                  type: string
+                  enum: [base58, base64]
+                  default: base58
+              required:
+                - platform
+                - wallet
+            examples:
+              pumpfun:
+                summary: Claim Pump.fun creator fees
+                value:
+                  platform: "pumpfun"
+                  wallet: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                  feeTipLamports: 1000000
+              meteoraCreator:
+                summary: Claim Meteora creator fees
+                value:
+                  platform: "meteora"
+                  wallet: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                  feeType: "creator"
+                  pool: "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX"
+                  maxBaseAmount: 1000000
+                  maxQuoteAmount: 1000000
+              meteoraPartner:
+                summary: Claim Meteora partner fees
+                value:
+                  platform: "meteora"
+                  wallet: "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                  feeType: "partner"
+                  pool: "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX"
+                  maxBaseAmount: 1000000
+                  maxQuoteAmount: 1000000
+      responses:
+        '200':
+          description: Fee claim transactions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9..."
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

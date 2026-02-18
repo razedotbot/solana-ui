@@ -21,13 +21,8 @@ export interface ApiResponse<T = unknown> {
 }
 
 export interface SenderResult {
-  jsonrpc: string;
-  id: number;
-  result?: string;
-  error?: {
-    code: number;
-    message: string;
-  };
+  rpc?: string;
+  jito?: string;
 }
 
 export interface ServerInfo {
@@ -141,6 +136,9 @@ export type {
   TokenMarketData,
   QuickTradeParams,
   QuickTradeResult,
+  LimitPriceMode,
+  LimitOrderStatus,
+  LimitOrder,
 } from "./trading";
 
 

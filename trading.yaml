@@ -1,0 +1,551 @@
+openapi: 3.0.3
+info:
+  title: Raze Trading API
+  description: Trading endpoints for Solana buy, sell and send operations
+  version: 3.0.0
+
+servers:
+  - url: https://de.raze.sh
+    description: Germany server
+  - url: https://us.raze.sh
+    description: US server
+  - url: https://jp.raze.sh
+    description: Japan server
+
+security: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        details:
+          type: string
+      required:
+        - success
+        - error
+
+    Quote:
+      type: object
+      description: Quote result returned by GET /v3/sol/quote/{mint}
+      properties:
+        mint:
+          type: string
+          example: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+        avgPrice:
+          type: number
+          example: 0.000000012453
+        hops:
+          type: integer
+          description: Number of hops in the route
+          example: 1
+        quoteResponse:
+          type: object
+          description: Raw quote payload — pass directly to buy/sell to skip server-side re-fetch
+      required:
+        - mint
+        - avgPrice
+
+    BuyRequest:
+      type: object
+      properties:
+        walletAddresses:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          example: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+        tokenAddress:
+          type: string
+          example: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+        solAmount:
+          type: number
+          description: Uniform SOL amount per wallet. Required if amounts not provided (SOL input only).
+          example: 0.1
+        amounts:
+          type: array
+          items:
+            type: number
+          description: Per-wallet SOL amounts. Required if solAmount not provided (SOL input only).
+          example: [0.05, 0.15]
+        inputMint:
+          type: string
+          description: Input token mint. Omit for native SOL input. Use for non-SOL → token swaps.
+          example: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        inputAmountRaw:
+          type: integer
+          description: Raw input amount in token base units. Required when inputMint is provided.
+          example: 1000000
+        quoteResponse:
+          type: object
+          description: Pre-fetched quote from GET /v3/sol/quote/{mint}. When provided, skips server-side quote fetch.
+        slippageBps:
+          type: integer
+          default: 9990
+          minimum: 0
+          maximum: 10000
+          example: 9990
+        transactionsFeeLamports:
+          type: number
+          description: Priority fee per transaction in lamports
+          example: 100000
+        feeTipLamports:
+          type: number
+          description: Tip in lamports (min 1000000). API key users — tip only. Public — tip + 0.001 SOL flat fee.
+          example: 1000000
+          minimum: 1000000
+        encoding:
+          type: string
+          enum: [base58, base64]
+          default: base58
+      required:
+        - walletAddresses
+        - tokenAddress
+
+    BuyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        transactions:
+          type: array
+          items:
+            type: string
+          description: Partially-prepared transactions ready to be signed and submitted
+      required:
+        - success
+        - transactions
+
+    SellRequest:
+      type: object
+      properties:
+        walletAddresses:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          example: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+        tokenAddress:
+          type: string
+          example: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+        percentage:
+          type: number
+          description: Percentage of holdings to sell (1–100). Required if tokensAmount not provided.
+          minimum: 1
+          maximum: 100
+          example: 100
+        tokensAmount:
+          oneOf:
+            - type: number
+            - type: array
+              items:
+                type: number
+          description: Fixed token amount(s). Single number applies to all wallets; array is per-wallet. Required if percentage not provided.
+          example: 500000
+        outputMint:
+          type: string
+          description: Output token mint. Omit for native SOL output. Use for token → non-SOL swaps.
+          example: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        quoteResponse:
+          type: object
+          description: Pre-fetched quote from GET /v3/sol/quote/{mint}. When provided, skips server-side quote fetch.
+        slippageBps:
+          type: integer
+          default: 9990
+          minimum: 0
+          maximum: 10000
+          example: 9990
+        transactionsFeeLamports:
+          type: number
+          example: 100000
+        feeTipLamports:
+          type: number
+          minimum: 1000000
+          example: 1000000
+        encoding:
+          type: string
+          enum: [base58, base64]
+          default: base58
+      required:
+        - walletAddresses
+        - tokenAddress
+
+    SellResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        transactions:
+          type: array
+          items:
+            type: string
+      required:
+        - success
+        - transactions
+
+    SendRequest:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 5
+          description: Signed transactions. Single tx → RPC. 2–5 txs → Jito bundle.
+          example: ["4hXTCkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWJ..."]
+        encoding:
+          type: string
+          enum: [base58, base64]
+          description: Encoding of the transactions. Auto-detected if omitted.
+      required:
+        - transactions
+
+    SendResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        result:
+          type: object
+          description: Submission result. Contains `rpc` for single tx or `jito` for bundle.
+          properties:
+            rpc:
+              type: string
+              description: Transaction signature (single tx)
+              example: "5KtPn1LGuxhF..."
+            jito:
+              type: string
+              description: Jito bundle ID (bundle)
+              example: "4xTWpZFcQh8..."
+      required:
+        - success
+        - result
+
+paths:
+  /v3/sol/quote/{mint}:
+    get:
+      summary: Get quote
+      description: |
+        Get the current price quote for a token.
+
+        Pass `inputMint` to quote a non-SOL input route (e.g. USDC → token).
+        The returned `quoteResponse` can be passed directly to buy/sell to skip a second server-side fetch.
+      operationId: getQuote
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: mint
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Token mint address
+          example: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+        - name: inputMint
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Input token mint for non-SOL routes. Omit for SOL → token quotes.
+          example: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      responses:
+        '200':
+          description: Quote retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  quote:
+                    $ref: '#/components/schemas/Quote'
+              examples:
+                solInput:
+                  summary: SOL → token quote
+                  value:
+                    success: true
+                    quote:
+                      mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                      avgPrice: 0.000000012453
+                      hops: 1
+                      quoteResponse: {}
+                nonSolInput:
+                  summary: USDC → token quote
+                  value:
+                    success: true
+                    quote:
+                      mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                      avgPrice: 0.000000012453
+                      hops: 2
+                      quoteResponse: {}
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Token not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/buy:
+    post:
+      summary: Buy tokens
+      description: |
+        Build buy transactions for one or more wallets. Auth optional — API key users pay tip only, public users pay tip + 0.001 SOL flat fee.
+
+        **Quote resolution order:**
+        1. `quoteResponse` (pre-fetched) — used directly, no server fetch
+        2. `inputMint` provided — fresh quote fetch for non-SOL input
+        3. Default — SOL input, standard route
+      operationId: buy
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyRequest'
+            examples:
+              solInput:
+                summary: SOL input, single wallet
+                value:
+                  walletAddresses: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  solAmount: 0.1
+              multiWallet:
+                summary: Multiple wallets, per-wallet amounts
+                value:
+                  walletAddresses:
+                    - "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                    - "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  amounts: [0.05, 0.15]
+                  slippageBps: 500
+                  feeTipLamports: 1000000
+              nonSolInput:
+                summary: Non-SOL input (USDC → token)
+                value:
+                  walletAddresses: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  inputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+                  inputAmountRaw: 1000000
+              withCachedQuote:
+                summary: Pre-fetched quote
+                value:
+                  walletAddresses: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  solAmount: 0.1
+                  quoteResponse: {}
+      responses:
+        '200':
+          description: Transactions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuyResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWJ..."
+                  - "5mYUDkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWJ..."
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Token not found / could not get quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/sell:
+    post:
+      summary: Sell tokens
+      description: |
+        Build sell transactions for one or more wallets. Auth optional — API key users pay tip only, public users pay tip + 0.001 SOL flat fee.
+
+        **Quote resolution order:**
+        1. `quoteResponse` (pre-fetched) — used directly, no server fetch
+        2. `outputMint` provided — fresh quote fetch for non-SOL output
+        3. Default — SOL output, standard route
+      operationId: sell
+      security: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellRequest'
+            examples:
+              sellAll:
+                summary: Sell 100% of holdings
+                value:
+                  walletAddresses: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  percentage: 100
+              sellFixed:
+                summary: Sell fixed token amount
+                value:
+                  walletAddresses: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  tokensAmount: 500000
+              sellPerWallet:
+                summary: Multiple wallets, per-wallet amounts
+                value:
+                  walletAddresses:
+                    - "62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"
+                    - "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  tokensAmount: [1000000, 2000000]
+              nonSolOutput:
+                summary: Token → USDC
+                value:
+                  walletAddresses: ["62ThHC1rs2GUfa8J4Qjcj5GD2MSL2d65pcJtenNieDnm"]
+                  tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                  percentage: 100
+                  outputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      responses:
+        '200':
+          description: Transactions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellResponse'
+              example:
+                success: true
+                transactions:
+                  - "4hXTCkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWJ..."
+        '400':
+          description: Invalid parameters or no balance to sell
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Could not get sell quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sol/send:
+    post:
+      summary: Send transactions
+      description: |
+        Submit signed transactions to the network. No auth required.
+
+        Transactions **must** contain a fee tip transfer to the fee recipient.
+
+        - **Single tx** — sent to 2 RPC endpoints in parallel
+        - **Bundle (2–5 txs)** — sent as Jito bundle. Sponsor tip auto-added if needed.
+
+        **Tiers** (based on total fee to FEE_RECIPIENT):
+        - Tier 1 `< 0.005 SOL` — 1 Jito endpoint
+        - Tier 2 `≥ 0.005 SOL` — all Jito endpoints + Jito tx endpoint
+
+        Encoding is auto-detected if not provided (`+`, `/`, `=` → base64, else base58).
+      operationId: send
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendRequest'
+            examples:
+              singleTx:
+                summary: Single transaction
+                value:
+                  transactions: ["4hXTCkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWJ..."]
+              bundle:
+                summary: Bundle of 2 transactions
+                value:
+                  transactions:
+                    - "4hXTCkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWJ..."
+                    - "5mYUDkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWJ..."
+      responses:
+        '200':
+          description: Transaction(s) submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendResponse'
+              examples:
+                singleTx:
+                  summary: Single tx result
+                  value:
+                    success: true
+                    result:
+                      rpc: "5KtPn1LGuxhFiwjxqLHpBCa6xjnB7YaB1pPB263DezX..."
+                bundle:
+                  summary: Bundle result
+                  value:
+                    success: true
+                    result:
+                      jito: "4xTWpZFcQh8mK3nRJjz3wXBoRgixCa6xjnB7YaB1pPB..."
+        '400':
+          description: Invalid transactions, missing fee tip, or expired blockhash
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

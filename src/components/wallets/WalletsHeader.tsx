@@ -256,7 +256,8 @@ const savePresets = (presets: QuickModePreset[]): void => {
 export const QuickModeDropdown: React.FC<{
   quickModeSettings: Record<WalletCategory, CategoryQuickTradeSettings>;
   onUpdateQuickMode: (category: WalletCategory, settings: CategoryQuickTradeSettings) => void;
-}> = ({ quickModeSettings, onUpdateQuickMode }) => {
+  compact?: boolean;
+}> = ({ quickModeSettings, onUpdateQuickMode, compact = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<WalletCategory>("Medium");
   const [presets, setPresets] = useState<QuickModePreset[]>(loadPresets);
@@ -270,12 +271,15 @@ export const QuickModeDropdown: React.FC<{
   const updatePortalPos = useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setPortalPos({ top: rect.bottom + 4, left: rect.left });
+      const dropdownWidth = 260;
+      const left = Math.max(8, rect.right - dropdownWidth);
+      setPortalPos({ top: rect.bottom + 4, left });
     }
   }, []);
 
   useEffect(() => {
     if (isOpen) {
+      setPresets(loadPresets());
       updatePortalPos();
     }
   }, [isOpen, updatePortalPos]);
@@ -342,10 +346,12 @@ export const QuickModeDropdown: React.FC<{
     <div ref={buttonRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${isOpen ? "border-primary-60" : ""}`}
+        className={compact
+          ? `p-0.5 rounded transition-colors ${isOpen ? "text-app-primary" : "text-app-secondary-40 hover:text-app-primary"} hover:bg-app-primary-10`
+          : `flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${isOpen ? "border-primary-60" : ""}`}
         title="Quick Trade Settings"
       >
-        <Zap size={14} className="color-primary" />
+        <Zap size={compact ? 11 : 14} className={compact ? "inherit" : "color-primary"} />
       </button>
 
       {isOpen && createPortal(
@@ -476,8 +482,8 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
   onImportMasterWallet: _onImportMasterWallet,
   onExportKeys: _onExportKeys,
   onCleanup: _onCleanup,
-  quickModeSettings,
-  onUpdateQuickMode,
+  quickModeSettings: _quickModeSettings,
+  onUpdateQuickMode: _onUpdateQuickMode,
   isConnected,
 }) => {
   return (
@@ -493,11 +499,6 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
           <span className="hidden lg:inline text-xs text-app-secondary-60">Balance</span>
           <span className="text-sm font-bold text-yellow-400 font-mono">{totalBalance}</span>
         </div>
-        <div className="w-px h-4 bg-app-primary-15" />
-        <QuickModeButtons
-          quickModeSettings={quickModeSettings}
-          onUpdateQuickMode={onUpdateQuickMode}
-        />
       </div>
 
       {/* Spacer */}

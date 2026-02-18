@@ -1,9 +1,9 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { SenderResult } from "./types";
-import { BASE_CURRENCIES, API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
+import { API_ENDPOINTS, OPERATION_DELAYS } from "./constants";
 import { parseTransactionArray, type RawTransactionResponse } from "./transactionParsing";
-import { sendTransactions, getServerBaseUrl, checkRateLimit, resolveBaseCurrency, splitLargeBundles } from "./trading";
+import { sendTransactions, getServerBaseUrl, checkRateLimit, splitLargeBundles } from "./trading";
 
 interface WalletConsolidation {
   address: string;
@@ -18,23 +18,17 @@ const getPartiallyPreparedTransactions = async (
   sourceAddresses: string[],
   receiverAddress: string,
   percentage: number,
-  baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
   const baseUrl = getServerBaseUrl();
 
   const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_CONSOLIDATE}`;
 
-  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const requestBody: Record<string, unknown> = {
-    sourceAddresses,
-    receiverAddress,
+    wallets: sourceAddresses,
+    receiver: receiverAddress,
     percentage,
+    encoding: "base64",
   };
-
-  // Add token mint for non-native currencies
-  if (!isNativeSOL) {
-    requestBody["tokenMint"] = baseCurrency.mint;
-  }
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -101,11 +95,9 @@ export const consolidateBaseCurrency = async (
   sourceWallets: WalletConsolidation[],
   receiverWallet: WalletConsolidation,
   percentage: number,
-  baseCurrency?: BaseCurrencyConfig,
+  _baseCurrency?: unknown,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    const currency = resolveBaseCurrency(baseCurrency);
-
     // Extract source addresses
     const sourceAddresses = sourceWallets.map((wallet) => wallet.address);
 
@@ -115,7 +107,6 @@ export const consolidateBaseCurrency = async (
         sourceAddresses,
         receiverWallet.address,
         percentage,
-        currency,
       );
 
     // Step 2: Create keypairs from private keys

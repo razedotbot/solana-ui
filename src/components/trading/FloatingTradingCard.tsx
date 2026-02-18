@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Move, Edit3, Check } from "lucide-react";
-import { toggleWallet } from "../../utils/wallet";
+import { filterActiveWallets, toggleWallet } from "../../utils/wallet";
 import { saveWalletsToCookies } from "../../utils/storage";
 import WalletSelectorPopup from "../trading/WalletSelectorPopup";
 import { PresetButton, TabButton, loadPresetsFromCookies, savePresetsToCookies } from "../wallets/PanelShared";
 import type { WalletType, PresetTab } from "../../utils/types";
+import type { InputMode } from "../../utils/trading";
 
 // Hook to detect mobile viewport
 const useIsMobile = (): boolean => {
@@ -43,6 +44,7 @@ interface FloatingTradingCardProps {
     dex?: string,
     buyAmount?: string,
     sellAmount?: string,
+    sellInputMode?: InputMode,
   ) => void;
   isLoading: boolean;
   countActiveWallets: (wallets: WalletType[]) => number;
@@ -76,6 +78,8 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
   const [showWalletSelector, setShowWalletSelector] = useState(false);
+  const [sellInputMode, setSellInputMode] = useState<InputMode>("perWallet");
+  const [buyInputMode, setBuyInputMode] = useState<InputMode>("perWallet");
   const isMobile = useIsMobile();
 
   const cardRef = useRef<HTMLDivElement>(null);
@@ -197,20 +201,33 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   // Handle trade submission
   const handleTrade = useCallback(
     (amount: string, isBuy: boolean): void => {
-      // Set the amount in parent state and call handleTradeSubmit with the specific amount
       if (isBuy) {
         setBuyAmount(amount);
-        // Pass the amount directly to avoid using stale state values
-        handleTradeSubmit(wallets, isBuy, selectedDex, amount, undefined);
+        // In cumulative mode, divide total SOL by active wallet count
+        const activeCount = filterActiveWallets(wallets).length;
+        const perWalletAmount = buyInputMode === "cumulative" && activeCount > 0
+          ? String(parseFloat(amount) / activeCount)
+          : amount;
+        handleTradeSubmit(wallets, isBuy, selectedDex, perWalletAmount, undefined);
       } else {
-        setSellAmount(amount);
-        // Pass the amount directly to avoid using stale state values
+        // Preset is a percentage — send as percentage directly
+        // But display the corresponding token amount in the input
+        const pct = parseFloat(amount);
+        if (!isNaN(pct)) {
+          const activeWallets = filterActiveWallets(wallets);
+          const totalTokens = activeWallets.reduce((sum, w) => sum + (tokenBalances.get(w.address) || 0), 0);
+          setSellAmount(String(totalTokens * (pct / 100)));
+        } else {
+          setSellAmount(amount);
+        }
         handleTradeSubmit(wallets, isBuy, selectedDex, undefined, amount);
       }
     },
     [
       selectedDex,
       wallets,
+      buyInputMode,
+      tokenBalances,
       setBuyAmount,
       setSellAmount,
       handleTradeSubmit,
@@ -390,8 +407,15 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                   <span className="text-base font-mono color-primary font-semibold">
                     BUY
                   </span>
-                  <span className="text-xs text-app-secondary-60 font-mono">
-                    SOL/wallet
+                  <span className="text-xs font-mono flex items-center gap-0">
+                    <span className="text-app-secondary-60">SOL/</span>
+                    <button
+                      type="button"
+                      onClick={() => setBuyInputMode(buyInputMode === "perWallet" ? "cumulative" : "perWallet")}
+                      className="text-app-secondary-60 hover:color-primary transition-colors cursor-pointer"
+                    >
+                      {buyInputMode === "perWallet" ? "wallet" : "total"}
+                    </button>
                   </span>
                 </div>
 
@@ -419,8 +443,15 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                   <span className="text-base font-mono text-error-alt font-semibold">
                     SELL
                   </span>
-                  <span className="text-xs text-error-alt-60 font-mono">
-                    % tokens
+                  <span className="text-xs font-mono flex items-center gap-0">
+                    <span className="text-error-alt-60">tokens/</span>
+                    <button
+                      type="button"
+                      onClick={() => setSellInputMode(sellInputMode === "perWallet" ? "cumulative" : "perWallet")}
+                      className="text-error-alt-60 hover:text-error-alt transition-colors cursor-pointer"
+                    >
+                      {sellInputMode === "perWallet" ? "wallet" : "total"}
+                    </button>
                   </span>
                 </div>
 
@@ -543,8 +574,15 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-mono color-primary">BUY</span>
-              <span className="text-xs text-app-secondary-60 font-mono">
-                SOL/wallet
+              <span className="text-xs font-mono flex items-center gap-0">
+                <span className="text-app-secondary-60">SOL/</span>
+                <button
+                  type="button"
+                  onClick={() => setBuyInputMode(buyInputMode === "perWallet" ? "cumulative" : "perWallet")}
+                  className="text-app-secondary-60 hover:color-primary transition-colors cursor-pointer"
+                >
+                  {buyInputMode === "perWallet" ? "wallet" : "total"}
+                </button>
               </span>
             </div>
 
@@ -568,8 +606,15 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-mono text-error-alt">SELL</span>
-              <span className="text-xs text-error-alt-60 font-mono">
-                % tokens
+              <span className="text-xs font-mono flex items-center gap-0">
+                <span className="text-error-alt-60">tokens/</span>
+                <button
+                  type="button"
+                  onClick={() => setSellInputMode(sellInputMode === "perWallet" ? "cumulative" : "perWallet")}
+                  className="text-error-alt-60 hover:text-error-alt transition-colors cursor-pointer"
+                >
+                  {sellInputMode === "perWallet" ? "wallet" : "total"}
+                </button>
               </span>
             </div>
 
@@ -689,8 +734,15 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-mono color-primary">BUY</span>
-                <span className="text-xs text-app-secondary-60 font-mono">
-                  SOL/wallet
+                <span className="text-xs font-mono flex items-center gap-0">
+                  <span className="text-app-secondary-60">SOL/</span>
+                  <button
+                    type="button"
+                    onClick={() => setBuyInputMode(buyInputMode === "perWallet" ? "cumulative" : "perWallet")}
+                    className="text-app-secondary-60 hover:color-primary transition-colors cursor-pointer"
+                  >
+                    {buyInputMode === "perWallet" ? "wallet" : "total"}
+                  </button>
                 </span>
               </div>
 
@@ -704,7 +756,7 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
                     isLoading={isLoading}
                     variant="buy"
                     isEditMode={isEditMode}
-  
+
                   />
                 ))}
               </div>
@@ -714,8 +766,11 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-mono text-error-alt">SELL</span>
-                <span className="text-xs text-error-alt-60 font-mono">
-                  % tokens
+                <span className="text-xs font-mono flex items-center gap-0">
+                  <span className="text-error-alt-60">tokens/</span>
+                  <span className="text-error-alt-60">
+                    {sellInputMode === "perWallet" ? "wallet" : "total"}
+                  </span>
                 </span>
               </div>
 

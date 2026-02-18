@@ -100,7 +100,6 @@ interface SendSenderResult {
 }
 
 interface SenderResultWithId extends SenderResult {
-  jito?: string;
   bundleId?: string;
 }
 

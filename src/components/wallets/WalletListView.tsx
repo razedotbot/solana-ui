@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Layers, Search, X, RefreshCw, CheckSquare, Square } from "lucide-react";
 import { WalletRow } from "./WalletRow";
+import { QuickModeDropdown } from "./WalletsHeader";
 import type {
   WalletType,
   WalletCategory,
@@ -43,6 +44,7 @@ export interface WalletListViewProps {
   onCopyToClipboard: (text: string) => void;
   onSaveCustomQuickMode: (walletId: number, settings: CustomQuickTradeSettings | null) => void;
   onMoveWalletToGroup: (walletId: number, targetGroupId: string) => void;
+  onUpdateQuickMode: (category: WalletCategory, settings: CategoryQuickTradeSettings) => void;
 }
 
 export const WalletListView: React.FC<WalletListViewProps> = ({
@@ -79,6 +81,7 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
   onCopyToClipboard,
   onSaveCustomQuickMode,
   onMoveWalletToGroup,
+  onUpdateQuickMode,
 }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -157,7 +160,14 @@ export const WalletListView: React.FC<WalletListViewProps> = ({
           )}
         </div>
         <div className="w-[80px] flex-shrink-0">QuickMode</div>
-        <div className="w-[140px] flex-shrink-0">Buy / Sell</div>
+        <div className="w-[140px] flex-shrink-0 flex items-center gap-1.5">
+          <span>Buy / Sell</span>
+          <QuickModeDropdown
+            quickModeSettings={quickModeSettings}
+            onUpdateQuickMode={onUpdateQuickMode}
+            compact
+          />
+        </div>
         <div className="w-[90px] flex-shrink-0 text-right flex items-center justify-end gap-1">
           <span>Balance</span>
           <button

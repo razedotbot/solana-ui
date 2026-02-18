@@ -84,7 +84,7 @@ export const getServerBaseUrl = (): string => {
 // ============================================================================
 
 /**
- * Sends transactions via the trading server's /v2/sol/send endpoint
+ * Sends transactions via the trading server's /v3/sol/send endpoint
  * @param transactions - Array of base64-encoded serialized transactions
  * @returns Result from the server
  */
@@ -354,11 +354,15 @@ export const createBatchErrorMessage = (
 // Trading Configuration Types
 // ============================================================================
 
+export type InputMode = "perWallet" | "cumulative";
+
 export interface TradingConfig {
   tokenAddress: string;
   solAmount?: number;
   sellPercent?: number;
-  tokensAmount?: number;
+  tokensAmount?: number | number[];
+  sellInputMode?: InputMode;
+  buyInputMode?: InputMode;
   bundleMode?: BundleMode;
   batchDelay?: number;
   singleDelay?: number;
@@ -434,14 +438,39 @@ const executeUnifiedBuy = async (
 const executeUnifiedSell = async (
   wallets: FormattedWallet[],
   config: TradingConfig,
+  tokenBalances?: Map<string, number>,
 ): Promise<TradingResult> => {
   try {
     const overrides = resolveExecutionOverrides(config);
 
+    let sellPercent = config.sellPercent;
+    let tokensAmount: number | number[] | undefined = config.tokensAmount;
+
+    // Convert percentage to per-wallet token amounts when balances are available
+    if (sellPercent !== undefined && sellPercent > 0 && !tokensAmount && tokenBalances && tokenBalances.size > 0) {
+      const perWalletAmounts: number[] = [];
+      let allWalletsHaveBalance = true;
+
+      for (const wallet of wallets) {
+        const balance = tokenBalances.get(wallet.address);
+        if (balance !== undefined && balance > 0) {
+          perWalletAmounts.push(balance * (sellPercent / 100));
+        } else {
+          allWalletsHaveBalance = false;
+          break;
+        }
+      }
+
+      if (allWalletsHaveBalance && perWalletAmounts.length === wallets.length) {
+        tokensAmount = perWalletAmounts;
+        sellPercent = undefined;
+      }
+    }
+
     const sellConfig = createSellConfig({
       tokenAddress: config.tokenAddress,
-      sellPercent: config.sellPercent,
-      tokensAmount: config.tokensAmount,
+      sellPercent: sellPercent,
+      tokensAmount: tokensAmount,
       slippageBps: overrides.slippageBps,
       feeTipLamports: overrides.feeTipLamports,
       bundleMode: overrides.bundleMode,
@@ -465,6 +494,7 @@ export const executeTrade = async (
   config: TradingConfig,
   isBuyMode: boolean,
   _solBalances: Map<string, number>,
+  tokenBalances?: Map<string, number>,
 ): Promise<TradingResult> => {
   const activeWallets = filterActiveWallets(wallets);
 
@@ -481,7 +511,7 @@ export const executeTrade = async (
     if (isBuyMode) {
       return await executeUnifiedBuy(formattedWallets, config);
     } else {
-      return await executeUnifiedSell(formattedWallets, config);
+      return await executeUnifiedSell(formattedWallets, config, tokenBalances);
     }
   } catch (err) {
     return {
@@ -503,7 +533,7 @@ export interface TradeHistoryEntry {
   timestamp: number;
   walletsCount: number;
   amount: number;
-  amountType: "sol" | "percentage" | "base-currency";
+  amountType: "sol" | "percentage" | "base-currency" | "tokens";
   baseCurrencyMint?: string;
   success: boolean;
   error?: string;

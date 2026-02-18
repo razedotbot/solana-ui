@@ -75,6 +75,9 @@ export const API_URLS = {
 
 // API Endpoint Paths
 export const API_ENDPOINTS = {
+  // Quote
+  SOL_QUOTE: "/v3/sol/quote",
+
   // Buy
   SOL_BUY: "/v3/sol/buy",
 
@@ -82,20 +85,25 @@ export const API_ENDPOINTS = {
   SOL_SELL: "/v3/sol/sell",
 
   // Create
-  SOL_CREATE: "/v2/sol/create",
+  SOL_CREATE: "/v3/sol/create",
 
   // Distribute
-  SOL_DISTRIBUTE: "/v2/sol/distribute",
+  SOL_DISTRIBUTE: "/v3/sol/distribute",
 
   // Mixer
-  SOL_MIXER: "/v2/sol/mixer",
-  
-  // Consolidate
-  SOL_CONSOLIDATE: "/v2/sol/consolidate",
+  SOL_MIXER: "/v3/sol/mixer",
 
+  // Consolidate
+  SOL_CONSOLIDATE: "/v3/sol/consolidate",
 
   // Transfer
-  SOL_TRANSFER: "/v2/sol/transfer",
+  SOL_TRANSFER: "/v3/sol/transfer",
+
+  // Burn
+  SOL_BURN: "/v3/sol/burn",
+
+  // Fee claim
+  SOL_FEE_CLAIM: "/v3/sol/fee-claim",
 
   // Send
   SOL_SEND: "/v3/sol/send",
@@ -125,6 +133,13 @@ export const BALANCE_REFRESH = {
   DEFAULT_BATCH_SIZE: 5,
   DEFAULT_DELAY_MS: 50,
   POLLING_INTERVAL_MS: 5000,
+} as const;
+
+// Limit Orders
+export const LIMIT_ORDERS = {
+  MAX_ACTIVE_ORDERS: 20,
+  STORAGE_KEY: "raze_limit_orders",
+  CHECK_DEBOUNCE_MS: 1000,
 } as const;
 
 // UI Preset Amounts (SOL)

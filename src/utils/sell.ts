@@ -61,6 +61,10 @@ const getPartiallyPreparedSellTransactions = async (
       requestBody["percentage"] = sellConfig.sellPercent;
     }
 
+    if (sellConfig.outputMint) {
+      requestBody["outputMint"] = sellConfig.outputMint;
+    }
+
     requestBody["slippageBps"] = getSlippageBps(sellConfig.slippageBps);
     requestBody["feeTipLamports"] = getFeeTipLamports(sellConfig.feeTipLamports);
     requestBody["encoding"] = "base64";
@@ -286,10 +290,12 @@ export const executeSell = async (
     BASE_CURRENCIES.SOL.mint;
   const amount =
     sellConfig.tokensAmount !== undefined
-      ? sellConfig.tokensAmount
+      ? (Array.isArray(sellConfig.tokensAmount)
+          ? sellConfig.tokensAmount.reduce((a, b) => a + b, 0)
+          : sellConfig.tokensAmount)
       : sellConfig.sellPercent;
-  const amountType: "base-currency" | "percentage" =
-    sellConfig.tokensAmount !== undefined ? "base-currency" : "percentage";
+  const amountType: "tokens" | "percentage" =
+    sellConfig.tokensAmount !== undefined ? "tokens" : "percentage";
 
   try {
     let result: SellResult;
@@ -359,7 +365,10 @@ export const validateSellInputs = (
   const hasPercent =
     sellConfig.sellPercent !== undefined && !isNaN(sellConfig.sellPercent);
   const hasAmount =
-    sellConfig.tokensAmount !== undefined && !isNaN(sellConfig.tokensAmount);
+    sellConfig.tokensAmount !== undefined &&
+    (Array.isArray(sellConfig.tokensAmount)
+      ? sellConfig.tokensAmount.length > 0
+      : !isNaN(sellConfig.tokensAmount));
 
   if (!hasPercent && !hasAmount) {
     return {
@@ -385,15 +394,20 @@ export const validateSellInputs = (
     };
   }
 
-  if (
-    hasAmount &&
-    sellConfig.tokensAmount !== undefined &&
-    sellConfig.tokensAmount <= 0
-  ) {
-    return {
-      valid: false,
-      error: "Invalid tokens amount (must be greater than 0)",
-    };
+  if (hasAmount && sellConfig.tokensAmount !== undefined) {
+    if (Array.isArray(sellConfig.tokensAmount)) {
+      if (sellConfig.tokensAmount.some((a) => a <= 0)) {
+        return {
+          valid: false,
+          error: "Invalid tokens amount (all must be greater than 0)",
+        };
+      }
+    } else if (sellConfig.tokensAmount <= 0) {
+      return {
+        valid: false,
+        error: "Invalid tokens amount (must be greater than 0)",
+      };
+    }
   }
 
   if (sellConfig.slippageBps !== undefined) {
@@ -438,7 +452,7 @@ export const validateSellInputs = (
 export const createSellConfig = (params: {
   tokenAddress: string;
   sellPercent?: number;
-  tokensAmount?: number;
+  tokensAmount?: number | number[];
   slippageBps?: number;
   outputMint?: string;
   feeTipLamports?: number;

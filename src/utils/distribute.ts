@@ -1,9 +1,9 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { SenderResult } from "./types";
-import { BASE_CURRENCIES, API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
+import { API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
 import { parseTransactionArray, type RawTransactionResponse } from "./transactionParsing";
-import { sendTransactions, getServerBaseUrl, checkRateLimit, resolveBaseCurrency, prepareTransactionBundles } from "./trading";
+import { sendTransactions, getServerBaseUrl, checkRateLimit, prepareTransactionBundles } from "./trading";
 
 interface WalletDistribution {
   address: string;
@@ -19,22 +19,16 @@ interface WalletDistribution {
 const getPartiallySignedTransactions = async (
   senderAddress: string,
   recipients: { address: string; amount: string }[],
-  baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
 ): Promise<string[]> => {
   const baseUrl = getServerBaseUrl();
 
   const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_DISTRIBUTE}`;
 
-  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const requestBody: Record<string, unknown> = {
     sender: senderAddress,
-    recipients: recipients,
+    recipients,
+    encoding: "base64",
   };
-
-  // Add token mint for non-native currencies
-  if (!isNativeSOL) {
-    requestBody["tokenMint"] = baseCurrency.mint;
-  }
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -100,10 +94,9 @@ const completeTransactionSigning = (
 export const distributeBaseCurrency = async (
   senderWallet: WalletDistribution,
   recipientWallets: WalletDistribution[],
-  baseCurrency?: BaseCurrencyConfig,
+  _baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    const currency = resolveBaseCurrency(baseCurrency);
     // Convert wallet data to recipient format for backend
     const recipients = recipientWallets.map((wallet) => ({
       address: wallet.address,
@@ -111,11 +104,9 @@ export const distributeBaseCurrency = async (
     }));
 
     // Step 1: Get partially signed transactions from backend
-    // These transactions are already signed by dump wallets created on the backend
     const partiallySignedTransactions = await getPartiallySignedTransactions(
       senderWallet.address,
       recipients,
-      currency,
     );
     // Step 2: Create keypairs from private keys
     const senderKeypair = Keypair.fromSecretKey(
@@ -218,10 +209,9 @@ export const validateDistributionInputs = (
 export const batchDistributeBaseCurrency = async (
   senderWallet: WalletDistribution,
   recipientWallets: WalletDistribution[],
-  baseCurrency?: BaseCurrencyConfig,
+  _baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
-    const currency = resolveBaseCurrency(baseCurrency);
     // Return early if no recipients
     if (recipientWallets.length === 0) {
       return { success: true, results: [] };
@@ -232,7 +222,6 @@ export const batchDistributeBaseCurrency = async (
       const result = await distributeBaseCurrency(
         senderWallet,
         recipientWallets,
-        currency,
       );
       return {
         success: result.success,
@@ -260,7 +249,6 @@ export const batchDistributeBaseCurrency = async (
       const batchResult = await distributeBaseCurrency(
         senderWallet,
         batch,
-        currency,
       );
 
       if (!batchResult.success) {

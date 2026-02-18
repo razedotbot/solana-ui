@@ -166,6 +166,7 @@ export const SettingsPage: React.FC = () => {
   const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
   const [isChangingServer, setIsChangingServer] = useState(false);
   const [isLoadingServers, setIsLoadingServers] = useState(true);
+  const [isPinging, setIsPinging] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
 
   // Configuration tab state
@@ -207,6 +208,21 @@ export const SettingsPage: React.FC = () => {
     return (): void =>
       window.removeEventListener("serverChanged", handleServerUpdate);
   }, [updateServerData]);
+
+  const refreshPings = useCallback(async (): Promise<void> => {
+    if (!window.refreshServerPings || isPinging) return;
+    setIsPinging(true);
+    try {
+      await window.refreshServerPings();
+    } finally {
+      setIsPinging(false);
+    }
+  }, [isPinging]);
+
+  useEffect(() => {
+    const id = setInterval((): void => { void refreshPings(); }, 5000);
+    return (): void => clearInterval(id);
+  }, [refreshPings]);
 
   const handleServerSwitch = async (serverId: string): Promise<void> => {
     if (!window.switchServer) return;
@@ -436,10 +452,22 @@ export const SettingsPage: React.FC = () => {
 
       {/* Regional Server Selection */}
       <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-        <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono mb-3 uppercase tracking-wider">
-          <Radio size={14} className="color-primary" />
-          Regional Server Selection
-        </label>
+        <div className="flex items-center justify-between mb-3">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+            <Radio size={14} className="color-primary" />
+            Regional Server Selection
+          </label>
+          <button
+            type="button"
+            onClick={() => void refreshPings()}
+            disabled={isPinging || isLoadingServers}
+            className="flex items-center gap-1.5 text-xs font-mono text-app-secondary-60 hover:color-primary transition-colors disabled:opacity-40"
+            title="Refresh pings"
+          >
+            <RefreshCw size={12} className={isPinging ? "animate-spin color-primary" : ""} />
+            {isPinging ? "Pinging..." : "Refresh"}
+          </button>
+        </div>
 
         {/* Server List */}
         <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">

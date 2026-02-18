@@ -51,14 +51,23 @@ const getPartiallyPreparedTransactions = async (
 ): Promise<BuyBundle[]> => {
   const baseUrl = getServerBaseUrl();
 
+  const isNonSolInput =
+    config.inputMint &&
+    config.inputMint !== BASE_CURRENCIES.SOL.mint;
+
   const requestBody: Record<string, unknown> = {
     tokenAddress: config.tokenAddress,
-    solAmount: config.amount,
     walletAddresses: wallets.map((wallet) => wallet.address),
   };
 
-  if (config.amounts) {
-    requestBody["amounts"] = config.amounts;
+  if (isNonSolInput) {
+    requestBody["inputMint"] = config.inputMint;
+    requestBody["inputAmountRaw"] = config.amount;
+  } else {
+    requestBody["solAmount"] = config.amount;
+    if (config.amounts) {
+      requestBody["amounts"] = config.amounts;
+    }
   }
 
   requestBody["slippageBps"] = getSlippageBps(config.slippageBps);

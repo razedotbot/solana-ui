@@ -5,20 +5,15 @@ import {
   X,
   ChevronRight,
 } from "lucide-react";
-import type { Connection } from "@solana/web3.js";
 import {
   Keypair,
-  Transaction,
-  TransactionInstruction,
-  PublicKey,
-  ComputeBudgetProgram,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { Buffer } from "buffer";
 import { useToast } from "../Notifications";
 import type { WalletType } from "../../utils/types";
-import { sendTransactions } from "../../utils/trading";
-import type { WindowWithConfig } from "../../utils/trading";
+import { sendTransactions, getServerBaseUrl } from "../../utils/trading";
+import { API_ENDPOINTS } from "../../utils/constants";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary } from "./PanelShared";
 
 // ─── Platform registry (add new platforms here) ───────────────────────────
@@ -36,32 +31,6 @@ const PLATFORMS: PlatformOption[] = [
   { id: "meteora", label: "METEORA", description: "Claim creator or partner fees from Meteora" },
 ];
 
-const PRIORITY_FEE_MICROLAMPORTS = 200_000;
-const COMPUTE_UNIT_LIMIT = 200_000;
-
-interface FeeClaimIxKey {
-  pubkey: string;
-  isSigner: boolean;
-  isWritable: boolean;
-}
-
-interface FeeClaimIx {
-  programId: string;
-  keys: FeeClaimIxKey[];
-  data: string;
-}
-
-interface FeeClaimResponse {
-  success: boolean;
-  error?: string;
-  platform?: string;
-  data?: {
-    instructions?: FeeClaimIx[];
-    transaction?: string;
-    feeType?: string;
-  };
-}
-
 // ─── Props ────────────────────────────────────────────────────────────────
 
 interface FeeClaimPanelProps {
@@ -70,7 +39,6 @@ interface FeeClaimPanelProps {
   onClose: () => void;
   wallets: WalletType[];
   baseCurrencyBalances: Map<string, number>;
-  connection: Connection;
   selectedWalletIds?: Set<number>;
 }
 
@@ -82,7 +50,6 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
   onClose,
   wallets,
   baseCurrencyBalances,
-  connection,
   selectedWalletIds,
 }) => {
   const { showToast } = useToast();
@@ -129,23 +96,6 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
   const formatAddress = (address: string): string =>
     `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 
-  const buildRequestBody = (walletAddress: string): { platform: string; params: Record<string, string> } => {
-    if (selectedPlatform === "pumpfun") {
-      return { platform: "pumpfun", params: { coinCreator: walletAddress } };
-    }
-
-    return {
-      platform: "meteora",
-      params: {
-        feeType: "creator",
-        creator: walletAddress,
-        payer: walletAddress,
-        pool: meteoraPool,
-        maxBaseAmount: meteoraMaxBaseAmount,
-        maxQuoteAmount: meteoraMaxQuoteAmount,
-      },
-    };
-  };
 
   const canProceedToReview = (): boolean => {
     if (selectedWallets.length === 0) return false;
@@ -163,63 +113,49 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
 
   // ─── Transaction handler ──────────────────────────────────────────────
 
-  const sendFeeClaimForWallet = async (
-    wallet: WalletType,
-    baseUrl: string,
-  ): Promise<void> => {
+  const sendFeeClaimForWallet = async (wallet: WalletType): Promise<void> => {
     const keypair = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+    const baseUrl = getServerBaseUrl();
 
-    const response = await fetch(`${baseUrl}/v2/sol/fee-claim`, {
+    const requestBody: Record<string, unknown> = {
+      platform: selectedPlatform,
+      wallet: wallet.address,
+    };
+
+    if (selectedPlatform === "meteora") {
+      requestBody["feeType"] = "creator";
+      requestBody["pool"] = meteoraPool;
+      requestBody["maxBaseAmount"] = meteoraMaxBaseAmount;
+      requestBody["maxQuoteAmount"] = meteoraMaxQuoteAmount;
+    }
+
+    const response = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_FEE_CLAIM}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildRequestBody(wallet.address)),
+      body: JSON.stringify(requestBody),
     });
 
-    const json = (await response.json()) as FeeClaimResponse;
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const json = (await response.json()) as { success: boolean; error?: string; transactions: string[] };
 
     if (!json.success) {
       throw new Error(json.error ?? "Fee claim API request failed");
     }
 
-    let tx: Transaction;
-
-    if (json.data?.instructions) {
-      const instructions: TransactionInstruction[] = json.data.instructions.map(
-        (ix) =>
-          new TransactionInstruction({
-            programId: new PublicKey(ix.programId),
-            keys: ix.keys.map((k) => ({
-              pubkey: new PublicKey(k.pubkey),
-              isSigner: k.isSigner,
-              isWritable: k.isWritable,
-            })),
-            data: Buffer.from(ix.data, "base64"),
-          }),
-      );
-
-      tx = new Transaction();
-      tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNIT_LIMIT }));
-      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: PRIORITY_FEE_MICROLAMPORTS }));
-      tx.add(...instructions);
-    } else if (json.data?.transaction) {
-      const txBuf = Buffer.from(json.data.transaction, "base64");
-      const originalTx = Transaction.from(txBuf);
-
-      tx = new Transaction();
-      tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNIT_LIMIT }));
-      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: PRIORITY_FEE_MICROLAMPORTS }));
-      tx.add(...originalTx.instructions);
-    } else {
-      throw new Error("Unexpected API response format");
+    if (!json.transactions?.length) {
+      throw new Error("No transactions returned");
     }
 
-    const { blockhash } = await connection.getLatestBlockhash("confirmed");
-    tx.feePayer = keypair.publicKey;
-    tx.recentBlockhash = blockhash;
-    tx.sign(keypair);
-
-    const serialized = bs58.encode(tx.serialize());
-    await sendTransactions([serialized]);
+    for (const txBase58 of json.transactions) {
+      const txBuffer = bs58.decode(txBase58);
+      const transaction = VersionedTransaction.deserialize(txBuffer);
+      transaction.sign([keypair]);
+      const serialized = bs58.encode(transaction.serialize());
+      await sendTransactions([serialized]);
+    }
   };
 
   const handleFeeClaim = async (e: React.FormEvent): Promise<void> => {
@@ -229,15 +165,12 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
     setIsSubmitting(true);
     setProcessedCount(0);
 
-    const baseUrl =
-      (window as unknown as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") || "";
-
     let successCount = 0;
     let failCount = 0;
 
     for (const wallet of selectedWallets) {
       try {
-        await sendFeeClaimForWallet(wallet, baseUrl);
+        await sendFeeClaimForWallet(wallet);
         successCount++;
       } catch (error) {
         failCount++;

@@ -18,7 +18,9 @@ import FloatingTradingCard from "./components/trading/FloatingTradingCard";
 import TradingCard from "./components/trading/TradingForm";
 import WalletSelectorPopup from "./components/trading/WalletSelectorPopup";
 import { PageBackground } from "./components/Styles";
-import { getLatestTrades, executeTrade, type TradeHistoryEntry } from "./utils/trading";
+import { getLatestTrades, executeTrade, type TradeHistoryEntry, type InputMode } from "./utils/trading";
+import { useLimitOrderMonitor, getActiveOrdersForToken, cancelLimitOrder, formatLimitPrice, formatDistance } from "./utils/limitOrders";
+import type { LimitOrder } from "./utils/types";
 
 // Styled Switch component (simplified)
 const Switch = React.forwardRef<
@@ -389,6 +391,9 @@ const LatestTrades: React.FC<{
     if (trade.amountType === "percentage") {
       return `${trade.amount}%`;
     }
+    if (trade.amountType === "tokens") {
+      return `${trade.amount.toFixed(3)} tokens`;
+    }
     return `${trade.amount.toFixed(3)} SOL`;
   };
 
@@ -461,6 +466,77 @@ const LatestTrades: React.FC<{
 });
 LatestTrades.displayName = "LatestTrades";
 
+// Active Limit Orders display — shows pending limit orders for current token
+const ActiveLimitOrders: React.FC<{
+  tokenAddress?: string;
+  currentMarketCap: number | null;
+  solPrice: number | null;
+}> = React.memo(({ tokenAddress, currentMarketCap, solPrice }) => {
+  const [orders, setOrders] = useState<LimitOrder[]>([]);
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    const loadOrders = (): void => {
+      if (!tokenAddress) {
+        setOrders([]);
+        return;
+      }
+      setOrders(getActiveOrdersForToken(tokenAddress));
+    };
+    loadOrders();
+    window.addEventListener("limitOrdersUpdated", loadOrders);
+    return () => window.removeEventListener("limitOrdersUpdated", loadOrders);
+  }, [tokenAddress]);
+
+  if (!tokenAddress || orders.length === 0) return null;
+
+  const tokenPriceSOL =
+    currentMarketCap && solPrice
+      ? currentMarketCap / (solPrice * 1_000_000_000)
+      : null;
+
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="text-[10px] font-mono text-app-secondary-60 uppercase tracking-wider">
+        Limit Orders
+      </div>
+      {orders.map((order) => (
+        <div
+          key={order.id}
+          className="flex items-center justify-between py-1 px-2 rounded border border-app-primary-30 bg-app-primary-80-alpha text-xs"
+        >
+          <div className="flex items-center gap-1.5 font-mono">
+            <span
+              className={`font-semibold ${
+                order.side === "buy" ? "color-primary" : "text-error-alt"
+              }`}
+            >
+              {order.side === "buy" ? "BUY" : "SELL"}
+            </span>
+            <span className="text-app-secondary-60">@</span>
+            <span className="text-app-secondary">
+              {formatLimitPrice(order)}
+            </span>
+            <span className="text-[9px] text-app-secondary-60">
+              {formatDistance(order, currentMarketCap, tokenPriceSOL)}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              cancelLimitOrder(order.id);
+              showToast("Limit order cancelled", "error");
+            }}
+            className="text-error-alt-60 hover:text-error-alt text-[10px] font-mono transition-colors"
+          >
+            CANCEL
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+});
+ActiveLimitOrders.displayName = "ActiveLimitOrders";
+
 export const ActionsPage: React.FC<ActionsPageProps> = ({
   tokenAddress,
   setTokenAddress,
@@ -488,7 +564,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true); // Auto redirect to token after buy
 
   // Floating card state
-  const [isFloatingCardOpen, setIsFloatingCardOpen] = useState(false);
+  const [isFloatingCardOpen, setIsFloatingCardOpen] = useState(() => {
+    return localStorage.getItem("floatingCardOpen") === "true";
+  });
   // Calculate center position on mount - will be updated when card opens
   const [floatingCardPosition, setFloatingCardPosition] = useState(() => {
     // Start at center of viewport
@@ -569,60 +647,76 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
   }, []);
 
   const handleTradeSubmit = useCallback(
-    async (
+    (
       wallets: WalletType[],
       isBuyMode: boolean,
       dex?: string,
       buyAmount?: string,
       sellAmount?: string,
       tokenAddressParam?: string,
+      sellInputMode?: InputMode,
     ) => {
-      setIsLoading(true);
-
       // Use tokenAddressParam if provided, otherwise use the component's tokenAddress
       const tokenAddressToUse = tokenAddressParam || tokenAddress;
 
       if (!tokenAddressToUse) {
         showToast("Please select a token first", "error");
-        setIsLoading(false);
         return;
       }
 
-      try {
-        // Use the provided dex parameter if available, otherwise use selectedDex
-        const dexToUse = dex || selectedDex;
+      // Use the provided dex parameter if available, otherwise use selectedDex
+      const dexToUse = dex || selectedDex;
 
-        // Create trading config
-        const config = {
-          tokenAddress: tokenAddressToUse,
-          ...(isBuyMode
-            ? { solAmount: parseFloat(buyAmount || "0") }
-            : { sellPercent: parseFloat(sellAmount || "0") }),
-        };
+      // Create trading config
+      const config: { tokenAddress: string; solAmount?: number; sellPercent?: number; tokensAmount?: number | number[]; sellInputMode?: InputMode } = {
+        tokenAddress: tokenAddressToUse,
+      };
 
-        // Execute trade using centralized logic
-        const result = await executeTrade(
-          dexToUse,
-          wallets,
-          config,
-          isBuyMode,
-          baseCurrencyBalances,
-        );
-
-        if (result.success) {
-          showToast(`${isBuyMode ? "Buy" : "Sell"} successful`, "success");
+      if (isBuyMode) {
+        config.solAmount = parseFloat(buyAmount || "0");
+      } else if (sellInputMode) {
+        // Token amount mode — sellAmount is a token amount
+        const sellAmountNum = parseFloat(sellAmount || "0");
+        if (sellInputMode === "cumulative") {
+          // Distribute total proportionally among wallets by their token balance
+          const activeWallets = filterActiveWallets(wallets);
+          const totalBalance = activeWallets.reduce((sum, w) => sum + (tokenBalances.get(w.address) || 0), 0);
+          if (totalBalance > 0 && sellAmountNum > 0) {
+            config.tokensAmount = activeWallets.map(w => {
+              const balance = tokenBalances.get(w.address) || 0;
+              return sellAmountNum * (balance / totalBalance);
+            });
+          } else {
+            config.tokensAmount = sellAmountNum;
+          }
         } else {
-          showToast(result.error || `${isBuyMode ? "Buy" : "Sell"} failed`, "error");
+          // Per-wallet mode — each wallet sells this exact amount
+          config.tokensAmount = sellAmountNum;
         }
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        showToast(`Error: ${errorMessage}`, "error");
-      } finally {
-        setIsLoading(false);
+        config.sellInputMode = sellInputMode;
+      } else {
+        // Fallback: treat as percentage (from FloatingCard / multichart)
+        config.sellPercent = parseFloat(sellAmount || "0");
       }
+
+      setIsLoading(true);
+      void executeTrade(dexToUse, wallets, config, isBuyMode, baseCurrencyBalances, tokenBalances)
+        .then((result) => {
+          if (result.success) {
+            showToast(`${isBuyMode ? "Buy" : "Sell"} successful`, "success");
+          } else {
+            showToast(result.error || `${isBuyMode ? "Buy" : "Sell"} failed`, "error");
+          }
+        })
+        .catch((error: unknown) => {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          showToast(`Error: ${errorMessage}`, "error");
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     },
-    [tokenAddress, selectedDex, baseCurrencyBalances, showToast, setIsLoading],
+    [tokenAddress, selectedDex, baseCurrencyBalances, tokenBalances, showToast, setIsLoading],
   );
 
   // Wrapper for FloatingTradingCard's handleTradeSubmit signature
@@ -633,11 +727,21 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       dex?: string,
       buyAmount?: string,
       sellAmount?: string,
+      sellInputMode?: InputMode,
     ): void => {
-      // Fire and forget - FloatingTradingCard doesn't await the result
-      void handleTradeSubmit(wallets, isBuy, dex, buyAmount, sellAmount);
+      void handleTradeSubmit(wallets, isBuy, dex, buyAmount, sellAmount, undefined, sellInputMode);
     },
     [handleTradeSubmit],
+  );
+
+  // Limit order monitoring
+  useLimitOrderMonitor(
+    iframeData,
+    currentMarketCap,
+    wallets,
+    tokenAddress,
+    handleTradeSubmit,
+    showToast,
   );
 
   // Track last processed message to prevent duplicates
@@ -741,6 +845,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
       localStorage.setItem("quickBuyAmount", buyAmount);
     }
   }, [buyAmount]);
+
+  // Persist floating card open/closed state
+  useEffect(() => {
+    localStorage.setItem("floatingCardOpen", String(isFloatingCardOpen));
+  }, [isFloatingCardOpen]);
 
   // Send QUICKBUY_ACTIVATE to iframe when component loads without token set
   useEffect(() => {
@@ -941,6 +1050,11 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 tokenBalances={tokenBalances}
               />
               <LatestTrades tokenAddress={tokenAddress} />
+              <ActiveLimitOrders
+                tokenAddress={tokenAddress}
+                currentMarketCap={currentMarketCap}
+                solPrice={iframeData?.solPrice || null}
+              />
             </div>
           </div>
         )}
@@ -1032,7 +1146,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
 
       {/* Floating Trading Card */}
       <FloatingTradingCard
-        isOpen={isFloatingCardOpen}
+        isOpen={isFloatingCardOpen && !!tokenAddress}
         onClose={handleCloseFloating}
         position={floatingCardPosition}
         onPositionChange={setFloatingCardPosition}
@@ -1045,7 +1159,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         setBuyAmount={setBuyAmount}
         setSellAmount={setSellAmount}
         handleTradeSubmit={handleFloatingTradeSubmit}
-        isLoading={isLoading}
+        isLoading={false}
         countActiveWallets={countActiveWallets}
         baseCurrencyBalances={baseCurrencyBalances}
         tokenBalances={tokenBalances}

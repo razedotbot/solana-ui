@@ -1225,6 +1225,7 @@ export const WalletsPage: React.FC = () => {
               onCopyToClipboard={(text: string) => copyToClipboard(text, showToast)}
               onSaveCustomQuickMode={handleSaveCustomQuickMode}
               onMoveWalletToGroup={moveWalletToGroup}
+              onUpdateQuickMode={handleUpdateQuickMode}
             />
           </div>
 
@@ -1302,7 +1303,6 @@ export const WalletsPage: React.FC = () => {
                     onClose={() => setActiveModal(null)}
                     wallets={wallets}
                     baseCurrencyBalances={baseCurrencyBalances}
-                    connection={connection}
                     selectedWalletIds={selectedWallets}
                   />
                 )}

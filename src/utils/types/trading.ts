@@ -86,8 +86,8 @@ export interface SellConfig {
   tokenAddress: string;
   /** Percentage of tokens to sell (1-100) */
   sellPercent: number;
-  /** Specific amount of tokens to sell (alternative to percentage) */
-  tokensAmount?: number;
+  /** Specific amount of tokens to sell (alternative to percentage). Single number applies to all wallets; array is per-wallet. */
+  tokensAmount?: number | number[];
   /** Slippage tolerance in basis points (e.g., 100 = 1%) */
   slippageBps?: number;
   /** Output token mint (usually SOL) - mainly for Auto */
@@ -337,4 +337,27 @@ export interface QuickTradeResult {
     signature?: string;
     error?: string;
   }>;
+}
+
+// ============================================================================
+// Limit Order Types
+// ============================================================================
+
+export type LimitPriceMode = "marketCap" | "tokenPrice";
+export type LimitOrderStatus = "active" | "triggered" | "cancelled" | "failed";
+
+export interface LimitOrder {
+  id: string;
+  tokenAddress: string;
+  side: "buy" | "sell";
+  priceMode: LimitPriceMode;
+  targetPrice: number;
+  amount: number;
+  walletAddresses: string[];
+  createdAt: number;
+  status: LimitOrderStatus;
+  resolvedAt?: number;
+  error?: string;
+  solPriceAtCreation: number;
+  marketCapAtCreation: number | null;
 }

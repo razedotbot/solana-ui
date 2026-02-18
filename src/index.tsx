@@ -236,6 +236,7 @@ declare global {
     serverRegion: string;
     availableServers: ServerInfo[];
     switchServer: (serverId: string) => Promise<boolean>;
+    refreshServerPings?: () => Promise<void>;
   }
 }
 
@@ -557,7 +558,7 @@ export const Root = (): JSX.Element => {
   const checkServerConnection = async (url: string): Promise<boolean> => {
     try {
       const baseUrl = url.replace(/\/+$/, "");
-      const healthEndpoint = "/v2/health";
+      const healthEndpoint = "/health";
       const checkUrl = `${baseUrl}${healthEndpoint}`;
 
       const controller = new AbortController();
@@ -616,61 +617,15 @@ export const Root = (): JSX.Element => {
   // Initialize server connection
   useEffect((): void => {
     const initializeServer = async (): Promise<void> => {
-      const measurePing = async (url: string): Promise<number> => {
-        const startTime = Date.now();
-        try {
-          const baseUrl = url.replace(/\/+$/, "");
-          const healthEndpoint = "/v2/health";
-          const checkUrl = `${baseUrl}${healthEndpoint}`;
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout((): void => controller.abort(), 5000);
-
-          await fetch(checkUrl, {
-            signal: controller.signal,
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-            },
-          });
-
-          clearTimeout(timeoutId);
-          return Date.now() - startTime;
-        } catch {
-          return Infinity; // Return infinite ping if unreachable
-        }
-      };
-
-      const measureAveragePing = async (
-        url: string,
-        samples: number = 3,
-      ): Promise<number> => {
-        const pings: number[] = [];
-
-        for (let i = 0; i < samples; i++) {
-          const ping = await measurePing(url);
-          if (ping === Infinity) {
-            return Infinity; // If any ping fails, return Infinity
-          }
-          pings.push(ping);
-        }
-
-        // Calculate average of all ping measurements
-        const average =
-          pings.reduce((sum, ping) => sum + ping, 0) / pings.length;
-        return average;
-      };
-
-      // Discover all available servers
+      // Discover all available servers — reuse the health check response time as ping
       const allServersWithPing = await Promise.all(
         DEFAULT_REGIONAL_SERVERS.map(async (server): Promise<ServerInfo> => {
+          const startTime = Date.now();
           const isConnected = await checkServerConnection(server.url);
           if (!isConnected) {
             return { ...server, ping: Infinity };
           }
-
-          const ping = await measureAveragePing(server.url, 3);
-          return { ...server, ping };
+          return { ...server, ping: Date.now() - startTime };
         }),
       );
 
@@ -735,13 +690,32 @@ export const Root = (): JSX.Element => {
     void initializeServer();
   }, []);
 
-  // Expose server switching function globally for the App component
+  // Expose server switching and ping refresh functions globally
   useEffect((): void => {
     if (availableServers.length > 0) {
       window.availableServers = availableServers;
       window.switchServer = switchToServer;
     }
   }, [availableServers, switchToServer]);
+
+  useEffect((): (() => void) => {
+    const refreshPings = async (): Promise<void> => {
+      const allServersWithPing = await Promise.all(
+        DEFAULT_REGIONAL_SERVERS.map(async (server): Promise<ServerInfo> => {
+          const startTime = Date.now();
+          const isConnected = await checkServerConnection(server.url);
+          if (!isConnected) return { ...server, ping: Infinity };
+          return { ...server, ping: Date.now() - startTime };
+        }),
+      );
+      const sorted = allServersWithPing.sort((a, b) => a.ping! - b.ping!);
+      setAvailableServers(sorted);
+      window.availableServers = sorted;
+      window.dispatchEvent(new CustomEvent("serverChanged", { detail: {} }));
+    };
+    window.refreshServerPings = refreshPings;
+    return (): void => { delete window.refreshServerPings; };
+  }, []);
 
   // Preload App component (/holdings route) after server check completes for faster navigation
   useEffect((): (() => void) | void => {
@@ -769,34 +743,43 @@ export const Root = (): JSX.Element => {
               >
                 <IframeStateProvider>
                   <MultichartProvider>
-                    {serverUrl ? (
-                      <Suspense fallback={<ServerCheckLoading />}>
-                        <Routes>
-                          {/* Homepage */}
-                          <Route path="/" element={<Homepage />} />
+                    <Suspense fallback={<ServerCheckLoading />}>
+                      <Routes>
+                        {/* Always accessible, even in BRB mode */}
+                        <Route path="/wallets" element={<WalletsPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
 
-                          {/* Main app routes */}
-                          <Route path="/holdings" element={<App />} />
-                          <Route path="/monitor" element={<App />} />
-                          <Route path="/tokens/:tokenAddress" element={<App />} />
+                        {serverUrl ? (
+                          <>
+                            {/* Homepage */}
+                            <Route path="/" element={<Homepage />} />
 
-                          {/* Feature pages */}
-                          <Route path="/deploy" element={<DeployPage />} />
-                          <Route path="/wallets" element={<WalletsPage />} />
-                          <Route path="/settings" element={<SettingsPage />} />
+                            {/* Main app routes */}
+                            <Route path="/holdings" element={<App />} />
+                            <Route path="/monitor" element={<App />} />
+                            <Route path="/tokens/:tokenAddress" element={<App />} />
 
-                          {/* Fallback - redirect to homepage */}
-                          <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                      </Suspense>
-                    ) : (
-                      <BeRightBack
-                        onOpenWallets={() => (window.location.href = "/wallets")}
-                        onOpenSettings={() => {
-                          window.location.href = "/settings";
-                        }}
-                      />
-                    )}
+                            {/* Feature pages */}
+                            <Route path="/deploy" element={<DeployPage />} />
+
+                            {/* Fallback - redirect to homepage */}
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                          </>
+                        ) : (
+                          <Route
+                            path="*"
+                            element={
+                              <BeRightBack
+                                onOpenWallets={() => (window.location.href = "/wallets")}
+                                onOpenSettings={() => {
+                                  window.location.href = "/settings";
+                                }}
+                              />
+                            }
+                          />
+                        )}
+                      </Routes>
+                    </Suspense>
                   </MultichartProvider>
                 </IframeStateProvider>
               </AppContextProvider>

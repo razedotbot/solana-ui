@@ -278,6 +278,7 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
           config,
           isBuy,
           baseCurrencyBalances,
+          tokenBalances,
         );
 
         if (result.success) {
@@ -298,7 +299,7 @@ export const MultichartFrameContainer: React.FC<MultichartFrameContainerProps> =
         setIsTrading(false);
       }
     },
-    [tradingCardToken, selectedDex, buyAmount, sellAmount, baseCurrencyBalances, showToast],
+    [tradingCardToken, selectedDex, buyAmount, sellAmount, baseCurrencyBalances, tokenBalances, showToast],
   );
 
   const isDragging = dragIndex !== null;

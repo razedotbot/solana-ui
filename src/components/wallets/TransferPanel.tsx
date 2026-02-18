@@ -360,15 +360,18 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
 
           // Step 1: Request the transaction from the backend
           const baseUrl = getServerBaseUrl();
+          const transferBody: Record<string, unknown> = {
+            sender: selectedWalletObj.address,
+            receiver: transfer.recipient,
+            amount: transfer.amount,
+          };
+          if (transferType === "TOKEN" && selectedToken) {
+            transferBody["tokenAddress"] = selectedToken;
+          }
           const buildResponse = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_TRANSFER}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              senderPublicKey: selectedWalletObj.address,
-              receiver: transfer.recipient,
-              tokenAddress: transferType === "TOKEN" ? selectedToken : null,
-              amount: transfer.amount,
-            }),
+            body: JSON.stringify(transferBody),
           });
 
           if (!buildResponse.ok) {
@@ -378,15 +381,15 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           const buildResult = (await buildResponse.json()) as {
             success: boolean;
             error?: string;
-            data: { transaction: string };
+            transactions: string[];
           };
-          if (!buildResult.success) {
-            throw new Error(buildResult.error);
+          if (!buildResult.success || !buildResult.transactions?.[0]) {
+            throw new Error(buildResult.error ?? "No transaction returned");
           }
 
           // Step 2: Deserialize the transaction message from Base58
           const transactionBuffer = Buffer.from(
-            bs58.decode(buildResult.data.transaction),
+            bs58.decode(buildResult.transactions[0]),
           );
           const messageV0 = MessageV0.deserialize(transactionBuffer);
 
@@ -401,15 +404,9 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
 
           // Step 4: Send the signed transaction via Jito Bundle Service
           const serializedTransaction = bs58.encode(transaction.serialize());
-          const jitoResult = (await sendTransactions([
-            serializedTransaction,
-          ])) as {
-            signature?: string;
-            txid?: string;
-          };
+          const sendResult = await sendTransactions([serializedTransaction]);
 
-          const signature =
-            jitoResult.signature || jitoResult.txid || "Unknown";
+          const signature = sendResult.rpc ?? sendResult.jito ?? "Unknown";
 
           setTransferQueue((prev) =>
             prev.map((t, idx) =>

@@ -800,54 +800,115 @@ export interface PresetButtonProps {
   isMobile?: boolean;
 }
 
+// Resolve a preset value — if it's a range like "0.01-0.05", pick a random value in that range
+const resolvePresetValue = (value: string): string => {
+  const parts = value.split("-");
+  if (parts.length === 2) {
+    const min = parseFloat(parts[0]);
+    const max = parseFloat(parts[1]);
+    if (!isNaN(min) && !isNaN(max) && min < max) {
+      const random = min + Math.random() * (max - min);
+      // Match decimal precision of the more precise side
+      const decimals = Math.max(
+        (parts[0].split(".")[1] || "").length,
+        (parts[1].split(".")[1] || "").length,
+      );
+      return random.toFixed(decimals);
+    }
+  }
+  return value;
+};
+
+// Validate a preset value — accepts single numbers ("0.1") or ranges ("0.01-0.05")
+const isValidPresetValue = (val: string): boolean => {
+  const parts = val.split("-");
+  if (parts.length === 1) {
+    const num = parseFloat(val);
+    return !isNaN(num) && num > 0;
+  }
+  if (parts.length === 2) {
+    const min = parseFloat(parts[0]);
+    const max = parseFloat(parts[1]);
+    return !isNaN(min) && !isNaN(max) && min > 0 && max > min;
+  }
+  return false;
+};
+
 const PresetButtonInner = React.memo<PresetButtonProps>(
   ({ value, onExecute, onChange, isLoading, variant = "buy", isEditMode, isMobile = false }) => {
-    const [editValue, setEditValue] = useState(value);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const parsedRange = value.match(/^(\d+\.?\d*)-(\d+\.?\d*)$/);
+    const [minVal, setMinVal] = useState(() => parsedRange ? parsedRange[1] : value);
+    const [maxVal, setMaxVal] = useState(() => parsedRange ? parsedRange[2] : "");
+    const minRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-      setEditValue(value);
+      const m = value.match(/^(\d+\.?\d*)-(\d+\.?\d*)$/);
+      if (m) {
+        setMinVal(m[1]);
+        setMaxVal(m[2]);
+      } else {
+        setMinVal(value);
+        setMaxVal("");
+      }
     }, [value]);
 
     useEffect(() => {
-      if (isEditMode && inputRef.current) {
-        inputRef.current.focus();
+      if (isEditMode && minRef.current) {
+        minRef.current.focus();
       }
     }, [isEditMode]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-      if (e.key === "Enter") {
-        const newValue = parseFloat(editValue);
-        if (!isNaN(newValue) && newValue > 0) {
-          onChange(newValue.toString());
-        }
-      } else if (e.key === "Escape") {
-        setEditValue(value);
+    const commitEdit = (): void => {
+      const newValue = maxVal && parseFloat(maxVal) > 0
+        ? `${minVal}-${maxVal}`
+        : minVal;
+      if (isValidPresetValue(newValue)) {
+        onChange(newValue);
+      } else {
+        // Revert
+        const m = value.match(/^(\d+\.?\d*)-(\d+\.?\d*)$/);
+        if (m) { setMinVal(m[1]); setMaxVal(m[2]); }
+        else { setMinVal(value); setMaxVal(""); }
       }
     };
 
-    const handleBlur = (): void => {
-      const newValue = parseFloat(editValue);
-      if (!isNaN(newValue) && newValue > 0) {
-        onChange(newValue.toString());
-      } else {
-        setEditValue(value);
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+      if (e.key === "Enter") commitEdit();
+      else if (e.key === "Escape") {
+        const m = value.match(/^(\d+\.?\d*)-(\d+\.?\d*)$/);
+        if (m) { setMinVal(m[1]); setMaxVal(m[2]); }
+        else { setMinVal(value); setMaxVal(""); }
       }
     };
+
+    const filterNum = (v: string): string => v.replace(/[^0-9.]/g, "");
+
+    // Check if this preset is a range value (for display)
+    const rangeMatch = value.match(/^(\d+\.?\d*)-(\d+\.?\d*)$/);
 
     if (isEditMode) {
       return (
-        <div className="relative">
+        <div className="flex flex-col gap-0.5">
           <input
-            ref={inputRef}
+            ref={minRef}
             type="text"
-            value={editValue}
-            onChange={(e) =>
-              setEditValue(e.target.value.replace(/[^0-9.]/g, ""))
-            }
+            value={minVal}
+            onChange={(e) => setMinVal(filterNum(e.target.value))}
             onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
-            className="w-full h-8 px-2 text-xs font-mono rounded border text-center
+            onBlur={commitEdit}
+            placeholder="min"
+            className="w-full h-[18px] px-1 text-[10px] font-mono rounded-t border border-b-0 text-center
+                   bg-app-primary text-app-primary border-app-primary-color
+                   focus:outline-none focus:ring-1 focus:ring-app-primary-40"
+          />
+          <input
+            type="text"
+            value={maxVal}
+            onChange={(e) => setMaxVal(filterNum(e.target.value))}
+            onKeyDown={handleKeyDown}
+            onBlur={commitEdit}
+            placeholder="max"
+            className="w-full h-[18px] px-1 text-[10px] font-mono rounded-b border border-t-0 text-center
                    bg-app-primary text-app-primary border-app-primary-color
                    focus:outline-none focus:ring-1 focus:ring-app-primary-40"
           />
@@ -857,8 +918,7 @@ const PresetButtonInner = React.memo<PresetButtonProps>(
 
     return (
       <button
-        onClick={() => onExecute(value)}
-        disabled={isLoading}
+        onClick={() => onExecute(resolvePresetValue(value))}
         className={`relative group ${
           isMobile
             ? "px-3 py-3 md:px-2 md:py-1.5 text-sm md:text-xs"
@@ -869,7 +929,6 @@ const PresetButtonInner = React.memo<PresetButtonProps>(
                     ? "min-h-[48px] md:min-h-[32px] h-auto md:h-8"
                     : "h-8"
                 } flex items-center justify-center
-                disabled:opacity-50 disabled:cursor-not-allowed
                 ${
                   variant === "buy"
                     ? "bg-app-primary-60 border-app-primary-40 color-primary hover-bg-primary-20 hover-border-primary"
@@ -881,6 +940,8 @@ const PresetButtonInner = React.memo<PresetButtonProps>(
             <Loader2 size={10} className="animate-spin" />
             <span>{value}</span>
           </div>
+        ) : rangeMatch ? (
+          <span className="text-[10px]">{rangeMatch[1]}-{rangeMatch[2]}</span>
         ) : (
           value
         )}

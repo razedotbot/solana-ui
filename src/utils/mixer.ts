@@ -1,9 +1,9 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { SenderResult } from "./types";
-import { BASE_CURRENCIES, API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
+import { API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
 import { parseTransactionArray, type RawTransactionResponse } from "./transactionParsing";
-import { sendTransactions, getServerBaseUrl, checkRateLimit, resolveBaseCurrency, prepareTransactionBundles } from "./trading";
+import { sendTransactions, getServerBaseUrl, checkRateLimit, prepareTransactionBundles } from "./trading";
 
 interface WalletMixing {
   address: string;
@@ -18,23 +18,19 @@ interface WalletMixing {
  */
 const getPartiallySignedTransactions = async (
   senderAddress: string,
-  recipients: { address: string; amount: string }[],
-  baseCurrency: BaseCurrencyConfig = BASE_CURRENCIES.SOL,
+  receiverAddress: string,
+  amount: string,
 ): Promise<string[]> => {
   const baseUrl = getServerBaseUrl();
 
   const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_MIXER}`;
 
-  const isNativeSOL = baseCurrency.mint === BASE_CURRENCIES.SOL.mint;
   const requestBody: Record<string, unknown> = {
     sender: senderAddress,
-    recipients: recipients,
+    receiver: receiverAddress,
+    amount,
+    encoding: "base64",
   };
-
-  // Add token mint for non-native currencies
-  if (!isNativeSOL) {
-    requestBody["tokenMint"] = baseCurrency.mint;
-  }
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -112,24 +108,14 @@ const completeTransactionSigning = (
 export const mixBaseCurrencyToSingleRecipient = async (
   senderWallet: WalletMixing,
   recipientWallet: WalletMixing,
-  baseCurrency?: BaseCurrencyConfig,
+  _baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   try {
-    const currency = resolveBaseCurrency(baseCurrency);
-    // Convert single recipient wallet to backend format
-    const recipients = [
-      {
-        address: recipientWallet.address,
-        amount: recipientWallet.amount,
-      },
-    ];
-
     // Step 1: Get partially signed transactions from backend
-    // These transactions are already signed by dump wallets created on the backend
     const partiallySignedTransactions = await getPartiallySignedTransactions(
       senderWallet.address,
-      recipients,
-      currency,
+      recipientWallet.address,
+      recipientWallet.amount,
     );
     // Step 2: Create keypairs from private keys
     const senderKeypair = Keypair.fromSecretKey(
@@ -188,14 +174,13 @@ export const mixBaseCurrencyToSingleRecipient = async (
 export const mixBaseCurrency = async (
   senderWallet: WalletMixing,
   recipientWallets: WalletMixing[],
-  baseCurrency?: BaseCurrencyConfig,
+  _baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; result?: unknown; error?: string }> => {
   // If only one recipient, use the optimized single recipient function
   if (recipientWallets.length === 1) {
     return await mixBaseCurrencyToSingleRecipient(
       senderWallet,
       recipientWallets[0],
-      baseCurrency,
     );
   }
 
@@ -203,7 +188,6 @@ export const mixBaseCurrency = async (
   const batchResult = await batchMixBaseCurrency(
     senderWallet,
     recipientWallets,
-    baseCurrency,
   );
   return {
     success: batchResult.success,
@@ -311,10 +295,9 @@ export const validateMixingInputs = (
 export const batchMixBaseCurrency = async (
   senderWallet: WalletMixing,
   recipientWallets: WalletMixing[],
-  baseCurrency?: BaseCurrencyConfig,
+  _baseCurrency?: BaseCurrencyConfig,
 ): Promise<{ success: boolean; results?: unknown[]; error?: string }> => {
   try {
-    const currency = resolveBaseCurrency(baseCurrency);
     // Return early if no recipients
     if (recipientWallets.length === 0) {
       return { success: true, results: [] };
@@ -328,7 +311,6 @@ export const batchMixBaseCurrency = async (
       const result = await mixBaseCurrencyToSingleRecipient(
         senderWallet,
         recipientWallet,
-        currency,
       );
 
       if (!result.success) {

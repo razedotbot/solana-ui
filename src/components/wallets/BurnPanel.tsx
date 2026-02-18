@@ -15,12 +15,10 @@ import { useTokenMetadata } from "../../utils/hooks/useTokenMetadata";
 import { loadConfigFromCookies } from "../../utils/storage";
 import * as web3 from "@solana/web3.js";
 import bs58 from "bs58";
-import type { ApiResponse } from "../../utils/types";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
-import { BASE_CURRENCIES } from "../../utils/constants";
-import { sendTransactions } from "../../utils/trading";
-import type { WindowWithConfig } from "../../utils/trading";
+import { BASE_CURRENCIES, API_ENDPOINTS } from "../../utils/constants";
+import { sendTransactions, getServerBaseUrl } from "../../utils/trading";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
 import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
 
@@ -294,41 +292,34 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
       );
 
       // 1. Request unsigned transaction from backend
-      const baseUrl =
-        (window as WindowWithConfig).tradingServerUrl?.replace(/\/+$/, "") ||
-        "";
+      const baseUrl = getServerBaseUrl();
 
-      const prepareResponse = await fetch(`${baseUrl}/v2/sol/burn`, {
+      const prepareResponse = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_BURN}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          walletPublicKey: walletKeypair.publicKey.toString(),
+          wallet: walletKeypair.publicKey.toString(),
           tokenAddress: tokenAddress,
           amount: amount,
         }),
       });
 
       if (!prepareResponse.ok) {
-        const errorData = (await prepareResponse.json()) as ApiResponse;
-        throw new Error(
-          errorData.error || "Failed to prepare burn transaction"
-        );
+        throw new Error(`HTTP error! Status: ${prepareResponse.status}`);
       }
 
-      const prepareResult = (await prepareResponse.json()) as ApiResponse<{
-        transaction: string;
-      }>;
+      const prepareResult = (await prepareResponse.json()) as {
+        success: boolean;
+        error?: string;
+        transactions: string[];
+      };
 
-      if (!prepareResult.success || !prepareResult.data) {
+      if (!prepareResult.success || !prepareResult.transactions?.[0]) {
         throw new Error(prepareResult.error || "Failed to prepare transaction");
       }
 
-      // 2. Deserialize and sign the transaction (now expecting base58)
-      const transactionData = prepareResult.data;
-      if (!transactionData) {
-        throw new Error("No transaction data received");
-      }
-      const transactionBuffer = bs58.decode(transactionData.transaction); // Changed from base64 to base58
+      // 2. Deserialize and sign the transaction
+      const transactionBuffer = bs58.decode(prepareResult.transactions[0]);
 
       const transaction =
         web3.VersionedTransaction.deserialize(transactionBuffer);
