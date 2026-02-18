@@ -641,9 +641,9 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
     setIsFloatingCardOpen(false);
   }, []);
 
-  // Handler to open floating card
+  // Handler to toggle floating card
   const handleOpenFloating = useCallback(() => {
-    setIsFloatingCardOpen(true);
+    setIsFloatingCardOpen((prev) => !prev);
   }, []);
 
   const handleTradeSubmit = useCallback(

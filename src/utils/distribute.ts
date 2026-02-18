@@ -27,7 +27,6 @@ const getPartiallySignedTransactions = async (
   const requestBody: Record<string, unknown> = {
     sender: senderAddress,
     recipients,
-    encoding: "base64",
   };
 
   const response = await fetch(endpoint, {

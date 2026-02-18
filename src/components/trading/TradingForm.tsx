@@ -61,7 +61,6 @@ const TradingCard: React.FC<TradingCardProps> = ({
   tokenBalances,
   baseCurrency,
   onOpenFloating,
-  isFloatingCardOpen,
   solPrice,
 }) => {
   const { showToast } = useToast();
@@ -383,8 +382,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       </div>
 
       {/* Main Tabs */}
-      {!isFloatingCardOpen && (
-        <div className="flex bg-app-primary-60 border-b border-app-primary-20">
+      <div className="flex bg-app-primary-60 border-b border-app-primary-20">
           {/* Limit Orders History Button */}
           <button
             onClick={() => setShowLimitHistory(!showLimitHistory)}
@@ -444,7 +442,6 @@ const TradingCard: React.FC<TradingCardProps> = ({
             </button>
           </div>
         </div>
-      )}
 
       {/* Wallet Selector Popup - Rendered via Portal to escape overflow constraints */}
       {showWalletSelector &&
@@ -466,7 +463,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
 
 
       {/* Limit Orders History Panel */}
-      {showLimitHistory && !isFloatingCardOpen && (
+      {showLimitHistory && (
         <div className="border-b border-app-primary-20 bg-app-primary-60 max-h-48 overflow-y-auto">
           <div className="p-2 space-y-1">
             {limitOrders.length === 0 ? (
@@ -520,8 +517,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
       )}
 
       {/* Main Content */}
-      {!isFloatingCardOpen ? (
-        <div className="p-3 space-y-2">
+      <div className="p-3 space-y-2">
           {/* Amount Input and Submit Button Row */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -829,14 +825,7 @@ const TradingCard: React.FC<TradingCardProps> = ({
               </div>
             </>
           )}
-        </div>
-      ) : (
-        <div className="p-8 text-center">
-          <p className="text-app-secondary-60 text-sm font-mono tracking-wider">
-            TRADING INTERFACE IS OPEN IN FLOATING MODE
-          </p>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

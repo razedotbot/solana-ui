@@ -27,7 +27,6 @@ const getPartiallyPreparedTransactions = async (
     wallets: sourceAddresses,
     receiver: receiverAddress,
     percentage,
-    encoding: "base64",
   };
 
   const response = await fetch(endpoint, {
