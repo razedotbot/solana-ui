@@ -14,7 +14,6 @@ import type { Connection } from "@solana/web3.js";
 import {
   Keypair,
   VersionedTransaction,
-  MessageV0,
   PublicKey,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -24,7 +23,6 @@ import type { WalletType } from "../../utils/types";
 import { getWalletDisplayName, fetchTokenBalance } from "../../utils/wallet";
 import { loadConfigFromCookies } from "../../utils/storage";
 import { formatAddress, formatTokenBalance } from "../../utils/formatting";
-import { Buffer } from "buffer";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
 import { BASE_CURRENCIES, API_ENDPOINTS } from "../../utils/constants";
@@ -387,14 +385,10 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
             throw new Error(buildResult.error ?? "No transaction returned");
           }
 
-          // Step 2: Deserialize the transaction message from Base58
-          const transactionBuffer = Buffer.from(
+          // Step 2: Deserialize the versioned transaction from Base58
+          const transaction = VersionedTransaction.deserialize(
             bs58.decode(buildResult.transactions[0]),
           );
-          const messageV0 = MessageV0.deserialize(transactionBuffer);
-
-          // Step 3: Create and sign the versioned transaction
-          const transaction = new VersionedTransaction(messageV0);
 
           const keypair = Keypair.fromSecretKey(
             bs58.decode(transfer.sourceWallet),
