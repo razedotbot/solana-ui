@@ -62,24 +62,24 @@ const completeTransactionSigning = (
   senderKeypair: Keypair,
   recipientKeypairs: Map<string, Keypair>,
 ): string[] => {
+  const lastIndex = partiallySignedTransactionsBase58.length - 1;
   return partiallySignedTransactionsBase58.map((txBase58, index) => {
     // Deserialize transaction
     const txBuffer = bs58.decode(txBase58);
     const transaction = VersionedTransaction.deserialize(txBuffer);
-    // Determine which keypair to use based on transaction index
+    // Determine which keypair to use based on transaction position
     if (index === 0) {
       // First transaction: signed by depositor (sender)
       transaction.sign([senderKeypair]);
-    } else if (index === 1 && recipientKeypairs.size > 0) {
-      // Second transaction: signed by receiver (recipient)
-      const recipientKeypair = Array.from(recipientKeypairs.values())[0]; // Get the first (and should be only) recipient keypair
-      transaction.sign([recipientKeypair]);
+    } else if (index === lastIndex && recipientKeypairs.size > 0) {
+      // Last transaction: signed by both sender and receiver
+      const recipientKeypair = Array.from(recipientKeypairs.values())[0];
+      transaction.sign([senderKeypair, recipientKeypair]);
     } else {
-      // For any additional transactions, fall back to analyzing required signers
+      // Middle transactions: analyze required signers
       const message = transaction.message;
       const requiredSigners: Keypair[] = [];
 
-      // Check which accounts are required signers
       for (const accountKey of message.staticAccountKeys) {
         const pubkeyStr = accountKey.toBase58();
         if (pubkeyStr === senderKeypair.publicKey.toBase58()) {
@@ -90,7 +90,6 @@ const completeTransactionSigning = (
       }
 
       if (requiredSigners.length === 0) {
-        // Default to sender if no specific signers found
         requiredSigners.push(senderKeypair);
       }
       transaction.sign(requiredSigners);
