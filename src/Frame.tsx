@@ -210,6 +210,7 @@ interface NavigationCompleteResponse {
   tokenMint: string | null;
 }
 
+
 // Button component with animation
 const IconButton: React.FC<{
   icon: React.ReactNode;
@@ -261,6 +262,7 @@ export const Frame: React.FC<FrameProps> = ({
   const { getViewState, setViewState } = useIframeState();
   const previousViewRef = useRef<{ view: ViewType; tokenMint?: string } | null>(null);
   const lastNavigationSentRef = useRef<{ view: string; tokenMint?: string } | null>(null);
+  const isInitialNavigationRef = useRef(true);
   const quickBuyMessageSentRef = useRef(false);
 
   // Calculate iframe src ONCE on mount based on initial route
@@ -278,16 +280,18 @@ export const Frame: React.FC<FrameProps> = ({
         urlParams.set('tokenMint', tokenAddress);
         urlParams.set('view', 'simple');
       }
-      // No params = monitor view
+      // No token in multichart = monitor area; let iframe use its stored preference
     } else if (location.pathname === '/holdings') {
       urlParams.set('view', 'holdings');
     } else if (location.pathname.startsWith('/tokens/') && tokenAddressParam) {
+      urlParams.set('view', 'token');
       urlParams.set('tokenMint', tokenAddressParam);
     } else if (tokenAddress) {
       // Non-multichart mode with tokenAddress prop (e.g., single token view)
+      urlParams.set('view', 'token');
       urlParams.set('tokenMint', tokenAddress);
     }
-    // For monitor view, no additional params needed (will show homepage)
+    // For monitor/trending/tracker routes, don't set view — let iframe use its stored preference
 
     initialIframeSrc.current = `https://frame.raze.sh/sol/?${urlParams.toString()}`;
   }
@@ -490,8 +494,15 @@ export const Frame: React.FC<FrameProps> = ({
       targetTokenMint = undefined;
     }
 
+    // On initial ready, the iframe already loaded with the correct URL params.
+    // Just record the current target so subsequent route changes are detected.
+    if (isInitialNavigationRef.current) {
+      isInitialNavigationRef.current = false;
+      lastNavigationSentRef.current = { view: targetView, tokenMint: targetTokenMint };
+      return;
+    }
+
     // Check if we're sending the same navigation message as last time
-    // In multichart mode, always navigate when tokenAddress changes (even if lastSent matches)
     const lastSent = lastNavigationSentRef.current;
     const shouldSkip = lastSent &&
         lastSent.view === targetView &&
@@ -509,22 +520,15 @@ export const Frame: React.FC<FrameProps> = ({
     const timeoutId = setTimeout(() => {
       if (!iframeRef.current?.contentWindow) return;
 
-      // Send navigation message
-      if (targetView === 'holdings') {
+      // Send navigation message - always include view field
+      if (targetView === 'token' && targetTokenMint) {
         iframeRef.current.contentWindow.postMessage({
           type: 'NAVIGATE',
-          view: 'holdings',
-          wallets: walletData
-        }, '*');
-      } else if (targetView === 'token' && targetTokenMint) {
-        // In multichart mode, use simple view
-        iframeRef.current.contentWindow.postMessage({
-          type: 'NAVIGATE',
-          view: isMultichartMode ? 'simple' : 'token',
+          view: 'token',
           tokenMint: targetTokenMint,
-          wallets: walletData
+          wallets: walletData.map(w => w.address)
         }, '*');
-      } else {
+      } else if (targetView === 'monitor') {
         iframeRef.current.contentWindow.postMessage({
           type: 'NAVIGATE',
           view: 'monitor'
@@ -547,7 +551,9 @@ export const Frame: React.FC<FrameProps> = ({
       switch (event.data.type) {
         case 'IFRAME_READY': {
           setIsIframeReady(true);
-          // Navigation will be triggered by the navigation effect when isIframeReady becomes true
+          // Don't send NAVIGATE back — the iframe loaded with the correct URL params.
+          // The navigation effect will record the initial target and only send
+          // NAVIGATE on subsequent route changes.
           break;
         }
 
@@ -610,15 +616,17 @@ export const Frame: React.FC<FrameProps> = ({
         }
 
         case 'HOLDINGS_OPENED': {
-          // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
-          lastNavigationSentRef.current = null;
+          // The iframe already navigated. Update parent state only.
+          lastNavigationSentRef.current = { view: 'holdings', tokenMint: undefined };
           navigate('/holdings');
           break;
         }
 
         case 'TOKEN_CLEARED': {
-          // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
-          lastNavigationSentRef.current = null;
+          // The iframe already navigated away from the token view (user clicked
+          // Trending/Monitor/Tracker inside iframe). Update parent state only —
+          // do NOT send NAVIGATE back or it will override the iframe's current view.
+          lastNavigationSentRef.current = { view: 'monitor', tokenMint: undefined };
           navigate('/monitor');
           if (onTokenSelect) {
             onTokenSelect('');
@@ -651,8 +659,9 @@ export const Frame: React.FC<FrameProps> = ({
 
         case 'WALLETS_ADDED':
         case 'WALLETS_CLEARED':
+          break;
+
         case 'NAVIGATION_COMPLETE':
-          // These are acknowledgment messages, no action needed
           break;
 
         case 'ADD_WALLETS':
