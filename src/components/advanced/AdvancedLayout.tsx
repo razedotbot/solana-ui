@@ -40,83 +40,29 @@ const ActionsPage = lazy(() =>
   import("../../Actions").then((module) => ({ default: module.ActionsPage })),
 );
 
-// ViewModeDropdown Component
-const ViewModeDropdown: React.FC<{
+// ViewModeToggle Component
+const ViewModeToggle: React.FC<{
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
 }> = ({ viewMode, onViewModeChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const modes: { value: ViewMode; label: string }[] = [
-    { value: "simple", label: "SIMPLE" },
-    { value: "advanced", label: "ADVANCED" },
-  ];
-
-  const handleSelect = (mode: ViewMode): void => {
-    onViewModeChange(mode);
-    setIsOpen(false);
+  const handleToggle = (): void => {
+    onViewModeChange(viewMode === "simple" ? "advanced" : "simple");
   };
 
-  const currentLabel =
-    viewMode === "simple"
-      ? "SIMPLE"
-      : "ADVANCED";
-
   return (
-    <div className="relative z-40">
-      <button
-        onClick={(): void => setIsOpen(!isOpen)}
-        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
-      >
-        <Columns2
-          size={16}
-          className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
-        />
-        <span className="text-xs font-mono color-primary font-medium tracking-wider">
-          {currentLabel}
-        </span>
-        <ChevronDown
-          size={12}
-          className={`text-app-primary-40 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={(): void => setIsOpen(false)}
-          />
-          <div className="absolute top-full right-0 mt-1 w-36 z-50">
-            <div className="bg-app-secondary border border-app-primary-20 rounded overflow-hidden shadow-xl">
-              {modes.map((mode) => (
-                <button
-                  key={mode.value}
-                  onClick={() => handleSelect(mode.value)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-all duration-200 hover:bg-primary-05 ${
-                    viewMode === mode.value
-                      ? "bg-primary-10 color-primary"
-                      : "text-app-tertiary"
-                  }`}
-                >
-                  <Columns2
-                    size={14}
-                    className={
-                      viewMode === mode.value
-                        ? "color-primary"
-                        : "text-app-secondary-60"
-                    }
-                  />
-                  <span className="text-xs font-mono font-medium">
-                    {mode.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+    <button
+      onClick={handleToggle}
+      className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+      title={`Switch to ${viewMode === "simple" ? "Advanced" : "Simple"} mode`}
+    >
+      <Columns2
+        size={16}
+        className={`color-primary transition-opacity ${viewMode === "simple" ? "opacity-50" : "opacity-100"}`}
+      />
+      <span className="text-xs font-mono color-primary font-medium tracking-wider">
+        {viewMode === "simple" ? "SIMPLE" : "ADVANCED"}
+      </span>
+    </button>
   );
 };
 
@@ -556,7 +502,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
             <div className="flex items-center gap-2">
               {/* View Mode Dropdown - Hidden on mobile */}
               {!isMobile && (
-                <ViewModeDropdown
+                <ViewModeToggle
                   viewMode={viewMode}
                   onViewModeChange={onViewModeChange}
                 />
