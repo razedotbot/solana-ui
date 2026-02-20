@@ -54,7 +54,6 @@ interface FrameProps {
   quickBuyMinAmount?: number;
   quickBuyMaxAmount?: number;
   useQuickBuyRange?: boolean;
-  isMultichartMode?: boolean;
 }
 
 // Iframe communication types
@@ -248,7 +247,6 @@ export const Frame: React.FC<FrameProps> = ({
   quickBuyMinAmount: _quickBuyMinAmount = 0.01,
   quickBuyMaxAmount: _quickBuyMaxAmount = 0.05,
   useQuickBuyRange: _useQuickBuyRange = false,
-  isMultichartMode = false
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -273,21 +271,12 @@ export const Frame: React.FC<FrameProps> = ({
     urlParams.set('theme', brand.theme.name);
 
     // Determine the correct iframe params based on INITIAL route
-    // In multichart mode, start with monitor view (no params) - tokens are added via onTokenSelect
-    if (isMultichartMode) {
-      // Multichart mode - if we have a token, show simple view; otherwise show monitor
-      if (tokenAddress) {
-        urlParams.set('tokenMint', tokenAddress);
-        urlParams.set('view', 'simple');
-      }
-      // No token in multichart = monitor area; let iframe use its stored preference
-    } else if (location.pathname === '/holdings') {
+    if (location.pathname === '/holdings') {
       urlParams.set('view', 'holdings');
     } else if (location.pathname.startsWith('/tokens/') && tokenAddressParam) {
       urlParams.set('view', 'token');
       urlParams.set('tokenMint', tokenAddressParam);
     } else if (tokenAddress) {
-      // Non-multichart mode with tokenAddress prop (e.g., single token view)
       urlParams.set('view', 'token');
       urlParams.set('tokenMint', tokenAddress);
     }
@@ -352,11 +341,10 @@ export const Frame: React.FC<FrameProps> = ({
   }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, calculateMarketCap]);
 
   // Notify parent component of data updates
-  // Skip in multichart mode - not needed for basic chart display
   useEffect(() => {
-    if (isMultichartMode || !onDataUpdate) return;
+    if (!onDataUpdate) return;
     onDataUpdate(iframeDataObject);
-  }, [iframeDataObject, onDataUpdate, isMultichartMode]);
+  }, [iframeDataObject, onDataUpdate]);
 
   // Helper to send messages to iframe directly
   const sendMessageToIframe = useCallback((message: IframeMessage): void => {
@@ -366,12 +354,7 @@ export const Frame: React.FC<FrameProps> = ({
   }, []);
 
   // Determine current view and token mint - using stable primitives
-  // In multichart mode (when tokenAddress prop is provided), always treat as token view
   const currentViewType: ViewType = useMemo(() => {
-    // If tokenAddress prop is provided (multichart mode), always use 'token' view type
-    if (tokenAddress) {
-      return 'token';
-    }
     const pathname = location.pathname;
     if (pathname === '/holdings') {
       return 'holdings';
@@ -379,22 +362,16 @@ export const Frame: React.FC<FrameProps> = ({
       return 'token';
     }
     return 'monitor';
-  }, [location.pathname, tokenAddress]);
+  }, [location.pathname]);
 
   const currentTokenMint = useMemo(() => {
-    // In multichart mode, tokenAddress prop takes priority over URL param
-    // This ensures each Frame instance uses its own token address for caching
-    if (tokenAddress) return tokenAddress;
     if (tokenAddressParam) return tokenAddressParam;
     return undefined;
-  }, [tokenAddress, tokenAddressParam]);
+  }, [tokenAddressParam]);
 
   // Restore cached state when view changes (using primitive dependencies)
-  // Skip in multichart mode - Frame remounts with key so no caching needed
   // Only run when view or token actually changes, not on every render
   useEffect(() => {
-    if (isMultichartMode) return;
-
     const prevView = previousViewRef.current;
     const viewChanged = !prevView || prevView.view !== currentViewType || prevView.tokenMint !== currentTokenMint;
 
@@ -417,12 +394,10 @@ export const Frame: React.FC<FrameProps> = ({
       setRecentTrades([]);
       setTokenPrice(null);
     }
-  }, [currentViewType, currentTokenMint, getViewState, isMultichartMode]);
+  }, [currentViewType, currentTokenMint, getViewState]);
 
   // Save state to cache whenever it changes (using primitive dependencies)
-  // Skip in multichart mode - Frame remounts with key so no caching needed
   useEffect(() => {
-    if (isMultichartMode) return;
     // Don't save if there's nothing meaningful to save
     if (!tradingStats && !solPrice && !tokenPrice && currentWallets.length === 0 && recentTrades.length === 0) {
       return;
@@ -437,7 +412,7 @@ export const Frame: React.FC<FrameProps> = ({
       tokenPrice,
       marketCap,
     }, currentTokenMint);
-  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, currentViewType, currentTokenMint, calculateMarketCap, setViewState, isMultichartMode]);
+  }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, currentViewType, currentTokenMint, calculateMarketCap, setViewState]);
 
   // Memoize wallet data with labels for iframe communication
   const walletData = useMemo(() => {
@@ -460,21 +435,10 @@ export const Frame: React.FC<FrameProps> = ({
     const pathname = location.pathname;
 
     // Determine which view and token to use for postMessage navigation
-    // Priority: multichart mode (prop) > route params > tokenAddress prop > monitor/holdings routes
     let targetView: 'holdings' | 'token' | 'monitor';
     let targetTokenMint: string | undefined;
 
-    if (isMultichartMode) {
-      // Multichart mode - use simple view if we have a token, otherwise monitor
-      // tokenAddress prop is the source of truth in multichart mode
-      if (tokenAddress) {
-        targetView = 'token';
-        targetTokenMint = tokenAddress;
-      } else {
-        targetView = 'monitor';
-        targetTokenMint = undefined;
-      }
-    } else if (pathname === '/holdings') {
+    if (pathname === '/holdings') {
       targetView = 'holdings';
       targetTokenMint = undefined;
     } else if (pathname.startsWith('/tokens/') && tokenAddressParam) {
@@ -538,12 +502,12 @@ export const Frame: React.FC<FrameProps> = ({
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, tokenAddressParam, tokenAddress, isIframeReady, isMultichartMode]);
+  }, [location.pathname, tokenAddressParam, tokenAddress, isIframeReady]);
 
   // Setup iframe message listener
   useEffect(() => {
     const handleMessage = (event: MessageEvent<IframeMessage | IframeResponse>): void => {
-      // Only process messages from our own iframe to prevent cross-talk in multichart mode
+      // Only process messages from our own iframe
       if (iframeRef.current?.contentWindow && event.source !== iframeRef.current.contentWindow) {
         return;
       }
@@ -598,9 +562,8 @@ export const Frame: React.FC<FrameProps> = ({
             const selectedToken = event.data.tokenAddress;
             // Only navigate if we're not already on this token page
             // This prevents redirect loops when iframe confirms navigation
-            // In multichart mode, always allow selection (parent handles navigation)
-            const currentToken = tokenAddress || tokenAddressParam;
-            if (isMultichartMode || currentToken !== selectedToken) {
+            const currentToken = tokenAddressParam;
+            if (currentToken !== selectedToken) {
               // Clear the last navigation sent ref to ensure we send NAVIGATE back to iframe
               // This fixes the issue where selecting a token from iframe doesn't update iframe view
               lastNavigationSentRef.current = null;
@@ -677,7 +640,7 @@ export const Frame: React.FC<FrameProps> = ({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname, tokenAddressParam, isMultichartMode, tokenAddress]);
+  }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname, tokenAddressParam]);
 
   // Note: Wallet syncing is now handled in the navigation message
   // No separate wallet sync effect needed since NAVIGATE includes wallets

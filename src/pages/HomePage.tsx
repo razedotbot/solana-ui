@@ -19,8 +19,6 @@ import { PageBackground } from '../components/Styles';
 import { OnboardingTutorial } from '../components/OnboardingTutorial';
 import { createConnectionFromConfig } from '../utils/rpcManager';
 import { useTokenMetadata, prefetchTokenMetadata } from '../utils/hooks/useTokenMetadata';
-import { useMultichart } from '../contexts/MultichartContext';
-import { loadViewModeFromCookies } from '../utils/storage';
 
 interface NetworkStats {
   solPrice: string;
@@ -107,7 +105,6 @@ const RecentTokenCard: React.FC<{
 
 export const Homepage: React.FC = () => {
   const navigate = useNavigate();
-  const { tokens: multichartTokens, addToken: addMultichartToken } = useMultichart();
   const [recentTokens, setRecentTokens] = useState<RecentToken[]>([]);
   const [networkStats, setNetworkStats] = useState<NetworkStats>({
     solPrice: '--',
@@ -201,13 +198,7 @@ export const Homepage: React.FC = () => {
   };
 
   const handleNavigateToToken = (tokenAddress: string): void => {
-    const viewMode = loadViewModeFromCookies();
-    if (viewMode === 'multichart') {
-      addMultichartToken(tokenAddress);
-      navigate('/monitor');
-    } else {
-      navigate(`/tokens/${tokenAddress}`);
-    }
+    navigate(`/tokens/${tokenAddress}`);
   };
 
   const handleExploreChart = (): void => {
@@ -318,7 +309,6 @@ export const Homepage: React.FC = () => {
               {recentTokens.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {recentTokens
-                    .filter((token) => !multichartTokens.some((mt) => mt.address === token.address))
                     .slice(0, 12)
                     .map((token, index) => (
                     <RecentTokenCard

@@ -695,7 +695,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
         }
         config.sellInputMode = sellInputMode;
       } else {
-        // Fallback: treat as percentage (from FloatingCard / multichart)
+        // Fallback: treat as percentage (from FloatingCard)
         config.sellPercent = parseFloat(sellAmount || "0");
       }
 

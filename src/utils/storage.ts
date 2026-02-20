@@ -15,7 +15,6 @@ import type {
   WalletGroup,
 } from "./types";
 import { DEFAULT_GROUP_ID } from "./types";
-import type { MultichartToken } from "./types";
 
 export { STORAGE_KEYS };
 
@@ -303,7 +302,7 @@ export function loadQuickBuyPreferencesFromCookies(): QuickBuyPreferences | null
 
 // ============= UI Preferences =============
 
-export type ViewMode = "simple" | "advanced" | "multichart";
+export type ViewMode = "simple" | "advanced";
 
 /**
  * Save view mode to cookies.
@@ -324,8 +323,7 @@ export function loadViewModeFromCookies(): ViewMode {
     const savedMode = Cookies.get(STORAGE_KEYS.viewMode);
     if (
       savedMode === "simple" ||
-      savedMode === "advanced" ||
-      savedMode === "multichart"
+      savedMode === "advanced"
     ) {
       return savedMode;
     }
@@ -372,77 +370,3 @@ export function loadSplitSizesFromCookies(): number[] | null {
   return null;
 }
 
-// ============= Multichart Storage =============
-
-const MAX_MULTICHART_TOKENS = 8;
-
-/**
- * Save multichart tokens to localStorage.
- */
-export function saveMultichartTokens(tokens: MultichartToken[]): void {
-  try {
-    const tokensToSave = tokens.slice(0, MAX_MULTICHART_TOKENS);
-    localStorage.setItem(
-      STORAGE_KEYS.multichartTokens,
-      JSON.stringify(tokensToSave),
-    );
-  } catch {
-    // Intentionally ignored
-  }
-}
-
-/**
- * Load multichart tokens from localStorage.
- */
-export function loadMultichartTokens(): MultichartToken[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.multichartTokens);
-    if (stored) {
-      const tokens = JSON.parse(stored) as MultichartToken[];
-      if (Array.isArray(tokens)) {
-        return tokens.slice(0, MAX_MULTICHART_TOKENS);
-      }
-    }
-  } catch {
-    // Intentionally ignored
-  }
-  return [];
-}
-
-/**
- * Save active multichart token index to cookies.
- */
-export function saveMultichartActiveIndex(index: number): void {
-  try {
-    Cookies.set(STORAGE_KEYS.multichartActiveIndex, String(index), {
-      expires: 365,
-    });
-  } catch {
-    // Intentionally ignored
-  }
-}
-
-/**
- * Load active multichart token index from cookies.
- */
-export function loadMultichartActiveIndex(): number {
-  try {
-    const saved = Cookies.get(STORAGE_KEYS.multichartActiveIndex);
-    if (saved) {
-      const index = parseInt(saved, 10);
-      if (!isNaN(index) && index >= 0) {
-        return index;
-      }
-    }
-  } catch {
-    // Intentionally ignored
-  }
-  return 0;
-}
-
-/**
- * Get maximum number of multichart tokens allowed.
- */
-export function getMaxMultichartTokens(): number {
-  return MAX_MULTICHART_TOKENS;
-}

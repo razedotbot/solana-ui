@@ -1,11 +1,9 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle, RefreshCw, X, ExternalLink, LayoutGrid } from "lucide-react";
+import { CheckCircle, RefreshCw, X, ExternalLink } from "lucide-react";
 import type { PlatformType } from "../../utils/create";
 import type { DeploymentProgressItem, AdditionalToken } from "./constants";
 import { PlatformIcons, PLATFORMS } from "./constants";
-import { useMultichart } from "../../contexts/MultichartContext";
-import { useToast } from "../Notifications";
 
 interface MultiDeployModalProps {
   isSubmitting: boolean;
@@ -23,8 +21,6 @@ export const MultiDeployModal: React.FC<MultiDeployModalProps> = ({
   onReset,
 }) => {
   const navigate = useNavigate();
-  const { addToken } = useMultichart();
-  const { showToast } = useToast();
 
   // Get platform for deployment index (0 = primary, 1+ = additional tokens)
   const getPlatformForIndex = (index: number): PlatformType => {
@@ -35,34 +31,6 @@ export const MultiDeployModal: React.FC<MultiDeployModalProps> = ({
   const handleViewToken = (mintAddress: string): void => {
     navigate(`/tokens/${mintAddress}`);
   };
-
-  const handleAddToMultichart = (mintAddress: string): void => {
-    const added = addToken(mintAddress);
-    if (added) {
-      showToast("Added to multichart", "success");
-    } else {
-      showToast("Already in multichart", "success");
-    }
-  };
-
-  const handleAddAllToMultichart = (): void => {
-    const successfulMints = deploymentProgress
-      .filter((p) => p.status === "success" && p.mintAddress)
-      .map((p) => p.mintAddress as string);
-
-    let addedCount = 0;
-    successfulMints.forEach((mint) => {
-      if (addToken(mint)) addedCount++;
-    });
-
-    if (addedCount > 0) {
-      showToast(`Added ${addedCount} token${addedCount > 1 ? "s" : ""} to multichart`, "success");
-    } else {
-      showToast("All tokens already in multichart", "success");
-    }
-  };
-
-  const successCount = deploymentProgress.filter((p) => p.status === "success").length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -113,13 +81,6 @@ export const MultiDeployModal: React.FC<MultiDeployModalProps> = ({
                       <ExternalLink size={12} />
                       View
                     </button>
-                    <button
-                      onClick={() => handleAddToMultichart(item.mintAddress!)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-app-primary-color/20 hover:bg-app-primary-color/30 text-xs font-mono color-primary transition-colors"
-                    >
-                      <LayoutGrid size={12} />
-                      Multichart
-                    </button>
                   </div>
                 )}
               </div>
@@ -128,15 +89,6 @@ export const MultiDeployModal: React.FC<MultiDeployModalProps> = ({
         </div>
         {!isSubmitting && (
           <div className="mt-6 space-y-2">
-            {successCount > 1 && (
-              <button
-                onClick={handleAddAllToMultichart}
-                className="w-full py-2.5 rounded-xl bg-app-primary-color/20 border border-app-primary-color/30 text-sm font-mono font-bold color-primary hover:bg-app-primary-color/30 transition-all flex items-center justify-center gap-2"
-              >
-                <LayoutGrid size={16} />
-                Add All to Multichart ({successCount})
-              </button>
-            )}
             <button onClick={onReset} className="w-full py-3 rounded-xl bg-app-primary-color text-black font-mono font-bold hover:shadow-lg transition-all">
               DONE
             </button>

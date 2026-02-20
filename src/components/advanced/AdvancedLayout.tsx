@@ -50,7 +50,6 @@ const ViewModeDropdown: React.FC<{
   const modes: { value: ViewMode; label: string }[] = [
     { value: "simple", label: "SIMPLE" },
     { value: "advanced", label: "ADVANCED" },
-    { value: "multichart", label: "MULTICHART" },
   ];
 
   const handleSelect = (mode: ViewMode): void => {
@@ -61,9 +60,7 @@ const ViewModeDropdown: React.FC<{
   const currentLabel =
     viewMode === "simple"
       ? "SIMPLE"
-      : viewMode === "advanced"
-        ? "ADVANCED"
-        : "MULTI";
+      : "ADVANCED";
 
   return (
     <div className="relative z-40">

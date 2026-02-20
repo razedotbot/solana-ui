@@ -8,7 +8,6 @@ import { brand } from "./utils/constants";
 import type { WindowWithToast, ServerInfo } from "./utils/types";
 import { AppContextProvider } from "./contexts/AppContext";
 import { IframeStateProvider } from "./contexts/IframeStateContext";
-import { MultichartProvider } from "./contexts/MultichartContext";
 
 // Dynamic CSS loading based on brand configuration using Vite's import
 const loadBrandCSS = async (): Promise<void> => {
@@ -742,7 +741,6 @@ export const Root = (): JSX.Element => {
                 showToast={(window as WindowWithToast).showToast || (() => { })}
               >
                 <IframeStateProvider>
-                  <MultichartProvider>
                     <Suspense fallback={<ServerCheckLoading />}>
                       <Routes>
                         {/* Always accessible, even in BRB mode */}
@@ -780,7 +778,6 @@ export const Root = (): JSX.Element => {
                         )}
                       </Routes>
                     </Suspense>
-                  </MultichartProvider>
                 </IframeStateProvider>
               </AppContextProvider>
             </ToastWrapper>

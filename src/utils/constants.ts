@@ -161,10 +161,6 @@ export const STORAGE_KEYS = {
   encryptedWallets: "encrypted_wallets",
   encryptedMasterWallets: "encrypted_master_wallets",
 
-  // Multichart
-  multichartTokens: "multichart_tokens",
-  multichartActiveIndex: "multichartActiveIndex",
-
   // Wallet Groups
   walletGroups: "wallet_groups",
 

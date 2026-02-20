@@ -42,9 +42,7 @@ import { addRecentToken } from "./utils/recentTokens";
 import { useAppContext } from "./contexts/AppContext";
 import { useToast } from "./components/Notifications";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
-import { MultichartLayout } from "./components/multichart/MultichartLayout";
 import { AdvancedLayout } from "./components/advanced/AdvancedLayout";
-import { useMultichart } from "./contexts/MultichartContext";
 
 // Lazy loaded components
 const Frame = lazy(() =>
@@ -193,9 +191,6 @@ const WalletManager: React.FC = () => {
     setTokenBalances: setContextTokenBalances,
     baseCurrency: contextBaseCurrency,
   } = useAppContext();
-
-  // Multichart context for adding tokens when in multichart mode
-  const { addToken: addMultichartToken, tokens: multichartTokens, setActiveToken: setMultichartActiveToken } = useMultichart();
 
   // Toast notifications
   const { showToast } = useToast();
@@ -359,9 +354,6 @@ const WalletManager: React.FC = () => {
       // Switch to advanced: restore saved sizes
       setViewMode("advanced");
       setSplitSizes(savedAdvancedSizes);
-    } else if (viewMode === "advanced") {
-      // Switch to multichart
-      setViewMode("multichart");
     } else {
       // Switch back to simple: save current sizes and collapse left panel
       setSavedAdvancedSizes(splitSizes);
@@ -388,13 +380,6 @@ const WalletManager: React.FC = () => {
         // Restore saved sizes
         setViewMode("advanced");
         setSplitSizes(savedAdvancedSizes);
-      } else {
-        // Switch to multichart
-        if (viewMode === "advanced") {
-          setSavedAdvancedSizes(splitSizes);
-          saveSplitSizesToCookies(splitSizes);
-        }
-        setViewMode("multichart");
       }
     },
     [viewMode, splitSizes, savedAdvancedSizes],
@@ -643,14 +628,6 @@ const WalletManager: React.FC = () => {
       setCopiedAddress: (address: string | null): void =>
         dispatch({ type: "SET_COPIED_ADDRESS", payload: address }),
       setTokenAddress: (address: string): void => {
-        if (viewMode === "multichart" && address) {
-          const alreadyInList = multichartTokens.some(t => t.address === address);
-          if (!alreadyInList) {
-            addMultichartToken(address);
-          }
-          navigate("/monitor", { replace: true });
-          return;
-        }
         dispatch({ type: "SET_TOKEN_ADDRESS", payload: address });
         // Navigate to the new token route
         if (address) {
@@ -749,36 +726,15 @@ const WalletManager: React.FC = () => {
       setContextWallets,
       setContextBaseCurrencyBalances,
       setContextTokenBalances,
-      addMultichartToken,
-      multichartTokens,
-      viewMode,
     ],
   );
 
   // Update token address when route changes
-  // In multichart mode, add token to list and clear URL instead of setting single token
   useEffect(() => {
-    if (viewMode === "multichart" && tokenAddressParam) {
-      // Add token to multichart list if not already there
-      const alreadyInList = multichartTokens.some(t => t.address === tokenAddressParam);
-      if (!alreadyInList) {
-        addMultichartToken(tokenAddressParam);
-      } else {
-        // Token already exists - switch to it
-        const tokenIndex = multichartTokens.findIndex(t => t.address === tokenAddressParam);
-        if (tokenIndex >= 0) {
-          setMultichartActiveToken(tokenIndex);
-        }
-      }
-      // Navigate to monitor to show multichart view
-      navigate("/monitor", { replace: true });
-      return;
-    }
-
     if (tokenAddressParam !== state.tokenAddress) {
       dispatch({ type: "SET_TOKEN_ADDRESS", payload: tokenAddressParam || "" });
     }
-  }, [tokenAddressParam, state.tokenAddress, viewMode, multichartTokens, addMultichartToken, setMultichartActiveToken, navigate]);
+  }, [tokenAddressParam, state.tokenAddress]);
 
   // Track processed trades to avoid infinite loops
   const processedTradesRef = useRef<Set<string>>(new Set());
@@ -1104,21 +1060,6 @@ const WalletManager: React.FC = () => {
         {/* Desktop Layout - Only render when not mobile */}
         {!isMobile && (
           <div className="w-full h-full relative flex">
-            {viewMode === "multichart" ? (
-              <MultichartLayout
-                wallets={state.wallets}
-                setWallets={memoizedCallbacks.setWallets}
-                isLoadingChart={state.isLoadingChart}
-                handleRefresh={handleRefresh}
-                isRefreshing={state.isRefreshing}
-                baseCurrencyBalances={state.baseCurrencyBalances}
-                tokenBalances={state.tokenBalances}
-                onNonWhitelistedTrade={handleNonWhitelistedTrade}
-                viewMode={viewMode}
-                onViewModeChange={handleViewModeChange}
-                connection={state.connection}
-              />
-            ) : (
               <AdvancedLayout
                 wallets={state.wallets}
                 setWallets={memoizedCallbacks.setWallets}
@@ -1152,7 +1093,6 @@ const WalletManager: React.FC = () => {
                 isLoadingChart={state.isLoadingChart}
                 isMobile={isMobile}
               />
-            )}
           </div>
         )}
 
