@@ -244,6 +244,13 @@ const SERVER_REGION_COOKIE = "trading_server_region";
 
 const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
   {
+    id: "uk",
+    name: "United Kingdom",
+    url: "https://uk.raze.sh/",
+    region: "uk",
+    flag: "🇬🇧",
+  },
+  {
     id: "de",
     name: "Germany",
     url: "https://de.raze.sh/",
