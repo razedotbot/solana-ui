@@ -72,6 +72,8 @@ export const DeploysTab: React.FC<DeploysTabProps> = ({
       meteoraCPAMMConfigAddress: METEORA_CPAMM_CONFIGS.standard,
       meteoraCPAMMInitialLiquidity: "1",
       meteoraCPAMMInitialTokenPercent: "80",
+      tokenizedAgent: false,
+      tokenizedAgentBps: "500",
       useCustomWallets: false,
     }]);
   };
