@@ -3,6 +3,7 @@ import {
   Zap,
   Sparkles,
   Check,
+  Bot,
 } from "lucide-react";
 import type { PlatformType } from "../../utils/create";
 import { METEORA_DBC_CONFIGS, METEORA_CPAMM_CONFIGS } from "../../utils/create";
@@ -25,6 +26,10 @@ interface PlatformTabProps {
   setMeteoraCPAMMInitialLiquidity: (value: string) => void;
   meteoraCPAMMInitialTokenPercent: string;
   setMeteoraCPAMMInitialTokenPercent: (value: string) => void;
+  tokenizedAgent: boolean;
+  setTokenizedAgent: (value: boolean) => void;
+  tokenizedAgentBps: string;
+  setTokenizedAgentBps: (value: string) => void;
 }
 
 export const PlatformTab: React.FC<PlatformTabProps> = ({
@@ -44,6 +49,10 @@ export const PlatformTab: React.FC<PlatformTabProps> = ({
   setMeteoraCPAMMInitialLiquidity,
   meteoraCPAMMInitialTokenPercent,
   setMeteoraCPAMMInitialTokenPercent,
+  tokenizedAgent,
+  setTokenizedAgent,
+  tokenizedAgentBps,
+  setTokenizedAgentBps,
 }) => {
   return (
     <div className="space-y-6 animate-fade-in-down">
@@ -144,6 +153,49 @@ export const PlatformTab: React.FC<PlatformTabProps> = ({
                 <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${cashBack ? "left-5" : "left-0.5"}`} />
               </button>
             </div>
+            <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-app-primary-10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
+                  <Bot size={16} className="text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-app-primary font-mono">Tokenized Agent</p>
+                  <p className="text-[10px] text-app-secondary-40 font-mono">Auto buybacks from revenue</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTokenizedAgent(!tokenizedAgent)}
+                className={`relative w-11 h-6 rounded-full transition-all duration-300 ${
+                  tokenizedAgent ? "bg-app-primary-color" : "bg-app-quaternary border border-app-primary-30"
+                }`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${tokenizedAgent ? "left-5" : "left-0.5"}`} />
+              </button>
+            </div>
+            {tokenizedAgent && (
+              <div className="mt-3 pt-3 border-t border-app-primary-10">
+                <label className="text-[10px] text-app-secondary-40 font-mono uppercase mb-1.5 block">Buyback Rate (BPS)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={tokenizedAgentBps}
+                    onChange={(e) => {
+                      if (/^\d*$/.test(e.target.value)) {
+                        const val = parseInt(e.target.value);
+                        if (isNaN(val) || (val >= 0 && val <= 10000)) setTokenizedAgentBps(e.target.value);
+                      }
+                    }}
+                    placeholder="500"
+                    className="w-full bg-app-quaternary border border-app-primary-30 rounded-lg px-3 py-2 text-xs text-app-primary focus:border-app-primary-color focus:outline-none font-mono pr-12"
+                  />
+                  <span className="absolute right-3 top-2 text-[10px] text-app-secondary-40 font-mono">
+                    {tokenizedAgentBps ? `${(parseInt(tokenizedAgentBps) / 100).toFixed(1)}%` : "BPS"}
+                  </span>
+                </div>
+                <p className="text-[10px] text-app-secondary-40 font-mono mt-1">100 = 1%, 500 = 5%, 10000 = 100%</p>
+              </div>
+            )}
           </div>
         )}
 

@@ -51,6 +51,8 @@ export const DeployPage: React.FC = () => {
   // Platform options
   const [pumpType, setPumpType] = useState<boolean>(false);
   const [cashBack, setCashBack] = useState<boolean>(false);
+  const [tokenizedAgent, setTokenizedAgent] = useState<boolean>(false);
+  const [tokenizedAgentBps, setTokenizedAgentBps] = useState<string>("500");
   const [bonkType, setBonkType] = useState<"meme" | "tech">("meme");
   const [meteoraDBCConfigAddress, setMeteoraDBCConfigAddress] = useState(METEORA_DBC_CONFIGS.standard);
   const [meteoraCPAMMConfigAddress, setMeteoraCPAMMConfigAddress] = useState(METEORA_CPAMM_CONFIGS.standard);
@@ -146,6 +148,9 @@ export const DeployPage: React.FC = () => {
         pumpType: platform === "pumpfun" ? settings.pumpType : undefined,
         cashBack: platform === "pumpfun" ? settings.cashBack : undefined,
         pumpAdvanced: platform === "pumpfun" ? isAdv : undefined,
+        tokenizedAgent: platform === "pumpfun" && settings.tokenizedAgent
+          ? { buybackBps: parseInt(settings.tokenizedAgentBps || "500") || 500 }
+          : undefined,
         bonkType: platform === "bonk" ? settings.bonkType : undefined,
         bonkAdvanced: platform === "bonk" ? isAdv : undefined,
         bonkConfig: platform === "bonk" ? {} : undefined,
@@ -173,6 +178,8 @@ export const DeployPage: React.FC = () => {
         meteoraCPAMMConfigAddress,
         meteoraCPAMMInitialLiquidity,
         meteoraCPAMMInitialTokenPercent,
+        tokenizedAgent,
+        tokenizedAgentBps,
       };
 
       // Primary deployment + additional tokens
@@ -283,6 +290,10 @@ export const DeployPage: React.FC = () => {
             setMeteoraCPAMMInitialLiquidity={setMeteoraCPAMMInitialLiquidity}
             meteoraCPAMMInitialTokenPercent={meteoraCPAMMInitialTokenPercent}
             setMeteoraCPAMMInitialTokenPercent={setMeteoraCPAMMInitialTokenPercent}
+            tokenizedAgent={tokenizedAgent}
+            setTokenizedAgent={setTokenizedAgent}
+            tokenizedAgentBps={tokenizedAgentBps}
+            setTokenizedAgentBps={setTokenizedAgentBps}
           />
         );
       case "token":

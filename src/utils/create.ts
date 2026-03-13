@@ -49,12 +49,18 @@ export interface MeteoraCPAMMConfig {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface BonkConfig {}
 
+export interface TokenizedAgentConfig {
+  buybackBps: number;
+  agentAuthority?: string;
+}
+
 export interface CreateConfig {
   platform: PlatformType;
   token: TokenMetadata;
   pumpType?: boolean;
   cashBack?: boolean;
   pumpAdvanced?: boolean;
+  tokenizedAgent?: TokenizedAgentConfig;
   bonkType?: "meme" | "tech";
   bonkAdvanced?: boolean;
   bonkConfig?: BonkConfig;
@@ -241,6 +247,9 @@ const getPartiallyPreparedTransactions = async (
     }
     if (config.pumpAdvanced !== undefined) {
       requestBody["pumpAdvanced"] = config.pumpAdvanced;
+    }
+    if (config.tokenizedAgent) {
+      requestBody["tokenizedAgent"] = config.tokenizedAgent;
     }
   }
   if (config.platform === "bonk") {
@@ -744,6 +753,7 @@ export const createDeployConfig = (params: {
   pumpType?: boolean;
   cashBack?: boolean;
   pumpAdvanced?: boolean;
+  tokenizedAgent?: TokenizedAgentConfig;
   bonkType?: "meme" | "tech";
   meteoraDBCConfig?: MeteoraDBCConfig;
   meteoraCPAMMConfig?: MeteoraCPAMMConfig;
@@ -756,6 +766,7 @@ export const createDeployConfig = (params: {
     pumpType: params.pumpType,
     cashBack: params.cashBack,
     pumpAdvanced: params.pumpAdvanced,
+    tokenizedAgent: params.tokenizedAgent,
     bonkType: params.bonkType,
     bonkAdvanced: params.bonkAdvanced,
     bonkConfig: params.bonkConfig,

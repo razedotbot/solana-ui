@@ -30,6 +30,8 @@ export interface AdditionalToken {
   meteoraCPAMMConfigAddress: string;
   meteoraCPAMMInitialLiquidity: string;
   meteoraCPAMMInitialTokenPercent: string;
+  tokenizedAgent: boolean;
+  tokenizedAgentBps: string;
   // Per-token wallet configuration
   useCustomWallets?: boolean;
   wallets?: string[]; // private keys
