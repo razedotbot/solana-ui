@@ -117,6 +117,13 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
   const showToastRef = useRef(showToast);
   showToastRef.current = showToast;
 
+  // Refs for current balance maps — lets refreshBalances read latest values
+  // without listing them as deps (which would recreate the callback on every fetch)
+  const baseCurrencyBalancesRef = useRef(baseCurrencyBalances);
+  baseCurrencyBalancesRef.current = baseCurrencyBalances;
+  const tokenBalancesRef = useRef(tokenBalances);
+  tokenBalancesRef.current = tokenBalances;
+
   // Compute current base currency config
   const baseCurrency = useMemo<BaseCurrencyConfig>(() => {
     return (
@@ -230,44 +237,38 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     });
   }, []);
 
-  // Refresh balances
+  // Refresh balances.
+  // Balance maps are read via refs so they don't appear in deps — otherwise every
+  // completed fetch (which updates the maps) would recreate this callback, invalidate
+  // the context value useMemo, and force every AppContext consumer to re-render.
   const refreshBalances = useCallback(
     async (tokenAddress?: string) => {
       if (!rpcManager || wallets.length === 0) return;
 
       setIsRefreshing(true);
       try {
-        // Pass rpcManager directly to fetchWalletBalances so it can rotate endpoints for each wallet
         await fetchWalletBalances(
           rpcManager,
           wallets,
           tokenAddress || "",
           setBaseCurrencyBalancesWrapper,
           setTokenBalances,
-          baseCurrencyBalances,
-          tokenBalances,
+          baseCurrencyBalancesRef.current,
+          tokenBalancesRef.current,
           {
             onRateLimitError: () => {
-              showToast("RPC rate limit reached, falling back to slower mode", "error");
+              showToastRef.current("RPC rate limit reached, falling back to slower mode", "error");
             },
           },
           baseCurrency,
         );
       } catch {
-        showToast("Failed to refresh balances", "error");
+        showToastRef.current("Failed to refresh balances", "error");
       } finally {
         setIsRefreshing(false);
       }
     },
-    [
-      rpcManager,
-      wallets,
-      baseCurrencyBalances,
-      tokenBalances,
-      showToast,
-      setBaseCurrencyBalancesWrapper,
-      baseCurrency,
-    ],
+    [rpcManager, wallets, setBaseCurrencyBalancesWrapper, baseCurrency],
   );
 
   // Memoize context value

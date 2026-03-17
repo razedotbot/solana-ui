@@ -775,6 +775,17 @@ const WalletManager: React.FC = () => {
   // Track processed trades to avoid infinite loops
   const processedTradesRef = useRef<Set<string>>(new Set());
 
+  // Periodically clear processedTradesRef — it would otherwise grow unbounded
+  // (one entry per whitelisted trade, forever). Clear when it exceeds 500 entries.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (processedTradesRef.current.size > 500) {
+        processedTradesRef.current.clear();
+      }
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
+
   // Track previous token address to clear balances when switching tokens
   const previousTokenAddressRef = useRef<string>(state.tokenAddress);
 

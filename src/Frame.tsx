@@ -263,6 +263,11 @@ export const Frame: React.FC<FrameProps> = ({
   const isInitialNavigationRef = useRef(true);
   const quickBuyMessageSentRef = useRef(false);
 
+  // Throttle view-state cache writes — price ticks fire constantly but the cache
+  // only needs updating a few times per minute (it's for navigation restore, not live display)
+  const viewStateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingViewSaveRef = useRef<(() => void) | null>(null);
+
   // Calculate iframe src ONCE on mount based on initial route
   // After initial load, ALL navigation uses postMessage (no iframe reloads)
   const initialIframeSrc = useRef<string | null>(null);
@@ -396,23 +401,59 @@ export const Frame: React.FC<FrameProps> = ({
     }
   }, [currentViewType, currentTokenMint, getViewState]);
 
-  // Save state to cache whenever it changes (using primitive dependencies)
+  // Save state to cache — throttled to at most once every 3 seconds.
+  // The cache is only used to restore state when navigating back to a view,
+  // so sub-second accuracy is unnecessary. Throttling prevents a new Map
+  // allocation in IframeStateContext on every incoming price tick.
   useEffect(() => {
-    // Don't save if there's nothing meaningful to save
     if (!tradingStats && !solPrice && !tokenPrice && currentWallets.length === 0 && recentTrades.length === 0) {
       return;
     }
 
     const marketCap = calculateMarketCap(tokenPrice, solPrice);
-    setViewState(currentViewType, {
-      tradingStats,
-      solPrice,
-      currentWallets,
-      recentTrades,
-      tokenPrice,
-      marketCap,
-    }, currentTokenMint);
+    const save = (): void => {
+      setViewState(currentViewType, {
+        tradingStats,
+        solPrice,
+        currentWallets,
+        recentTrades,
+        tokenPrice,
+        marketCap,
+      }, currentTokenMint);
+    };
+
+    pendingViewSaveRef.current = save;
+
+    // Always save immediately when the view or token changes (flush stale pending save first)
+    if (
+      previousViewRef.current?.view !== currentViewType ||
+      previousViewRef.current?.tokenMint !== currentTokenMint
+    ) {
+      if (viewStateSaveTimerRef.current) {
+        clearTimeout(viewStateSaveTimerRef.current);
+        viewStateSaveTimerRef.current = null;
+      }
+      save();
+      return;
+    }
+
+    if (viewStateSaveTimerRef.current) return; // already scheduled
+    viewStateSaveTimerRef.current = setTimeout(() => {
+      viewStateSaveTimerRef.current = null;
+      pendingViewSaveRef.current?.();
+      pendingViewSaveRef.current = null;
+    }, 3000);
   }, [tradingStats, solPrice, currentWallets, recentTrades, tokenPrice, currentViewType, currentTokenMint, calculateMarketCap, setViewState]);
+
+  // Flush any pending cache write on unmount so state isn't lost on navigation
+  useEffect(() => () => {
+    if (viewStateSaveTimerRef.current) {
+      clearTimeout(viewStateSaveTimerRef.current);
+      viewStateSaveTimerRef.current = null;
+    }
+    pendingViewSaveRef.current?.();
+    pendingViewSaveRef.current = null;
+  }, []);
 
   // Memoize wallet data with labels for iframe communication
   const walletData = useMemo(() => {
