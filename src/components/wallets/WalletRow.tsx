@@ -120,11 +120,15 @@ export const WalletRow: React.FC<WalletRowProps> = ({
       const target = e.target as Node;
       if (rowRef.current?.contains(target)) return;
       if ((target as Element).closest?.("[data-wallet-dropdown]")) return;
-      closeAllDropdowns();
+      setShowMenu(false);
+      setShowCategoryPicker(false);
+      setShowGroupPicker(false);
+      setShowCustomEditor(false);
+      setCustomDraft(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  });
+  }, [anyDropdownOpen]);
 
   // Close dropdowns on any scroll
   useEffect(() => {
@@ -265,7 +269,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
       onDragOver={(e) => onDragOver(e, wallet.id)}
       onDragLeave={(e) => onDragLeave(e)}
       onDrop={(e) => onDrop(e, wallet.id)}
-      className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-2 border-b transition-all duration-150
+      className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-2 border-b transition-colors duration-150
         ${isSelected ? "bg-app-primary-color/5 border-app-primary-30" : "border-app-primary-10 hover:bg-app-secondary/20"}
         ${isDragging ? "opacity-40" : ""}
         ${isDragOver && !isDragging ? "bg-app-primary-color/8" : ""}
@@ -277,7 +281,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
             draggable
             onDragStart={(e) => onDragStart(e, wallet.id)}
             onDragEnd={onDragEnd}
-            className="hidden md:block cursor-grab active:cursor-grabbing p-1 -ml-1 rounded transition-all hover:bg-app-primary-color/10 active:bg-app-primary-color/20 hover:scale-110 active:scale-95"
+            className="hidden md:block cursor-grab active:cursor-grabbing p-1 -ml-1 rounded transition-colors hover:bg-app-primary-color/10 active:bg-app-primary-color/20"
           >
             <GripVertical size={14} className="text-app-secondary-40" />
           </div>
@@ -604,7 +608,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
                   closeAllDropdowns();
                   setShowGroupPicker(!showGroupPicker);
                 }}
-                className={`p-1.5 rounded-lg transition-all duration-150 ${
+                className={`p-1.5 rounded-lg transition-colors duration-150 ${
                   showGroupPicker
                     ? "bg-app-quaternary text-app-primary"
                     : "hover:bg-app-quaternary text-app-secondary-40"
@@ -666,7 +670,7 @@ export const WalletRow: React.FC<WalletRowProps> = ({
                 closeAllDropdowns();
                 setShowMenu(!showMenu);
               }}
-              className={`p-1.5 rounded-lg transition-all duration-150 ${
+              className={`p-1.5 rounded-lg transition-colors duration-150 ${
                 showMenu
                   ? "bg-app-quaternary text-app-primary"
                   : "hover:bg-app-quaternary text-app-secondary-40"

@@ -24,14 +24,14 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
         const active = isActive(path);
         
         if (isProminent) {
-            return `flex items-center gap-2 px-5 py-2.5 rounded-lg transition-all duration-300 font-mono text-sm font-bold tracking-wider uppercase
+            return `flex items-center gap-2 px-5 py-2.5 rounded-lg transition-colors duration-300 font-mono text-sm font-bold tracking-wider uppercase
                 ${active
                     ? 'bg-gradient-to-r from-app-primary-color to-app-primary-dark text-app-primary border border-app-primary shadow-[0_0_20px_rgba(2,179,109,0.5)] scale-105'
                     : 'bg-gradient-to-r from-primary-20 to-primary-30 text-app-primary border border-app-primary-60 shadow-[0_0_15px_rgba(2,179,109,0.3)] hover:shadow-[0_0_25px_rgba(2,179,109,0.5)] hover:scale-105 hover:border-app-primary'
                 }`;
         }
         
-        return `flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-mono text-sm font-medium tracking-wider uppercase
+        return `flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 font-mono text-sm font-medium tracking-wider uppercase
             ${active
                 ? 'bg-primary-20 text-app-primary border border-app-primary-40 shadow-[0_0_10px_rgba(2,179,109,0.2)]'
                 : 'text-app-secondary-60 hover:text-app-primary hover:bg-app-primary-80-alpha hover:border-app-primary-30 border border-transparent'
@@ -69,11 +69,11 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                     onClick={handleLogoClick}
                     className="flex items-center gap-3 group"
                 >
-                    <div className="relative p-1 overflow-hidden rounded-lg border border-app-primary-30 group-hover:border-app-primary-60 transition-all duration-300">
+                    <div className="relative p-1 overflow-hidden rounded-lg border border-app-primary-30 group-hover:border-app-primary-60 transition-colors duration-300">
                         <img
                             src="/logo.png"
                             alt={brand.altText}
-                            className="h-8 w-auto filter drop-shadow-[0_0_5px_var(--color-primary-40)] group-hover:drop-shadow-[0_0_8px_var(--color-primary-60)] transition-all"
+                            className="h-8 w-auto filter drop-shadow-[0_0_5px_var(--color-primary-40)] group-hover:drop-shadow-[0_0_8px_var(--color-primary-60)] transition-colors"
                         />
                     </div>
                 </button>
@@ -126,7 +126,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                         rel="noopener noreferrer"
                         aria-label={item.label}
                         title={item.label}
-                        className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-all duration-300"
+                        className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-colors duration-300"
                     >
                         {item.label === 'GitHub' && (
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -151,7 +151,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                     rel="noopener noreferrer"
                     aria-label="Docs"
                     title="Docs"
-                    className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-all duration-300"
+                    className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-colors duration-300"
                 >
                     <BookOpen size={18} />
                 </a>
@@ -163,11 +163,11 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                     onClick={handleLogoClick}
                     className="flex items-center gap-3 group"
                 >
-                    <div className="relative p-1 overflow-hidden rounded-lg border border-app-primary-30 group-hover:border-app-primary-60 transition-all duration-300">
+                    <div className="relative p-1 overflow-hidden rounded-lg border border-app-primary-30 group-hover:border-app-primary-60 transition-colors duration-300">
                         <img
                             src="/logo.png"
                             alt={brand.altText}
-                            className="h-8 w-auto filter drop-shadow-[0_0_5px_var(--color-primary-40)] group-hover:drop-shadow-[0_0_8px_var(--color-primary-60)] transition-all"
+                            className="h-8 w-auto filter drop-shadow-[0_0_5px_var(--color-primary-40)] group-hover:drop-shadow-[0_0_8px_var(--color-primary-60)] transition-colors"
                         />
                     </div>
                 </button>
@@ -217,7 +217,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                                 rel="noopener noreferrer"
                                 aria-label={item.label}
                                 title={item.label}
-                                className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-all duration-300"
+                                className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-colors duration-300"
                             >
                                 {item.label === 'GitHub' && (
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -242,7 +242,7 @@ export const HorizontalHeader: React.FC<HeaderProps> = () => {
                             rel="noopener noreferrer"
                             aria-label="Docs"
                             title="Docs"
-                            className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-all duration-300"
+                            className="flex items-center justify-center p-2 rounded-lg bg-app-secondary-80/50 border border-app-primary-20 hover:border-app-primary hover:bg-app-primary-10 text-app-secondary-60 hover:text-app-primary transition-colors duration-300"
                         >
                             <BookOpen size={18} />
                         </a>

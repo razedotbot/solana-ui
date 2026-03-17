@@ -793,6 +793,10 @@ model-viewer::part(default-ar-button) {
   background-color: rgba(2, 179, 109, 0.08);
 }
 
+.hover-bg-primary-08:hover {
+  background-color: rgba(2, 179, 109, 0.08);
+}
+
 .bg-primary-15 {
   background-color: rgba(2, 179, 109, 0.15);
 }

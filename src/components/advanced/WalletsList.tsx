@@ -50,8 +50,6 @@ interface WalletRowData {
   tokenAddress: string;
   solBalances: Map<string, number>;
   tokenBalances: Map<string, number>;
-  hoverRow: number | null;
-  setHoverRow: (id: number | null) => void;
   clickedWalletId: number | null;
   recentlyUpdatedWallets: Set<string>;
   copiedAddress: string | null;
@@ -92,8 +90,6 @@ const WalletRow = React.memo(
       tokenAddress,
       solBalances,
       tokenBalances,
-      hoverRow,
-      setHoverRow,
       clickedWalletId,
       recentlyUpdatedWallets,
       copiedAddress,
@@ -180,16 +176,13 @@ const WalletRow = React.memo(
       <div
         style={style}
         onClick={() => onWalletClick(wallet)}
-        onMouseEnter={() => setHoverRow(wallet.id)}
-        onMouseLeave={() => setHoverRow(null)}
         className={`
-          flex items-center border-b transition-all duration-300 cursor-pointer group text-sm
+          flex items-center border-b transition-colors duration-300 cursor-pointer group text-sm
           ${
             wallet.isActive
               ? "bg-primary-20 border-app-primary-60 border-l-4 border-l-primary shadow-lg shadow-primary-20"
-              : "border-app-primary-15 hover-border-primary-30"
+              : "border-app-primary-15 hover-border-primary-30 hover-bg-primary-08"
           }
-          ${hoverRow === wallet.id && !wallet.isActive ? "bg-primary-08 border-app-primary-30" : ""}
           ${recentlyUpdatedWallets.has(wallet.address) ? "border-l-2 border-l-success" : ""}
           ${clickedWalletId === wallet.id ? "animate-click" : ""}
         `}
@@ -216,7 +209,7 @@ const WalletRow = React.memo(
                     solBalance < minRequired + 0.01
                   }
                   className={`
-                    w-6 h-6 rounded-full transition-all duration-200 flex items-center justify-center
+                    w-6 h-6 rounded-full transition-colors duration-200 flex items-center justify-center
                     ${
                       !tokenAddress || solBalance < minRequired + 0.01
                         ? "bg-app-tertiary border border-app-primary-20 cursor-not-allowed opacity-50"
@@ -252,7 +245,7 @@ const WalletRow = React.memo(
           <div className="flex items-center">
             <Tooltip content="Click to copy" position="bottom">
               <span
-                className={`text-sm font-mono cursor-pointer transition-all duration-300 tracking-wide font-medium truncate
+                className={`text-sm font-mono cursor-pointer transition-colors duration-300 tracking-wide font-medium truncate
                   ${
                     wallet.isActive
                       ? "text-success drop-shadow-sm"
@@ -330,7 +323,7 @@ const WalletRow = React.memo(
                 tokenBalance <= 0
               }
               className={`
-                w-6 h-6 rounded-full transition-all duration-200 flex items-center justify-center
+                w-6 h-6 rounded-full transition-colors duration-200 flex items-center justify-center
                 ${
                   !tokenAddress || tokenBalance <= 0
                     ? "bg-app-tertiary border border-app-primary-20 cursor-not-allowed opacity-50"
@@ -483,7 +476,6 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
   categorySettings,
 }) => {
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-  const [hoverRow, setHoverRow] = useState<number | null>(null);
   const [buyingWalletId, setBuyingWalletId] = useState<number | null>(null);
   const [sellingWalletId, setSellingWalletId] = useState<number | null>(null);
   const [recentlyUpdatedWallets, setRecentlyUpdatedWallets] = useState<
@@ -1247,8 +1239,6 @@ export const WalletsListSidebar: React.FC<WalletsListSidebarProps> = ({
           tokenAddress={tokenAddress}
           solBalances={solBalances}
           tokenBalances={tokenBalances}
-          hoverRow={hoverRow}
-          setHoverRow={setHoverRow}
           clickedWalletId={clickedWalletId}
           recentlyUpdatedWallets={recentlyUpdatedWallets}
           copiedAddress={copiedAddress}

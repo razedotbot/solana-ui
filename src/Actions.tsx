@@ -108,7 +108,7 @@ const DataBox: React.FC<{
     <div className="mb-4">
       <div
         onClick={handleCurrencyToggle}
-        className="bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-app-primary-20 relative overflow-hidden cursor-pointer hover:border-app-primary-40 transition-all duration-300"
+        className="bg-gradient-to-br from-app-secondary-80 to-app-primary-dark-50 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-app-primary-20 relative overflow-hidden cursor-pointer hover:border-app-primary-40 transition-colors duration-300"
       >
         {/*  accent lines */}
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-app-primary-40 to-transparent"></div>
@@ -883,7 +883,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
             <div
               ref={activeWalletsRef}
               onClick={() => setShowWalletSelector(!showWalletSelector)}
-              className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden cursor-pointer hover:border-app-primary-60 transition-all duration-200"
+              className="bg-app-primary-60-alpha p-4 rounded-lg border border-app-primary-40 relative overflow-hidden cursor-pointer hover:border-app-primary-60 transition-colors duration-200"
               >
                 {/*  corner accents - smaller version */}
                 <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none opacity-60">
@@ -954,10 +954,10 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                   />
                   <div className="w-8 h-5 bg-app-secondary border border-app-primary-30 rounded-full
                                 peer-checked:bg-gradient-to-r peer-checked:from-success peer-checked:to-success-alt
-                                peer-checked:border-success transition-all duration-200
+                                peer-checked:border-success transition-colors duration-200
                                 peer-checked:shadow-md peer-checked:shadow-success-40"></div>
                   <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full
-                                transition-all duration-200 peer-checked:translate-x-3
+                                transition-transform duration-200 peer-checked:translate-x-3
                                 shadow-md peer-checked:shadow-lg"></div>
                 </div>
               </label>
@@ -1036,7 +1036,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                   className="flex items-center gap-2 px-3 py-2 rounded-lg
                             bg-gradient-to-r from-app-primary-color to-app-primary-dark hover-from-app-primary-dark hover-to-app-primary-color
                             shadow-md shadow-app-primary-40 hover-shadow-app-primary-60
-                            transition-all duration-300 relative overflow-hidden"
+                            transition-colors duration-300 relative overflow-hidden"
                 >
                   <ChartSpline size={16} className="text-black relative z-10" />
                   <span className="text-sm font-mono tracking-wider text-black font-medium relative z-10">
@@ -1066,7 +1066,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
           <div
             className="bg-gradient-to-br from-app-secondary-50 to-app-primary-dark-50 backdrop-blur-sm
                      rounded-xl p-4 relative overflow-hidden border border-app-primary-10
-                     hover-border-primary-30 transition-all duration-300"
+                     hover-border-primary-30 transition-colors duration-300"
           >
             {/* Header */}
             <div className="flex items-center mb-3">
@@ -1102,7 +1102,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 className="flex items-center justify-center py-2 px-4 rounded-lg bg-gradient-to-r
                          from-app-primary-color to-primary-90 text-black font-mono text-xs font-semibold
                          hover-from-primary-90 hover-to-app-primary-color
-                         transition-all duration-300 transform hover:scale-105"
+                         transition-colors duration-300"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -1124,7 +1124,7 @@ export const ActionsPage: React.FC<ActionsPageProps> = ({
                 className="flex items-center justify-center py-2 px-4 rounded-lg bg-gradient-to-r
                          from-app-primary-20 to-app-primary-10 border border-app-primary-30
                          hover-from-app-primary-30 hover-to-app-primary-20
-                         transition-all duration-300 transform hover:scale-105"
+                         transition-colors duration-300"
               >
                 <svg
                   viewBox="0 0 24 24"

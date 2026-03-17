@@ -150,7 +150,6 @@ const FloatingTradingCard: React.FC<FloatingTradingCardProps> = ({
   // Save presets to cookies whenever they change
   useEffect(() => {
     savePresetsToCookies(presetTabs, activeTabId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetTabs, activeTabId]);
 
   // Handle tab switching with cookie save

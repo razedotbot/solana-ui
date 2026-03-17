@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 /**
  * Limit Orders — client-side price monitoring with localStorage persistence.
  * Orders trigger when iframe price data crosses the user-defined threshold.

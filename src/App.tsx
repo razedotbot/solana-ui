@@ -75,7 +75,7 @@ const ToolsDropdown: React.FC = () => {
       <button
         id="nav-tools"
         onClick={(): void => setIsOpen(!isOpen)}
-        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover-border-primary-60 rounded transition-all duration-300"
+        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover-border-primary-60 rounded transition-colors duration-200"
       >
         <Wrench size={16} className="color-primary" />
         <span className="text-xs font-mono color-primary font-medium tracking-wider">
@@ -112,7 +112,7 @@ const ToolsDropdown: React.FC = () => {
                 {/* Wallets */}
                 <button
                   onClick={() => handleItemClick(() => navigate("/wallets"))}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <Wallet size={14} className="color-primary" />
@@ -123,7 +123,7 @@ const ToolsDropdown: React.FC = () => {
                 {/* Deploy */}
                 <button
                   onClick={() => handleItemClick(() => navigate("/deploy"))}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <Blocks size={14} className="color-primary" />
@@ -142,7 +142,7 @@ const ToolsDropdown: React.FC = () => {
                       ),
                     )
                   }
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <BookOpen size={14} className="color-primary" />
@@ -155,7 +155,7 @@ const ToolsDropdown: React.FC = () => {
                 {/* Settings */}
                 <button
                   onClick={() => handleItemClick(() => navigate("/settings"))}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <Settings size={14} className="color-primary" />
@@ -1198,7 +1198,7 @@ const WalletManager: React.FC = () => {
                         {!isMobile && (
                           <button
                             onClick={handleViewModeToggle}
-                            className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                            className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-200"
                             title={
                               viewMode === "simple"
                                 ? "Switch to Advanced mode"
@@ -1220,7 +1220,7 @@ const WalletManager: React.FC = () => {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => navigate("/wallets")}
-                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-200"
                               title="Wallets"
                             >
                               <Wallet size={14} className="color-primary" />
@@ -1230,7 +1230,7 @@ const WalletManager: React.FC = () => {
                             </button>
                             <button
                               onClick={() => navigate("/settings")}
-                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                              className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-200"
                               title="Settings"
                             >
                               <Settings size={14} className="color-primary" />

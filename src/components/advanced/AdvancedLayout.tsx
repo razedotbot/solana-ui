@@ -52,7 +52,7 @@ const ViewModeToggle: React.FC<{
   return (
     <button
       onClick={handleToggle}
-      className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+      className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-300"
       title={`Switch to ${viewMode === "simple" ? "Advanced" : "Simple"} mode`}
     >
       <Columns2
@@ -80,7 +80,7 @@ const ToolsDropdown: React.FC = () => {
       <button
         id="nav-tools"
         onClick={(): void => setIsOpen(!isOpen)}
-        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover-border-primary-60 rounded transition-all duration-300"
+        className="group relative flex items-center gap-2 px-3 py-2 bg-transparent border border-app-primary-20 hover-border-primary-60 rounded transition-colors duration-300"
       >
         <Wrench size={16} className="color-primary" />
         <span className="text-xs font-mono color-primary font-medium tracking-wider">
@@ -110,7 +110,7 @@ const ToolsDropdown: React.FC = () => {
               <div className="py-1">
                 <button
                   onClick={() => handleItemClick(() => navigate("/wallets"))}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <Wallet size={14} className="color-primary" />
@@ -120,7 +120,7 @@ const ToolsDropdown: React.FC = () => {
 
                 <button
                   onClick={() => handleItemClick(() => navigate("/deploy"))}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <Blocks size={14} className="color-primary" />
@@ -134,7 +134,7 @@ const ToolsDropdown: React.FC = () => {
                       window.open(brand.docsUrl, "_blank", "noopener,noreferrer"),
                     )
                   }
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <BookOpen size={14} className="color-primary" />
@@ -144,7 +144,7 @@ const ToolsDropdown: React.FC = () => {
 
                 <button
                   onClick={() => handleItemClick(() => navigate("/settings"))}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-200 hover:bg-primary-05 text-app-tertiary"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-200 hover:bg-primary-05 text-app-tertiary"
                 >
                   <div className="p-1.5 bg-gradient-to-br from-app-primary-20 to-app-primary-05 rounded">
                     <Settings size={14} className="color-primary" />
@@ -311,7 +311,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
         }}
       >
         {/* Left Column */}
-        <div className="backdrop-blur-sm bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col">
+        <div className="transform-gpu relative z-0 bg-app-primary-99 border-r border-app-primary-40 overflow-y-auto h-full flex flex-col">
           {/* Top Navigation - Left Column */}
           <nav className="sticky top-0 border-b border-app-primary-70 px-1 sm:px-2 md:px-4 py-1.5 sm:py-2 backdrop-blur-sm bg-app-primary-99 z-30">
             <div className="flex items-center gap-1 sm:gap-2 md:gap-3 justify-between">
@@ -319,12 +319,12 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
               <div className="relative flex items-center bg-app-quaternary rounded-lg p-0.5 border border-app-primary-20">
                 {/* Sliding indicator */}
                 <div
-                  className="absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-gradient-to-r from-app-primary-color/20 to-app-primary-color/10 rounded-md border border-app-primary-color/40 transition-all duration-300 ease-out"
+                  className="absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-gradient-to-r from-app-primary-color/20 to-app-primary-color/10 rounded-md border border-app-primary-color/40 transition-[left] duration-300 ease-out"
                   style={{ left: leftColumnView === "wallets" ? "2px" : "calc(50% + 0px)" }}
                 />
                 <button
                   onClick={() => setLeftColumnView("wallets")}
-                  className={`relative z-10 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all duration-300 ${
+                  className={`relative z-10 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors duration-300 ${
                     leftColumnView === "wallets"
                       ? "color-primary"
                       : "text-app-secondary-40 hover:text-app-secondary-60"
@@ -340,7 +340,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                 </button>
                 <button
                   onClick={() => setLeftColumnView("deploy")}
-                  className={`relative z-10 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all duration-300 ${
+                  className={`relative z-10 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors duration-300 ${
                     leftColumnView === "deploy"
                       ? "color-primary"
                       : "text-app-secondary-40 hover:text-app-secondary-60"
@@ -367,7 +367,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                   <button
                     onClick={handleRefresh}
                     disabled={isRefreshing || !connection}
-                    className="flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Refresh wallet balances"
                   >
                     <RefreshCw
@@ -455,7 +455,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
         </div>
 
         {/* Middle Column */}
-        <div className="backdrop-blur-sm bg-app-primary-99 border-l border-r border-app-primary-40 overflow-y-auto">
+        <div className="transform-gpu relative z-0 bg-app-primary-99 border-l border-r border-app-primary-40 overflow-y-auto">
           <Frame
             isLoadingChart={isLoadingChart}
             tokenAddress={tokenAddress}
@@ -477,7 +477,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
 
       {/* Right Column - Fixed Width */}
       <div
-        className="backdrop-blur-sm bg-app-primary-99 overflow-hidden relative flex flex-col"
+        className="transform-gpu relative z-0 bg-app-primary-99 overflow-hidden flex flex-col"
         style={{
           width: "350px",
           minWidth: "350px",
@@ -513,7 +513,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => navigate("/wallets")}
-                    className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                    className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-300"
                     title="Wallets"
                   >
                     <Wallet size={14} className="color-primary" />
@@ -521,7 +521,7 @@ export const AdvancedLayout: React.FC<AdvancedLayoutProps> = ({
                   </button>
                   <button
                     onClick={() => navigate("/settings")}
-                    className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+                    className="flex items-center gap-1 px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-300"
                     title="Settings"
                   >
                     <Settings size={14} className="color-primary" />

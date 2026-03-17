@@ -168,7 +168,6 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     } catch {
       // RPC endpoints parse error, ignore
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update RPC manager and connection when endpoints change

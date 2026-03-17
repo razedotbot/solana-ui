@@ -181,7 +181,7 @@ export const QuickModeButtons: React.FC<{
                 onClick={() => {
                   setExpandedCategory(isExpanded ? null : category);
                 }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md border transition-all duration-200
+                className={`flex items-center gap-1 px-2 py-1 rounded-md border transition-colors duration-200
                   ${styles.bg} ${styles.border} ${styles.hoverBg}
                   ${isExpanded ? "ring-1 ring-current" : ""}`}
               >
@@ -348,7 +348,7 @@ export const QuickModeDropdown: React.FC<{
         onClick={() => setIsOpen(!isOpen)}
         className={compact
           ? `p-0.5 rounded transition-colors ${isOpen ? "text-app-primary" : "text-app-secondary-40 hover:text-app-primary"} hover:bg-app-primary-10`
-          : `flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300 ${isOpen ? "border-primary-60" : ""}`}
+          : `flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-300 ${isOpen ? "border-primary-60" : ""}`}
         title="Quick Trade Settings"
       >
         <Zap size={compact ? 11 : 14} className={compact ? "inherit" : "color-primary"} />
@@ -369,7 +369,7 @@ export const QuickModeDropdown: React.FC<{
                 <button
                   key={category}
                   onClick={() => setActiveTab(category)}
-                  className={`flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase transition-all duration-200 ${
+                  className={`flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase transition-colors duration-200 ${
                     isActive
                       ? `${tabStyles.bg} ${tabStyles.text} border-b-2 ${tabStyles.border}`
                       : "text-app-secondary-40 hover:text-app-secondary-60 hover:bg-app-primary-60"
@@ -435,14 +435,14 @@ export const QuickModeDropdown: React.FC<{
                   <div key={preset.id} className="group flex items-center gap-0.5">
                     <button
                       onClick={() => handleLoadPreset(preset)}
-                      className="px-2 py-0.5 text-[10px] font-mono bg-app-quaternary border border-app-primary-20 rounded-l hover:border-primary-60 hover:bg-primary-05 text-app-secondary-60 hover:text-app-primary transition-all"
+                      className="px-2 py-0.5 text-[10px] font-mono bg-app-quaternary border border-app-primary-20 rounded-l hover:border-primary-60 hover:bg-primary-05 text-app-secondary-60 hover:text-app-primary transition-colors"
                       title={`Load "${preset.name}"`}
                     >
                       {preset.name}
                     </button>
                     <button
                       onClick={() => handleDeletePreset(preset.id)}
-                      className="px-1 py-0.5 text-[10px] bg-app-quaternary border border-l-0 border-app-primary-20 rounded-r text-app-secondary-40 hover:text-rose-400 hover:border-rose-500/30 transition-all"
+                      className="px-1 py-0.5 text-[10px] bg-app-quaternary border border-l-0 border-app-primary-20 rounded-r text-app-secondary-40 hover:text-rose-400 hover:border-rose-500/30 transition-colors"
                       title="Delete preset"
                     >
                       <X size={8} />
@@ -524,7 +524,7 @@ export const WalletsHeader: React.FC<WalletsHeaderProps> = ({
         {/* Import */}
         <button
           onClick={onImportWallet}
-          className="flex items-center justify-center gap-1.5 px-3 2xl:px-4 h-full rounded-lg text-sm font-medium bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-30 text-app-primary transition-all"
+          className="flex items-center justify-center gap-1.5 px-3 2xl:px-4 h-full rounded-lg text-sm font-medium bg-app-quaternary hover:bg-app-tertiary border border-app-primary-20 hover:border-app-primary-30 text-app-primary transition-colors"
           title="Import Wallet"
         >
           <Key size={16} />
@@ -573,7 +573,7 @@ export const GroupSelector: React.FC<GroupSelectorProps> = ({
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-all duration-300"
+        className="relative flex items-center justify-center px-2 py-1.5 bg-transparent border border-app-primary-20 hover:border-primary-60 rounded transition-colors duration-300"
         title={activeGroupId === "all" ? "All Groups" : activeGroup?.name || "All Groups"}
       >
         <Layers size={14} className="color-primary" />
