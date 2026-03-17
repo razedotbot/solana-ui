@@ -151,10 +151,23 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    this.setState({
-      error,
-      errorInfo
-    });
+    this.setState({ error, errorInfo });
+
+    // Chunk load failures happen when the browser has a stale index.html that
+    // references old content-hashed chunks that no longer exist on the server.
+    // Auto-reload once to pick up the fresh index.html and new chunk URLs.
+    const isChunkLoadError =
+      error.message?.includes("Failed to fetch dynamically imported module") ||
+      error.message?.includes("Importing a module script failed") ||
+      error.message?.includes("Failed to load module script") ||
+      error.message?.includes("error loading dynamically imported module") ||
+      error.name === "ChunkLoadError";
+
+    const RELOAD_FLAG = "chunk_reload_attempted";
+    if (isChunkLoadError && !sessionStorage.getItem(RELOAD_FLAG)) {
+      sessionStorage.setItem(RELOAD_FLAG, "1");
+      window.location.reload();
+    }
   }
 
   resetError = (): void => {
