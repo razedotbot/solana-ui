@@ -975,6 +975,12 @@ const WalletManager: React.FC = () => {
     }
   }, [contextConnection, state.connection, memoizedCallbacks]);
 
+  useEffect(() => {
+    if (contextWallets !== state.wallets) {
+      dispatch({ type: "SET_WALLETS", payload: contextWallets });
+    }
+  }, [contextWallets, state.wallets]);
+
   // Create a stable wallet identifier that only changes when wallet addresses change (not selection)
   const walletAddresses = useMemo(
     () =>
