@@ -60,3 +60,4 @@ shrinkwrap.yaml
 /.kiro
 /.vercel
 .claude/settings.local.json
+CLAUDE.md

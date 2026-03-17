@@ -729,6 +729,42 @@ const WalletManager: React.FC = () => {
     ],
   );
 
+  // Throttled iframe data handler.
+  // Price ticks (TOKEN_PRICE_UPDATE, SOL_PRICE_UPDATE) can arrive many times per second.
+  // Dispatching to the reducer on every tick causes a full App re-render each time.
+  // Strategy: dispatch immediately when new trades arrive; throttle price-only updates to 2s.
+  const handleIframeData = useCallback((data: IframeData | null): void => {
+    iframeDataRef.current = data;
+
+    const firstTrade = data?.recentTrades?.[0];
+    const firstTradeKey = firstTrade
+      ? `${firstTrade.signature}-${firstTrade.timestamp}`
+      : "";
+
+    if (firstTradeKey !== lastIframeTradeKeyRef.current) {
+      // New trade arrived — dispatch immediately and cancel any pending throttle
+      lastIframeTradeKeyRef.current = firstTradeKey;
+      if (iframeDataTimerRef.current) {
+        clearTimeout(iframeDataTimerRef.current);
+        iframeDataTimerRef.current = null;
+      }
+      dispatch({ type: "SET_IFRAME_DATA", payload: data });
+      return;
+    }
+
+    // Price-only update — throttle: skip if a dispatch is already scheduled
+    if (iframeDataTimerRef.current) return;
+    iframeDataTimerRef.current = setTimeout(() => {
+      iframeDataTimerRef.current = null;
+      dispatch({ type: "SET_IFRAME_DATA", payload: iframeDataRef.current });
+    }, 2000);
+  }, []); // dispatch is stable from useReducer; refs never need to be deps
+
+  // Cleanup throttle timer on unmount
+  useEffect(() => () => {
+    if (iframeDataTimerRef.current) clearTimeout(iframeDataTimerRef.current);
+  }, []);
+
   // Update token address when route changes
   useEffect(() => {
     if (tokenAddressParam !== state.tokenAddress) {
@@ -741,6 +777,11 @@ const WalletManager: React.FC = () => {
 
   // Track previous token address to clear balances when switching tokens
   const previousTokenAddressRef = useRef<string>(state.tokenAddress);
+
+  // Refs for throttling iframe data dispatches — price ticks can fire many times/second
+  const iframeDataRef = useRef<IframeData | null>(null);
+  const iframeDataTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastIframeTradeKeyRef = useRef<string>("");
 
   // Monitor iframe data for whitelist trades and update wallet balances
   useEffect(() => {
@@ -805,12 +846,13 @@ const WalletManager: React.FC = () => {
     }
   }, [state.iframeData?.marketCap, memoizedCallbacks]);
 
-  // Track token views in recent tokens
+  // Track token views in recent tokens — only when the token address changes,
+  // not on every iframe data update (price ticks were causing localStorage writes every second)
   useEffect(() => {
-    if (state.tokenAddress && state.iframeData) {
+    if (state.tokenAddress) {
       addRecentToken(state.tokenAddress);
     }
-  }, [state.tokenAddress, state.iframeData]);
+  }, [state.tokenAddress]);
 
   // Initialize app on mount - load quick buy preferences
   useEffect(() => {
@@ -1107,7 +1149,7 @@ const WalletManager: React.FC = () => {
                   isLoadingChart={state.isLoadingChart}
                   tokenAddress={state.tokenAddress}
                   wallets={state.wallets}
-                  onDataUpdate={memoizedCallbacks.setIframeData}
+                  onDataUpdate={handleIframeData}
                   onTokenSelect={memoizedCallbacks.setTokenAddress}
                   onNonWhitelistedTrade={handleNonWhitelistedTrade}
                   quickBuyEnabled={state.quickBuyEnabled}
