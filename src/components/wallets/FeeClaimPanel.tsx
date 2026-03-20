@@ -12,8 +12,8 @@ import {
 import bs58 from "bs58";
 import { useToast } from "../Notifications";
 import type { WalletType } from "../../utils/types";
-import { sendTransactions, getServerBaseUrl } from "../../utils/trading";
-import { API_ENDPOINTS } from "../../utils/constants";
+import { sendTransactions } from "../../utils/trading";
+import { API_ENDPOINTS, API_URLS } from "../../utils/constants";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary } from "./PanelShared";
 
 // ─── Platform registry (add new platforms here) ───────────────────────────
@@ -115,7 +115,6 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
 
   const sendFeeClaimForWallet = async (wallet: WalletType): Promise<void> => {
     const keypair = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-    const baseUrl = getServerBaseUrl();
 
     const requestBody: Record<string, unknown> = {
       platform: selectedPlatform,
@@ -129,7 +128,7 @@ export const FeeClaimPanel: React.FC<FeeClaimPanelProps> = ({
       requestBody["maxQuoteAmount"] = meteoraMaxQuoteAmount;
     }
 
-    const response = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_FEE_CLAIM}`, {
+    const response = await fetch(`${API_URLS.RAZE_PUBLIC}${API_ENDPOINTS.SOL_FEE_CLAIM}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),

@@ -1,8 +1,8 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { SenderResult as SharedSenderResult } from "./types";
-import { API_ENDPOINTS, CREATE_CONFIG, OPERATION_DELAYS } from "./constants";
-import { sendTransactions, getServerBaseUrl, splitLargeBundles, createKeypairs } from "./trading";
+import { API_ENDPOINTS, API_URLS, CREATE_CONFIG, OPERATION_DELAYS } from "./constants";
+import { sendTransactions, splitLargeBundles, createKeypairs } from "./trading";
 
 // ============================================================================
 // Constants
@@ -227,7 +227,7 @@ const getPartiallyPreparedTransactions = async (
   mintPrivateKey?: string;
   isAdvancedMode?: boolean;
 }> => {
-  const baseUrl = getServerBaseUrl();
+  const baseUrl = API_URLS.RAZE_PUBLIC;
 
   const requestBody: Record<string, unknown> = {
     platform: config.platform,

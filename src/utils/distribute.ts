@@ -1,9 +1,9 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { SenderResult } from "./types";
-import { API_ENDPOINTS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
+import { API_ENDPOINTS, API_URLS, OPERATION_DELAYS, type BaseCurrencyConfig } from "./constants";
 import { parseTransactionArray, type RawTransactionResponse } from "./transactionParsing";
-import { sendTransactions, getServerBaseUrl, checkRateLimit, prepareTransactionBundles } from "./trading";
+import { sendTransactions, checkRateLimit, prepareTransactionBundles } from "./trading";
 
 interface WalletDistribution {
   address: string;
@@ -20,9 +20,7 @@ const getPartiallySignedTransactions = async (
   senderAddress: string,
   recipients: { address: string; amount: string }[],
 ): Promise<string[]> => {
-  const baseUrl = getServerBaseUrl();
-
-  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_DISTRIBUTE}`;
+  const endpoint = `${API_URLS.RAZE_PUBLIC}${API_ENDPOINTS.SOL_DISTRIBUTE}`;
 
   const requestBody: Record<string, unknown> = {
     sender: senderAddress,

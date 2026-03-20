@@ -149,7 +149,7 @@ export const DeployPage: React.FC = () => {
         cashBack: platform === "pumpfun" ? settings.cashBack : undefined,
         pumpAdvanced: platform === "pumpfun" ? isAdv : undefined,
         tokenizedAgent: platform === "pumpfun" && settings.tokenizedAgent
-          ? { buybackBps: parseInt(settings.tokenizedAgentBps || "500") || 500 }
+          ? { buybackBps: parseInt(String(settings.tokenizedAgentBps || "500")) || 500 }
           : undefined,
         bonkType: platform === "bonk" ? settings.bonkType : undefined,
         bonkAdvanced: platform === "bonk" ? isAdv : undefined,

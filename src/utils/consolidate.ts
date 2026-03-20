@@ -1,9 +1,9 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { SenderResult } from "./types";
-import { API_ENDPOINTS, OPERATION_DELAYS } from "./constants";
+import { API_ENDPOINTS, API_URLS, OPERATION_DELAYS } from "./constants";
 import { parseTransactionArray, type RawTransactionResponse } from "./transactionParsing";
-import { sendTransactions, getServerBaseUrl, checkRateLimit, splitLargeBundles } from "./trading";
+import { sendTransactions, checkRateLimit, splitLargeBundles } from "./trading";
 
 interface WalletConsolidation {
   address: string;
@@ -19,9 +19,7 @@ const getPartiallyPreparedTransactions = async (
   receiverAddress: string,
   percentage: number,
 ): Promise<string[]> => {
-  const baseUrl = getServerBaseUrl();
-
-  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_CONSOLIDATE}`;
+  const endpoint = `${API_URLS.RAZE_PUBLIC}${API_ENDPOINTS.SOL_CONSOLIDATE}`;
 
   const requestBody: Record<string, unknown> = {
     wallets: sourceAddresses,
