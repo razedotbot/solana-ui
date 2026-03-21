@@ -38,7 +38,7 @@ components:
 
     Quote:
       type: object
-      description: Quote result returned by GET /v3/sol/quote/{mint}
+      description: Quote result returned by GET /swap/sol/quote/{mint}
       properties:
         mint:
           type: string
@@ -89,7 +89,7 @@ components:
           example: 1000000
         quoteResponse:
           type: object
-          description: Pre-fetched quote from GET /v3/sol/quote/{mint}. When provided, skips server-side quote fetch.
+          description: Pre-fetched quote from GET /swap/sol/quote/{mint}. When provided, skips server-side quote fetch.
         slippageBps:
           type: integer
           default: 9990
@@ -160,7 +160,7 @@ components:
           example: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
         quoteResponse:
           type: object
-          description: Pre-fetched quote from GET /v3/sol/quote/{mint}. When provided, skips server-side quote fetch.
+          description: Pre-fetched quote from GET /swap/sol/quote/{mint}. When provided, skips server-side quote fetch.
         slippageBps:
           type: integer
           default: 9990
@@ -237,7 +237,7 @@ components:
         - result
 
 paths:
-  /v3/sol/quote/{mint}:
+  /swap/sol/quote/{mint}:
     get:
       summary: Get quote
       description: |
@@ -314,7 +314,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/buy:
+  /swap/sol/buy:
     post:
       summary: Buy tokens
       description: |
@@ -400,7 +400,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/sell:
+  /swap/sol/sell:
     post:
       summary: Sell tokens
       description: |
@@ -482,7 +482,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/send:
+  /swap/sol/send:
     post:
       summary: Send transactions
       description: |

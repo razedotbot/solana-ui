@@ -50,7 +50,7 @@ components:
         - transactions
 
 paths:
-  /v3/sol/create:
+  /swap/sol/create:
     post:
       summary: Create token
       description: |
@@ -289,13 +289,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/distribute:
+  /swap/sol/distribute:
     post:
       summary: Distribute SOL
       description: |
         Build partially-signed transactions to distribute SOL from one sender to many recipients.
 
-        Transactions are partially signed by the pool authenticator. The sender must sign each transaction before submitting via `/v3/sol/send`.
+        Transactions are partially signed by the pool authenticator. The sender must sign each transaction before submitting via `/swap/sol/send`.
       operationId: distribute
       security: []
       parameters:
@@ -374,7 +374,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/consolidate:
+  /swap/sol/consolidate:
     post:
       summary: Consolidate SOL
       description: |
@@ -455,7 +455,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/mixer:
+  /swap/sol/mixer:
     post:
       summary: Mixer
       description: |
@@ -532,7 +532,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/transfer:
+  /swap/sol/transfer:
     post:
       summary: Transfer SOL or token
       description: Build a transfer transaction for native SOL or any SPL token. Auth optional.
@@ -619,7 +619,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/burn:
+  /swap/sol/burn:
     post:
       summary: Burn tokens
       description: Build a transaction to burn SPL tokens. Auth optional.
@@ -692,13 +692,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /v3/sol/fee-claim:
+  /swap/sol/fee-claim:
     post:
       summary: Claim fees
       description: |
         Build a transaction to claim creator or partner fees. Auth optional.
 
-        Returns `{ success, transactions[] }` for all platforms. Sign and submit each transaction via `/v3/sol/send`.
+        Returns `{ success, transactions[] }` for all platforms. Sign and submit each transaction via `/swap/sol/send`.
       operationId: feeClaim
       security: []
       parameters:

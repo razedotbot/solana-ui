@@ -89,6 +89,7 @@ const defaultConfig: ConfigType = {
   bundleMode: "batch",
   singleDelay: "200",
   batchDelay: "1000",
+  sendEndpoint: "https://fra.send.raze.sh",
 };
 
 interface AppContextProviderProps {

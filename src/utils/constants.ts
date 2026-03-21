@@ -76,13 +76,13 @@ export const API_URLS = {
 // API Endpoint Paths
 export const API_ENDPOINTS = {
   // Quote
-  SOL_QUOTE: "/v3/sol/quote",
+  SOL_QUOTE: "/swap/sol/quote",
 
   // Buy
-  SOL_BUY: "/v3/sol/buy",
+  SOL_BUY: "/swap/sol/buy",
 
   // Sell
-  SOL_SELL: "/v3/sol/sell",
+  SOL_SELL: "/swap/sol/sell",
 
   // Create
   SOL_CREATE: "/sol/create",
@@ -106,7 +106,7 @@ export const API_ENDPOINTS = {
   SOL_FEE_CLAIM: "/sol/fee-claim",
 
   // Send
-  SOL_SEND: "/v3/sol/send",
+  SOL_SEND: "/swap/sol/send",
 } as const;
 
 // Trading Constants
