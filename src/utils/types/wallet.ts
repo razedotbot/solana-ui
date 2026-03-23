@@ -194,6 +194,8 @@ export interface ConfigType {
   singleDelay: string;
   /** Delay between batches in batch mode (milliseconds) */
   batchDelay: string;
+  /** Send node endpoint URL for broadcasting transactions */
+  sendEndpoint: string;
 }
 
 // ============================================================================

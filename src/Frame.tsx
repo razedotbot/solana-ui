@@ -262,6 +262,9 @@ export const Frame: React.FC<FrameProps> = ({
   const lastNavigationSentRef = useRef<{ view: string; tokenMint?: string } | null>(null);
   const isInitialNavigationRef = useRef(true);
   const quickBuyMessageSentRef = useRef(false);
+  // Throttle timers for high-frequency iframe messages
+  const tokenPriceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tradingStatsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Throttle view-state cache writes — price ticks fire constantly but the cache
   // only needs updating a few times per minute (it's for navigation restore, not live display)
@@ -567,7 +570,10 @@ export const Frame: React.FC<FrameProps> = ({
           break;
 
         case 'WHITELIST_TRADING_STATS': {
-          setTradingStats(event.data.data);
+          // Debounce — stats update on every trade; cap re-renders at ~5/sec
+          const statsData = event.data.data;
+          if (tradingStatsTimerRef.current) clearTimeout(tradingStatsTimerRef.current);
+          tradingStatsTimerRef.current = setTimeout(() => { setTradingStats(statsData); }, 200);
           break;
         }
 
@@ -594,7 +600,10 @@ export const Frame: React.FC<FrameProps> = ({
         }
 
         case 'TOKEN_PRICE_UPDATE': {
-          setTokenPrice(event.data.data);
+          // Debounce — price fires on every on-chain trade; cap re-renders at ~2/sec
+          const priceData = event.data.data;
+          if (tokenPriceTimerRef.current) clearTimeout(tokenPriceTimerRef.current);
+          tokenPriceTimerRef.current = setTimeout(() => { setTokenPrice(priceData); }, 500);
           break;
         }
 
@@ -680,7 +689,11 @@ export const Frame: React.FC<FrameProps> = ({
     };
 
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (tokenPriceTimerRef.current) clearTimeout(tokenPriceTimerRef.current);
+      if (tradingStatsTimerRef.current) clearTimeout(tradingStatsTimerRef.current);
+    };
   }, [onTokenSelect, onNonWhitelistedTrade, sendMessageToIframe, navigate, walletData, location.pathname, tokenAddressParam]);
 
   // Note: Wallet syncing is now handled in the navigation message

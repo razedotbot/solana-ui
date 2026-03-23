@@ -17,8 +17,8 @@ import * as web3 from "@solana/web3.js";
 import bs58 from "bs58";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
-import { BASE_CURRENCIES, API_ENDPOINTS } from "../../utils/constants";
-import { sendTransactions, getServerBaseUrl } from "../../utils/trading";
+import { BASE_CURRENCIES, API_ENDPOINTS, API_URLS } from "../../utils/constants";
+import { sendTransactions } from "../../utils/trading";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
 import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
 
@@ -292,9 +292,7 @@ export const BurnPanel: React.FC<BurnPanelProps> = ({
       );
 
       // 1. Request unsigned transaction from backend
-      const baseUrl = getServerBaseUrl();
-
-      const prepareResponse = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_BURN}`, {
+      const prepareResponse = await fetch(`${API_URLS.RAZE_PUBLIC}${API_ENDPOINTS.SOL_BURN}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

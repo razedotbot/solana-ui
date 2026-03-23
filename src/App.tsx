@@ -40,7 +40,6 @@ import type {
 } from "./utils/types";
 import { addRecentToken } from "./utils/recentTokens";
 import { useAppContext } from "./contexts/AppContext";
-import { useToast } from "./components/Notifications";
 import { OnboardingTutorial } from "./components/OnboardingTutorial";
 import { AdvancedLayout } from "./components/advanced/AdvancedLayout";
 
@@ -191,9 +190,6 @@ const WalletManager: React.FC = () => {
     setTokenBalances: setContextTokenBalances,
     baseCurrency: contextBaseCurrency,
   } = useAppContext();
-
-  // Toast notifications
-  const { showToast } = useToast();
 
   // Detect if we're on mobile or desktop to conditionally render layouts
   const [isMobile, setIsMobile] = useState(false);
@@ -1016,12 +1012,7 @@ const WalletManager: React.FC = () => {
         memoizedCallbacks.setTokenBalances,
         state.baseCurrencyBalances,
         state.tokenBalances,
-        {
-          onlyIfZeroOrNull: false,
-          onRateLimitError: () => {
-            showToast("RPC rate limit reached, falling back to slower mode", "error");
-          },
-        },
+        false,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1062,11 +1053,6 @@ const WalletManager: React.FC = () => {
         memoizedCallbacks.setTokenBalances,
         state.baseCurrencyBalances,
         state.tokenBalances,
-        {
-          onRateLimitError: () => {
-            showToast("RPC rate limit reached, falling back to slower mode", "error");
-          },
-        },
       );
     } catch {
       // Balance refresh error, handled in finally block
@@ -1082,7 +1068,6 @@ const WalletManager: React.FC = () => {
     state.baseCurrencyBalances,
     state.tokenBalances,
     memoizedCallbacks,
-    showToast,
   ]);
 
   const handleNonWhitelistedTrade = useCallback(

@@ -25,8 +25,8 @@ import { loadConfigFromCookies } from "../../utils/storage";
 import { formatAddress, formatTokenBalance } from "../../utils/formatting";
 import { createConnectionFromConfig } from "../../utils/rpcManager";
 import type { BaseCurrencyConfig } from "../../utils/constants";
-import { BASE_CURRENCIES, API_ENDPOINTS } from "../../utils/constants";
-import { sendTransactions, getServerBaseUrl } from "../../utils/trading";
+import { BASE_CURRENCIES, API_ENDPOINTS, API_URLS } from "../../utils/constants";
+import { sendTransactions } from "../../utils/trading";
 import { useModalStyles, ConfirmCheckbox, Spinner, SourceWalletSummary, filterAndSortWallets } from "./PanelShared";
 import * as PU from "./PanelShared";
 import type { BalanceFilter, SortOption, SortDirection } from "./PanelShared";
@@ -357,7 +357,6 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           }
 
           // Step 1: Request the transaction from the backend
-          const baseUrl = getServerBaseUrl();
           const transferBody: Record<string, unknown> = {
             sender: selectedWalletObj.address,
             receiver: transfer.recipient,
@@ -366,7 +365,7 @@ export const TransferPanel: React.FC<TransferPanelProps> = ({
           if (transferType === "TOKEN" && selectedToken) {
             transferBody["tokenAddress"] = selectedToken;
           }
-          const buildResponse = await fetch(`${baseUrl}${API_ENDPOINTS.SOL_TRANSFER}`, {
+          const buildResponse = await fetch(`${API_URLS.RAZE_PUBLIC}${API_ENDPOINTS.SOL_TRANSFER}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(transferBody),

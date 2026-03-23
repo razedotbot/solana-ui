@@ -2,8 +2,8 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { WalletType } from "./types";
 import { loadConfigFromCookies } from "./storage";
-import { TRADING, RATE_LIMIT, BASE_CURRENCIES, API_ENDPOINTS, type BaseCurrencyConfig } from "./constants";
-import type { SenderResult, ApiResponse } from "./types";
+import { TRADING, RATE_LIMIT, BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
+import type { SenderResult } from "./types";
 import { executeBuy, createBuyConfig } from "./buy";
 import type { BundleMode } from "./buy";
 import { executeSell, createSellConfig } from "./sell";
@@ -83,34 +83,75 @@ export const getServerBaseUrl = (): string => {
 // Transaction Sending
 // ============================================================================
 
+interface JsonRpcResponse {
+  jsonrpc: string;
+  id: number;
+  result?: string;
+  error?: { message: string; code: number };
+}
+
 /**
- * Sends transactions via the trading server's /v3/sol/send endpoint
- * @param transactions - Array of base64-encoded serialized transactions
+ * Sends transactions via the user-configured send node (JSON-RPC).
+ * Single transaction uses sendTransaction; multiple use sendBundle.
+ * @param transactions - Array of base58-encoded serialized transactions
  * @returns Result from the server
+ */
+/**
+ * Send transactions via the configured send node.
+ * Accepts base64 or base58-encoded signed transactions (auto-detected).
+ * Uses sendTransaction for 1 tx, sendBundle for multiple.
  */
 export const sendTransactions = async (
   transactions: string[],
 ): Promise<SenderResult> => {
-  const baseUrl = getServerBaseUrl();
-  const endpoint = `${baseUrl}${API_ENDPOINTS.SOL_SEND}`;
+  const config = loadConfigFromCookies();
+  const endpoint = config?.sendEndpoint || "https://fra.send.raze.sh";
+
+  // Normalise to base64: if already base64 keep as-is, else convert from bs58
+  const base64Txs = transactions.map((tx) => {
+    if (tx.includes("+") || tx.includes("/") || tx.endsWith("=")) {
+      return tx;
+    }
+    try {
+      return Buffer.from(bs58.decode(tx)).toString("base64");
+    } catch {
+      return tx;
+    }
+  });
+
+  let body: Record<string, unknown>;
+
+  if (base64Txs.length === 1) {
+    body = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "sendTransaction",
+      params: [base64Txs[0], { encoding: "base64" }],
+    };
+  } else {
+    body = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "sendBundle",
+      params: [base64Txs, { encoding: "base64" }],
+    };
+  }
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ transactions }),
+    body: JSON.stringify(body),
   });
 
-  const result = (await response.json()) as ApiResponse<SenderResult>;
+  const result = (await response.json()) as JsonRpcResponse;
 
-  if (!result.success) {
-    const errorMessage = result.error || "Unknown error sending transactions";
-    const errorDetails = result.details ? `: ${result.details}` : "";
-    throw new Error(`${errorMessage}${errorDetails}`);
+  if (result.error) {
+    throw new Error(result.error.message || "Unknown error sending transactions");
   }
 
-  return result.result as SenderResult;
+  return { rpc: result.result };
 };
 
 // ============================================================================
@@ -142,15 +183,27 @@ export const resolveBaseCurrency = (
  * Sign a transaction with the provided keypairs
  */
 export const signTransaction = (
-  txBase58: string,
+  txInput: string,
   walletKeypairs: Keypair[],
 ): string | null => {
   try {
     let txBuffer: Uint8Array;
-    try {
-      txBuffer = bs58.decode(txBase58);
-    } catch {
-      txBuffer = new Uint8Array(Buffer.from(txBase58, "base64"));
+
+    // Try base64 first (endpoints return base64 when requested),
+    // then fall back to base58
+    const isBase64 =
+      txInput.includes("+") ||
+      txInput.includes("/") ||
+      txInput.endsWith("=");
+
+    if (isBase64) {
+      txBuffer = new Uint8Array(Buffer.from(txInput, "base64"));
+    } else {
+      try {
+        txBuffer = bs58.decode(txInput);
+      } catch {
+        txBuffer = new Uint8Array(Buffer.from(txInput, "base64"));
+      }
     }
 
     const transaction = VersionedTransaction.deserialize(txBuffer);
@@ -193,6 +246,47 @@ export const completeBundleSigning = (
     .filter((tx): tx is string => tx !== null);
 
   return { transactions: signedTransactions };
+};
+
+/**
+ * Sign all transactions from bundles and return base64 strings.
+ * Keeps base64 encoding throughout — no bs58 roundtrip.
+ * Throws if any transaction fails to sign.
+ */
+export const signAllTransactions = (
+  bundles: TransactionBundle[],
+  walletKeypairs: Keypair[],
+): string[] => {
+  const signed: string[] = [];
+
+  for (const bundle of bundles) {
+    if (!bundle.transactions || !Array.isArray(bundle.transactions)) {
+      continue;
+    }
+
+    for (const rawTx of bundle.transactions) {
+      const txBuffer = new Uint8Array(Buffer.from(rawTx, "base64"));
+      const transaction = VersionedTransaction.deserialize(txBuffer);
+
+      const signers: Keypair[] = [];
+      for (const accountKey of transaction.message.staticAccountKeys) {
+        const matchingKeypair = walletKeypairs.find(
+          (kp) => kp.publicKey.toBase58() === accountKey.toBase58(),
+        );
+        if (matchingKeypair && !signers.includes(matchingKeypair)) {
+          signers.push(matchingKeypair);
+        }
+      }
+
+      if (signers.length > 0) {
+        transaction.sign(signers);
+      }
+
+      signed.push(Buffer.from(transaction.serialize()).toString("base64"));
+    }
+  }
+
+  return signed;
 };
 
 // ============================================================================

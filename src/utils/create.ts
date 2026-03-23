@@ -1,8 +1,8 @@
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { SenderResult as SharedSenderResult } from "./types";
-import { API_ENDPOINTS, CREATE_CONFIG, OPERATION_DELAYS } from "./constants";
-import { sendTransactions, getServerBaseUrl, splitLargeBundles, createKeypairs } from "./trading";
+import { API_ENDPOINTS, API_URLS, CREATE_CONFIG, OPERATION_DELAYS } from "./constants";
+import { sendTransactions, splitLargeBundles, createKeypairs } from "./trading";
 
 // ============================================================================
 // Constants
@@ -61,9 +61,10 @@ export interface CreateConfig {
   cashBack?: boolean;
   pumpAdvanced?: boolean;
   tokenizedAgent?: TokenizedAgentConfig;
-  bonkType?: "meme" | "tech";
+  bonkType?: "standard" | "bonkers";
   bonkAdvanced?: boolean;
   bonkConfig?: BonkConfig;
+  jitoTipAmountSOL?: number;
   meteoraDBCConfig?: MeteoraDBCConfig;
   meteoraCPAMMConfig?: MeteoraCPAMMConfig;
 }
@@ -227,7 +228,7 @@ const getPartiallyPreparedTransactions = async (
   mintPrivateKey?: string;
   isAdvancedMode?: boolean;
 }> => {
-  const baseUrl = getServerBaseUrl();
+  const baseUrl = API_URLS.RAZE_PUBLIC;
 
   const requestBody: Record<string, unknown> = {
     platform: config.platform,
@@ -261,6 +262,9 @@ const getPartiallyPreparedTransactions = async (
     }
     if (config.bonkConfig) {
       requestBody["bonkConfig"] = config.bonkConfig;
+    }
+    if (config.jitoTipAmountSOL !== undefined) {
+      requestBody["jitoTipAmountSOL"] = config.jitoTipAmountSOL;
     }
   }
   if (config.platform === "meteoraDBC" && config.meteoraDBCConfig) {
@@ -754,11 +758,12 @@ export const createDeployConfig = (params: {
   cashBack?: boolean;
   pumpAdvanced?: boolean;
   tokenizedAgent?: TokenizedAgentConfig;
-  bonkType?: "meme" | "tech";
+  bonkType?: "standard" | "bonkers";
   meteoraDBCConfig?: MeteoraDBCConfig;
   meteoraCPAMMConfig?: MeteoraCPAMMConfig;
   bonkAdvanced?: boolean;
   bonkConfig?: BonkConfig;
+  jitoTipAmountSOL?: number;
 }): CreateConfig => {
   return {
     platform: params.platform,
@@ -770,6 +775,7 @@ export const createDeployConfig = (params: {
     bonkType: params.bonkType,
     bonkAdvanced: params.bonkAdvanced,
     bonkConfig: params.bonkConfig,
+    jitoTipAmountSOL: params.jitoTipAmountSOL,
     meteoraDBCConfig: params.meteoraDBCConfig,
     meteoraCPAMMConfig: params.meteoraCPAMMConfig,
   };

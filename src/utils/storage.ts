@@ -262,7 +262,9 @@ export function loadConfigFromCookies(): ConfigType | null {
       if (config.rpcEndpoints === undefined) {
         config.rpcEndpoints = JSON.stringify(createDefaultEndpoints());
       }
-
+      if (config.sendEndpoint === undefined) {
+        config.sendEndpoint = "https://fra.send.raze.sh";
+      }
 
       return config as ConfigType;
     } catch {

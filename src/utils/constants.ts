@@ -76,37 +76,37 @@ export const API_URLS = {
 // API Endpoint Paths
 export const API_ENDPOINTS = {
   // Quote
-  SOL_QUOTE: "/v3/sol/quote",
+  SOL_QUOTE: "/swap/sol/quote",
 
   // Buy
-  SOL_BUY: "/v3/sol/buy",
+  SOL_BUY: "/swap/sol/buy",
 
   // Sell
-  SOL_SELL: "/v3/sol/sell",
+  SOL_SELL: "/swap/sol/sell",
 
   // Create
-  SOL_CREATE: "/v3/sol/create",
+  SOL_CREATE: "/sol/create",
 
   // Distribute
-  SOL_DISTRIBUTE: "/v3/sol/distribute",
+  SOL_DISTRIBUTE: "/sol/distribute",
 
   // Mixer
-  SOL_MIXER: "/v3/sol/mixer",
+  SOL_MIXER: "/sol/mixer",
 
   // Consolidate
-  SOL_CONSOLIDATE: "/v3/sol/consolidate",
+  SOL_CONSOLIDATE: "/sol/consolidate",
 
   // Transfer
-  SOL_TRANSFER: "/v3/sol/transfer",
+  SOL_TRANSFER: "/sol/transfer",
 
   // Burn
-  SOL_BURN: "/v3/sol/burn",
+  SOL_BURN: "/sol/burn",
 
   // Fee claim
-  SOL_FEE_CLAIM: "/v3/sol/fee-claim",
+  SOL_FEE_CLAIM: "/sol/fee-claim",
 
   // Send
-  SOL_SEND: "/v3/sol/send",
+  SOL_SEND: "/swap/sol/send",
 } as const;
 
 // Trading Constants
@@ -128,12 +128,6 @@ export const RATE_LIMIT = {
   THROTTLE_MS: 5000,
 } as const;
 
-// Balance Refresh
-export const BALANCE_REFRESH = {
-  DEFAULT_BATCH_SIZE: 5,
-  DEFAULT_DELAY_MS: 50,
-  POLLING_INTERVAL_MS: 5000,
-} as const;
 
 // Limit Orders
 export const LIMIT_ORDERS = {

@@ -4,8 +4,6 @@
  * Handles all buy transactions for Solana tokens.
  */
 
-import { Keypair } from "@solana/web3.js";
-import bs58 from "bs58";
 import { loadConfigFromCookies } from "./storage";
 import { TRADING, BASE_CURRENCIES, API_ENDPOINTS } from "./constants";
 import type {
@@ -20,8 +18,7 @@ import {
   addTradeHistory,
   checkRateLimit,
   getServerBaseUrl,
-  completeBundleSigning,
-  splitLargeBundles,
+  signAllTransactions,
   createKeypairs,
   getSlippageBps,
   getFeeTipLamports,
@@ -127,18 +124,16 @@ const executeBuySingleMode = async (
         continue;
       }
 
-      const walletKeypair = Keypair.fromSecretKey(
-        bs58.decode(wallet.privateKey),
+      const walletKeypairs = createKeypairs([wallet]);
+      const signedBase64Txs = signAllTransactions(
+        partiallyPreparedBundles,
+        walletKeypairs,
       );
 
-      for (const bundle of partiallyPreparedBundles) {
-        const signedBundle = completeBundleSigning(bundle, [walletKeypair]);
-
-        if (signedBundle.transactions.length > 0) {
-          await checkRateLimit();
-          const result = await sendTransactions(signedBundle.transactions);
-          results.push(result);
-        }
+      if (signedBase64Txs.length > 0) {
+        await checkRateLimit();
+        const result = await sendTransactions(signedBase64Txs);
+        results.push(result);
       }
 
       successfulWallets++;
@@ -146,7 +141,8 @@ const executeBuySingleMode = async (
       if (i < wallets.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, singleDelay));
       }
-    } catch {
+    } catch (err) {
+      console.error("[buy:single] wallet failed:", wallet.address, err);
       failedWallets++;
     }
   }
@@ -165,7 +161,7 @@ const executeBuyBatchMode = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyResult> => {
-  const batchSize = TRADING.MAX_TRANSACTIONS_PER_BUNDLE;
+  const batchSize = 4;
   const batchDelay = config.batchDelay || TRADING.DEFAULT_BATCH_DELAY_MS;
   const results: unknown[] = [];
   let successfulBatches = 0;
@@ -191,17 +187,15 @@ const executeBuyBatchMode = async (
       }
 
       const walletKeypairs = createKeypairs(batch);
-      const splitBundles = splitLargeBundles(partiallyPreparedBundles, 4);
-      const signedBundles = splitBundles.map((bundle) =>
-        completeBundleSigning(bundle, walletKeypairs),
+      const signedBase64Txs = signAllTransactions(
+        partiallyPreparedBundles,
+        walletKeypairs,
       );
 
-      for (const bundle of signedBundles) {
-        if (bundle.transactions.length > 0) {
-          await checkRateLimit();
-          const result = await sendTransactions(bundle.transactions);
-          results.push(result);
-        }
+      if (signedBase64Txs.length > 0) {
+        await checkRateLimit();
+        const result = await sendTransactions(signedBase64Txs);
+        results.push(result);
       }
 
       successfulBatches++;
@@ -209,7 +203,8 @@ const executeBuyBatchMode = async (
       if (i < batches.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, batchDelay));
       }
-    } catch {
+    } catch (err) {
+      console.error("[buy:batch] batch failed:", err);
       failedBatches++;
     }
   }
@@ -228,8 +223,10 @@ const executeBuyAllInOneMode = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyResult> => {
+  const maxWallets = 4;
+  const cappedWallets = wallets.slice(0, maxWallets);
   const partiallyPreparedBundles = await getPartiallyPreparedTransactions(
-    wallets,
+    cappedWallets,
     config,
   );
 
@@ -237,29 +234,26 @@ const executeBuyAllInOneMode = async (
     return { success: false, error: "No transactions generated." };
   }
 
-  const walletKeypairs = createKeypairs(wallets);
-  const splitBundles = splitLargeBundles(partiallyPreparedBundles, 4);
-  const signedBundles = splitBundles.map((bundle) =>
-    completeBundleSigning(bundle, walletKeypairs),
+  const walletKeypairs = createKeypairs(cappedWallets);
+  const signedBase64Txs = signAllTransactions(
+    partiallyPreparedBundles,
+    walletKeypairs,
   );
 
-  const validSignedBundles = signedBundles.filter(
-    (bundle) => bundle.transactions.length > 0,
-  );
-
-  if (validSignedBundles.length === 0) {
+  if (signedBase64Txs.length === 0) {
     return { success: false, error: "Failed to sign any transactions" };
   }
 
-  const bundlePromises = validSignedBundles.map(async (bundle, index) => {
+  const bundlePromises = [signedBase64Txs].map(async (txs, index) => {
     await new Promise((resolve) =>
       setTimeout(resolve, index * TRADING.DEFAULT_BUNDLE_DELAY_MS),
     );
 
     try {
-      const result = await sendTransactions(bundle.transactions);
+      const result = await sendTransactions(txs);
       return { success: true, result };
-    } catch {
+    } catch (err) {
+      console.error("[buy:all-in-one] send failed:", err);
       return { success: false };
     }
   });

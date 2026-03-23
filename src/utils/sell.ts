@@ -18,8 +18,7 @@ import {
   addTradeHistory,
   checkRateLimit,
   getServerBaseUrl,
-  completeBundleSigning,
-  splitLargeBundles,
+  signAllTransactions,
   createKeypairs,
   getSlippageBps,
   getFeeTipLamports,
@@ -120,15 +119,15 @@ const executeSellSingleMode = async (
       }
 
       const walletKeypairs = createKeypairs([wallet]);
+      const signedBase64Txs = signAllTransactions(
+        partiallyPreparedBundles,
+        walletKeypairs,
+      );
 
-      for (const bundle of partiallyPreparedBundles) {
-        const signedBundle = completeBundleSigning(bundle, walletKeypairs);
-
-        if (signedBundle.transactions.length > 0) {
-          await checkRateLimit();
-          const result = await sendTransactions(signedBundle.transactions);
-          results.push(result);
-        }
+      if (signedBase64Txs.length > 0) {
+        await checkRateLimit();
+        const result = await sendTransactions(signedBase64Txs);
+        results.push(result);
       }
 
       successfulWallets++;
@@ -160,7 +159,7 @@ const executeSellBatchMode = async (
   wallets: WalletSell[],
   sellConfig: SellConfig,
 ): Promise<SellResult> => {
-  const batchSize = TRADING.MAX_TRANSACTIONS_PER_BUNDLE;
+  const batchSize = 4;
   const batchDelay = sellConfig.batchDelay || TRADING.DEFAULT_BATCH_DELAY_MS;
   const results: unknown[] = [];
   let successfulBatches = 0;
@@ -184,17 +183,15 @@ const executeSellBatchMode = async (
       }
 
       const walletKeypairs = createKeypairs(batch);
-      const splitBundles = splitLargeBundles(partiallyPreparedBundles, 4);
-      const signedBundles = splitBundles.map((bundle) =>
-        completeBundleSigning(bundle, walletKeypairs),
+      const signedBase64Txs = signAllTransactions(
+        partiallyPreparedBundles,
+        walletKeypairs,
       );
 
-      for (const bundle of signedBundles) {
-        if (bundle.transactions.length > 0) {
-          await checkRateLimit();
-          const result = await sendTransactions(bundle.transactions);
-          results.push(result);
-        }
+      if (signedBase64Txs.length > 0) {
+        await checkRateLimit();
+        const result = await sendTransactions(signedBase64Txs);
+        results.push(result);
       }
 
       successfulBatches++;
@@ -221,8 +218,10 @@ const executeSellAllInOneMode = async (
   wallets: WalletSell[],
   sellConfig: SellConfig,
 ): Promise<SellResult> => {
+  const maxWallets = 4;
+  const cappedWallets = wallets.slice(0, maxWallets);
   const partiallyPreparedBundles = await getPartiallyPreparedSellTransactions(
-    wallets,
+    cappedWallets,
     sellConfig,
   );
 
@@ -233,27 +232,23 @@ const executeSellAllInOneMode = async (
     };
   }
 
-  const walletKeypairs = createKeypairs(wallets);
-  const splitBundles = splitLargeBundles(partiallyPreparedBundles, 4);
-  const signedBundles = splitBundles.map((bundle) =>
-    completeBundleSigning(bundle, walletKeypairs),
+  const walletKeypairs = createKeypairs(cappedWallets);
+  const signedBase64Txs = signAllTransactions(
+    partiallyPreparedBundles,
+    walletKeypairs,
   );
 
-  const validSignedBundles = signedBundles.filter(
-    (bundle) => bundle.transactions.length > 0,
-  );
-
-  if (validSignedBundles.length === 0) {
+  if (signedBase64Txs.length === 0) {
     return { success: false, error: "Failed to sign any transactions" };
   }
 
-  const bundlePromises = validSignedBundles.map(async (bundle, index) => {
+  const bundlePromises = [signedBase64Txs].map(async (txs, index) => {
     await new Promise((resolve) =>
       setTimeout(resolve, index * TRADING.DEFAULT_BUNDLE_DELAY_MS),
     );
 
     try {
-      const result = await sendTransactions(bundle.transactions);
+      const result = await sendTransactions(txs);
       return { success: true, result };
     } catch {
       return { success: false };

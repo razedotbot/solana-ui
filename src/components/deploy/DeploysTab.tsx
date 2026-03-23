@@ -65,7 +65,7 @@ export const DeploysTab: React.FC<DeploysTabProps> = ({
       pumpType: false,
       cashBack: false,
       pumpMode: "simple",
-      bonkType: "meme",
+      bonkType: "standard",
       bonkMode: "simple",
       meteoraDBCMode: "simple",
       meteoraDBCConfigAddress: METEORA_DBC_CONFIGS.standard,
@@ -533,13 +533,13 @@ export const DeploysTab: React.FC<DeploysTabProps> = ({
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             {[
-                              { value: "meme", label: "Meme" },
-                              { value: "tech", label: "Tech" },
+                              { value: "standard", label: "Standard" },
+                              { value: "bonkers", label: "Bonkers" },
                             ].map((opt) => (
                               <button
                                 key={opt.value}
                                 type="button"
-                                onClick={() => updateTokenSetting(index, "bonkType", opt.value as "meme" | "tech")}
+                                onClick={() => updateTokenSetting(index, "bonkType", opt.value as "standard" | "bonkers")}
                                 className={`p-2 rounded-lg border transition-all text-center ${
                                   token.bonkType === opt.value
                                     ? "border-app-primary-color/50 bg-app-primary-color/10"

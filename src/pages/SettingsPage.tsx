@@ -531,6 +531,67 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Send Node Selection */}
+      <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20 space-y-3">
+        <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+          <Network size={14} className="color-primary" />
+          Send Node
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "Frankfurt", url: "https://fra.send.raze.sh", flag: "🇩🇪" },
+            { label: "Amsterdam", url: "https://ams.send.raze.sh", flag: "🇳🇱" },
+            { label: "Chicago", url: "https://chi.send.raze.sh", flag: "🇺🇸" },
+            { label: "Singapore", url: "https://sg.send.raze.sh", flag: "🇸🇬" },
+          ].map((node) => {
+            const isActive = config.sendEndpoint === node.url;
+            return (
+              <button
+                key={node.url}
+                type="button"
+                onClick={() => handleConfigChange("sendEndpoint", node.url)}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
+                  isActive
+                    ? "bg-app-primary-color/10 border-2 border-app-primary-color/50 shadow-[0_0_15px_rgba(2,179,109,0.15)]"
+                    : "bg-app-quaternary/50 border border-app-primary-20 hover:border-app-primary-40 hover:bg-app-quaternary"
+                }`}
+              >
+                <span className="text-lg">{node.flag}</span>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-xs font-mono font-bold ${isActive ? "color-primary" : "text-app-primary"}`}>
+                    {node.label}
+                  </div>
+                  <div className="text-[10px] font-mono text-app-secondary-40 truncate">
+                    {node.url.replace("https://", "")}
+                  </div>
+                </div>
+                {isActive && (
+                  <div className="w-4 h-4 rounded-full bg-app-primary-color flex items-center justify-center flex-shrink-0">
+                    <Check size={10} className="text-black" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-mono text-app-secondary-40 uppercase tracking-wider">Custom endpoint</label>
+          <input
+            type="text"
+            value={
+              ["https://fra.send.raze.sh", "https://ams.send.raze.sh", "https://chi.send.raze.sh", "https://sg.send.raze.sh"].includes(config.sendEndpoint)
+                ? ""
+                : config.sendEndpoint
+            }
+            onChange={(e) => {
+              if (e.target.value) handleConfigChange("sendEndpoint", e.target.value);
+            }}
+            placeholder="https://custom.send.node"
+            className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2 text-xs text-app-primary focus:border-app-primary focus:ring-1 focus:ring-primary-50 focus:outline-none font-mono transition-all"
+          />
+        </div>
+      </div>
+
       {/* Bundle Strategy */}
       <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20 space-y-3">
         <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">

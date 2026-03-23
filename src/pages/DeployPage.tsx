@@ -53,7 +53,7 @@ export const DeployPage: React.FC = () => {
   const [cashBack, setCashBack] = useState<boolean>(false);
   const [tokenizedAgent, setTokenizedAgent] = useState<boolean>(false);
   const [tokenizedAgentBps, setTokenizedAgentBps] = useState<string>("500");
-  const [bonkType, setBonkType] = useState<"meme" | "tech">("meme");
+  const [bonkType, setBonkType] = useState<"standard" | "bonkers">("standard");
   const [meteoraDBCConfigAddress, setMeteoraDBCConfigAddress] = useState(METEORA_DBC_CONFIGS.standard);
   const [meteoraCPAMMConfigAddress, setMeteoraCPAMMConfigAddress] = useState(METEORA_CPAMM_CONFIGS.standard);
   const [meteoraCPAMMInitialLiquidity, setMeteoraCPAMMInitialLiquidity] = useState("1");
@@ -149,7 +149,7 @@ export const DeployPage: React.FC = () => {
         cashBack: platform === "pumpfun" ? settings.cashBack : undefined,
         pumpAdvanced: platform === "pumpfun" ? isAdv : undefined,
         tokenizedAgent: platform === "pumpfun" && settings.tokenizedAgent
-          ? { buybackBps: parseInt(settings.tokenizedAgentBps || "500") || 500 }
+          ? { buybackBps: parseInt(String(settings.tokenizedAgentBps || "500")) || 500 }
           : undefined,
         bonkType: platform === "bonk" ? settings.bonkType : undefined,
         bonkAdvanced: platform === "bonk" ? isAdv : undefined,
