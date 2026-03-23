@@ -21,6 +21,7 @@ import { brand } from "./utils/constants";
 import type { Connection } from "@solana/web3.js";
 import { initStyles } from "./components/Styles";
 import { fetchWalletBalances } from "./utils/wallet";
+import { getServerBaseUrl } from "./utils/trading";
 import { saveWalletsToCookies } from "./utils/storage";
 import {
   loadQuickBuyPreferencesFromCookies,
@@ -1069,6 +1070,35 @@ const WalletManager: React.FC = () => {
     state.tokenBalances,
     memoizedCallbacks,
   ]);
+
+  // Keep trading and sending endpoints hot
+  useEffect(() => {
+    const ping = async (url: string): Promise<void> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        await fetch(`${url}/health`, {
+          signal: controller.signal,
+          method: "GET",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+        clearTimeout(timeoutId);
+      } catch { /* ignore */ }
+    };
+
+    const keepAlive = (): void => {
+      const tradingUrl = getServerBaseUrl();
+      if (tradingUrl) void ping(tradingUrl);
+
+      const sendUrl = state.config.sendEndpoint;
+      if (sendUrl) void ping(sendUrl);
+    };
+
+    keepAlive();
+    const id = setInterval(keepAlive, 10000);
+    return () => clearInterval(id);
+  }, [state.config.sendEndpoint]);
 
   const handleNonWhitelistedTrade = useCallback(
     (trade: {

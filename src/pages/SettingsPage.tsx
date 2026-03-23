@@ -20,6 +20,7 @@ import Cookies from "js-cookie";
 import { useAppContext } from "../contexts/AppContext";
 import { useToast } from "../components/Notifications";
 import { saveConfigToCookies, STORAGE_KEYS } from "../utils/storage";
+import { SEND_NODES } from "../utils/constants";
 import { HorizontalHeader } from "../components/Header";
 import { PageBackground } from "../components/Styles";
 import type { ServerInfo } from "../utils/types";
@@ -168,6 +169,8 @@ export const SettingsPage: React.FC = () => {
   const [isLoadingServers, setIsLoadingServers] = useState(true);
   const [isPinging, setIsPinging] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [sendNodePings, setSendNodePings] = useState<Record<string, number>>({});
+  const [isPingSendNodes, setIsPingSendNodes] = useState(false);
 
   // Configuration tab state
   const [exportSelection, setExportSelection] = useState<Set<string>>(
@@ -219,10 +222,55 @@ export const SettingsPage: React.FC = () => {
     }
   }, [isPinging]);
 
+
+
+  const pingSendNode = async (url: string): Promise<number> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const start = performance.now();
+      const response = await fetch(`${url}/health`, {
+        signal: controller.signal,
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      clearTimeout(timeoutId);
+      if (response.ok) {
+        const data = (await response.json()) as { status?: string };
+        if (data.status === "healthy") {
+          return Math.round(performance.now() - start);
+        }
+      }
+      return Infinity;
+    } catch {
+      return Infinity;
+    }
+  };
+
+  const pingSendNodes = useCallback(async (): Promise<void> => {
+    if (isPingSendNodes) return;
+    setIsPingSendNodes(true);
+    try {
+      const results: Record<string, number> = {};
+      await Promise.all(
+        SEND_NODES.map(async (node) => {
+          // First ping (warmup)
+          await pingSendNode(node.url);
+          await new Promise((r) => setTimeout(r, 100));
+          // Second ping (measured)
+          results[node.url] = await pingSendNode(node.url);
+        }),
+      );
+      setSendNodePings(results);
+    } finally {
+      setIsPingSendNodes(false);
+    }
+  }, [isPingSendNodes]);
+
   useEffect(() => {
-    const id = setInterval((): void => { void refreshPings(); }, 5000);
-    return (): void => clearInterval(id);
-  }, [refreshPings]);
+    void pingSendNodes();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleServerSwitch = async (serverId: string): Promise<void> => {
     if (!window.switchServer) return;
@@ -450,12 +498,12 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Regional Server Selection */}
-      <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20">
-        <div className="flex items-center justify-between mb-3">
+      {/* Trading Endpoints */}
+      <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20 space-y-3">
+        <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
             <Radio size={14} className="color-primary" />
-            Regional Server Selection
+            Trading Endpoints
           </label>
           <button
             type="button"
@@ -468,83 +516,81 @@ export const SettingsPage: React.FC = () => {
             {isPinging ? "Pinging..." : "Refresh"}
           </button>
         </div>
-
-        {/* Server List */}
-        <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-          {isLoadingServers ? (
-            <div className="p-6 text-center">
-              <RefreshCw
-                size={24}
-                className="animate-spin color-primary mx-auto mb-2"
-              />
-              <span className="text-xs text-app-secondary-60 font-mono">
-                Checking server availability...
-              </span>
-            </div>
-          ) : availableServers.length > 0 ? (
-            availableServers.map((server) => (
-              <button
-                key={server.id}
-                type="button"
-                onClick={() => void handleServerSwitch(server.id)}
-                disabled={isChangingServer}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all duration-200 group ${
-                  server.region === currentRegion
-                    ? "bg-app-primary-color/10 border-2 border-app-primary-color/50 shadow-[0_0_15px_rgba(2,179,109,0.15)]"
-                    : "bg-app-quaternary/50 border border-app-primary-20 hover:border-app-primary-40 hover:bg-app-quaternary"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{server.flag}</span>
-                  <div>
-                    <div
-                      className={`text-sm font-mono font-bold ${server.region === currentRegion ? "color-primary" : "text-app-primary"}`}
-                    >
+        {isLoadingServers ? (
+          <div className="p-6 text-center">
+            <RefreshCw size={24} className="animate-spin color-primary mx-auto mb-2" />
+            <span className="text-xs text-app-secondary-60 font-mono">Checking server availability...</span>
+          </div>
+        ) : availableServers.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2">
+            {availableServers.map((server) => {
+              const isActive = server.region === currentRegion;
+              return (
+                <button
+                  key={server.id}
+                  type="button"
+                  onClick={() => void handleServerSwitch(server.id)}
+                  disabled={isChangingServer}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${
+                    isActive
+                      ? "bg-app-primary-color/10 border-2 border-app-primary-color/50 shadow-[0_0_15px_rgba(2,179,109,0.15)]"
+                      : "bg-app-quaternary/50 border border-app-primary-20 hover:border-app-primary-40 hover:bg-app-quaternary"
+                  }`}
+                >
+                  <span className="text-lg">{server.flag}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-xs font-mono font-bold ${isActive ? "color-primary" : "text-app-primary"}`}>
                       {server.name}
                     </div>
-                    <div className="text-[10px] font-mono text-app-secondary-40 truncate max-w-[180px]">
+                    <div className="text-[10px] font-mono text-app-secondary-40 truncate">
                       {server.url}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {server.ping && server.ping < Infinity && (
-                    <div
-                      className={`text-xs font-mono px-2 py-1 rounded-full border ${getPingBg(server.ping)} ${getPingColor(server.ping)} border-current/20`}
-                    >
-                      {Math.round(server.ping)}ms
-                    </div>
-                  )}
-                  {server.region === currentRegion && (
-                    <div className="w-6 h-6 rounded-full bg-app-primary-color flex items-center justify-center">
-                      <Check size={14} className="text-black" />
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))
-          ) : (
-            <div className="p-6 text-center text-error font-mono text-sm">
-              No servers reachable. Check your connection.
-            </div>
-          )}
-        </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {server.ping != null && server.ping < Infinity && (
+                      <div className={`text-xs font-mono px-2 py-1 rounded-full border ${getPingBg(server.ping)} ${getPingColor(server.ping)} border-current/20`}>
+                        {Math.round(server.ping)}ms
+                      </div>
+                    )}
+                    {isActive && (
+                      <div className="w-4 h-4 rounded-full bg-app-primary-color flex items-center justify-center">
+                        <Check size={10} className="text-black" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-6 text-center text-error font-mono text-sm">
+            No servers reachable. Check your connection.
+          </div>
+        )}
       </div>
 
       {/* Send Node Selection */}
       <div className="p-5 rounded-xl bg-app-tertiary/50 border border-app-primary-20 space-y-3">
-        <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
-          <Network size={14} className="color-primary" />
-          Send Node
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-xs text-app-secondary-60 font-mono uppercase tracking-wider">
+            <Network size={14} className="color-primary" />
+            Sending Endpoints
+          </label>
+          <button
+            type="button"
+            onClick={() => void pingSendNodes()}
+            disabled={isPingSendNodes}
+            className="flex items-center gap-1.5 text-xs font-mono text-app-secondary-60 hover:color-primary transition-colors disabled:opacity-40"
+            title="Refresh pings"
+          >
+            <RefreshCw size={12} className={isPingSendNodes ? "animate-spin color-primary" : ""} />
+            {isPingSendNodes ? "Pinging..." : "Refresh"}
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: "Frankfurt", url: "https://fra.send.raze.sh", flag: "🇩🇪" },
-            { label: "Amsterdam", url: "https://ams.send.raze.sh", flag: "🇳🇱" },
-            { label: "Chicago", url: "https://chi.send.raze.sh", flag: "🇺🇸" },
-            { label: "Singapore", url: "https://sg.send.raze.sh", flag: "🇸🇬" },
-          ].map((node) => {
+          {SEND_NODES.map((node) => {
             const isActive = config.sendEndpoint === node.url;
+            const ping = sendNodePings[node.url];
             return (
               <button
                 key={node.url}
@@ -565,30 +611,21 @@ export const SettingsPage: React.FC = () => {
                     {node.url.replace("https://", "")}
                   </div>
                 </div>
-                {isActive && (
-                  <div className="w-4 h-4 rounded-full bg-app-primary-color flex items-center justify-center flex-shrink-0">
-                    <Check size={10} className="text-black" />
-                  </div>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {ping != null && ping < Infinity && (
+                    <div className={`text-xs font-mono px-2 py-1 rounded-full border ${getPingBg(ping)} ${getPingColor(ping)} border-current/20`}>
+                      {ping}ms
+                    </div>
+                  )}
+                  {isActive && (
+                    <div className="w-4 h-4 rounded-full bg-app-primary-color flex items-center justify-center">
+                      <Check size={10} className="text-black" />
+                    </div>
+                  )}
+                </div>
               </button>
             );
           })}
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-mono text-app-secondary-40 uppercase tracking-wider">Custom endpoint</label>
-          <input
-            type="text"
-            value={
-              ["https://fra.send.raze.sh", "https://ams.send.raze.sh", "https://chi.send.raze.sh", "https://sg.send.raze.sh"].includes(config.sendEndpoint)
-                ? ""
-                : config.sendEndpoint
-            }
-            onChange={(e) => {
-              if (e.target.value) handleConfigChange("sendEndpoint", e.target.value);
-            }}
-            placeholder="https://custom.send.node"
-            className="w-full bg-app-tertiary border border-app-primary-30 rounded-lg px-3 py-2 text-xs text-app-primary focus:border-app-primary focus:ring-1 focus:ring-primary-50 focus:outline-none font-mono transition-all"
-          />
         </div>
       </div>
 
@@ -616,7 +653,7 @@ export const SettingsPage: React.FC = () => {
               value: "batch",
               label: "Batch",
               icon: "📦",
-              desc: "5 per block",
+              desc: "4 per block",
               delayKey: "batchDelay" as const,
               delayLabel: "Delay between batches",
               delayDefault: "1000",

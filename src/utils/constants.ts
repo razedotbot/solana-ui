@@ -73,6 +73,15 @@ export const API_URLS = {
   RAZE_PUBLIC: "https://public.raze.sh/api",
 } as const;
 
+export const SEND_NODES = [
+  { label: "Frankfurt", url: "https://fra.send.raze.sh", flag: "\u{1F1E9}\u{1F1EA}" },
+  { label: "Chicago", url: "https://chi.send.raze.sh", flag: "\u{1F1FA}\u{1F1F8}" },
+  { label: "Amsterdam", url: "https://ams.send.raze.sh", flag: "\u{1F1F3}\u{1F1F1}" },
+  { label: "Montreal", url: "https://mtl.send.raze.sh", flag: "\u{1F1E8}\u{1F1E6}" },
+  { label: "London", url: "https://lon.send.raze.sh", flag: "\u{1F1EC}\u{1F1E7}" },
+  { label: "Singapore", url: "https://sgp.send.raze.sh", flag: "\u{1F1F8}\u{1F1EC}" },
+] as const;
+
 // API Endpoint Paths
 export const API_ENDPOINTS = {
   // Quote

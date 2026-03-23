@@ -283,13 +283,6 @@ const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
     url: "https://ca.raze.sh/",
     region: "CA",
     flag: "🇨🇦",
-  },
-  {
-    id: "us",
-    name: "United States",
-    url: "https://us.raze.sh/",
-    region: "US",
-    flag: "🇺🇸",
   }
 ];
 
