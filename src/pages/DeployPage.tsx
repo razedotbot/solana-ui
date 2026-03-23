@@ -53,7 +53,7 @@ export const DeployPage: React.FC = () => {
   const [cashBack, setCashBack] = useState<boolean>(false);
   const [tokenizedAgent, setTokenizedAgent] = useState<boolean>(false);
   const [tokenizedAgentBps, setTokenizedAgentBps] = useState<string>("500");
-  const [bonkType, setBonkType] = useState<"meme" | "tech">("meme");
+  const [bonkType, setBonkType] = useState<"standard" | "bonkers">("standard");
   const [meteoraDBCConfigAddress, setMeteoraDBCConfigAddress] = useState(METEORA_DBC_CONFIGS.standard);
   const [meteoraCPAMMConfigAddress, setMeteoraCPAMMConfigAddress] = useState(METEORA_CPAMM_CONFIGS.standard);
   const [meteoraCPAMMInitialLiquidity, setMeteoraCPAMMInitialLiquidity] = useState("1");

@@ -159,7 +159,7 @@ const executeSellBatchMode = async (
   wallets: WalletSell[],
   sellConfig: SellConfig,
 ): Promise<SellResult> => {
-  const batchSize = TRADING.MAX_TRANSACTIONS_PER_BUNDLE;
+  const batchSize = 4;
   const batchDelay = sellConfig.batchDelay || TRADING.DEFAULT_BATCH_DELAY_MS;
   const results: unknown[] = [];
   let successfulBatches = 0;
@@ -218,8 +218,10 @@ const executeSellAllInOneMode = async (
   wallets: WalletSell[],
   sellConfig: SellConfig,
 ): Promise<SellResult> => {
+  const maxWallets = 4;
+  const cappedWallets = wallets.slice(0, maxWallets);
   const partiallyPreparedBundles = await getPartiallyPreparedSellTransactions(
-    wallets,
+    cappedWallets,
     sellConfig,
   );
 
@@ -230,7 +232,7 @@ const executeSellAllInOneMode = async (
     };
   }
 
-  const walletKeypairs = createKeypairs(wallets);
+  const walletKeypairs = createKeypairs(cappedWallets);
   const signedBase64Txs = signAllTransactions(
     partiallyPreparedBundles,
     walletKeypairs,

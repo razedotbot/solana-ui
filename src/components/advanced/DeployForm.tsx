@@ -56,7 +56,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
   // Platform options
   const [pumpType, setPumpType] = useState<boolean>(false);
   const [cashBack, setCashBack] = useState<boolean>(false);
-  const [bonkType, setBonkType] = useState<"meme" | "tech">("meme");
+  const [bonkType, setBonkType] = useState<"standard" | "bonkers">("standard");
   const [meteoraDBCConfigAddress, setMeteoraDBCConfigAddress] = useState(METEORA_DBC_CONFIGS.standard);
   const [meteoraCPAMMConfigAddress, setMeteoraCPAMMConfigAddress] = useState(METEORA_CPAMM_CONFIGS.standard);
   const [meteoraCPAMMInitialLiquidity, setMeteoraCPAMMInitialLiquidity] = useState("1");
@@ -367,12 +367,13 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
             </>
           )}
           {selectedPlatform === "bonk" && (
+            <>
             <div className="flex items-center gap-2 px-3 py-2 bg-app-tertiary/30">
               <span className="text-xs font-mono text-app-secondary-60 mr-2">Type:</span>
-              {["meme", "tech"].map((t) => (
+              {["standard", "bonkers"].map((t) => (
                 <button
                   key={t}
-                  onClick={() => setBonkType(t as "meme" | "tech")}
+                  onClick={() => setBonkType(t as "standard" | "bonkers")}
                   className={`px-2 py-1 text-xs font-mono rounded transition-all ${
                     bonkType === t ? "bg-primary-30 color-primary" : "bg-app-quaternary text-app-secondary-60 hover:text-app-primary"
                   }`}
@@ -381,6 +382,7 @@ export const DeployForm: React.FC<DeployFormProps> = ({ onTokenDeployed }) => {
                 </button>
               ))}
             </div>
+            </>
           )}
           {selectedPlatform === "meteoraDBC" && (
             <div className="px-3 py-2 bg-app-tertiary/30">

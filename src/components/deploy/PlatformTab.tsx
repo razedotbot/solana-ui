@@ -16,8 +16,8 @@ interface PlatformTabProps {
   setPumpType: (value: boolean) => void;
   cashBack: boolean;
   setCashBack: (value: boolean) => void;
-  bonkType: "meme" | "tech";
-  setBonkType: (type: "meme" | "tech") => void;
+  bonkType: "standard" | "bonkers";
+  setBonkType: (type: "standard" | "bonkers") => void;
   meteoraDBCConfigAddress: string;
   setMeteoraDBCConfigAddress: (address: string) => void;
   meteoraCPAMMConfigAddress: string;
@@ -206,12 +206,12 @@ export const PlatformTab: React.FC<PlatformTabProps> = ({
             </label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: "meme", label: "Meme", desc: "Fun & community" },
-                { value: "tech", label: "Tech", desc: "Utility tokens" },
+                { value: "standard", label: "Standard", desc: "Standard launch" },
+                { value: "bonkers", label: "Bonkers", desc: "Enhanced launch" },
               ].map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => setBonkType(opt.value as "meme" | "tech")}
+                  onClick={() => setBonkType(opt.value as "standard" | "bonkers")}
                   className={`p-2.5 rounded-lg border transition-all text-left ${
                     bonkType === opt.value
                       ? "border-app-primary-color/50 bg-app-primary-color/10"

@@ -255,11 +255,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
           setTokenBalances,
           baseCurrencyBalancesRef.current,
           tokenBalancesRef.current,
-          {
-            onRateLimitError: () => {
-              showToastRef.current("RPC rate limit reached, falling back to slower mode", "error");
-            },
-          },
+          false,
           baseCurrency,
         );
       } catch {

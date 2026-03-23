@@ -61,9 +61,10 @@ export interface CreateConfig {
   cashBack?: boolean;
   pumpAdvanced?: boolean;
   tokenizedAgent?: TokenizedAgentConfig;
-  bonkType?: "meme" | "tech";
+  bonkType?: "standard" | "bonkers";
   bonkAdvanced?: boolean;
   bonkConfig?: BonkConfig;
+  jitoTipAmountSOL?: number;
   meteoraDBCConfig?: MeteoraDBCConfig;
   meteoraCPAMMConfig?: MeteoraCPAMMConfig;
 }
@@ -261,6 +262,9 @@ const getPartiallyPreparedTransactions = async (
     }
     if (config.bonkConfig) {
       requestBody["bonkConfig"] = config.bonkConfig;
+    }
+    if (config.jitoTipAmountSOL !== undefined) {
+      requestBody["jitoTipAmountSOL"] = config.jitoTipAmountSOL;
     }
   }
   if (config.platform === "meteoraDBC" && config.meteoraDBCConfig) {
@@ -754,11 +758,12 @@ export const createDeployConfig = (params: {
   cashBack?: boolean;
   pumpAdvanced?: boolean;
   tokenizedAgent?: TokenizedAgentConfig;
-  bonkType?: "meme" | "tech";
+  bonkType?: "standard" | "bonkers";
   meteoraDBCConfig?: MeteoraDBCConfig;
   meteoraCPAMMConfig?: MeteoraCPAMMConfig;
   bonkAdvanced?: boolean;
   bonkConfig?: BonkConfig;
+  jitoTipAmountSOL?: number;
 }): CreateConfig => {
   return {
     platform: params.platform,
@@ -770,6 +775,7 @@ export const createDeployConfig = (params: {
     bonkType: params.bonkType,
     bonkAdvanced: params.bonkAdvanced,
     bonkConfig: params.bonkConfig,
+    jitoTipAmountSOL: params.jitoTipAmountSOL,
     meteoraDBCConfig: params.meteoraDBCConfig,
     meteoraCPAMMConfig: params.meteoraCPAMMConfig,
   };

@@ -161,7 +161,7 @@ const executeBuyBatchMode = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyResult> => {
-  const batchSize = TRADING.MAX_TRANSACTIONS_PER_BUNDLE;
+  const batchSize = 4;
   const batchDelay = config.batchDelay || TRADING.DEFAULT_BATCH_DELAY_MS;
   const results: unknown[] = [];
   let successfulBatches = 0;
@@ -223,8 +223,10 @@ const executeBuyAllInOneMode = async (
   wallets: WalletBuy[],
   config: BuyConfig,
 ): Promise<BuyResult> => {
+  const maxWallets = 4;
+  const cappedWallets = wallets.slice(0, maxWallets);
   const partiallyPreparedBundles = await getPartiallyPreparedTransactions(
-    wallets,
+    cappedWallets,
     config,
   );
 
@@ -232,7 +234,7 @@ const executeBuyAllInOneMode = async (
     return { success: false, error: "No transactions generated." };
   }
 
-  const walletKeypairs = createKeypairs(wallets);
+  const walletKeypairs = createKeypairs(cappedWallets);
   const signedBase64Txs = signAllTransactions(
     partiallyPreparedBundles,
     walletKeypairs,

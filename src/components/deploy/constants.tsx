@@ -23,7 +23,7 @@ export interface AdditionalToken {
   pumpType: boolean;
   cashBack: boolean;
   pumpMode: "simple" | "advanced";
-  bonkType: "meme" | "tech";
+  bonkType: "standard" | "bonkers";
   bonkMode: "simple" | "advanced";
   meteoraDBCMode: "simple" | "advanced";
   meteoraDBCConfigAddress: string;

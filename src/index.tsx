@@ -271,19 +271,26 @@ const DEFAULT_REGIONAL_SERVERS: ServerInfo[] = [
     flag: "🇩🇪",
   },
   {
+  id: "sg",
+  name: "Singapore",
+  url: "https://sg.raze.sh/",
+  region: "SG",
+  flag: "🇸🇬",
+  },
+  {
+    id: "ca",
+    name: "Canada",
+    url: "https://ca.raze.sh/",
+    region: "CA",
+    flag: "🇨🇦",
+  },
+  {
     id: "us",
     name: "United States",
     url: "https://us.raze.sh/",
     region: "US",
     flag: "🇺🇸",
-  },
-  {
-    id: "jp",
-    name: "Japan",
-    url: "https://jp.raze.sh/",
-    region: "JP",
-    flag: "🇯🇵",
-  },
+  }
 ];
 
 export const ServerCheckLoading = (): JSX.Element => {

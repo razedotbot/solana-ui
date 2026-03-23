@@ -128,12 +128,6 @@ export const RATE_LIMIT = {
   THROTTLE_MS: 5000,
 } as const;
 
-// Balance Refresh
-export const BALANCE_REFRESH = {
-  DEFAULT_BATCH_SIZE: 5,
-  DEFAULT_DELAY_MS: 50,
-  POLLING_INTERVAL_MS: 5000,
-} as const;
 
 // Limit Orders
 export const LIMIT_ORDERS = {
