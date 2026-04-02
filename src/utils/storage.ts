@@ -6,7 +6,12 @@
 import Cookies from "js-cookie";
 import CryptoJS from 'crypto-js';
 import { createDefaultEndpoints } from "./rpcManager";
-import { ENCRYPTION, INDEXED_DB, STORAGE_KEYS } from "./constants";
+import {
+  DEFAULT_SEND_ENDPOINT,
+  ENCRYPTION,
+  INDEXED_DB,
+  STORAGE_KEYS,
+} from "./constants";
 import type {
   WalletType,
   ConfigType,
@@ -263,7 +268,7 @@ export function loadConfigFromCookies(): ConfigType | null {
         config.rpcEndpoints = JSON.stringify(createDefaultEndpoints());
       }
       if (config.sendEndpoint === undefined) {
-        config.sendEndpoint = "https://fra.send.raze.sh";
+        config.sendEndpoint = DEFAULT_SEND_ENDPOINT;
       }
 
       return config as ConfigType;

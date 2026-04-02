@@ -24,10 +24,18 @@ import {
   type RPCEndpoint,
 } from "../utils/rpcManager";
 import {
+  DEFAULT_SEND_ENDPOINT,
+  SENDING_SERVERS,
   BASE_CURRENCIES,
   getBaseCurrencyByMint,
   type BaseCurrencyConfig,
 } from "../utils/constants";
+import {
+  discoverHealthyServers,
+  isSameServerUrl,
+  normalizeServerUrl,
+} from "../utils/serverHealth";
+import type { ServerInfo } from "../utils/types";
 
 export interface AppContextType {
   // Wallet state
@@ -62,6 +70,9 @@ export interface AppContextType {
   // Refresh state
   isRefreshing: boolean;
   refreshBalances: (tokenAddress?: string) => Promise<void>;
+  availableSendServers: ServerInfo[];
+  isRefreshingSendServers: boolean;
+  refreshSendServers: () => Promise<void>;
 
   // Toast
   showToast: (message: string, type: "success" | "error") => void;
@@ -89,7 +100,7 @@ const defaultConfig: ConfigType = {
   bundleMode: "batch",
   singleDelay: "200",
   batchDelay: "1000",
-  sendEndpoint: "https://fra.send.raze.sh",
+  sendEndpoint: DEFAULT_SEND_ENDPOINT,
 };
 
 interface AppContextProviderProps {
@@ -113,6 +124,12 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [rpcManager, setRpcManager] = useState<RPCManager | null>(null);
+  const [availableSendServers, setAvailableSendServers] = useState<ServerInfo[]>(
+    [],
+  );
+  const [isRefreshingSendServers, setIsRefreshingSendServers] = useState(false);
+  const [hasLoadedConfig, setHasLoadedConfig] = useState(false);
+  const isRefreshingSendServersRef = useRef(false);
 
   // Stable ref for showToast so effects don't re-fire on reference changes
   const showToastRef = useRef(showToast);
@@ -168,6 +185,8 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       }
     } catch {
       // RPC endpoints parse error, ignore
+    } finally {
+      setHasLoadedConfig(true);
     }
   }, []);
 
@@ -267,6 +286,63 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     [rpcManager, wallets, setBaseCurrencyBalancesWrapper, baseCurrency],
   );
 
+  const refreshSendServers = useCallback(async (): Promise<void> => {
+    if (!hasLoadedConfig || isRefreshingSendServersRef.current) {
+      return;
+    }
+
+    isRefreshingSendServersRef.current = true;
+    setIsRefreshingSendServers(true);
+
+    try {
+      const healthySendServers = await discoverHealthyServers(SENDING_SERVERS);
+      setAvailableSendServers(healthySendServers);
+
+      if (healthySendServers.length === 0) {
+        return;
+      }
+
+      const currentSendEndpoint = normalizeServerUrl(
+        config.sendEndpoint || DEFAULT_SEND_ENDPOINT,
+      );
+      const isCurrentServerHealthy = healthySendServers.some((server) =>
+        isSameServerUrl(server.url, currentSendEndpoint),
+      );
+
+      if (!isCurrentServerHealthy) {
+        const nextServerUrl = normalizeServerUrl(healthySendServers[0].url);
+        setConfigState((prev) => {
+          if (isSameServerUrl(prev.sendEndpoint, nextServerUrl)) {
+            return prev;
+          }
+
+          const updated = {
+            ...prev,
+            sendEndpoint: nextServerUrl,
+          };
+          saveConfigToCookies(updated);
+          return updated;
+        });
+      }
+    } finally {
+      isRefreshingSendServersRef.current = false;
+      setIsRefreshingSendServers(false);
+    }
+  }, [config.sendEndpoint, hasLoadedConfig]);
+
+  useEffect(() => {
+    if (!hasLoadedConfig) {
+      return;
+    }
+
+    void refreshSendServers();
+    const intervalId = window.setInterval(() => {
+      void refreshSendServers();
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [hasLoadedConfig, refreshSendServers]);
+
   // Memoize context value
   const value = useMemo<AppContextType>(
     () => ({
@@ -285,6 +361,9 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       baseCurrency,
       isRefreshing,
       refreshBalances,
+      availableSendServers,
+      isRefreshingSendServers,
+      refreshSendServers,
       showToast,
     }),
     [
@@ -300,6 +379,9 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
       baseCurrency,
       isRefreshing,
       refreshBalances,
+      availableSendServers,
+      isRefreshingSendServers,
+      refreshSendServers,
       showToast,
       setBaseCurrencyBalancesWrapper,
     ],

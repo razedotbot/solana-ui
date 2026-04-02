@@ -2,7 +2,13 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { WalletType } from "./types";
 import { loadConfigFromCookies } from "./storage";
-import { TRADING, RATE_LIMIT, BASE_CURRENCIES, type BaseCurrencyConfig } from "./constants";
+import {
+  BASE_CURRENCIES,
+  DEFAULT_SEND_ENDPOINT,
+  RATE_LIMIT,
+  TRADING,
+  type BaseCurrencyConfig,
+} from "./constants";
 import type { SenderResult } from "./types";
 import { executeBuy, createBuyConfig } from "./buy";
 import type { BundleMode } from "./buy";
@@ -105,7 +111,7 @@ export const sendTransactions = async (
   transactions: string[],
 ): Promise<SenderResult> => {
   const config = loadConfigFromCookies();
-  const endpoint = config?.sendEndpoint || "https://fra.send.raze.sh";
+  const endpoint = config?.sendEndpoint || DEFAULT_SEND_ENDPOINT;
 
   // Normalise to base64: if already base64 keep as-is, else convert from bs58
   const base64Txs = transactions.map((tx) => {
@@ -264,25 +270,57 @@ export const signAllTransactions = (
       continue;
     }
 
-    for (const rawTx of bundle.transactions) {
-      const txBuffer = new Uint8Array(Buffer.from(rawTx, "base64"));
-      const transaction = VersionedTransaction.deserialize(txBuffer);
-
-      const signers: Keypair[] = [];
-      for (const accountKey of transaction.message.staticAccountKeys) {
-        const matchingKeypair = walletKeypairs.find(
-          (kp) => kp.publicKey.toBase58() === accountKey.toBase58(),
-        );
-        if (matchingKeypair && !signers.includes(matchingKeypair)) {
-          signers.push(matchingKeypair);
+    for (let txIdx = 0; txIdx < bundle.transactions.length; txIdx++) {
+      const rawTx = bundle.transactions[txIdx];
+      try {
+        const isBase64 =
+          rawTx.includes("+") || rawTx.includes("/") || rawTx.endsWith("=");
+        let txBuffer: Uint8Array;
+        if (isBase64) {
+          txBuffer = new Uint8Array(Buffer.from(rawTx, "base64"));
+        } else {
+          try {
+            txBuffer = bs58.decode(rawTx);
+          } catch {
+            txBuffer = new Uint8Array(Buffer.from(rawTx, "base64"));
+          }
         }
-      }
 
-      if (signers.length > 0) {
-        transaction.sign(signers);
-      }
+        console.debug(
+          `[signAllTransactions] tx ${txIdx}: encoding=${isBase64 ? "base64" : "base58"}, rawLen=${rawTx.length}, bufferLen=${txBuffer.length}`,
+        );
 
-      signed.push(Buffer.from(transaction.serialize()).toString("base64"));
+        const transaction = VersionedTransaction.deserialize(txBuffer);
+
+        const signers: Keypair[] = [];
+        for (const accountKey of transaction.message.staticAccountKeys) {
+          const matchingKeypair = walletKeypairs.find(
+            (kp) => kp.publicKey.toBase58() === accountKey.toBase58(),
+          );
+          if (matchingKeypair && !signers.includes(matchingKeypair)) {
+            signers.push(matchingKeypair);
+          }
+        }
+
+        console.debug(
+          `[signAllTransactions] tx ${txIdx}: version=${transaction.version}, signers=${signers.length}, staticKeys=${transaction.message.staticAccountKeys.length}, numSignatures=${transaction.signatures.length}`,
+        );
+
+        if (signers.length > 0) {
+          transaction.sign(signers);
+        }
+
+        const serialized = transaction.serialize();
+        console.debug(
+          `[signAllTransactions] tx ${txIdx}: serialized OK, size=${serialized.length}/1232`,
+        );
+        signed.push(Buffer.from(serialized).toString("base64"));
+      } catch (err) {
+        console.warn(`[signAllTransactions] tx ${txIdx} failed:`, err);
+        console.debug(
+          `[signAllTransactions] tx ${txIdx} raw (first 80 chars): ${rawTx.substring(0, 80)}...`,
+        );
+      }
     }
   }
 

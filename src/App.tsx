@@ -1071,7 +1071,7 @@ const WalletManager: React.FC = () => {
     memoizedCallbacks,
   ]);
 
-  // Keep trading and sending endpoints hot
+  // Keep the active trading endpoint hot between requests.
   useEffect(() => {
     const ping = async (url: string): Promise<void> => {
       try {
@@ -1090,15 +1090,12 @@ const WalletManager: React.FC = () => {
     const keepAlive = (): void => {
       const tradingUrl = getServerBaseUrl();
       if (tradingUrl) void ping(tradingUrl);
-
-      const sendUrl = state.config.sendEndpoint;
-      if (sendUrl) void ping(sendUrl);
     };
 
     keepAlive();
     const id = setInterval(keepAlive, 10000);
     return () => clearInterval(id);
-  }, [state.config.sendEndpoint]);
+  }, []);
 
   const handleNonWhitelistedTrade = useCallback(
     (trade: {

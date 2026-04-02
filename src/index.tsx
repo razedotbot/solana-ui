@@ -4,10 +4,16 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Buffer } from "buffer";
 import Cookies from "js-cookie";
 window.Buffer = Buffer;
-import { brand } from "./utils/constants";
+import { brand, TRADING_SERVERS } from "./utils/constants";
 import type { WindowWithToast, ServerInfo } from "./utils/types";
 import { AppContextProvider } from "./contexts/AppContext";
 import { IframeStateProvider } from "./contexts/IframeStateContext";
+import {
+  discoverHealthyServers,
+  isSameServerUrl,
+  normalizeServerUrl,
+  pingHealthyServer,
+} from "./utils/serverHealth";
 
 // Dynamic CSS loading based on brand configuration using Vite's import
 const loadBrandCSS = async (): Promise<void> => {
@@ -367,6 +373,7 @@ export const Root = (): JSX.Element => {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [availableServers, setAvailableServers] = useState<ServerInfo[]>([]);
   const [isChecking, setIsChecking] = useState(true);
+  const isRefreshingServersRef = React.useRef(false);
 
   // Apply custom scrollbar styles and disable right-click/text selection globally
   useEffect((): (() => void) => {
@@ -574,35 +581,80 @@ export const Root = (): JSX.Element => {
     };
   }, []);
 
-  const checkServerConnection = async (url: string): Promise<boolean> => {
+  const applyServerSelection = useCallback(
+    (server: ServerInfo): void => {
+      const nextUrl = normalizeServerUrl(server.url);
+      const didChange = !isSameServerUrl(serverUrl, nextUrl);
+
+      setServerUrl(nextUrl);
+      window.tradingServerUrl = nextUrl;
+      window.serverRegion = server.region;
+      Cookies.set(SERVER_URL_COOKIE, nextUrl, { expires: 30 });
+      Cookies.set(SERVER_REGION_COOKIE, server.id, { expires: 30 });
+
+      if (didChange) {
+        window.dispatchEvent(
+          new CustomEvent("serverChanged", {
+            detail: { server: { ...server, url: nextUrl } },
+          }),
+        );
+      }
+    },
+    [serverUrl],
+  );
+
+  const refreshAvailableServers = useCallback(async (): Promise<void> => {
+    if (isRefreshingServersRef.current) {
+      return;
+    }
+
+    isRefreshingServersRef.current = true;
+
     try {
-      const baseUrl = url.replace(/\/+$/, "");
-      const healthEndpoint = "/health";
-      const checkUrl = `${baseUrl}${healthEndpoint}`;
+      const healthyServers = await discoverHealthyServers(TRADING_SERVERS);
+      setAvailableServers(healthyServers);
+      window.availableServers = healthyServers;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout((): void => controller.abort(), 3000);
-
-      const response = await fetch(checkUrl, {
-        signal: controller.signal,
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        return false;
+      if (healthyServers.length === 0) {
+        window.dispatchEvent(
+          new CustomEvent("serverChanged", { detail: { server: null } }),
+        );
+        return;
       }
 
-      const data = (await response.json()) as { status?: string };
-      return data.status === "healthy";
-    } catch {
-      return false;
+      const activeServer = healthyServers.find((server) =>
+        isSameServerUrl(server.url, serverUrl),
+      );
+
+      if (activeServer) {
+        window.serverRegion = activeServer.region;
+      } else {
+        const savedUrl = Cookies.get(SERVER_URL_COOKIE);
+        const savedRegion = Cookies.get(SERVER_REGION_COOKIE);
+        const savedServer = healthyServers.find(
+          (server) =>
+            server.id === savedRegion && isSameServerUrl(server.url, savedUrl),
+        );
+
+        applyServerSelection(savedServer ?? healthyServers[0]);
+      }
+
+      window.dispatchEvent(
+        new CustomEvent("serverChanged", {
+          detail: { server: activeServer ?? healthyServers[0] },
+        }),
+      );
+    } finally {
+      isRefreshingServersRef.current = false;
     }
-  };
+  }, [applyServerSelection, serverUrl]);
+
+  const checkServerConnection = useCallback(
+    async (url: string): Promise<boolean> => {
+      return (await pingHealthyServer(url)) < Infinity;
+    },
+    [],
+  );
 
   const switchToServer = useCallback(
     async (serverId: string): Promise<boolean> => {
@@ -611,31 +663,24 @@ export const Root = (): JSX.Element => {
         return false;
       }
 
-      const isConnected = await checkServerConnection(server.url);
-      if (isConnected) {
-        setServerUrl(server.url);
-        window.tradingServerUrl = server.url;
-        window.serverRegion = server.region;
-        Cookies.set(SERVER_URL_COOKIE, server.url, { expires: 30 });
-        Cookies.set(SERVER_REGION_COOKIE, server.id, { expires: 30 });
-
-        // Emit event to notify components of server change
-        const event = new CustomEvent("serverChanged", {
-          detail: { server },
-        });
-        window.dispatchEvent(event);
-
+      const ping = await pingHealthyServer(server.url);
+      if (ping < Infinity) {
+        applyServerSelection({ ...server, ping });
         return true;
       }
 
+      void refreshAvailableServers();
       return false;
     },
-    [availableServers],
+    [applyServerSelection, availableServers, refreshAvailableServers],
   );
 
   // Initialize server connection
   useEffect((): void => {
     const initializeServer = async (): Promise<void> => {
+      await refreshAvailableServers();
+      setIsChecking(false);
+      return;
       // Discover all available servers — reuse the health check response time as ping
       const allServersWithPing = await Promise.all(
         DEFAULT_REGIONAL_SERVERS.map(async (server): Promise<ServerInfo> => {
@@ -669,9 +714,10 @@ export const Root = (): JSX.Element => {
         );
 
         if (savedServer) {
-          setServerUrl(savedUrl);
-          window.tradingServerUrl = savedUrl;
-          window.serverRegion = savedServer.region;
+          const activeSavedServer = savedServer as ServerInfo;
+          setServerUrl(activeSavedServer.url);
+          window.tradingServerUrl = activeSavedServer.url;
+          window.serverRegion = activeSavedServer.region;
           setIsChecking(false);
 
           // Emit event to notify components
@@ -707,17 +753,29 @@ export const Root = (): JSX.Element => {
     };
 
     void initializeServer();
-  }, []);
+  }, [checkServerConnection, refreshAvailableServers]);
+
+  useEffect((): (() => void) => {
+    const intervalId = window.setInterval(() => {
+      void refreshAvailableServers();
+    }, 10000);
+
+    return (): void => {
+      window.clearInterval(intervalId);
+    };
+  }, [checkServerConnection, refreshAvailableServers]);
 
   // Expose server switching and ping refresh functions globally
   useEffect((): void => {
-    if (availableServers.length > 0) {
-      window.availableServers = availableServers;
-      window.switchServer = switchToServer;
-    }
+    window.availableServers = availableServers;
+    window.switchServer = switchToServer;
   }, [availableServers, switchToServer]);
 
   useEffect((): (() => void) => {
+    window.refreshServerPings = refreshAvailableServers;
+    return (): void => {
+      delete window.refreshServerPings;
+    };
     const refreshPings = async (): Promise<void> => {
       const allServersWithPing = await Promise.all(
         DEFAULT_REGIONAL_SERVERS.map(async (server): Promise<ServerInfo> => {
@@ -734,7 +792,7 @@ export const Root = (): JSX.Element => {
     };
     window.refreshServerPings = refreshPings;
     return (): void => { delete window.refreshServerPings; };
-  }, []);
+  }, [checkServerConnection, refreshAvailableServers]);
 
   // Preload App component (/holdings route) after server check completes for faster navigation
   useEffect((): (() => void) | void => {

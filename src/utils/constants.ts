@@ -73,14 +73,59 @@ export const API_URLS = {
   RAZE_PUBLIC: "https://public.raze.sh/api",
 } as const;
 
-export const SEND_NODES = [
-  { label: "Frankfurt", url: "https://fra.send.raze.sh", flag: "\u{1F1E9}\u{1F1EA}" },
-  { label: "Chicago", url: "https://chi.send.raze.sh", flag: "\u{1F1FA}\u{1F1F8}" },
-  { label: "Amsterdam", url: "https://ams.send.raze.sh", flag: "\u{1F1F3}\u{1F1F1}" },
-  { label: "Montreal", url: "https://mtl.send.raze.sh", flag: "\u{1F1E8}\u{1F1E6}" },
-  { label: "London", url: "https://lon.send.raze.sh", flag: "\u{1F1EC}\u{1F1E7}" },
-  { label: "Singapore", url: "https://sgp.send.raze.sh", flag: "\u{1F1F8}\u{1F1EC}" },
+export interface RazeServerDefinition {
+  id: string;
+  name: string;
+  url: string;
+  region: string;
+  flag: string;
+  supportsSending: boolean;
+}
+
+export const RAZE_SERVERS: readonly RazeServerDefinition[] = [
+  {
+    id: "de",
+    name: "Germany",
+    url: "https://de.raze.sh",
+    region: "DE",
+    flag: "\u{1F1E9}\u{1F1EA}",
+    supportsSending: true,
+  },
+  {
+    id: "ca",
+    name: "Canada",
+    url: "https://ca.raze.sh",
+    region: "CA",
+    flag: "\u{1F1E8}\u{1F1E6}",
+    supportsSending: true,
+  },
+  {
+    id: "sg",
+    name: "Singapore",
+    url: "https://sg.raze.sh",
+    region: "SG",
+    flag: "\u{1F1F8}\u{1F1EC}",
+    supportsSending: true,
+  },
+  {
+    id: "uk",
+    name: "United Kingdom",
+    url: "https://uk.raze.sh",
+    region: "UK",
+    flag: "\u{1F1EC}\u{1F1E7}",
+    supportsSending: false,
+  },
 ] as const;
+
+export const TRADING_SERVERS = RAZE_SERVERS.map(
+  ({ supportsSending: _supportsSending, ...server }) => server,
+);
+
+export const SENDING_SERVERS = RAZE_SERVERS.filter(
+  (server) => server.supportsSending,
+).map(({ supportsSending: _supportsSending, ...server }) => server);
+
+export const DEFAULT_SEND_ENDPOINT = SENDING_SERVERS[0]?.url ?? "https://de.raze.sh";
 
 // API Endpoint Paths
 export const API_ENDPOINTS = {
